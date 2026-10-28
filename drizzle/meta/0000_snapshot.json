@@ -1,5 +1,5 @@
 {
-  "id": "fd0f6949-c506-482f-90d1-a4850456bcb1",
+  "id": "53006248-0973-4572-9754-ffb3fed6c0d4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -224,7 +224,7 @@
         },
         "first_appeared_ya": {
           "name": "first_appeared_ya",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
           "notNull": false
         },

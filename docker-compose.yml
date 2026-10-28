@@ -1,0 +1,97 @@
+# Local UAT for Made Of.
+#
+#   docker compose up --build          # dev loop: app runs `next dev`
+#   docker compose --profile prod up   # UAT: app runs the standalone server
+#   docker compose down -v             # wipe the DB volume
+#
+# Visit http://localhost:3000 once the `seed` service exits 0.
+#
+# The dev app mounts the repo so edits hot-reload. The prod app is a fresh
+# build of the Dockerfile at repo root, same image Railway will run.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: made_of
+      POSTGRES_PASSWORD: made_of
+      POSTGRES_DB: made_of
+    ports:
+      - "5433:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U made_of -d made_of"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  # Runs migrations and seeds the artifact once Postgres is healthy, then
+  # exits. Both the dev app and the prod app depend on it so you always have
+  # 276 items ready before the server comes up.
+  seed:
+    image: node:22-alpine
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgres://made_of:made_of@db:5432/made_of
+    volumes:
+      - .:/app
+      - node-modules:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        if [ ! -d node_modules/next ]; then
+          echo "installing deps..."
+          npm ci --no-audit --no-fund
+        fi
+        npm run db:migrate
+        npm run db:seed
+
+  # Dev loop. Keep this the default (no profile).
+  app:
+    image: node:22-alpine
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgres://made_of:made_of@db:5432/made_of
+      NODE_ENV: development
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - node-modules:/app/node_modules
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    command: ["npm", "run", "dev"]
+
+  # Production-mode UAT. Opt in with `--profile prod`.
+  # Builds the same Dockerfile Railway uses. The origin-lock middleware is
+  # active, so we set ORIGIN_LOCK_SECRET and send it from your client:
+  #   curl -H "x-origin-lock: local-uat" http://localhost:3001/api/health
+  app-prod:
+    profiles: ["prod"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://made_of:made_of@db:5432/made_of
+      NODE_ENV: production
+      ORIGIN_LOCK_SECRET: local-uat
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    ports:
+      - "3001:3000"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+volumes:
+  db-data:
+  node-modules:

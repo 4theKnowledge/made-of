@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   index,
   integer,
@@ -82,7 +83,8 @@ export const items = pgTable(
     tier: tierEnum("tier").notNull(),
     kind: itemKindEnum("kind").notNull(),
     firstAppeared: text("first_appeared"),
-    firstAppearedYa: integer("first_appeared_ya"),
+    // Years before 2026. Big bang is ~13.8e9, which overflows int32.
+    firstAppearedYa: bigint("first_appeared_ya", { mode: "number" }),
     symbol: text("symbol"),
     fact: text("fact").notNull().default(""),
     status: itemStatusEnum("status").notNull().default("live"),

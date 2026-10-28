@@ -27,7 +27,7 @@ CREATE TABLE "items" (
 	"tier" "tier" NOT NULL,
 	"kind" "item_kind" NOT NULL,
 	"first_appeared" text,
-	"first_appeared_ya" integer,
+	"first_appeared_ya" bigint,
 	"symbol" text,
 	"fact" text DEFAULT '' NOT NULL,
 	"status" "item_status" DEFAULT 'live' NOT NULL,
