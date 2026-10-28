@@ -7,6 +7,7 @@ import { toRows } from "../parser/load";
 import { buildCanaryLinks } from "../parser/canaries";
 import { buildSnapshot } from "../graph/snapshot";
 import { buildCodeMap } from "../graph/codes";
+import { buildClosedSet } from "../graph/daily";
 import {
   setLiveSnapshotForTesting,
   type LiveSnapshot,
@@ -35,7 +36,8 @@ function buildFixture(): LiveSnapshot {
     rows.links.map((l) => l.id),
     "test-seed:links",
   );
-  return { snapshot, itemCodes, linkCodes, version: 1 };
+  const closed = buildClosedSet(snapshot);
+  return { snapshot, itemCodes, linkCodes, closed, version: 1 };
 }
 
 let live: LiveSnapshot;

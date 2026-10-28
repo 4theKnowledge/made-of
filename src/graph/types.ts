@@ -1,4 +1,4 @@
-import type { Confidence, LinkType, Tier } from "../db/schema";
+import type { Confidence, ItemKind, LinkType, Tier } from "../db/schema";
 
 export interface GraphEdge {
   /** The other end of the edge (always the slug/id). */
@@ -17,6 +17,11 @@ export interface GraphNode {
   id: string;
   name: string;
   tier: Tier;
+  kind: ItemKind;
+  firstAppeared: string | null;
+  firstAppearedYa: number | null;
+  symbol: string | null;
+  fact: string;
   recipes: Array<{ id: string; label: string | null; position: number }>;
   /** All edges leading *up* (into the parents, i.e. what this item is made from). */
   up: GraphEdge[];

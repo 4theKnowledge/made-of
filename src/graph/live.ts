@@ -11,11 +11,14 @@ import { randomBytes } from "node:crypto";
 import { loadRowsFromDb } from "./load";
 import { buildSnapshot, type Snapshot } from "./snapshot";
 import { buildCodeMap, type CodeMap } from "./codes";
+import { buildClosedSet } from "./daily";
 
 export interface LiveSnapshot {
   snapshot: Snapshot;
   itemCodes: CodeMap<string>;
   linkCodes: CodeMap<string>;
+  /** Items closed in daily puzzles (fundamentals + 10 busiest hubs). */
+  closed: Set<string>;
   /** Monotonic version id; bumped on every reload. */
   version: number;
 }
@@ -74,6 +77,7 @@ async function buildLive(): Promise<LiveSnapshot> {
     rows.links.map((l) => l.id),
     slot.codeSeed + ":links",
   );
+  const closed = buildClosedSet(snapshot);
   slot.version += 1;
-  return { snapshot, itemCodes, linkCodes, version: slot.version };
+  return { snapshot, itemCodes, linkCodes, closed, version: slot.version };
 }
