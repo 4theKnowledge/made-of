@@ -7,6 +7,10 @@ export interface GraphEdge {
   confidence: Confidence;
   /** If the edge belongs to a specific recipe (recipe id); null for item-level. */
   recipeId: string | null;
+  /** The concrete link row id (same as rows.links[i].id). */
+  linkId: string;
+  /** Canary links appear only in API responses, never on item pages. */
+  isCanary: boolean;
 }
 
 export interface GraphNode {

@@ -55,18 +55,15 @@ export function buildSnapshot(rows: LoadedRows): Snapshot {
     const src = srcId ? nodes.get(srcId) : null;
     const dst = nodes.get(l.targetItemId);
     if (!src || !dst) continue;
-    const edgeUp: GraphEdge = {
-      id: dst.id,
+    const common = {
       type: l.type as LinkType,
       confidence: (l.confidence ?? "established") as Confidence,
       recipeId: l.recipeId ?? null,
+      linkId: l.id,
+      isCanary: l.isCanary ?? false,
     };
-    const edgeDown: GraphEdge = {
-      id: src.id,
-      type: l.type as LinkType,
-      confidence: (l.confidence ?? "established") as Confidence,
-      recipeId: l.recipeId ?? null,
-    };
+    const edgeUp: GraphEdge = { id: dst.id, ...common };
+    const edgeDown: GraphEdge = { id: src.id, ...common };
     src.up.push(edgeUp);
     dst.down.push(edgeDown);
   }

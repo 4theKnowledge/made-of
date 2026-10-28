@@ -9,6 +9,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parsePrototype } from "../parser/prototype";
 import { toRows } from "../parser/load";
+import { buildCanaryLinks } from "../parser/canaries";
 import { closeDb, getDb, schema } from "./client";
 
 const HTML_PATH = resolve(process.cwd(), "legacy/made-of.html");
@@ -24,11 +25,23 @@ async function main() {
     );
   }
 
+  // Plant the canary links. If any referenced slug is missing (because the
+  // artifact changed), fail loudly — a stale canary set is worse than none.
+  const itemIds = new Set(rows.items.map((i) => i.id));
+  const canaries = buildCanaryLinks(itemIds);
+  if (canaries.missing.length > 0) {
+    throw new Error(
+      `Canary set references unknown items: ${canaries.missing.join(", ")}`,
+    );
+  }
+  rows.links.push(...canaries.links);
+
   console.log("parsed:", {
     items: rows.stats.items,
     links: rows.stats.links,
     evidencedLinks: rows.stats.evidencedLinks,
     sources: rows.stats.sources,
+    canaries: canaries.links.length,
   });
 
   const db = getDb();
