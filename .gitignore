@@ -1,0 +1,30 @@
+# deps
+node_modules
+
+# next
+.next
+out
+next-env.d.ts
+
+# build
+dist
+.turbo
+
+# env
+.env
+.env.local
+.env.*.local
+
+# misc
+.DS_Store
+*.log
+coverage
+.vscode/*
+!.vscode/settings.json
+.idea
+
+# drizzle generated artifacts kept, but local dumps ignored
+drizzle/.snapshots
+
+# tsc
+*.tsbuildinfo

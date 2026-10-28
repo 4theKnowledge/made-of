@@ -1,0 +1,13 @@
+.git
+.next
+node_modules
+coverage
+dist
+docs
+legacy
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+README.md
