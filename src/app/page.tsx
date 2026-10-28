@@ -7,8 +7,9 @@ import {
 } from "@/graph/daily";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
+import { getExploreView } from "@/graph/explore";
 import { DailyBoard } from "@/components/daily/DailyBoard";
-import type { DailyNeighbour, DailyPuzzle } from "@/components/daily/types";
+import type { DailyPuzzle } from "@/components/daily/types";
 
 export const dynamic = "force-dynamic";
 
@@ -54,18 +55,8 @@ export default async function HomePage() {
     },
   };
 
-  const startNeighbours: DailyNeighbour[] = start.neighbours.map((nbId) => {
-    const nb = live.snapshot.nodes.get(nbId)!;
-    return {
-      code: live.itemCodes.toCode(nbId)!,
-      name: nb.name,
-      tier: nb.tier,
-      kind: nb.kind,
-      symbol: nb.symbol,
-      closed: live.closed.has(nbId),
-      isGoal: nbId === puzzleRaw.goalId,
-    };
-  });
+  const initialView = await getExploreView(start.id, { includeCanary: true });
+  if (!initialView) throw new Error("Daily start item has no view");
 
   return (
     <main className="wrap">
@@ -83,12 +74,7 @@ export default async function HomePage() {
         </nav>
       </header>
 
-      <DailyBoard puzzle={puzzle} startNeighbours={startNeighbours} />
-
-      <p className="msg nudge" style={{ textAlign: "center" }}>
-        Want to see what anything is made of?{" "}
-        <Link href={`/explore/${start.id}`}>Explore the map →</Link>
-      </p>
+      <DailyBoard puzzle={puzzle} initialView={initialView} />
     </main>
   );
 }

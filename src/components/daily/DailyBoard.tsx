@@ -1,67 +1,56 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
-import type {
-  DailyItem,
-  DailyNeighbour,
-  DailyPuzzle,
-  GameState,
-  MoveResponse,
-} from "./types";
-import { EMPTY_GAME } from "./types";
+import { Bowtie } from "@/components/bowtie/Bowtie";
+import { flyPictogram } from "@/components/bowtie/fly";
 import { cap } from "@/lib/taxonomy";
+import type { ExploreView } from "@/components/explore/types";
+import type { DailyPuzzle, GameState, MoveResponse } from "./types";
+import { EMPTY_GAME } from "./types";
 
 /**
- * Client-side daily game.
+ * The daily game, rendered as the shared Bowtie plus a puzzle bar.
  *
- * The server owns the answer path. All moves go through /api/daily/move,
- * which returns {ok, done, delta, neighbours}. The client only persists
- * what's safe to lose on refresh (path, deltas, hints) into localStorage.
+ * - Server owns the answer path. Every move goes through /api/daily/move.
+ * - Chip click fires a move; closed/target/hint markers come from state.
+ * - After each move we fetch /api/view/<arrivedCode> to render the next
+ *   bowtie around the new current item.
  */
 export function DailyBoard({
   puzzle,
-  startNeighbours,
+  initialView,
 }: {
   puzzle: DailyPuzzle;
-  /** Pre-fetched neighbours of the start item (SSR hop, saves one roundtrip). */
-  startNeighbours: DailyNeighbour[];
+  initialView: ExploreView;
 }) {
   const storageKey = `madeof:daily:${puzzle.date}`;
 
+  const [view, setView] = useState<ExploreView>(initialView);
   const [game, setGame] = useState<GameState>(() => ({
     ...EMPTY_GAME,
     path: [puzzle.start.code],
   }));
-  const [current, setCurrent] = useState<DailyItem>(puzzle.start);
-  const [neighbours, setNeighbours] =
-    useState<DailyNeighbour[]>(startNeighbours);
-  const [giveUpSteps, setGiveUpSteps] = useState<DailyItem[] | null>(null);
   const [hintMsg, setHintMsg] = useState<string>("");
   const [moving, setMoving] = useState(false);
+  const [giveUpSteps, setGiveUpSteps] = useState<ExploreView["originChain"] | null>(null);
+  const [hintCodes, setHintCodes] = useState<Set<string>>(new Set());
 
-  // Hydrate from localStorage on mount.
+  // Fly-ghost rect sources, captured on chip click.
+  const flyFromRef = useRef<HTMLElement | null>(null);
+  const focusHeadRef = useRef<HTMLDivElement | null>(null);
+
+  // Hydrate from localStorage.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
       if (!raw) return;
-      const saved = JSON.parse(raw) as {
-        path?: string[];
-        deltas?: GameState["deltas"];
-        hintCodes?: string[];
-        gaveUp?: boolean;
-        done?: boolean;
-      } | null;
+      const saved = JSON.parse(raw) as GameState | null;
       if (!saved?.path || saved.path[0] !== puzzle.start.code) return;
-      setGame({
-        path: saved.path,
-        deltas: saved.deltas ?? [],
-        hintCodes: saved.hintCodes ?? [],
-        gaveUp: saved.gaveUp ?? false,
-        done: saved.done ?? false,
-      });
+      setGame(saved);
+      setHintCodes(new Set(saved.hintCodes));
       if (saved.path.length > 1) {
-        void refreshFrom(saved.path[saved.path.length - 1]);
+        void loadView(saved.path[saved.path.length - 1]);
       }
     } catch {
       /* ignore */
@@ -69,25 +58,7 @@ export function DailyBoard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const refreshFrom = useCallback(
-    async (atCode: string) => {
-      const res = await fetch("/api/daily/neighbours", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ at: atCode, date: puzzle.date }),
-      });
-      if (!res.ok) return;
-      const body = (await res.json()) as {
-        arrived: DailyItem;
-        neighbours: DailyNeighbour[];
-      };
-      setCurrent(body.arrived);
-      setNeighbours(body.neighbours);
-    },
-    [puzzle.date],
-  );
-
-  // Persist whenever game changes.
+  // Persist on game change.
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(game));
@@ -96,20 +67,80 @@ export function DailyBoard({
     }
   }, [game, storageKey]);
 
+  const loadView = useCallback(async (code: string) => {
+    const res = await fetch(`/api/view/${code}`);
+    if (!res.ok) return;
+    const body = (await res.json()) as ExploreView;
+    setView(body);
+  }, []);
+
+  const closedCodes = useMemo(() => {
+    // The server tells us per-neighbour "closed" via /api/daily/move result.
+    // For the bowtie we need every potentially-closed neighbour marked
+    // whether we've visited it or not. The simplest route: hit
+    // /api/daily/neighbours when the bowtie changes to get the flags, then
+    // merge. But /api/daily/neighbours uses the daily-rate limiter and
+    // charges per hop. For now we build the set lazily by prefetching
+    // closed flags on view load. Phase 3 polish: include closed/isGoal in
+    // the view payload directly.
+    void view;
+    return new Set<string>();
+  }, [view]);
+
+  // Keep a live cache of closed-neighbour codes for the current view.
+  const [closedFromServer, setClosedFromServer] = useState<Set<string>>(
+    new Set(),
+  );
+  useEffect(() => {
+    // Fetch per-view closed flags once per focus change.
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/daily/neighbours", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ at: view.item.code, date: puzzle.date }),
+        });
+        if (!res.ok) return;
+        const body = (await res.json()) as {
+          neighbours: Array<{ code: string; closed: boolean }>;
+        };
+        if (cancelled) return;
+        setClosedFromServer(
+          new Set(body.neighbours.filter((n) => n.closed).map((n) => n.code)),
+        );
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [view.item.code, puzzle.date]);
+
+  const effectiveClosed = useMemo(() => {
+    const out = new Set(closedFromServer);
+    for (const c of closedCodes) out.add(c);
+    return out;
+  }, [closedCodes, closedFromServer]);
+
   const moves = game.path.length - 1;
 
-  const doMove = useCallback(
-    async (next: DailyNeighbour) => {
+  const onChipClick = useCallback(
+    async (targetCode: string, chipEl: HTMLElement) => {
       if (moving || game.done) return;
+
+      flyFromRef.current = chipEl;
       setMoving(true);
       setHintMsg("");
+
       try {
         const res = await fetch("/api/daily/move", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            from: current.code,
-            to: next.code,
+            from: view.item.code,
+            to: targetCode,
             date: puzzle.date,
           }),
         });
@@ -117,27 +148,52 @@ export function DailyBoard({
         if (!body.ok) {
           if (body.reason === "closed") {
             setHintMsg(
-              `${cap(body.name ?? next.name)} is a busy hub, so it's closed in puzzles. Find another way.`,
+              `${cap(body.name ?? "That item")} is a busy hub, so it's closed in puzzles. Find another way.`,
             );
           } else {
             setHintMsg("That isn't a direct link.");
           }
           return;
         }
-        if (!body.arrived || !body.neighbours || !body.delta) return;
-        setCurrent(body.arrived);
-        setNeighbours(body.neighbours);
+        if (!body.arrived || !body.delta) return;
+
+        // Pluck the chip's pictogram tile before the view swaps away.
+        const srcIc = chipEl.querySelector<HTMLElement>(".ic");
+
+        await loadView(body.arrived.code);
+
+        // Delightful: hide the fresh focus head, fly the pictogram ghost in,
+        // then fade the real head back in.
+        requestAnimationFrame(() => {
+          const head = focusHeadRef.current?.querySelector<HTMLElement>(".fpic .ic");
+          const headWrap = focusHeadRef.current?.querySelector<HTMLElement>(".fhead");
+          if (!head || !headWrap) return;
+          headWrap.style.visibility = "hidden";
+          flyPictogram(srcIc, head.getBoundingClientRect()).then(() => {
+            headWrap.style.visibility = "";
+            try {
+              headWrap.animate(
+                [{ opacity: 0.3 }, { opacity: 1 }],
+                { duration: 180 },
+              );
+            } catch {
+              /* animate() unsupported */
+            }
+          });
+        });
+
         setGame((g) => ({
           ...g,
           path: [...g.path, body.arrived!.code],
           deltas: [...g.deltas, body.delta!],
           done: Boolean(body.done),
         }));
+        setHintCodes(new Set());
       } finally {
         setMoving(false);
       }
     },
-    [current.code, game.done, moving, puzzle.date],
+    [game.done, loadView, moving, puzzle.date, view.item.code],
   );
 
   const doUndo = useCallback(async () => {
@@ -148,7 +204,7 @@ export function DailyBoard({
     setMoving(true);
     setHintMsg("");
     try {
-      await refreshFrom(prevCode);
+      await loadView(prevCode);
       setGame({
         path: newPath,
         deltas: newDeltas,
@@ -156,10 +212,11 @@ export function DailyBoard({
         gaveUp: false,
         done: false,
       });
+      setHintCodes(new Set());
     } finally {
       setMoving(false);
     }
-  }, [game, moves, refreshFrom]);
+  }, [game, loadView, moves]);
 
   const doHint = useCallback(async () => {
     if (game.done) return;
@@ -167,7 +224,7 @@ export function DailyBoard({
       const res = await fetch("/api/daily/hint", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ from: current.code, date: puzzle.date }),
+        body: JSON.stringify({ from: view.item.code, date: puzzle.date }),
       });
       if (!res.ok) return;
       const body = (await res.json()) as {
@@ -178,11 +235,16 @@ export function DailyBoard({
         ...g,
         hintCodes: [...g.hintCodes, body.hint!.code],
       }));
+      setHintCodes((s) => {
+        const next = new Set(s);
+        next.add(body.hint!.code);
+        return next;
+      });
       setHintMsg(`Head for ${body.hint.name}.`);
     } catch {
       /* ignore */
     }
-  }, [current.code, game.done, puzzle.date]);
+  }, [game.done, puzzle.date, view.item.code]);
 
   const doGiveUp = useCallback(async () => {
     try {
@@ -192,28 +254,13 @@ export function DailyBoard({
         body: JSON.stringify({ date: puzzle.date }),
       });
       if (!res.ok) return;
-      const body = (await res.json()) as {
-        steps: Array<{
-          code: string;
-          name: string;
-          tier: DailyItem["tier"];
-          kind: DailyItem["kind"];
-          symbol: string | null;
-        }>;
-      };
+      const body = (await res.json()) as { steps: ExploreView["originChain"] };
       setGiveUpSteps(body.steps);
       setGame((g) => ({ ...g, gaveUp: true, done: true }));
     } catch {
       /* ignore */
     }
   }, [puzzle.date]);
-
-  const squares = useMemo(() => {
-    const marks = game.deltas.map((d) =>
-      d === "closer" ? "g" : d === "same" ? "y" : "r",
-    );
-    return marks.join("");
-  }, [game.deltas]);
 
   const shareText = useMemo(() => {
     const squaresPlain = game.deltas
@@ -238,15 +285,19 @@ export function DailyBoard({
     puzzle.start.name,
   ]);
 
-  // Trail of names walked so far.
-  const trailNames = useMemo(() => {
-    // We only have codes in game.path; the current name is in `current`.
-    // Build a label list by swapping codes we know for their names.
-    const nameByCode = new Map<string, string>();
-    nameByCode.set(puzzle.start.code, puzzle.start.name);
-    nameByCode.set(current.code, current.name);
-    return game.path.map((c) => nameByCode.get(c) ?? "…");
-  }, [current.code, current.name, game.path, puzzle.start.code, puzzle.start.name]);
+  // Trail of names from path codes. We have names for puzzle.start, puzzle.goal
+  // and view.item.name (current); intermediate names aren't persisted in state,
+  // so the trail is "start › … › current".
+  const trail = useMemo(() => {
+    if (game.path.length <= 1) return [puzzle.start.name];
+    if (game.path.length === 2)
+      return [puzzle.start.name, view.item.name];
+    return [
+      puzzle.start.name,
+      ...Array(game.path.length - 2).fill("…"),
+      view.item.name,
+    ];
+  }, [game.path.length, puzzle.start.name, view.item.name]);
 
   return (
     <>
@@ -315,51 +366,31 @@ export function DailyBoard({
         </div>
       </section>
 
-      <div className="trail">
-        {trailNames.map((n, i) => (
-          <span key={`${n}-${i}`} className={i === trailNames.length - 1 ? "now" : ""}>
+      <nav className="trail" aria-label="Your path">
+        {trail.map((n, i) => (
+          <span
+            key={`${n}-${i}`}
+            className={i === trail.length - 1 ? "now" : ""}
+          >
             {i > 0 ? <span aria-hidden="true">› </span> : null}
             {cap(n)}
           </span>
         ))}
-      </div>
+      </nav>
 
-      <section className="panel">
-        <h3>From {cap(current.name)}</h3>
-        <p className="sub">
-          Pick a neighbour. Green closer, yellow same distance, red further.
-        </p>
-        <div className="cs">
-          {neighbours.length === 0 ? (
-            <p className="empty">
-              {moves === 0
-                ? ""
-                : "Neighbours refresh on your next move. (Undo clears them.)"}
-            </p>
-          ) : (
-            neighbours.map((nb) => (
-              <button
-                key={nb.code}
-                type="button"
-                className={`chip sm${nb.closed ? " closed" : ""}${nb.isGoal ? " target" : ""}${game.hintCodes.includes(nb.code) ? " hint" : ""}`}
-                onClick={() => doMove(nb)}
-                disabled={moving || game.done}
-                aria-disabled={nb.closed}
-                title={nb.closed ? "Closed in puzzles" : undefined}
-              >
-                <Pictogram
-                  name={nb.name}
-                  tier={nb.tier}
-                  kind={nb.kind}
-                  symbol={nb.symbol}
-                  className="sm"
-                />
-                <span className="nm">{nb.name}</span>
-              </button>
-            ))
-          )}
-        </div>
-      </section>
+      {/* Hidden handle for the focus-head rect used by the fly-ghost. */}
+      <div ref={focusHeadRef} style={{ display: "contents" }}>
+        <Bowtie
+          view={view}
+          mode="daily"
+          daily={{
+            goalCode: puzzle.goal.code,
+            closedCodes: effectiveClosed,
+            hintCodes,
+          }}
+          onChipClick={onChipClick}
+        />
+      </div>
 
       {game.done && !game.gaveUp && (
         <section className="panel">
@@ -378,8 +409,11 @@ export function DailyBoard({
             className="squares"
             aria-label="Green: got closer. Yellow: same distance. Red: moved away."
           >
-            {squares.split("").map((c, i) => (
-              <i key={i} className={`sq ${c}`} />
+            {game.deltas.map((d, i) => (
+              <i
+                key={i}
+                className={`sq ${d === "closer" ? "g" : d === "same" ? "y" : "r"}`}
+              />
             ))}
             {game.hintCodes.length > 0 ? (
               <span className="sqh">
@@ -410,7 +444,10 @@ export function DailyBoard({
           </h3>
           <div className="chain">
             {giveUpSteps.map((s, i) => (
-              <div key={s.code} className={`node${i === giveUpSteps.length - 1 ? " end" : ""}`}>
+              <div
+                key={s.slug}
+                className={`node${i === giveUpSteps.length - 1 ? " end" : ""}`}
+              >
                 <Pictogram
                   name={s.name}
                   tier={s.tier}
@@ -421,7 +458,9 @@ export function DailyBoard({
                 <span className="tx">
                   <span className="v">{s.name}</span>
                 </span>
-                {i < giveUpSteps.length - 1 ? <span className="arr">›</span> : null}
+                {i < giveUpSteps.length - 1 ? (
+                  <span className="arr">›</span>
+                ) : null}
               </div>
             ))}
           </div>
@@ -431,7 +470,11 @@ export function DailyBoard({
   );
 }
 
-function ChipSpan({ item }: { item: DailyItem }) {
+function ChipSpan({
+  item,
+}: {
+  item: { name: string; tier: DailyPuzzle["start"]["tier"]; kind: DailyPuzzle["start"]["kind"]; symbol: string | null };
+}) {
   return (
     <span className="chip">
       <Pictogram

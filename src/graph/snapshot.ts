@@ -53,6 +53,9 @@ export function buildSnapshot(rows: LoadedRows): Snapshot {
   }
   for (const n of nodes.values()) n.recipes.sort((a, b) => a.position - b.position);
 
+  // Build raw edge lists first, then dedupe below so we can pick the best
+  // representative when the same (type, source, target) appears in several
+  // of the source's recipes.
   for (const l of rows.links) {
     const srcId = l.recipeId
       ? recipeOwner(rows, l.recipeId)
@@ -65,12 +68,28 @@ export function buildSnapshot(rows: LoadedRows): Snapshot {
       confidence: (l.confidence ?? "established") as Confidence,
       recipeId: l.recipeId ?? null,
       linkId: l.id,
+      hasEvidence: (l as { hasEvidence?: boolean }).hasEvidence ?? false,
       isCanary: l.isCanary ?? false,
     };
     const edgeUp: GraphEdge = { id: dst.id, ...common };
     const edgeDown: GraphEdge = { id: src.id, ...common };
     src.up.push(edgeUp);
     dst.down.push(edgeDown);
+  }
+
+  // Dedupe up edges within each (recipeId, type, target) tuple. A single
+  // recipe listing `f:X` twice should still produce one chip; the prototype
+  // dedupes on `type+id` within a recipe (see legacy made-of.html line 1789).
+  for (const n of nodes.values()) {
+    n.up = pickBestPerKey(n.up, (e) => `${e.recipeId ?? "~"}|${e.type}|${e.id}`);
+  }
+
+  // Dedupe down edges by (type, source). From a target's point of view, the
+  // same source hitting it in two of its recipes is still "source goes into
+  // target" — one chip is right. The prototype does this at graph-build time
+  // via a per-item `seen` set.
+  for (const n of nodes.values()) {
+    n.down = pickBestPerKey(n.down, (e) => `${e.type}|${e.id}`);
   }
 
   for (const n of nodes.values()) {
@@ -81,6 +100,40 @@ export function buildSnapshot(rows: LoadedRows): Snapshot {
   }
 
   return { nodes, byName };
+}
+
+/**
+ * Keep one edge per key, preferring edges with evidence (so the dot still
+ * renders) and stronger confidence. The relative order of the surviving
+ * edges is otherwise preserved.
+ */
+function pickBestPerKey<T extends { hasEvidence: boolean; confidence: Confidence }>(
+  edges: T[],
+  keyFn: (e: T) => string,
+): T[] {
+  const confRank: Record<Confidence, number> = {
+    established: 4,
+    strong: 3,
+    debated: 2,
+    hypothesis: 1,
+  };
+  const order: string[] = [];
+  const best = new Map<string, T>();
+  for (const e of edges) {
+    const k = keyFn(e);
+    const cur = best.get(k);
+    if (!cur) {
+      best.set(k, e);
+      order.push(k);
+      continue;
+    }
+    const better =
+      (e.hasEvidence && !cur.hasEvidence) ||
+      (e.hasEvidence === cur.hasEvidence &&
+        confRank[e.confidence] > confRank[cur.confidence]);
+    if (better) best.set(k, e);
+  }
+  return order.map((k) => best.get(k)!);
 }
 
 const recipeToItem = new WeakMap<LoadedRows, Map<string, string>>();

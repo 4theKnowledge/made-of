@@ -9,6 +9,8 @@ export interface GraphEdge {
   recipeId: string | null;
   /** The concrete link row id (same as rows.links[i].id). */
   linkId: string;
+  /** True if this link has evidence rows (used to show the evidence dot). */
+  hasEvidence: boolean;
   /** Canary links appear only in API responses, never on item pages. */
   isCanary: boolean;
 }

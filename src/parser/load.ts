@@ -22,7 +22,7 @@ import type {
 export interface LoadedRows {
   items: NewItem[];
   recipes: NewRecipe[];
-  links: NewLink[];
+  links: Array<NewLink & { hasEvidence?: boolean }>;
   linkEvidence: NewLinkEvidence[];
   evidenceSources: Array<{
     evidenceId: string;
@@ -187,10 +187,13 @@ export function toRows(parsed: ParsedPrototype): LoadedRows {
     // above; apply it after the loop.
   }
 
-  // Apply denormalised confidence to link rows.
+  // Apply denormalised confidence + hasEvidence flag to link rows.
   for (const link of links) {
     const c = linkConfidence.get(link.id);
     if (c) (link as { confidence: string }).confidence = c;
+    (link as { hasEvidence?: boolean }).hasEvidence = evidencedLinkIds.has(
+      link.id,
+    );
   }
 
   // Attach notes too.

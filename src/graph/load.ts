@@ -27,20 +27,29 @@ export async function loadRowsFromDb(opts?: {
 
   const liveIds = new Set(items.map((i) => i.id));
 
-  const [recipes, links] = await Promise.all([
+  const [recipes, links, evidence] = await Promise.all([
     db.select().from(schema.recipes),
     db.select().from(schema.links),
+    db
+      .selectDistinct({ linkId: schema.linkEvidence.linkId })
+      .from(schema.linkEvidence),
   ]);
 
   const liveRecipes = recipes.filter((r) => liveIds.has(r.itemId));
   const liveRecipeIds = new Set(liveRecipes.map((r) => r.id));
+  const linksWithEvidence = new Set(evidence.map((e) => e.linkId));
 
-  const liveLinks = links.filter((l) => {
-    if (!liveIds.has(l.targetItemId)) return false;
-    if (l.recipeId && !liveRecipeIds.has(l.recipeId)) return false;
-    if (l.itemId && !liveIds.has(l.itemId)) return false;
-    return true;
-  });
+  const liveLinks = links
+    .filter((l) => {
+      if (!liveIds.has(l.targetItemId)) return false;
+      if (l.recipeId && !liveRecipeIds.has(l.recipeId)) return false;
+      if (l.itemId && !liveIds.has(l.itemId)) return false;
+      return true;
+    })
+    .map((l) => ({
+      ...l,
+      hasEvidence: linksWithEvidence.has(l.id),
+    }));
 
   return {
     items,
