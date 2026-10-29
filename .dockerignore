@@ -3,8 +3,11 @@
 node_modules
 coverage
 dist
+dist-scripts
 docs
-legacy
+# NOTE: legacy/ is intentionally NOT ignored. The build stage reads
+# legacy/made-of.html during the seed bundle step, and the runtime image
+# copies it in so the predeploy `seed-if-empty` can run.
 *.log
 .env
 .env.*

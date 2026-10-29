@@ -20,7 +20,8 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN npm run build \
+    && npm run build:scripts
 
 # -- runtime ------------------------------------------------------------------
 FROM node:${NODE_VERSION} AS runtime
@@ -35,6 +36,20 @@ RUN addgroup -g 1001 -S nodejs && adduser -S -u 1001 -G nodejs nextjs
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=build --chown=nextjs:nodejs /app/public ./public
+
+# Predeploy bundle: compiled JS for migrate + seed-if-empty, plus the data
+# they need. Standalone doesn't trace scripts; we build a small single-file
+# bundle in the build stage and only ship that + the migration SQL + the
+# artifact HTML. Everything is plain Node — no tsx at runtime.
+COPY --from=build --chown=nextjs:nodejs /app/dist-scripts ./dist-scripts
+COPY --from=build --chown=nextjs:nodejs /app/drizzle ./drizzle
+COPY --from=build --chown=nextjs:nodejs /app/legacy ./legacy
+# The predeploy bundle marks `postgres` as external, so it must be present
+# in node_modules at runtime. Next's standalone output traces imports from
+# server.js only; our dist-scripts don't go through that tracer, so copy
+# the postgres package explicitly. Same for its transitive runtime deps
+# that aren't dev-only.
+COPY --from=build --chown=nextjs:nodejs /app/node_modules/postgres ./node_modules/postgres
 
 USER nextjs
 EXPOSE 3000

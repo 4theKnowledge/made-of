@@ -8,6 +8,7 @@ next-env.d.ts
 
 # build
 dist
+dist-scripts
 .turbo
 
 # env

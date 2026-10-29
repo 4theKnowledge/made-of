@@ -17,6 +17,12 @@ const HEADER = "x-origin-lock";
 export function middleware(req: NextRequest) {
   if (process.env.NODE_ENV !== "production") return NextResponse.next();
 
+  // Explicit kill switch: used while Cloudflare isn't yet in front of the
+  // Railway domain. Without this, the service is unreachable from a browser
+  // because every request lacks the Cloudflare-injected header. Remove the
+  // env var once Cloudflare is live. See docs/SERVICES.md → Cloudflare.
+  if (process.env.ORIGIN_LOCK_DISABLED === "1") return NextResponse.next();
+
   const expected = process.env.ORIGIN_LOCK_SECRET;
   if (!expected) {
     // Fail closed: if the secret is missing in production, something is
