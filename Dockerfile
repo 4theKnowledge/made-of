@@ -44,6 +44,7 @@ COPY --from=build --chown=nextjs:nodejs /app/public ./public
 COPY --from=build --chown=nextjs:nodejs /app/dist-scripts ./dist-scripts
 COPY --from=build --chown=nextjs:nodejs /app/drizzle ./drizzle
 COPY --from=build --chown=nextjs:nodejs /app/legacy ./legacy
+COPY --from=build --chown=nextjs:nodejs /app/scripts/predeploy.sh ./scripts/predeploy.sh
 # The predeploy bundle marks `postgres` as external, so it must be present
 # in node_modules at runtime. Next's standalone output traces imports from
 # server.js only; our dist-scripts don't go through that tracer, so copy
