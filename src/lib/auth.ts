@@ -24,8 +24,14 @@ export const auth = new Proxy({} as ReturnType<typeof buildAuth>, {
 });
 
 function buildAuth() {
-  const resend = new Resend(process.env.RESEND_API_KEY ?? "");
   const from = process.env.RESEND_FROM ?? "Made Of <login@madeof.app>";
+  // Resend's constructor throws on an empty key, so defer creation until
+  // we actually need to send. The build-time prerender never calls this.
+  let resend: Resend | null = null;
+  const getResend = () => {
+    if (!resend) resend = new Resend(process.env.RESEND_API_KEY);
+    return resend;
+  };
 
   return betterAuth({
     database: drizzleAdapter(getDb(), {
@@ -68,7 +74,7 @@ function buildAuth() {
             console.log(`[auth] magic link for ${email}: ${url}`);
             return;
           }
-          const { error } = await resend.emails.send({
+          const { error } = await getResend().emails.send({
             from,
             to: email,
             subject: "Your Made Of sign-in link",
