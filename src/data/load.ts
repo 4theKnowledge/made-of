@@ -113,6 +113,7 @@ export function normaliseItem(it: DataItem): LoadedItem {
     fact: it.fact ?? "",
     recipes,
     itemLinks: { n: it.linksN ?? [], s: it.linksS ?? [] },
+    tags: it.tags ?? [],
   };
 }
 

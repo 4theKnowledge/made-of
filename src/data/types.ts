@@ -18,6 +18,29 @@ import type {
   Tier,
 } from "../db/schema";
 
+/* --------------------------------- tags --------------------------------- */
+
+/**
+ * Membership markers on items. Tags are closed (not freeform) so the compiler
+ * catches typos, grep finds every use, and renaming a tag is one Edit away.
+ *
+ * Membership lives *on the item* — this is what lets different modes
+ * (Combine themes, future classroom/kitchen modes, etc.) all read the same
+ * data without maintaining parallel allow-lists.
+ */
+export type Tag =
+  // --- Combine themes ---
+  /** Output is in Combine's Everyday theme (food, home, craft, clothes…). */
+  | "combine-everyday"
+  /** Never dealt or made in Combine. Covers the semiconductor fab chain and
+   *  the one surviving non-physical item (big bang). */
+  | "combine-exclude"
+
+  // --- Reusable categories (available to any mode) ---
+  /** Part of the semiconductor fab chain — kept out of Combine, but useful
+   *  as a tag anyone else can read later. */
+  | "fab-chain";
+
 /* -------------------------- hand-edited shapes --------------------------- */
 
 export interface DataRecipe {
@@ -38,6 +61,8 @@ export interface DataItem {
   recipes?: DataRecipe[];
   linksN?: string[];
   linksS?: string[];
+  /** Membership markers (see Tag). Omit when empty. */
+  tags?: Tag[];
 }
 
 export interface DataEvidenceEntry {
@@ -99,6 +124,8 @@ export interface LoadedItem {
   recipes: LoadedRecipe[];
   /** Item-level links. Only `n` and `s` are legal here. */
   itemLinks: { n: string[]; s: string[] };
+  /** Membership markers. Always present (empty array if none). */
+  tags: Tag[];
 }
 
 export interface LoadedEvidenceEntry {

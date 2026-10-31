@@ -34,6 +34,10 @@ export function buildSnapshot(rows: SeedRows): Snapshot {
       symbol: it.symbol ?? null,
       fact: it.fact ?? "",
       recipes: [],
+      // `tags` is `text[]` in Postgres which Drizzle infers as `string[]`;
+      // the type is narrower (Tag[]) in our data module, so we cast here.
+      // Values are validated at parse time by the DataItem type.
+      tags: (it.tags ?? []) as GraphNode["tags"],
       up: [],
       down: [],
       neighbours: [],

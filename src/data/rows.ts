@@ -65,6 +65,7 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
       fact: item.fact,
       status: "live",
       isCanary: false,
+      tags: item.tags,
     });
 
     item.recipes.forEach((recipe, idx) => {

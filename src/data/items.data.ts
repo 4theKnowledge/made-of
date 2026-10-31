@@ -21,6 +21,7 @@ export const ITEMS: DataItem[] = [
     kind: "cosmic",
     firstAppeared: "13.8bya",
     fact: "The start of everything. Almost all the hydrogen and helium that exists was made in its first few minutes.",
+    tags: ["combine-exclude"],
   },
   {
     name: "hydrogen",
@@ -225,6 +226,7 @@ export const ITEMS: DataItem[] = [
         f: ["supernova"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "calcium",
@@ -503,6 +505,7 @@ export const ITEMS: DataItem[] = [
         e: ["LUCA"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "archaea",
@@ -640,6 +643,7 @@ export const ITEMS: DataItem[] = [
         f: ["proteins","complex cell"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "bone",
@@ -652,6 +656,7 @@ export const ITEMS: DataItem[] = [
         f: ["calcium","phosphorus","proteins","complex cell"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "brain",
@@ -664,6 +669,7 @@ export const ITEMS: DataItem[] = [
         f: ["lipids","proteins","complex cell"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "lung",
@@ -676,6 +682,7 @@ export const ITEMS: DataItem[] = [
         f: ["proteins","complex cell"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "fish",
@@ -690,6 +697,7 @@ export const ITEMS: DataItem[] = [
         e: ["early animals"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "insects",
@@ -704,6 +712,7 @@ export const ITEMS: DataItem[] = [
         e: ["early animals"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "amphibians",
@@ -743,6 +752,7 @@ export const ITEMS: DataItem[] = [
         e: ["reptiles"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "birds",
@@ -755,6 +765,7 @@ export const ITEMS: DataItem[] = [
         e: ["dinosaurs"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "mammals",
@@ -794,6 +805,7 @@ export const ITEMS: DataItem[] = [
         e: ["primates"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "water",
@@ -806,6 +818,7 @@ export const ITEMS: DataItem[] = [
         f: ["hydrogen","oxygen"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "air",
@@ -819,6 +832,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["cyanobacteria"],
+    tags: ["combine-everyday"],
   },
   {
     name: "rock",
@@ -856,6 +870,7 @@ export const ITEMS: DataItem[] = [
         n: ["water"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "clay",
@@ -868,6 +883,7 @@ export const ITEMS: DataItem[] = [
         f: ["rock","water"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "gravel",
@@ -910,6 +926,7 @@ export const ITEMS: DataItem[] = [
         f: ["calcium","carbon","oxygen","plankton"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "crude oil",
@@ -923,6 +940,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["oil well"],
+    tags: ["combine-everyday"],
   },
   {
     name: "natural gas",
@@ -949,6 +967,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
+    tags: ["combine-everyday"],
   },
   {
     name: "iron ore",
@@ -962,6 +981,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
+    tags: ["combine-everyday"],
   },
   {
     name: "bauxite",
@@ -1013,6 +1033,7 @@ export const ITEMS: DataItem[] = [
         f: ["water","sodium","chlorine"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "lithium brine",
@@ -1055,6 +1076,7 @@ export const ITEMS: DataItem[] = [
         f: ["tree"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "tree",
@@ -1068,6 +1090,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["water","air","soil"],
+    tags: ["combine-everyday"],
   },
   {
     name: "grass",
@@ -1081,6 +1104,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["water","air","soil"],
+    tags: ["combine-everyday"],
   },
   {
     name: "flower",
@@ -1094,6 +1118,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["water","soil"],
+    tags: ["combine-everyday"],
   },
   {
     name: "wheat",
@@ -1108,6 +1133,7 @@ export const ITEMS: DataItem[] = [
     ],
     linksN: ["water","soil"],
     linksS: ["farm"],
+    tags: ["combine-everyday"],
   },
   {
     name: "cotton plant",
@@ -1122,6 +1148,7 @@ export const ITEMS: DataItem[] = [
     ],
     linksN: ["water","soil"],
     linksS: ["farm"],
+    tags: ["combine-everyday"],
   },
   {
     name: "sugarcane",
@@ -1136,6 +1163,7 @@ export const ITEMS: DataItem[] = [
     ],
     linksN: ["water","soil"],
     linksS: ["farm"],
+    tags: ["combine-everyday"],
   },
   {
     name: "sugar beet",
@@ -1164,6 +1192,7 @@ export const ITEMS: DataItem[] = [
     ],
     linksN: ["water","soil"],
     linksS: ["farm"],
+    tags: ["combine-everyday"],
   },
   {
     name: "coffee plant",
@@ -1178,6 +1207,7 @@ export const ITEMS: DataItem[] = [
     ],
     linksN: ["water","soil"],
     linksS: ["farm"],
+    tags: ["combine-everyday"],
   },
   {
     name: "tomato plant",
@@ -1192,6 +1222,7 @@ export const ITEMS: DataItem[] = [
     ],
     linksN: ["water","soil"],
     linksS: ["farm"],
+    tags: ["combine-everyday"],
   },
   {
     name: "indigo plant",
@@ -1218,6 +1249,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["water","soil"],
+    tags: ["combine-everyday"],
   },
   {
     name: "sheep",
@@ -1232,6 +1264,7 @@ export const ITEMS: DataItem[] = [
     ],
     linksN: ["grass","water"],
     linksS: ["farm"],
+    tags: ["combine-everyday"],
   },
   {
     name: "cow",
@@ -1246,6 +1279,7 @@ export const ITEMS: DataItem[] = [
     ],
     linksN: ["grass","water"],
     linksS: ["farm"],
+    tags: ["combine-everyday"],
   },
   {
     name: "chicken",
@@ -1260,6 +1294,7 @@ export const ITEMS: DataItem[] = [
     ],
     linksN: ["wheat","water"],
     linksS: ["farm"],
+    tags: ["combine-everyday"],
   },
   {
     name: "bee",
@@ -1273,6 +1308,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["flower"],
+    tags: ["combine-everyday"],
   },
   {
     name: "yeast",
@@ -1299,6 +1335,7 @@ export const ITEMS: DataItem[] = [
         w: ["shears"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "cotton",
@@ -1317,6 +1354,7 @@ export const ITEMS: DataItem[] = [
         f: ["cotton plant"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "thread",
@@ -1336,6 +1374,7 @@ export const ITEMS: DataItem[] = [
         w: ["spinning wheel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "fabric",
@@ -1349,6 +1388,7 @@ export const ITEMS: DataItem[] = [
         w: ["loom"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "dye",
@@ -1379,6 +1419,7 @@ export const ITEMS: DataItem[] = [
         f: ["cow","salt"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "milk",
@@ -1391,6 +1432,7 @@ export const ITEMS: DataItem[] = [
         f: ["cow"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "egg",
@@ -1403,6 +1445,7 @@ export const ITEMS: DataItem[] = [
         f: ["chicken"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "flour",
@@ -1416,6 +1459,7 @@ export const ITEMS: DataItem[] = [
         w: ["mill"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "sugar",
@@ -1435,6 +1479,7 @@ export const ITEMS: DataItem[] = [
         w: ["mill"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "cocoa",
@@ -1447,6 +1492,7 @@ export const ITEMS: DataItem[] = [
         f: ["cacao tree"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "coffee beans",
@@ -1459,6 +1505,7 @@ export const ITEMS: DataItem[] = [
         f: ["coffee plant"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "tomato",
@@ -1471,6 +1518,7 @@ export const ITEMS: DataItem[] = [
         f: ["tomato plant"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "salt",
@@ -1483,6 +1531,7 @@ export const ITEMS: DataItem[] = [
         f: ["seawater"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "honey",
@@ -1496,6 +1545,7 @@ export const ITEMS: DataItem[] = [
         w: ["bee"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "beeswax",
@@ -1508,6 +1558,7 @@ export const ITEMS: DataItem[] = [
         f: ["bee"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "wood",
@@ -1526,6 +1577,7 @@ export const ITEMS: DataItem[] = [
         f: ["tree"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "charcoal",
@@ -1538,6 +1590,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "paper",
@@ -1555,6 +1608,7 @@ export const ITEMS: DataItem[] = [
         f: ["paper","water"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "coke",
@@ -1592,6 +1646,7 @@ export const ITEMS: DataItem[] = [
         w: ["furnace"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "aluminium metal",
@@ -1621,6 +1676,7 @@ export const ITEMS: DataItem[] = [
         f: ["refined copper","plastic"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "soda ash",
@@ -1646,6 +1702,7 @@ export const ITEMS: DataItem[] = [
         w: ["furnace"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "plastic",
@@ -1665,6 +1722,7 @@ export const ITEMS: DataItem[] = [
         w: ["refinery"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "rubber",
@@ -1683,6 +1741,7 @@ export const ITEMS: DataItem[] = [
         w: ["refinery"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "asphalt",
@@ -1709,6 +1768,7 @@ export const ITEMS: DataItem[] = [
         w: ["refinery"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "cement",
@@ -1722,6 +1782,7 @@ export const ITEMS: DataItem[] = [
         w: ["kiln"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "concrete",
@@ -1734,6 +1795,7 @@ export const ITEMS: DataItem[] = [
         f: ["cement","sand","gravel","water"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "brick",
@@ -1752,6 +1814,7 @@ export const ITEMS: DataItem[] = [
         f: ["clay"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "silicon wafer",
@@ -1766,6 +1829,7 @@ export const ITEMS: DataItem[] = [
         n: ["ultrapure water"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "ink",
@@ -1778,6 +1842,7 @@ export const ITEMS: DataItem[] = [
         f: ["carbon","water"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "paint",
@@ -1795,6 +1860,7 @@ export const ITEMS: DataItem[] = [
         f: ["rock","water"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "glue",
@@ -1816,6 +1882,7 @@ export const ITEMS: DataItem[] = [
         f: ["tree"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "solder",
@@ -1840,6 +1907,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "nail",
@@ -1852,6 +1920,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "button",
@@ -1869,6 +1938,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "zipper",
@@ -1881,6 +1951,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","fabric"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "gear",
@@ -1893,6 +1964,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "chain",
@@ -1905,6 +1977,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "magnet",
@@ -1917,6 +1990,7 @@ export const ITEMS: DataItem[] = [
         f: ["iron"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "lens",
@@ -1929,6 +2003,7 @@ export const ITEMS: DataItem[] = [
         f: ["glass"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "battery",
@@ -1941,6 +2016,7 @@ export const ITEMS: DataItem[] = [
         f: ["lithium brine","graphite","aluminium metal","copper wire","plastic"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "microchip",
@@ -1954,6 +2030,7 @@ export const ITEMS: DataItem[] = [
         w: ["packaging plant"],
       },
     ],
+    tags: ["combine-everyday", "combine-exclude", "fab-chain"],
   },
   {
     name: "circuit board",
@@ -1966,6 +2043,7 @@ export const ITEMS: DataItem[] = [
         f: ["copper wire","plastic","solder"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "screen",
@@ -1978,6 +2056,7 @@ export const ITEMS: DataItem[] = [
         f: ["glass","plastic","copper wire"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "electric motor",
@@ -1990,6 +2069,7 @@ export const ITEMS: DataItem[] = [
         f: ["copper wire","magnet","steel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "engine",
@@ -2003,6 +2083,7 @@ export const ITEMS: DataItem[] = [
         n: ["petrol"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "tyre",
@@ -2015,6 +2096,7 @@ export const ITEMS: DataItem[] = [
         f: ["rubber","steel","fabric"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "fibre optic cable",
@@ -2039,6 +2121,7 @@ export const ITEMS: DataItem[] = [
         f: ["silicon wafer","glass","aluminium metal","copper wire"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "shears",
@@ -2051,6 +2134,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "spinning wheel",
@@ -2063,6 +2147,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "loom",
@@ -2080,6 +2165,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","electric motor"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "cotton gin",
@@ -2116,6 +2202,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","wood"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "mill",
@@ -2146,6 +2233,7 @@ export const ITEMS: DataItem[] = [
         n: ["wood"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "furnace",
@@ -2165,6 +2253,7 @@ export const ITEMS: DataItem[] = [
         n: ["natural gas"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "blast furnace",
@@ -2197,6 +2286,7 @@ export const ITEMS: DataItem[] = [
         n: ["natural gas"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "printing press",
@@ -2226,6 +2316,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "tractor",
@@ -2239,6 +2330,7 @@ export const ITEMS: DataItem[] = [
         n: ["petrol"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "wind turbine",
@@ -2251,6 +2343,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","plastic","copper wire","magnet"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "shirt",
@@ -2269,6 +2362,7 @@ export const ITEMS: DataItem[] = [
         f: ["fabric","thread","button"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "sweater",
@@ -2281,6 +2375,7 @@ export const ITEMS: DataItem[] = [
         f: ["thread"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "jeans",
@@ -2294,6 +2389,7 @@ export const ITEMS: DataItem[] = [
         w: ["sewing machine"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "shoe",
@@ -2311,6 +2407,7 @@ export const ITEMS: DataItem[] = [
         f: ["rubber","fabric","thread","glue"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "bread",
@@ -2330,6 +2427,7 @@ export const ITEMS: DataItem[] = [
         w: ["oven"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "butter",
@@ -2342,6 +2440,7 @@ export const ITEMS: DataItem[] = [
         f: ["milk"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "cheese",
@@ -2354,6 +2453,7 @@ export const ITEMS: DataItem[] = [
         f: ["milk","salt"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "cake",
@@ -2367,6 +2467,7 @@ export const ITEMS: DataItem[] = [
         w: ["oven"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "chocolate",
@@ -2384,6 +2485,7 @@ export const ITEMS: DataItem[] = [
         f: ["cocoa","sugar"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "coffee",
@@ -2397,6 +2499,7 @@ export const ITEMS: DataItem[] = [
         w: ["kettle"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "pizza",
@@ -2410,6 +2513,7 @@ export const ITEMS: DataItem[] = [
         w: ["oven"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "candle",
@@ -2428,6 +2532,7 @@ export const ITEMS: DataItem[] = [
         w: ["refinery"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "book",
@@ -2446,6 +2551,7 @@ export const ITEMS: DataItem[] = [
         f: ["paper","ink","thread"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "pencil",
@@ -2458,6 +2564,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood","graphite","clay","paint","rubber","aluminium metal"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "table",
@@ -2476,6 +2583,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood","nail"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "window",
@@ -2493,6 +2601,7 @@ export const ITEMS: DataItem[] = [
         f: ["glass","aluminium metal"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "light bulb",
@@ -2510,6 +2619,7 @@ export const ITEMS: DataItem[] = [
         f: ["glass","copper wire"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "smartphone",
@@ -2523,6 +2633,7 @@ export const ITEMS: DataItem[] = [
         w: ["factory"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "laptop",
@@ -2536,6 +2647,7 @@ export const ITEMS: DataItem[] = [
         w: ["factory"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "bicycle",
@@ -2548,6 +2660,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","tyre","chain","gear"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "car",
@@ -2562,6 +2675,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["petrol"],
+    tags: ["combine-everyday"],
   },
   {
     name: "electric car",
@@ -2575,6 +2689,7 @@ export const ITEMS: DataItem[] = [
         w: ["factory"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "house",
@@ -2592,6 +2707,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood","nail","window","concrete"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "farm",
@@ -2611,6 +2727,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["water","humans"],
+    tags: ["combine-everyday"],
   },
   {
     name: "mine",
@@ -2667,6 +2784,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["ultrapure water"],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "factory",
@@ -2686,6 +2804,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["humans"],
+    tags: ["combine-everyday"],
   },
   {
     name: "power plant",
@@ -2705,6 +2824,7 @@ export const ITEMS: DataItem[] = [
         n: ["natural gas","water"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "power grid",
@@ -2738,6 +2858,7 @@ export const ITEMS: DataItem[] = [
         f: ["rock"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "data centre",
@@ -2769,6 +2890,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["farm","water"],
+    tags: ["combine-everyday"],
   },
   {
     name: "boron",
@@ -2782,6 +2904,7 @@ export const ITEMS: DataItem[] = [
         f: ["carbon","oxygen"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "phosphorus",
@@ -2808,6 +2931,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "argon",
@@ -2821,6 +2945,7 @@ export const ITEMS: DataItem[] = [
         f: ["supernova"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "neon",
@@ -2834,6 +2959,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "sulfur",
@@ -2847,6 +2973,7 @@ export const ITEMS: DataItem[] = [
         f: ["supernova"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "chromium",
@@ -2860,6 +2987,7 @@ export const ITEMS: DataItem[] = [
         f: ["supernova"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "cobalt",
@@ -2873,6 +3001,7 @@ export const ITEMS: DataItem[] = [
         f: ["supernova"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "zirconium",
@@ -2886,6 +3015,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "hafnium",
@@ -2899,6 +3029,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "molybdenum",
@@ -2912,6 +3043,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "tantalum",
@@ -2925,6 +3057,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "tungsten",
@@ -2938,6 +3071,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "carbon dioxide",
@@ -2963,6 +3097,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "fluorite",
@@ -2976,6 +3111,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "phosphate rock",
@@ -2989,6 +3125,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "borax",
@@ -3002,6 +3139,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "tungsten ore",
@@ -3015,6 +3153,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "molybdenite",
@@ -3028,6 +3167,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "zircon",
@@ -3041,6 +3181,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "cobalt ore",
@@ -3054,6 +3195,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "coltan",
@@ -3067,6 +3209,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "chromite",
@@ -3080,6 +3223,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "metallurgical silicon",
@@ -3093,6 +3237,7 @@ export const ITEMS: DataItem[] = [
         w: ["arc furnace"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "hydrogen gas",
@@ -3110,6 +3255,7 @@ export const ITEMS: DataItem[] = [
         f: ["water"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "chlorine gas",
@@ -3122,6 +3268,7 @@ export const ITEMS: DataItem[] = [
         f: ["salt","water"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "hydrogen chloride",
@@ -3134,6 +3281,7 @@ export const ITEMS: DataItem[] = [
         f: ["hydrogen gas","chlorine gas"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "trichlorosilane",
@@ -3147,6 +3295,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "polysilicon",
@@ -3160,6 +3309,7 @@ export const ITEMS: DataItem[] = [
         w: ["siemens reactor"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "argon gas",
@@ -3173,6 +3323,7 @@ export const ITEMS: DataItem[] = [
         w: ["air separation unit"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "neon gas",
@@ -3186,6 +3337,7 @@ export const ITEMS: DataItem[] = [
         w: ["air separation unit"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "fluorine gas",
@@ -3198,6 +3350,7 @@ export const ITEMS: DataItem[] = [
         f: ["hydrofluoric acid"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "sulfuric acid",
@@ -3211,6 +3364,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "hydrofluoric acid",
@@ -3224,6 +3378,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "etching gas",
@@ -3237,6 +3392,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "dopant gases",
@@ -3250,6 +3406,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "silicon ingot",
@@ -3264,6 +3421,7 @@ export const ITEMS: DataItem[] = [
         n: ["argon gas"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "polishing slurry",
@@ -3276,6 +3434,7 @@ export const ITEMS: DataItem[] = [
         f: ["sand","soda ash","water"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "synthetic diamond",
@@ -3294,6 +3453,7 @@ export const ITEMS: DataItem[] = [
         f: ["natural gas","hydrogen gas"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "ultrapure water",
@@ -3306,6 +3466,7 @@ export const ITEMS: DataItem[] = [
         f: ["water"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "solvent",
@@ -3319,6 +3480,7 @@ export const ITEMS: DataItem[] = [
         w: ["refinery"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "photoresist",
@@ -3332,6 +3494,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "fused silica",
@@ -3345,6 +3508,7 @@ export const ITEMS: DataItem[] = [
         w: ["furnace"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "photomask",
@@ -3358,6 +3522,7 @@ export const ITEMS: DataItem[] = [
         w: ["electron beam writer"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "refined copper",
@@ -3376,6 +3541,7 @@ export const ITEMS: DataItem[] = [
         f: ["copper ore","sulfuric acid"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "tantalum metal",
@@ -3389,6 +3555,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "cobalt metal",
@@ -3401,6 +3568,7 @@ export const ITEMS: DataItem[] = [
         f: ["cobalt ore","sulfuric acid"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "tungsten metal",
@@ -3413,6 +3581,7 @@ export const ITEMS: DataItem[] = [
         f: ["tungsten ore","hydrogen gas"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "molybdenum metal",
@@ -3425,6 +3594,7 @@ export const ITEMS: DataItem[] = [
         f: ["molybdenite","hydrogen gas"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "hafnium oxide",
@@ -3438,6 +3608,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "ABF film",
@@ -3451,6 +3622,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "transistor layer",
@@ -3465,6 +3637,7 @@ export const ITEMS: DataItem[] = [
         n: ["ultrapure water"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "finished wafer",
@@ -3478,6 +3651,7 @@ export const ITEMS: DataItem[] = [
         w: ["lithography scanner","plasma etcher","chip fab"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "die",
@@ -3491,6 +3665,7 @@ export const ITEMS: DataItem[] = [
         w: ["dicing saw"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "package substrate",
@@ -3503,6 +3678,7 @@ export const ITEMS: DataItem[] = [
         f: ["ABF film","refined copper","glass"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "quartz crucible",
@@ -3516,6 +3692,7 @@ export const ITEMS: DataItem[] = [
         w: ["furnace"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "EUV mirror",
@@ -3528,6 +3705,7 @@ export const ITEMS: DataItem[] = [
         f: ["molybdenum metal","polysilicon","fused silica"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "CO2 laser",
@@ -3540,6 +3718,7 @@ export const ITEMS: DataItem[] = [
         f: ["carbon dioxide","helium","nitrogen","copper wire","steel"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "argon fluoride laser",
@@ -3552,6 +3731,7 @@ export const ITEMS: DataItem[] = [
         f: ["argon gas","fluorine gas","neon gas","steel"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "arc furnace",
@@ -3564,6 +3744,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","brick","graphite"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "siemens reactor",
@@ -3576,6 +3757,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","copper wire"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "czochralski puller",
@@ -3588,6 +3770,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","graphite","copper wire"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "air separation unit",
@@ -3600,6 +3783,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","electric motor"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "wire saw",
@@ -3612,6 +3796,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","synthetic diamond"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "dicing saw",
@@ -3624,6 +3809,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","synthetic diamond"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "diamond press",
@@ -3636,6 +3822,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "electron beam writer",
@@ -3648,6 +3835,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","magnet","copper wire"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "ion implanter",
@@ -3660,6 +3848,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","magnet","copper wire"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "plasma etcher",
@@ -3672,6 +3861,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","fused silica","copper wire"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "lithography scanner",
@@ -3689,6 +3879,7 @@ export const ITEMS: DataItem[] = [
         f: ["argon fluoride laser","fused silica","steel"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "chemical plant",
@@ -3702,6 +3893,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["water"],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "packaging plant",
@@ -3714,6 +3906,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","concrete"],
       },
     ],
+    tags: ["combine-exclude", "fab-chain"],
   },
   {
     name: "apple tree",
@@ -3721,6 +3914,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Apple trees grown from seed rarely taste like their parents, so every named apple variety is grafted from one original tree.",
+    tags: ["combine-everyday"],
   },
   {
     name: "olive tree",
@@ -3728,6 +3922,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Some olive trees still bearing fruit today are over 2,000 years old.",
+    tags: ["combine-everyday"],
   },
   {
     name: "grape vine",
@@ -3735,6 +3930,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "~-6000",
     fact: "Grapes were among the first fruits people farmed, about 8,000 years ago in the Caucasus.",
+    tags: ["combine-everyday"],
   },
   {
     name: "rice plant",
@@ -3742,6 +3938,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "~-7000",
     fact: "Rice feeds more people than any other crop. It grows best standing in flooded paddies.",
+    tags: ["combine-everyday"],
   },
   {
     name: "potato plant",
@@ -3749,6 +3946,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "~-6000",
     fact: "Potatoes were first farmed in the Andes about 8,000 years ago. Thousands of varieties still grow there.",
+    tags: ["combine-everyday"],
   },
   {
     name: "soybean plant",
@@ -3756,6 +3954,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Soybean roots host bacteria that pull nitrogen from the air, so the plant fertilises its own soil.",
+    tags: ["combine-everyday"],
   },
   {
     name: "tea plant",
@@ -3763,6 +3962,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Green, black and oolong tea all come from the same plant. Only the processing is different.",
+    tags: ["combine-everyday"],
   },
   {
     name: "maize plant",
@@ -3770,6 +3970,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "~-7000",
     fact: "Maize was bred from a wild grass called teosinte in Mexico about 9,000 years ago.",
+    tags: ["combine-everyday"],
   },
   {
     name: "barley",
@@ -3777,6 +3978,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "~-8000",
     fact: "One of the first grains ever farmed, around 10,000 years ago in the Fertile Crescent.",
+    tags: ["combine-everyday"],
   },
   {
     name: "lemon tree",
@@ -3784,6 +3986,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Lemons are a cross between a bitter orange and a citron.",
+    tags: ["combine-everyday"],
   },
   {
     name: "pepper plant",
@@ -3791,6 +3994,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Black pepper was once so valuable it was used as money and paid as rent.",
+    tags: ["combine-everyday"],
   },
   {
     name: "flax plant",
@@ -3798,6 +4002,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Flax gives two things: fibres for linen from its stem, and linseed oil from its seeds.",
+    tags: ["combine-everyday"],
   },
   {
     name: "bamboo",
@@ -3805,6 +4010,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Some bamboo grows almost a metre in a single day, faster than any other plant.",
+    tags: ["combine-everyday"],
   },
   {
     name: "pig",
@@ -3812,6 +4018,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "~-7000",
     fact: "Pigs were domesticated from wild boar about 9,000 years ago.",
+    tags: ["combine-everyday"],
   },
   {
     name: "apple",
@@ -3824,6 +4031,7 @@ export const ITEMS: DataItem[] = [
         f: ["apple tree"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "olives",
@@ -3836,6 +4044,7 @@ export const ITEMS: DataItem[] = [
         f: ["olive tree"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "grapes",
@@ -3848,6 +4057,7 @@ export const ITEMS: DataItem[] = [
         f: ["grape vine"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "rice",
@@ -3860,6 +4070,7 @@ export const ITEMS: DataItem[] = [
         f: ["rice plant"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "potato",
@@ -3872,6 +4083,7 @@ export const ITEMS: DataItem[] = [
         f: ["potato plant"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "soybeans",
@@ -3884,6 +4096,7 @@ export const ITEMS: DataItem[] = [
         f: ["soybean plant"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "tea leaves",
@@ -3896,6 +4109,7 @@ export const ITEMS: DataItem[] = [
         f: ["tea plant"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "corn",
@@ -3908,6 +4122,7 @@ export const ITEMS: DataItem[] = [
         f: ["maize plant"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "lemon",
@@ -3920,6 +4135,7 @@ export const ITEMS: DataItem[] = [
         f: ["lemon tree"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "pepper",
@@ -3932,6 +4148,7 @@ export const ITEMS: DataItem[] = [
         f: ["pepper plant"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "malt",
@@ -3944,6 +4161,7 @@ export const ITEMS: DataItem[] = [
         f: ["barley","water"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "flax fibre",
@@ -3956,6 +4174,7 @@ export const ITEMS: DataItem[] = [
         f: ["flax plant"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "straw",
@@ -3968,6 +4187,7 @@ export const ITEMS: DataItem[] = [
         f: ["wheat"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "feathers",
@@ -3980,6 +4200,7 @@ export const ITEMS: DataItem[] = [
         f: ["chicken"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "cream",
@@ -3992,6 +4213,7 @@ export const ITEMS: DataItem[] = [
         f: ["milk"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "yogurt",
@@ -4004,6 +4226,7 @@ export const ITEMS: DataItem[] = [
         f: ["milk","bacteria"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "ash",
@@ -4016,6 +4239,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood","air"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "lye",
@@ -4028,6 +4252,7 @@ export const ITEMS: DataItem[] = [
         f: ["ash","water"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "glaze",
@@ -4040,6 +4265,7 @@ export const ITEMS: DataItem[] = [
         f: ["sand","ash","water"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "felt",
@@ -4052,6 +4278,7 @@ export const ITEMS: DataItem[] = [
         f: ["wool","water","soap"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "linen",
@@ -4065,6 +4292,7 @@ export const ITEMS: DataItem[] = [
         w: ["spinning wheel","loom"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "cardboard",
@@ -4077,6 +4305,7 @@ export const ITEMS: DataItem[] = [
         f: ["paper","glue"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "compost",
@@ -4089,6 +4318,7 @@ export const ITEMS: DataItem[] = [
         f: ["leaf litter","soil"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "olive oil",
@@ -4102,6 +4332,7 @@ export const ITEMS: DataItem[] = [
         w: ["press"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "grape juice",
@@ -4115,6 +4346,7 @@ export const ITEMS: DataItem[] = [
         w: ["press"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "tortilla",
@@ -4127,6 +4359,7 @@ export const ITEMS: DataItem[] = [
         f: ["corn","water","salt"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "caramel",
@@ -4140,6 +4373,7 @@ export const ITEMS: DataItem[] = [
         w: ["cooking pot"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "ice",
@@ -4153,6 +4387,7 @@ export const ITEMS: DataItem[] = [
         w: ["fridge"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "rope",
@@ -4166,6 +4401,7 @@ export const ITEMS: DataItem[] = [
         w: ["spinning wheel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "wheel",
@@ -4178,6 +4414,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood","steel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "sail",
@@ -4190,6 +4427,7 @@ export const ITEMS: DataItem[] = [
         f: ["linen","rope"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "mattress",
@@ -4202,6 +4440,7 @@ export const ITEMS: DataItem[] = [
         f: ["fabric","wool","cotton"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "press",
@@ -4214,6 +4453,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood","steel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "barrel",
@@ -4227,6 +4467,7 @@ export const ITEMS: DataItem[] = [
         w: ["saw"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "cooking pot",
@@ -4240,6 +4481,7 @@ export const ITEMS: DataItem[] = [
         w: ["furnace"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "frying pan",
@@ -4253,6 +4495,7 @@ export const ITEMS: DataItem[] = [
         w: ["furnace"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "fridge",
@@ -4265,6 +4508,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","plastic","copper wire","electric motor"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "knitting needles",
@@ -4278,6 +4522,7 @@ export const ITEMS: DataItem[] = [
         w: ["saw"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "knife",
@@ -4291,6 +4536,7 @@ export const ITEMS: DataItem[] = [
         w: ["furnace"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "hammer",
@@ -4303,6 +4549,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","wood"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "wine",
@@ -4316,6 +4563,7 @@ export const ITEMS: DataItem[] = [
         w: ["barrel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "vinegar",
@@ -4328,6 +4576,7 @@ export const ITEMS: DataItem[] = [
         f: ["wine","bacteria"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "beer",
@@ -4341,6 +4590,7 @@ export const ITEMS: DataItem[] = [
         w: ["barrel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "cider",
@@ -4354,6 +4604,7 @@ export const ITEMS: DataItem[] = [
         w: ["press"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "ham",
@@ -4366,6 +4617,7 @@ export const ITEMS: DataItem[] = [
         f: ["pig","salt"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "ice cream",
@@ -4379,6 +4631,7 @@ export const ITEMS: DataItem[] = [
         w: ["fridge"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "soy sauce",
@@ -4392,6 +4645,7 @@ export const ITEMS: DataItem[] = [
         w: ["barrel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "tofu",
@@ -4404,6 +4658,7 @@ export const ITEMS: DataItem[] = [
         f: ["soybeans","water","salt"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "noodles",
@@ -4416,6 +4671,7 @@ export const ITEMS: DataItem[] = [
         f: ["flour","water","salt"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "pasta",
@@ -4428,6 +4684,7 @@ export const ITEMS: DataItem[] = [
         f: ["flour","egg"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "sushi",
@@ -4440,6 +4697,7 @@ export const ITEMS: DataItem[] = [
         f: ["rice","fish","vinegar"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "french fries",
@@ -4453,6 +4711,7 @@ export const ITEMS: DataItem[] = [
         w: ["frying pan"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "jam",
@@ -4466,6 +4725,7 @@ export const ITEMS: DataItem[] = [
         w: ["cooking pot"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "apple pie",
@@ -4479,6 +4739,7 @@ export const ITEMS: DataItem[] = [
         w: ["oven"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "tea",
@@ -4492,6 +4753,7 @@ export const ITEMS: DataItem[] = [
         w: ["kettle"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "lemonade",
@@ -4504,6 +4766,7 @@ export const ITEMS: DataItem[] = [
         f: ["lemon","sugar","water"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "tomato sauce",
@@ -4517,6 +4780,7 @@ export const ITEMS: DataItem[] = [
         w: ["cooking pot"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "soup",
@@ -4530,6 +4794,7 @@ export const ITEMS: DataItem[] = [
         w: ["cooking pot"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "popcorn",
@@ -4543,6 +4808,7 @@ export const ITEMS: DataItem[] = [
         w: ["cooking pot"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "taco",
@@ -4555,6 +4821,7 @@ export const ITEMS: DataItem[] = [
         f: ["tortilla","cheese","tomato"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "sandwich",
@@ -4567,6 +4834,7 @@ export const ITEMS: DataItem[] = [
         f: ["bread","cheese","butter"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "pancake",
@@ -4580,6 +4848,7 @@ export const ITEMS: DataItem[] = [
         w: ["frying pan"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "omelette",
@@ -4593,6 +4862,7 @@ export const ITEMS: DataItem[] = [
         w: ["frying pan"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "cookies",
@@ -4606,6 +4876,7 @@ export const ITEMS: DataItem[] = [
         w: ["oven"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "latte",
@@ -4618,6 +4889,7 @@ export const ITEMS: DataItem[] = [
         f: ["coffee","milk"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "hot chocolate",
@@ -4630,6 +4902,7 @@ export const ITEMS: DataItem[] = [
         f: ["cocoa","milk","sugar"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "birthday cake",
@@ -4642,6 +4915,7 @@ export const ITEMS: DataItem[] = [
         f: ["cake","candle"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "soap",
@@ -4654,6 +4928,7 @@ export const ITEMS: DataItem[] = [
         f: ["olive oil","lye"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "bowl",
@@ -4667,6 +4942,7 @@ export const ITEMS: DataItem[] = [
         w: ["kiln"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "plate",
@@ -4680,6 +4956,7 @@ export const ITEMS: DataItem[] = [
         w: ["kiln"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "cup",
@@ -4693,6 +4970,7 @@ export const ITEMS: DataItem[] = [
         w: ["kiln"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "teapot",
@@ -4706,6 +4984,7 @@ export const ITEMS: DataItem[] = [
         w: ["kiln"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "jar",
@@ -4719,6 +4998,7 @@ export const ITEMS: DataItem[] = [
         w: ["furnace"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "bottle",
@@ -4732,6 +5012,7 @@ export const ITEMS: DataItem[] = [
         w: ["furnace"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "mirror",
@@ -4744,6 +5025,7 @@ export const ITEMS: DataItem[] = [
         f: ["glass","tin"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "hat",
@@ -4756,6 +5038,7 @@ export const ITEMS: DataItem[] = [
         f: ["felt","thread"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "socks",
@@ -4769,6 +5052,7 @@ export const ITEMS: DataItem[] = [
         w: ["knitting needles"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "scarf",
@@ -4782,6 +5066,7 @@ export const ITEMS: DataItem[] = [
         w: ["knitting needles"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "rug",
@@ -4795,6 +5080,7 @@ export const ITEMS: DataItem[] = [
         w: ["loom"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "towel",
@@ -4808,6 +5094,7 @@ export const ITEMS: DataItem[] = [
         w: ["loom"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "t-shirt",
@@ -4821,6 +5108,7 @@ export const ITEMS: DataItem[] = [
         w: ["sewing machine"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "dress",
@@ -4834,6 +5122,7 @@ export const ITEMS: DataItem[] = [
         w: ["sewing machine"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "gloves",
@@ -4846,6 +5135,7 @@ export const ITEMS: DataItem[] = [
         f: ["leather","thread"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "belt",
@@ -4858,6 +5148,7 @@ export const ITEMS: DataItem[] = [
         f: ["leather","steel"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "bag",
@@ -4870,6 +5161,7 @@ export const ITEMS: DataItem[] = [
         f: ["leather","thread","button"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "pillow",
@@ -4882,6 +5174,7 @@ export const ITEMS: DataItem[] = [
         f: ["fabric","feathers"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "bed",
@@ -4894,6 +5187,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood","mattress","nail"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "teddy bear",
@@ -4906,6 +5200,7 @@ export const ITEMS: DataItem[] = [
         f: ["fabric","cotton","thread","button"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "ball",
@@ -4918,6 +5213,7 @@ export const ITEMS: DataItem[] = [
         f: ["leather","rubber","thread"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "tent",
@@ -4930,6 +5226,7 @@ export const ITEMS: DataItem[] = [
         f: ["fabric","rope","wood"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "boat",
@@ -4942,6 +5239,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood","nail","sail"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "cart",
@@ -4954,6 +5252,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood","wheel","nail"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "skateboard",
@@ -4966,6 +5265,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood","wheel","glue"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "wheelbarrow",
@@ -4978,6 +5278,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","wheel","wood"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "chair",
@@ -4991,6 +5292,7 @@ export const ITEMS: DataItem[] = [
         w: ["saw"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "broom",
@@ -5003,6 +5305,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood","straw"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "basket",
@@ -5015,6 +5318,7 @@ export const ITEMS: DataItem[] = [
         f: ["bamboo","rope"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "kite",
@@ -5027,6 +5331,7 @@ export const ITEMS: DataItem[] = [
         f: ["bamboo","paper","thread"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "flute",
@@ -5040,6 +5345,7 @@ export const ITEMS: DataItem[] = [
         w: ["knife"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "drum",
@@ -5052,6 +5358,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood","leather","rope"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "guitar",
@@ -5065,6 +5372,7 @@ export const ITEMS: DataItem[] = [
         w: ["saw"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "crayon",
@@ -5077,6 +5385,7 @@ export const ITEMS: DataItem[] = [
         f: ["beeswax","dye"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "envelope",
@@ -5089,6 +5398,7 @@ export const ITEMS: DataItem[] = [
         f: ["paper","glue"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "notebook",
@@ -5101,6 +5411,7 @@ export const ITEMS: DataItem[] = [
         f: ["paper","thread","glue"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "newspaper",
@@ -5114,6 +5425,7 @@ export const ITEMS: DataItem[] = [
         w: ["printing press"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "box",
@@ -5126,6 +5438,7 @@ export const ITEMS: DataItem[] = [
         f: ["cardboard","glue"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "board game",
@@ -5138,6 +5451,7 @@ export const ITEMS: DataItem[] = [
         f: ["cardboard","paper","ink","wood"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "umbrella",
@@ -5150,6 +5464,7 @@ export const ITEMS: DataItem[] = [
         f: ["fabric","steel","wood"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "matches",
@@ -5162,6 +5477,7 @@ export const ITEMS: DataItem[] = [
         f: ["wood","sulfur","glue"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "lamp",
@@ -5174,6 +5490,7 @@ export const ITEMS: DataItem[] = [
         f: ["light bulb","glass","copper wire"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "washing machine",
@@ -5186,6 +5503,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","electric motor","plastic","rubber"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "fireplace",
@@ -5198,6 +5516,7 @@ export const ITEMS: DataItem[] = [
         f: ["brick","cement"],
       },
     ],
+    tags: ["combine-everyday"],
   },
   {
     name: "garden",
@@ -5210,5 +5529,6 @@ export const ITEMS: DataItem[] = [
         f: ["soil","compost","flower"],
       },
     ],
+    tags: ["combine-everyday"],
   },
 ];

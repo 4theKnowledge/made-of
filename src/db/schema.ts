@@ -89,6 +89,13 @@ export const items = pgTable(
     fact: text("fact").notNull().default(""),
     status: itemStatusEnum("status").notNull().default("live"),
     isCanary: boolean("is_canary").notNull().default(false),
+    // Membership markers (see src/data/types.ts Tag). Treated as a closed
+    // set at the type level; stored as a plain text[] here so new tags can
+    // land without a migration.
+    tags: text("tags")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -15,6 +15,13 @@
       "when": 1793486087133,
       "tag": "0001_parched_thena",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793487736665,
+      "tag": "0002_jazzy_roland_deschain",
+      "breakpoints": true
     }
   ]
 }

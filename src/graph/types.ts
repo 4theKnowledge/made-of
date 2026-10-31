@@ -1,4 +1,5 @@
 import type { Confidence, ItemKind, LinkType, Tier } from "../db/schema";
+import type { Tag } from "../data/types";
 
 export interface GraphEdge {
   /** The other end of the edge (always the slug/id). */
@@ -25,6 +26,8 @@ export interface GraphNode {
   symbol: string | null;
   fact: string;
   recipes: Array<{ id: string; label: string | null; position: number }>;
+  /** Membership markers. Empty array if none. */
+  tags: Tag[];
   /** All edges leading *up* (into the parents, i.e. what this item is made from). */
   up: GraphEdge[];
   /** All edges leading *down* (consumers of this item). */
