@@ -87,6 +87,13 @@ export function CombineBoard({ bundle: serialised }: Props) {
           selected={selectedSlot}
           onSlotTap={onSlotTap}
         />
+        <p className="cbkey">
+          <span>Everything that combines is used up</span>
+          <span>
+            <i className="k2" />
+            Finished things go to your shelf
+          </span>
+        </p>
         {state.choosing && (
           <ChoicePicker
             state={state}
@@ -103,19 +110,39 @@ export function CombineBoard({ bundle: serialised }: Props) {
 
 function TopBar({ state }: { state: GameState }) {
   const helpersLeft = state.swaps + state.clears + state.hints + state.mv;
+  const themeName = state.daily ? "Daily" : state.theme === "everyday" ? "Everyday" : "Everything";
   return (
     <div className="cbtop">
       <div className="cbscore">
         <b>{state.score.toLocaleString("en")}</b>
         <span>best 0</span>
       </div>
-      <button className="cbh cbtheme" type="button" disabled>
-        <span>Everyday</span>
+      <button
+        className="cbh cbtheme"
+        type="button"
+        aria-label={`Theme: ${themeName}. Change theme`}
+        disabled
+      >
+        <span>{themeName}</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </button>
-      <button className="cbh" type="button" disabled>
-        <span className="lbl">Helpers</span>
-        <b>{helpersLeft}</b>
-      </button>
+      <div className="cbhelpwrap">
+        <button
+          className="cbh"
+          id="cbHelp"
+          type="button"
+          aria-label="Helpers"
+          disabled
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 9h18v11H3zM8 9V5h8v4M3 13h18M11 12v3h2v-3" />
+          </svg>
+          <span className="lbl">Helpers</span>
+          <b>{helpersLeft}</b>
+        </button>
+      </div>
     </div>
   );
 }
@@ -129,34 +156,68 @@ function TipLine({
 }) {
   let tip: string;
   if (state.over) tip = "Game over.";
-  else if (state.choosing) tip = "These make more than one thing. Pick one.";
-  else if (selectedSlot != null)
-    tip = "Tap a square to place, or tap a tile to combine on top.";
-  else tip = "Tap a tray tile to pick it up.";
-  return <p className="cbtip" aria-live="polite">{tip}</p>;
+  else if (state.choosing)
+    tip = "These make more than one thing. Pick one.";
+  else if (selectedSlot != null) {
+    // Phase 3C adds ghost-preview-based tips (Nothing glows / Glowing squares
+    // make things you've found before / etc.). For now the single-tile tip.
+    tip = state.found.length
+      ? "Glowing squares make things you've found before. New combos don't glow: try things."
+      : "Nothing glows until you've found it. Drop it on, or beside, things that might go with it.";
+  } else {
+    tip =
+      "Drag a tile onto the board, or tap it and then a square. Things that touch combine.";
+  }
+  return (
+    <p className="cbtip" aria-live="polite">
+      {tip}
+    </p>
+  );
 }
 
 function AgeBar({ state, bundle }: { state: GameState; bundle: ThemeBundle }) {
   const ages = bundle.theme.ages;
+  const last = state.age >= ages.length - 1;
   const need = 6 + 2 * state.age;
-  const next = state.age < ages.length - 1 ? ages[state.age + 1] : null;
-  const pct = Math.min(100, Math.round((state.ageMade / need) * 100));
+  const pct = last ? 100 : Math.min(100, Math.round((state.ageMade / need) * 100));
+  const ariaLabel = `Age ${state.age + 1} of ${ages.length}: ${ages[state.age]}${
+    last ? "" : `. Make ${need - state.ageMade} more to reach ${ages[state.age + 1]}`
+  }`;
   return (
-    <div className="cbage">
-      <div className="an">
+    <div className="cbage" aria-label={ariaLabel}>
+      <span className="an">
         <em>Age {state.age + 1}</em>
         <b>{ages[state.age]}</b>
-      </div>
-      <div className="bar">
+      </span>
+      <span className="bar">
         <i style={{ width: `${pct}%` }} />
-      </div>
-      {next ? (
-        <div className="nx">
-          {state.ageMade}/{need} → {next}
-        </div>
-      ) : (
-        <div className="nx">Final age</div>
-      )}
+      </span>
+      <span className="nx">
+        {last ? "Final age" : `${state.ageMade}/${need} → ${ages[state.age + 1]}`}
+      </span>
+      <button
+        type="button"
+        className="cbsnd"
+        aria-label="Collection"
+        title="Collection"
+        disabled
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 5c3-1 6-1 8 1v14c-2-2-5-2-8-1zM20 5c-3-1-6-1-8 1v14c2-2 5-2 8-1z" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        className="cbsnd"
+        aria-label="Music and sound settings"
+        title="Music and sound"
+        disabled
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 9h4l5-4v14l-5-4H4z" />
+          <path d="M17 9l5 6M22 9l-5 6" />
+        </svg>
+      </button>
     </div>
   );
 }
@@ -165,26 +226,24 @@ function Shelf({ state, bundle }: { state: GameState; bundle: ThemeBundle }) {
   // Group by output id with a count badge.
   const counts = new Map<string, number>();
   for (const id of state.shelf) counts.set(id, (counts.get(id) ?? 0) + 1);
-  if (counts.size === 0) {
-    return (
-      <div className="cbshelf" aria-label="Shelf">
-        <span className="cbshelf-empty">
-          Finished things land here.
-        </span>
-      </div>
-    );
-  }
+  const empty = counts.size === 0;
   return (
-    <div className="cbshelf" aria-label="Shelf">
+    <div
+      className={`cbshelf${empty ? " none" : ""}`}
+      aria-label={`Made and shipped: ${state.shelf.length}`}
+    >
       {[...counts.entries()].map(([id, n]) => {
         const item = bundle.items.get(id);
         if (!item) return null;
         return (
-          <div
+          <button
             key={id}
+            type="button"
             className="cbslot"
             style={fillVar(item)}
+            aria-label={`${cap(item.name)}${n > 1 ? `, ×${n}` : ""}. Show how it's made`}
             title={cap(item.name)}
+            disabled
           >
             <Pictogram
               name={item.name}
@@ -192,10 +251,14 @@ function Shelf({ state, bundle }: { state: GameState; bundle: ThemeBundle }) {
               kind={item.kind}
               symbol={item.symbol}
             />
-            {n > 1 && <b>×{n}</b>}
-          </div>
+            {n > 1 && <b>{n}</b>}
+          </button>
         );
       })}
+      <span className="cbslot cbslot-next" aria-hidden="true" />
+      {empty && (
+        <span className="cbshelf-empty">Finished things land here</span>
+      )}
     </div>
   );
 }
