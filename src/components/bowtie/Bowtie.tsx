@@ -239,7 +239,7 @@ export function Bowtie({ view, mode, daily, onChipClick }: BowtieViewProps) {
   const renderSideChip = (edge: ExploreEdge, dir: "up" | "down", i: number) => {
     const closed = markers.closedCodes.has(edge.item.code);
     const target = markers.goalCode === edge.item.code;
-    const hint = markers.hintCodes.has(edge.item.code);
+    const hint = markers.lastHintCode === edge.item.code;
     const weak =
       edge.confidence === "debated" || edge.confidence === "hypothesis";
 
@@ -279,6 +279,8 @@ export function Bowtie({ view, mode, daily, onChipClick }: BowtieViewProps) {
 
     const chipEl =
       mode === "daily" ? (
+        // Closed chips are *not* disabled — a click fires onChipClick so the
+        // parent can run the busy-hub shake, matching the prototype.
         <button
           key={edge.linkCode}
           type="button"
@@ -286,7 +288,6 @@ export function Bowtie({ view, mode, daily, onChipClick }: BowtieViewProps) {
           onClick={(e) =>
             onChipClick?.(edge.item.code, e.currentTarget as HTMLElement)
           }
-          disabled={closed}
           aria-disabled={closed}
         >
           {inner}

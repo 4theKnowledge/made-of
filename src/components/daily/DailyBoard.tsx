@@ -6,7 +6,12 @@ import { Bowtie } from "@/components/bowtie/Bowtie";
 import { flyPictogram } from "@/components/bowtie/fly";
 import { cap } from "@/lib/taxonomy";
 import type { ExploreView } from "@/components/explore/types";
-import type { DailyPuzzle, GameState, MoveResponse } from "./types";
+import type {
+  DailyPuzzle,
+  GameState,
+  MoveResponse,
+  PathStep,
+} from "./types";
 import { EMPTY_GAME } from "./types";
 
 /**
@@ -26,18 +31,22 @@ export function DailyBoard({
 }) {
   const storageKey = `madeof:daily:${puzzle.date}`;
 
+  const startStep: PathStep = {
+    code: puzzle.start.code,
+    name: puzzle.start.name,
+  };
+
   const [view, setView] = useState<ExploreView>(initialView);
   const [game, setGame] = useState<GameState>(() => ({
     ...EMPTY_GAME,
-    path: [puzzle.start.code],
+    path: [startStep],
   }));
   const [hintMsg, setHintMsg] = useState<string>("");
   const [moving, setMoving] = useState(false);
   const [giveUpSteps, setGiveUpSteps] = useState<ExploreView["originChain"] | null>(null);
-  const [hintCodes, setHintCodes] = useState<Set<string>>(new Set());
+  const [copyMsg, setCopyMsg] = useState<string>("");
 
   // Fly-ghost rect sources, captured on chip click.
-  const flyFromRef = useRef<HTMLElement | null>(null);
   const focusHeadRef = useRef<HTMLDivElement | null>(null);
 
   // Hydrate from localStorage.
@@ -46,11 +55,14 @@ export function DailyBoard({
       const raw = localStorage.getItem(storageKey);
       if (!raw) return;
       const saved = JSON.parse(raw) as GameState | null;
-      if (!saved?.path || saved.path[0] !== puzzle.start.code) return;
+      if (!saved?.path?.length) return;
+      // Backwards-compat: old shape stored string codes.
+      const first = saved.path[0];
+      if (typeof first === "string") return;
+      if (first.code !== puzzle.start.code) return;
       setGame(saved);
-      setHintCodes(new Set(saved.hintCodes));
       if (saved.path.length > 1) {
-        void loadView(saved.path[saved.path.length - 1]);
+        void loadView(saved.path[saved.path.length - 1].code);
       }
     } catch {
       /* ignore */
@@ -74,25 +86,11 @@ export function DailyBoard({
     setView(body);
   }, []);
 
-  const closedCodes = useMemo(() => {
-    // The server tells us per-neighbour "closed" via /api/daily/move result.
-    // For the bowtie we need every potentially-closed neighbour marked
-    // whether we've visited it or not. The simplest route: hit
-    // /api/daily/neighbours when the bowtie changes to get the flags, then
-    // merge. But /api/daily/neighbours uses the daily-rate limiter and
-    // charges per hop. For now we build the set lazily by prefetching
-    // closed flags on view load. Phase 3 polish: include closed/isGoal in
-    // the view payload directly.
-    void view;
-    return new Set<string>();
-  }, [view]);
-
   // Keep a live cache of closed-neighbour codes for the current view.
   const [closedFromServer, setClosedFromServer] = useState<Set<string>>(
     new Set(),
   );
   useEffect(() => {
-    // Fetch per-view closed flags once per focus change.
     let cancelled = false;
     (async () => {
       try {
@@ -118,19 +116,12 @@ export function DailyBoard({
     };
   }, [view.item.code, puzzle.date]);
 
-  const effectiveClosed = useMemo(() => {
-    const out = new Set(closedFromServer);
-    for (const c of closedCodes) out.add(c);
-    return out;
-  }, [closedCodes, closedFromServer]);
-
   const moves = game.path.length - 1;
 
   const onChipClick = useCallback(
     async (targetCode: string, chipEl: HTMLElement) => {
       if (moving || game.done) return;
 
-      flyFromRef.current = chipEl;
       setMoving(true);
       setHintMsg("");
 
@@ -150,6 +141,11 @@ export function DailyBoard({
             setHintMsg(
               `${cap(body.name ?? "That item")} is a busy hub, so it's closed in puzzles. Find another way.`,
             );
+            // Retrigger the .nope shake, matching prototype.
+            chipEl.classList.remove("nope");
+            // Force reflow so the keyframes restart.
+            void chipEl.offsetWidth;
+            chipEl.classList.add("nope");
           } else {
             setHintMsg("That isn't a direct link.");
           }
@@ -157,13 +153,10 @@ export function DailyBoard({
         }
         if (!body.arrived || !body.delta) return;
 
-        // Pluck the chip's pictogram tile before the view swaps away.
         const srcIc = chipEl.querySelector<HTMLElement>(".ic");
 
         await loadView(body.arrived.code);
 
-        // Delightful: hide the fresh focus head, fly the pictogram ghost in,
-        // then fade the real head back in.
         requestAnimationFrame(() => {
           const head = focusHeadRef.current?.querySelector<HTMLElement>(".fpic .ic");
           const headWrap = focusHeadRef.current?.querySelector<HTMLElement>(".fhead");
@@ -182,13 +175,14 @@ export function DailyBoard({
           });
         });
 
+        const arrived = body.arrived;
         setGame((g) => ({
           ...g,
-          path: [...g.path, body.arrived!.code],
+          path: [...g.path, { code: arrived.code, name: arrived.name }],
           deltas: [...g.deltas, body.delta!],
+          lastHintCode: null,
           done: Boolean(body.done),
         }));
-        setHintCodes(new Set());
       } finally {
         setMoving(false);
       }
@@ -200,19 +194,19 @@ export function DailyBoard({
     if (moves === 0 || game.done) return;
     const newPath = game.path.slice(0, -1);
     const newDeltas = game.deltas.slice(0, -1);
-    const prevCode = newPath[newPath.length - 1];
+    const prev = newPath[newPath.length - 1];
     setMoving(true);
     setHintMsg("");
     try {
-      await loadView(prevCode);
-      setGame({
+      await loadView(prev.code);
+      setGame((g) => ({
+        ...g,
         path: newPath,
         deltas: newDeltas,
-        hintCodes: game.hintCodes,
+        lastHintCode: null,
         gaveUp: false,
         done: false,
-      });
-      setHintCodes(new Set());
+      }));
     } finally {
       setMoving(false);
     }
@@ -228,19 +222,22 @@ export function DailyBoard({
       });
       if (!res.ok) return;
       const body = (await res.json()) as {
-        hint: { code: string; name: string } | null;
+        hint: { code: string; name: string; recipeLabel: string | null } | null;
       };
       if (!body.hint) return;
+      const hint = body.hint;
       setGame((g) => ({
         ...g,
-        hintCodes: [...g.hintCodes, body.hint!.code],
+        hintCodes: g.hintCodes.includes(hint.code)
+          ? g.hintCodes
+          : [...g.hintCodes, hint.code],
+        lastHintCode: hint.code,
       }));
-      setHintCodes((s) => {
-        const next = new Set(s);
-        next.add(body.hint!.code);
-        return next;
-      });
-      setHintMsg(`Head for ${body.hint.name}.`);
+      setHintMsg(
+        hint.recipeLabel
+          ? `Head for ${hint.name}. It's in the "${hint.recipeLabel}" recipe.`
+          : `Head for ${hint.name}.`,
+      );
     } catch {
       /* ignore */
     }
@@ -269,12 +266,16 @@ export function DailyBoard({
     const hintSuffix = game.hintCodes.length
       ? ` · ${game.hintCodes.length} hint${game.hintCodes.length > 1 ? "s" : ""}`
       : "";
+    const url = typeof window !== "undefined" ? window.location.origin + "/" : "";
     return [
       `Made Of · Daily link #${puzzle.number}`,
       `${cap(puzzle.start.name)} → ${cap(puzzle.goal.name)}`,
       `${moves} moves (par ${puzzle.par})`,
       squaresPlain + hintSuffix,
-    ].join("\n");
+      url,
+    ]
+      .filter(Boolean)
+      .join("\n");
   }, [
     game.deltas,
     game.hintCodes.length,
@@ -284,20 +285,6 @@ export function DailyBoard({
     puzzle.par,
     puzzle.start.name,
   ]);
-
-  // Trail of names from path codes. We have names for puzzle.start, puzzle.goal
-  // and view.item.name (current); intermediate names aren't persisted in state,
-  // so the trail is "start › … › current".
-  const trail = useMemo(() => {
-    if (game.path.length <= 1) return [puzzle.start.name];
-    if (game.path.length === 2)
-      return [puzzle.start.name, view.item.name];
-    return [
-      puzzle.start.name,
-      ...Array(game.path.length - 2).fill("…"),
-      view.item.name,
-    ];
-  }, [game.path.length, puzzle.start.name, view.item.name]);
 
   return (
     <>
@@ -367,13 +354,13 @@ export function DailyBoard({
       </section>
 
       <nav className="trail" aria-label="Your path">
-        {trail.map((n, i) => (
+        {game.path.map((step, i) => (
           <span
-            key={`${n}-${i}`}
-            className={i === trail.length - 1 ? "now" : ""}
+            key={`${step.code}-${i}`}
+            className={i === game.path.length - 1 ? "now" : ""}
           >
             {i > 0 ? <span aria-hidden="true">› </span> : null}
-            {cap(n)}
+            {cap(step.name)}
           </span>
         ))}
       </nav>
@@ -385,15 +372,15 @@ export function DailyBoard({
           mode="daily"
           daily={{
             goalCode: puzzle.goal.code,
-            closedCodes: effectiveClosed,
-            hintCodes,
+            closedCodes: closedFromServer,
+            lastHintCode: game.lastHintCode,
           }}
           onChipClick={onChipClick}
         />
       </div>
 
       {game.done && !game.gaveUp && (
-        <section className="panel">
+        <section className="panel" aria-live="polite">
           <h3>
             {moves <= puzzle.par
               ? game.hintCodes.length > 0
@@ -422,18 +409,32 @@ export function DailyBoard({
               </span>
             ) : null}
           </div>
+          <p className="msg">
+            Green means a move took you closer, yellow kept you level, red
+            took you further away.
+          </p>
           <pre className="share">{shareText}</pre>
           <div className="row">
             <button
               className="btn primary"
               type="button"
-              onClick={() => {
-                navigator.clipboard?.writeText(shareText).catch(() => undefined);
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(shareText);
+                  setCopyMsg("Copied.");
+                } catch {
+                  setCopyMsg("Select the text above and copy it.");
+                }
               }}
             >
               Copy result
             </button>
+            <span className="msg" role="status">{copyMsg}</span>
           </div>
+          <p className="msg nudge">
+            Want to play this with a class?{" "}
+            <a href="/pricing">See what's coming for classrooms</a>.
+          </p>
         </section>
       )}
 
@@ -445,7 +446,7 @@ export function DailyBoard({
           <div className="chain">
             {giveUpSteps.map((s, i) => (
               <div
-                key={s.slug}
+                key={`${s.code}-${i}`}
                 className={`node${i === giveUpSteps.length - 1 ? " end" : ""}`}
               >
                 <Pictogram

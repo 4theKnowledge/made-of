@@ -53,10 +53,35 @@ export async function POST(req: NextRequest) {
     if (!hintId) return NextResponse.json({ hint: null });
 
     const node = live.snapshot.nodes.get(hintId)!;
+
+    // Recipe-context clause: if the hint target is reached via a *non-primary*
+    // recipe of the current item (and isn't among its direct up-edges on the
+    // primary recipe), the prototype adds `It's in the "<label>" recipe.`
+    // Mirrors `inRecipe = current.recipes.findIndex(r => r.e|f|w|n includes next)`
+    // and the primary-recipe exclusion in the artifact (around line 2085).
+    const fromNode = live.snapshot.nodes.get(fromId)!;
+    let recipeLabel: string | null = null;
+    if (fromNode.recipes.length > 1) {
+      const primaryId = fromNode.recipes[0]?.id ?? null;
+      const inPrimary = fromNode.up.some(
+        (e) => e.id === hintId && (e.recipeId === primaryId || e.recipeId === null),
+      );
+      if (!inPrimary) {
+        const inOther = fromNode.up.find(
+          (e) => e.id === hintId && e.recipeId && e.recipeId !== primaryId,
+        );
+        if (inOther) {
+          const r = fromNode.recipes.find((r) => r.id === inOther.recipeId);
+          if (r?.label) recipeLabel = r.label;
+        }
+      }
+    }
+
     return NextResponse.json({
       hint: {
         code: live.itemCodes.toCode(hintId),
         name: node.name,
+        recipeLabel,
       },
     });
   }) as Promise<Response>;

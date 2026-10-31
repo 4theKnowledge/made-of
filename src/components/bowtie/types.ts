@@ -7,14 +7,17 @@ export interface DailyMarkers {
   goalCode: string | null;
   /** Codes of items closed in puzzles; chips get .closed. */
   closedCodes: Set<string>;
-  /** Codes of items currently flagged as hint; chips get .hint. */
-  hintCodes: Set<string>;
+  /**
+   * The *last* hinted code — only this chip glows (prototype P.lastHint).
+   * null when the user has moved on or hasn't asked for a hint yet.
+   */
+  lastHintCode: string | null;
 }
 
 export const EMPTY_MARKERS: DailyMarkers = {
   goalCode: null,
   closedCodes: new Set(),
-  hintCodes: new Set(),
+  lastHintCode: null,
 };
 
 export interface BowtieViewProps {

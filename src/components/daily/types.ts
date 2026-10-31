@@ -33,12 +33,20 @@ export interface MoveResponse {
   neighbours?: DailyNeighbour[];
 }
 
+export interface PathStep {
+  code: string;
+  name: string;
+}
+
 export interface GameState {
-  /** Codes along the path; path[0] is start. */
-  path: string[];
+  /** Steps along the path; path[0] is start. */
+  path: PathStep[];
   /** Deltas array; deltas[i] is for the move from path[i] to path[i+1]. */
   deltas: MoveDelta[];
+  /** Every item code ever hinted at (so the counter persists across moves). */
   hintCodes: string[];
+  /** Only the most recent hint — only this chip glows (prototype P.lastHint). */
+  lastHintCode: string | null;
   gaveUp: boolean;
   done: boolean;
 }
@@ -47,6 +55,7 @@ export const EMPTY_GAME: GameState = {
   path: [],
   deltas: [],
   hintCodes: [],
+  lastHintCode: null,
   gaveUp: false,
   done: false,
 };
