@@ -1,14 +1,17 @@
 import Link from "next/link";
+import { getSession } from "@/lib/session";
 
 /**
  * Shared header, used by static pages and anywhere a page doesn't need to
  * compute per-item tab targets.
  */
-export function Header({
+export async function Header({
   current,
 }: {
-  current?: "daily" | "explore" | "scratch" | "pricing" | "about";
+  current?: "daily" | "explore" | "scratch" | "pricing" | "about" | "account";
 }) {
+  const session = await getSession();
+
   return (
     <header>
       <div className="brand">
@@ -36,6 +39,17 @@ export function Header({
         <Link href="/about" className={current === "about" ? "on" : ""}>
           About
         </Link>
+        {session ? (
+          <Link
+            href="/account"
+            className={current === "account" ? "on" : ""}
+            title={session.user.email}
+          >
+            Account
+          </Link>
+        ) : (
+          <Link href="/sign-in">Sign in</Link>
+        )}
       </nav>
     </header>
   );

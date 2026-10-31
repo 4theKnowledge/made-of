@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Footer } from "@/components/common/Footer";
+import { AuthNavLink } from "@/components/common/AuthNavLink";
 import { getLiveSnapshot } from "@/graph/live";
 import {
   bestRecipe,
@@ -102,6 +103,7 @@ export default async function ScratchPage() {
           <Link href="/scratch" className="on">
             From scratch
           </Link>
+          <AuthNavLink />
         </nav>
       </header>
 

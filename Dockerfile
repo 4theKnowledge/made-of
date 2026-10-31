@@ -7,7 +7,7 @@ ARG NODE_VERSION=22-alpine
 # -- deps ---------------------------------------------------------------------
 FROM node:${NODE_VERSION} AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json* .npmrc* ./
 # Named cache mount: Railway rejects BuildKit cache mounts without an id so it
 # can scope the cache per-service. The literal value here is given to us by
 # Railway's build validation; any stable id works locally.

@@ -19,11 +19,13 @@
     "predeploy": "node dist-scripts/migrate.js && node dist-scripts/seed-if-empty.js"
   },
   "dependencies": {
+    "better-auth": "^1.7.14",
     "drizzle-orm": "^0.36.4",
     "next": "^15.5.28",
     "postgres": "^3.4.5",
     "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react-dom": "19.0.0",
+    "resend": "^6.37.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",

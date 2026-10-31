@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Footer } from "@/components/common/Footer";
+import { AuthNavLink } from "@/components/common/AuthNavLink";
 import { getExploreView } from "@/graph/explore";
 import { ExploreShell } from "@/components/explore/ExploreShell";
 
@@ -46,6 +47,7 @@ export default async function ExplorePage({
             Explore
           </Link>
           <Link href="/scratch">From scratch</Link>
+          <AuthNavLink />
         </nav>
       </header>
 
