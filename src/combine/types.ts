@@ -3,7 +3,7 @@
  * `ThemeBundle`; the full graph never crosses this boundary.
  */
 
-import type { Tier } from "../db/schema";
+import type { ItemKind, Tier } from "../db/schema";
 
 export type ThemeKey = "everyday" | "everything";
 
@@ -38,7 +38,7 @@ export interface CombineItem {
   tier: Tier;
   symbol: string | null;
   fact: string;
-  kind: string;
+  kind: ItemKind;
 }
 
 /** The subset of a theme that is "in play" at a given age index (0-based).

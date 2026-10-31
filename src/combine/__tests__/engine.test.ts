@@ -38,7 +38,7 @@ function fakeBundle(opts: {
     tier: "F" | "N" | "M" | "C" | "P" | "S";
     symbol: string | null;
     fact: string;
-    kind: string;
+    kind: "object";
   }>();
   const touched = new Set<string>([...outputs, ...ingredients]);
   for (const id of touched) {

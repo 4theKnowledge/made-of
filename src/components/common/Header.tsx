@@ -9,7 +9,14 @@ import { AuthNavLink } from "./AuthNavLink";
 export function Header({
   current,
 }: {
-  current?: "daily" | "explore" | "scratch" | "pricing" | "about" | "account";
+  current?:
+    | "daily"
+    | "explore"
+    | "scratch"
+    | "combine"
+    | "pricing"
+    | "about"
+    | "account";
 }) {
   return (
     <header>
@@ -31,6 +38,9 @@ export function Header({
         </Link>
         <Link href="/scratch" className={current === "scratch" ? "on" : ""}>
           From scratch
+        </Link>
+        <Link href="/combine" className={current === "combine" ? "on" : ""}>
+          Combine
         </Link>
         <Link href="/pricing" className={current === "pricing" ? "on" : ""}>
           Pricing
