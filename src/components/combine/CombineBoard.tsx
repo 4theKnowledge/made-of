@@ -1,13 +1,32 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import { newGame, reduce } from "@/combine/engine";
-import type { Action, GameState } from "@/combine/engine";
+import type { Action, Event, GameState } from "@/combine/engine";
 import { hydrateBundle, type SerialisedBundle } from "@/combine/serialise";
 import type { CombineItem, ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
+
+/**
+ * Transient per-move visual state. Keys match the prototype's `renderCB(fx)`
+ * contract. Each entry is set from an engine event, applied as a CSS class
+ * or badge on the matching cell, and cleared after its animation duration.
+ */
+interface Fx {
+  placed?: number;
+  nope?: number;
+  fuse?: Set<number>;
+  pop?: number;
+  burst?: { at: number; pts: number; mult: number };
+  shipped?: { at: number; bonus: number };
+  crumble?: Set<number>;
+  /** Chain multiplier for the top-row ×N badge. */
+  chain?: number;
+  /** Close-call bonus for the "Close call!" badge. */
+  close?: number;
+}
 
 interface Props {
   bundle: SerialisedBundle;
@@ -26,21 +45,71 @@ export function CombineBoard({ bundle: serialised }: Props) {
 
   const [state, setState] = useState<GameState>(initial);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
-  const [nopeCell, setNopeCell] = useState<number | null>(null);
+  const [fx, setFx] = useState<Fx>({});
+  // Pending clears so overlapping actions don't orphan timers.
+  const timers = useRef<number[]>([]);
+  useEffect(() => () => {
+    for (const t of timers.current) window.clearTimeout(t);
+  }, []);
 
-  // Apply an action: run reduce once, read events, then set the new state.
+  const scheduleClear = useCallback((patch: Partial<Fx>, delay: number) => {
+    const id = window.setTimeout(() => {
+      setFx((cur) => {
+        const next: Fx = { ...cur };
+        for (const k of Object.keys(patch) as (keyof Fx)[]) {
+          delete next[k];
+        }
+        return next;
+      });
+    }, delay);
+    timers.current.push(id);
+  }, []);
+
+  const applyEvents = useCallback(
+    (events: Event[]) => {
+      // Fold events into one fx patch so React batches a single render.
+      const patch: Fx = {};
+      for (const e of events) {
+        if (e.type === "placed") patch.placed = e.at;
+        else if (e.type === "nope") patch.nope = e.at;
+        else if (e.type === "combine") {
+          patch.fuse = new Set([...(patch.fuse ?? []), ...e.cells]);
+          patch.pop = e.at;
+          patch.burst = { at: e.at, pts: e.pts, mult: e.mult };
+          if (e.mult > 1) patch.chain = e.mult;
+          if (e.close) patch.close = e.close;
+        } else if (e.type === "shipped") {
+          patch.shipped = { at: e.at, bonus: e.bonus };
+        } else if (e.type === "crumble") {
+          patch.crumble = new Set(e.cells);
+        }
+      }
+      if (Object.keys(patch).length === 0) return;
+      setFx((cur) => ({ ...cur, ...patch }));
+      // Durations roughly match the prototype's cbWait timings.
+      if (patch.placed != null) scheduleClear({ placed: 0 }, 260);
+      if (patch.nope != null) scheduleClear({ nope: 0 }, 380);
+      if (patch.fuse || patch.pop || patch.burst || patch.chain || patch.close) {
+        scheduleClear(
+          { fuse: undefined, pop: 0, burst: undefined, chain: 0, close: 0 },
+          900,
+        );
+      }
+      if (patch.shipped) scheduleClear({ shipped: undefined }, 480);
+      if (patch.crumble) scheduleClear({ crumble: undefined }, 500);
+    },
+    [scheduleClear],
+  );
+
+  // Apply an action: run reduce once, update state, and route events.
   const act = useCallback(
     (action: Action) => {
       const r = reduce(state, bundle, action);
-      if (r.events.some((e) => e.type === "nope")) {
-        const target = action.type === "drop-on" ? action.cell : null;
-        setNopeCell(target);
-        setTimeout(() => setNopeCell(null), 350);
-      }
       setState(r.state);
+      applyEvents(r.events);
       setSelectedSlot(null);
     },
-    [state, bundle],
+    [state, bundle, applyEvents],
   );
 
   const onCellTap = useCallback(
@@ -70,15 +139,15 @@ export function CombineBoard({ bundle: serialised }: Props) {
   return (
     <div className="cbwrap">
       <div id="cb">
-        <TopBar state={state} />
+        <TopBar state={state} fx={fx} />
         <TipLine state={state} selectedSlot={selectedSlot} />
         <AgeBar state={state} bundle={bundle} />
-        <Shelf state={state} bundle={bundle} />
+        <Shelf state={state} bundle={bundle} fx={fx} />
         <Board
           state={state}
           bundle={bundle}
           selectedSlot={selectedSlot}
-          nopeCell={nopeCell}
+          fx={fx}
           onCellTap={onCellTap}
         />
         <Tray
@@ -108,7 +177,7 @@ export function CombineBoard({ bundle: serialised }: Props) {
 
 /* --- Top row: score + helpers (count badges only, menu lands later) --- */
 
-function TopBar({ state }: { state: GameState }) {
+function TopBar({ state, fx }: { state: GameState; fx: Fx }) {
   const helpersLeft = state.swaps + state.clears + state.hints + state.mv;
   const themeName = state.daily ? "Daily" : state.theme === "everyday" ? "Everyday" : "Everything";
   return (
@@ -117,6 +186,16 @@ function TopBar({ state }: { state: GameState }) {
         <b>{state.score.toLocaleString("en")}</b>
         <span>best 0</span>
       </div>
+      {fx.chain && fx.chain > 1 ? (
+        <span className="cbchain" aria-live="polite">
+          ×{fx.chain} chain
+        </span>
+      ) : null}
+      {fx.close ? (
+        <span className="cbchain cbclose" aria-live="polite">
+          Close call! +{fx.close}
+        </span>
+      ) : null}
       <button
         className="cbh cbtheme"
         type="button"
@@ -222,11 +301,23 @@ function AgeBar({ state, bundle }: { state: GameState; bundle: ThemeBundle }) {
   );
 }
 
-function Shelf({ state, bundle }: { state: GameState; bundle: ThemeBundle }) {
+function Shelf({
+  state,
+  bundle,
+  fx,
+}: {
+  state: GameState;
+  bundle: ThemeBundle;
+  fx: Fx;
+}) {
   // Group by output id with a count badge.
   const counts = new Map<string, number>();
   for (const id of state.shelf) counts.set(id, (counts.get(id) ?? 0) + 1);
   const empty = counts.size === 0;
+  // The id that just landed on the shelf, so it gets .new.
+  const freshlyShipped = fx.shipped
+    ? state.shelf[state.shelf.length - 1]
+    : null;
   return (
     <div
       className={`cbshelf${empty ? " none" : ""}`}
@@ -235,11 +326,12 @@ function Shelf({ state, bundle }: { state: GameState; bundle: ThemeBundle }) {
       {[...counts.entries()].map(([id, n]) => {
         const item = bundle.items.get(id);
         if (!item) return null;
+        const isNew = id === freshlyShipped;
         return (
           <button
             key={id}
             type="button"
-            className="cbslot"
+            className={`cbslot${isNew ? " new" : ""}`}
             style={fillVar(item)}
             aria-label={`${cap(item.name)}${n > 1 ? `, ×${n}` : ""}. Show how it's made`}
             title={cap(item.name)}
@@ -267,13 +359,13 @@ function Board({
   state,
   bundle,
   selectedSlot,
-  nopeCell,
+  fx,
   onCellTap,
 }: {
   state: GameState;
   bundle: ThemeBundle;
   selectedSlot: number | null;
-  nopeCell: number | null;
+  fx: Fx;
   onCellTap: (cell: number) => void;
 }) {
   const size = state.n;
@@ -284,44 +376,78 @@ function Board({
       role="grid"
       aria-label="Board"
     >
-      {state.board.map((v, i) => (
-        <Cell
-          key={i}
-          cell={i}
-          id={v}
-          bundle={bundle}
-          selectedSlot={selectedSlot}
-          nope={nopeCell === i}
-          onTap={() => onCellTap(i)}
-        />
-      ))}
+      {state.board.map((v, i) => {
+        const crumbleTick =
+          v && state.crumb[i]?.id === v ? state.crumb[i]!.n : 0;
+        return (
+          <Cell
+            key={i}
+            cell={i}
+            id={v}
+            bundle={bundle}
+            selectedSlot={selectedSlot}
+            crumbleTick={crumbleTick}
+            fx={fx}
+            onTap={() => onCellTap(i)}
+          />
+        );
+      })}
     </div>
   );
 }
+
+const CRUMBLE_TTL = 3;
 
 function Cell({
   cell,
   id,
   bundle,
   selectedSlot,
-  nope,
+  crumbleTick,
+  fx,
   onTap,
 }: {
   cell: number;
   id: string | null;
   bundle: ThemeBundle;
   selectedSlot: number | null;
-  nope: boolean;
+  crumbleTick: number;
+  fx: Fx;
   onTap: () => void;
 }) {
   const empty = !id;
   const item = id ? bundle.items.get(id) : null;
+
+  const inFuse = fx.fuse?.has(cell) ?? false;
+  const inCrumble = fx.crumble?.has(cell) ?? false;
+  const isPop = fx.pop === cell;
+  const isPlaced = fx.placed === cell;
+  const isNope = fx.nope === cell;
+  const isShipped = fx.shipped?.at === cell;
+  const burst = fx.burst?.at === cell ? fx.burst : null;
+
   const classes = ["cbc"];
   if (!empty) classes.push("full");
-  if (nope) classes.push("nope");
+  if (isPlaced) classes.push("placed");
+  if (inFuse) classes.push("fuse");
+  if (isPop) classes.push("cbpopc");
+  if (isNope) classes.push("nope");
+  if (isShipped) classes.push("ship");
+  if (crumbleTick > 0 && !inCrumble) classes.push("crumbling");
+  if (inCrumble) classes.push("crumble");
+
   const words = id ? id.split("-") : [];
   const longest = Math.max(0, ...words.map((w) => w.length));
   const lenClass = longest >= 10 ? " l2" : longest >= 7 ? " l1" : "";
+
+  const ariaLabel = item
+    ? `${cap(item.name)}${
+        crumbleTick > 0
+          ? `, crumbling: nothing in this age uses it, gone in ${CRUMBLE_TTL + 1 - crumbleTick} turns`
+          : ""
+      }`
+    : `Empty cell ${cell}`;
+
   return (
     <button
       type="button"
@@ -329,12 +455,10 @@ function Cell({
       data-cb={cell}
       style={item ? fillVar(item) : undefined}
       onClick={onTap}
-      aria-label={
-        item ? `${cap(item.name)} at cell ${cell}` : `Empty cell ${cell}`
-      }
+      aria-label={ariaLabel}
       disabled={empty && selectedSlot == null}
     >
-      {item ? (
+      {item && (
         <>
           <Pictogram
             name={item.name}
@@ -344,7 +468,17 @@ function Cell({
           />
           <span className={`cbn${lenClass}`}>{cap(item.name)}</span>
         </>
-      ) : null}
+      )}
+      {burst && <span className="pts">+{burst.pts}</span>}
+      {isNope && <span className="pts nope">no recipe</span>}
+      {isShipped && (
+        <span className="pts ship">shipped +{fx.shipped!.bonus}</span>
+      )}
+      {crumbleTick > 0 && !inCrumble && (
+        <span className="crk" aria-hidden="true">
+          {CRUMBLE_TTL + 1 - crumbleTick}
+        </span>
+      )}
     </button>
   );
 }

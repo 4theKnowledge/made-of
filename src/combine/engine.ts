@@ -102,7 +102,16 @@ export interface GameState {
 export type Event =
   | { type: "placed"; at: number; tile: string }
   | { type: "nope"; at: number }
-  | { type: "combine"; cells: number[]; out: string; mult: number; close: number }
+  | {
+      type: "combine";
+      cells: number[];
+      /** Cell the output tile landed on. */
+      at: number;
+      out: string;
+      pts: number;
+      mult: number;
+      close: number;
+    }
   | { type: "shipped"; at: number; out: string; bonus: number }
   | { type: "age-up"; age: number; sample: string[] }
   | { type: "crumble"; cells: number[] }
@@ -262,7 +271,9 @@ function finishResolve(
   events.push({
     type: "combine",
     cells: cells.slice(),
+    at: choice,
     out: recipe.out,
+    pts,
     mult,
     close,
   });

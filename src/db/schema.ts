@@ -67,6 +67,11 @@ export const sourceKindEnum = pgEnum("source_kind", [
   "encyclopedia",
 ]);
 
+// Access-control role on the user table. `admin` unlocks /admin and the
+// matching API routes. Flipped manually in Postgres (there is no self-serve
+// path), so we keep the set small on purpose.
+export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
+
 /* ========================================================================
  * Items.
  *
