@@ -1,8 +1,6 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parsePrototype } from "../parser/prototype";
-import { toRows } from "../parser/load";
+import { loadKnowledgeBase } from "../data/load";
+import { toRows } from "../data/rows";
 import {
   ancestors,
   buildSnapshot,
@@ -11,18 +9,14 @@ import {
   shortestPath,
 } from "./snapshot";
 
-const HTML = readFileSync(
-  resolve(process.cwd(), "legacy/made-of.html"),
-  "utf8",
-);
-const rows = toRows(parsePrototype(HTML));
+const rows = toRows(loadKnowledgeBase());
 const snap = buildSnapshot(rows);
 
 /* Cases chosen from the prototype, so the ported snapshot must agree. */
 
 describe("buildSnapshot", () => {
   it("has one node per item", () => {
-    expect(snap.nodes.size).toBe(276);
+    expect(snap.nodes.size).toBe(rows.items.length);
   });
 
   it("every node's up and down edges are self-consistent", () => {

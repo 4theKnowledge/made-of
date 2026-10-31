@@ -1,10 +1,8 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { parsePrototype } from "../parser/prototype";
-import { toRows } from "../parser/load";
-import { buildCanaryLinks } from "../parser/canaries";
+import { loadKnowledgeBase } from "../data/load";
+import { toRows } from "../data/rows";
+import { buildCanaryLinks } from "../data/canaries";
 import { buildSnapshot } from "../graph/snapshot";
 import { buildCodeMap } from "../graph/codes";
 import { buildClosedSet } from "../graph/daily";
@@ -18,13 +16,9 @@ import { GET as getSearch } from "../app/api/search/route";
 import { GET as getPath } from "../app/api/path/route";
 import { GET as getEverything } from "../app/api/items/[code]/everything/route";
 
-/* Build an in-memory LiveSnapshot from the artifact + canaries. No DB needed. */
+/* Build an in-memory LiveSnapshot from the knowledge base + canaries. No DB needed. */
 function buildFixture(): LiveSnapshot {
-  const html = readFileSync(
-    resolve(process.cwd(), "legacy/made-of.html"),
-    "utf8",
-  );
-  const rows = toRows(parsePrototype(html));
+  const rows = toRows(loadKnowledgeBase());
   const canaries = buildCanaryLinks(new Set(rows.items.map((i) => i.id)));
   rows.links.push(...canaries.links);
   const snapshot = buildSnapshot(rows);

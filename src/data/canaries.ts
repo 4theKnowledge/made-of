@@ -34,7 +34,7 @@ export interface CanarySpec {
  * The canary set. Keep this small — three to five is plenty for proof.
  *
  * Each pair references items that definitely exist (asserted at seed time).
- * Review this list whenever the artifact gains or loses items.
+ * Review this list whenever the knowledge base gains or loses items.
  */
 export const CANARIES: CanarySpec[] = [
   {

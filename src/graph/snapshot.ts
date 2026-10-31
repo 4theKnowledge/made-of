@@ -1,16 +1,16 @@
 /**
  * In-memory graph snapshot.
  *
- * Built once at server boot from the loaded parser rows (or directly from
- * Postgres in later phases). Pathfinding and "everything it takes" run
- * against the snapshot, never SQL.
+ * Built once at server boot from the seed rows (or directly from Postgres
+ * in later phases). Pathfinding and "everything it takes" run against the
+ * snapshot, never SQL.
  *
  * Mirrors the artifact's graph helpers (ancestors, bfsU, connect) so the
  * ported UI stays byte-identical in behaviour.
  */
 
 import type { Confidence, LinkType } from "../db/schema";
-import type { LoadedRows } from "../parser/load";
+import type { SeedRows } from "../data/rows";
 import type { GraphEdge, GraphNode, PathStep } from "./types";
 
 export interface Snapshot {
@@ -19,7 +19,7 @@ export interface Snapshot {
   byName: Map<string, GraphNode>;
 }
 
-export function buildSnapshot(rows: LoadedRows): Snapshot {
+export function buildSnapshot(rows: SeedRows): Snapshot {
   const nodes = new Map<string, GraphNode>();
   const byName = new Map<string, GraphNode>();
 
@@ -136,8 +136,8 @@ function pickBestPerKey<T extends { hasEvidence: boolean; confidence: Confidence
   return order.map((k) => best.get(k)!);
 }
 
-const recipeToItem = new WeakMap<LoadedRows, Map<string, string>>();
-function recipeOwner(rows: LoadedRows, recipeId: string): string | null {
+const recipeToItem = new WeakMap<SeedRows, Map<string, string>>();
+function recipeOwner(rows: SeedRows, recipeId: string): string | null {
   let map = recipeToItem.get(rows);
   if (!map) {
     map = new Map(rows.recipes.map((r) => [r.id, r.itemId]));

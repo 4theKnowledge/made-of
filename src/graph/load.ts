@@ -9,12 +9,12 @@
 
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "../db/client";
-import type { LoadedRows } from "../parser/load";
+import type { SeedRows } from "../data/rows";
 
 export async function loadRowsFromDb(opts?: {
   /** Include only status='live' items and their links. Default true. */
   liveOnly?: boolean;
-}): Promise<LoadedRows> {
+}): Promise<SeedRows> {
   const liveOnly = opts?.liveOnly ?? true;
   const db = getDb();
 

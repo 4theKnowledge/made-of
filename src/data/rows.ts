@@ -1,25 +1,21 @@
 /**
- * Convert a ParsedPrototype into the rows that will be inserted into
- * Postgres. We generate deterministic ids so re-running the seed gives the
- * same row ids, which makes diffs and migrations easier.
+ * Convert a `LoadedKnowledgeBase` into the rows that will be inserted into
+ * Postgres. Ids are deterministic so re-running the seed gives the same row
+ * ids, which makes diffs and migrations easy.
  */
 
 import type {
+  LinkType,
   NewItem,
   NewLink,
   NewLinkEvidence,
   NewRecipe,
   NewSource,
 } from "../db/schema";
-import type { LinkType } from "../db/schema";
-import { parseLinkId, slug } from "./prototype";
-import type {
-  ParsedEvidenceLink,
-  ParsedItem,
-  ParsedPrototype,
-} from "./types";
+import { parseLinkId, slug } from "./load";
+import type { LoadedEvidenceLink, LoadedKnowledgeBase } from "./types";
 
-export interface LoadedRows {
+export interface SeedRows {
   items: NewItem[];
   recipes: NewRecipe[];
   links: Array<NewLink & { hasEvidence?: boolean }>;
@@ -39,16 +35,14 @@ export interface LoadedRows {
   };
 }
 
-/** Build all seed rows from the parsed artifact. */
-export function toRows(parsed: ParsedPrototype): LoadedRows {
+/** Build all seed rows from the loaded knowledge base. */
+export function toRows(kb: LoadedKnowledgeBase): SeedRows {
   const items: NewItem[] = [];
   const recipes: NewRecipe[] = [];
   const links: NewLink[] = [];
 
   // Fast lookup from an evidence link id ("child<type<parent") to the concrete
-  // link row ids it should attach to. Both child and parent are the original
-  // DATA names (lowercase, may contain spaces), which we convert to slugs for
-  // the DB id.
+  // link row ids it should attach to.
   const linkIdsByKey = new Map<string, string[]>();
   const pushLinkKey = (key: string, linkId: string) => {
     const arr = linkIdsByKey.get(key);
@@ -56,7 +50,7 @@ export function toRows(parsed: ParsedPrototype): LoadedRows {
     else linkIdsByKey.set(key, [linkId]);
   };
 
-  for (const item of parsed.items) {
+  for (const item of kb.items) {
     const itemId = item.slug;
     items.push({
       id: itemId,
@@ -69,8 +63,6 @@ export function toRows(parsed: ParsedPrototype): LoadedRows {
         : null,
       symbol: item.symbol,
       fact: item.fact,
-      // Phase 1 seed treats every artifact row as live. Later content lives in
-      // draft/review until approved.
       status: "live",
       isCanary: false,
     });
@@ -130,13 +122,13 @@ export function toRows(parsed: ParsedPrototype): LoadedRows {
 
   // Attach evidence to links.
   const linkEvidence: NewLinkEvidence[] = [];
-  const evidenceSources: LoadedRows["evidenceSources"] = [];
+  const evidenceSources: SeedRows["evidenceSources"] = [];
   const unresolved: string[] = [];
   const evidencedLinkIds = new Set<string>();
   const linkConfidence = new Map<string, string>();
 
   let evidenceCounter = 0;
-  for (const ev of parsed.evidenceLinks) {
+  for (const ev of kb.evidenceLinks) {
     const matchedLinks: string[] = [];
     for (const id of ev.ids) {
       const key = evidenceKeyFromArtifactId(id);
@@ -153,15 +145,7 @@ export function toRows(parsed: ParsedPrototype): LoadedRows {
     }
     if (matchedLinks.length === 0) continue;
 
-    // One evidence row set per unique concrete link. The artifact stores a
-    // single evidence record keyed by id; we denormalise so each concrete
-    // link row carries its own evidence copy. The round-trip test confirms
-    // 354 EVIDENCE entries map back cleanly.
     ev.evidence.forEach((entry, i) => {
-      // We attach the evidence to the "first" matched link for round-trip
-      // identity, but all matched links share the same confidence and note.
-      // For completeness, duplicate the evidence entries across every
-      // matched link so the API can return evidence from any copy.
       for (const linkId of matchedLinks) {
         const evId = `ev:${linkId}:${i}:${++evidenceCounter}`;
         linkEvidence.push({
@@ -181,10 +165,6 @@ export function toRows(parsed: ParsedPrototype): LoadedRows {
         });
       }
     });
-
-    // If an evidence entry has note but no evidence rows, we still want the
-    // confidence stamped on the link. That is done through linkConfidence
-    // above; apply it after the loop.
   }
 
   // Apply denormalised confidence + hasEvidence flag to link rows.
@@ -196,9 +176,8 @@ export function toRows(parsed: ParsedPrototype): LoadedRows {
     );
   }
 
-  // Attach notes too.
   const linkNotes = new Map<string, string>();
-  for (const ev of parsed.evidenceLinks) {
+  for (const ev of kb.evidenceLinks) {
     if (!ev.note) continue;
     for (const id of ev.ids) {
       const key = evidenceKeyFromArtifactId(id);
@@ -212,7 +191,7 @@ export function toRows(parsed: ParsedPrototype): LoadedRows {
     if (note) (link as { note: string | null }).note = note;
   }
 
-  const sources: NewSource[] = parsed.sources.map((s) => ({
+  const sources: NewSource[] = kb.sources.map((s) => ({
     id: s.id,
     kind: s.kind,
     title: s.title,
@@ -239,30 +218,17 @@ export function toRows(parsed: ParsedPrototype): LoadedRows {
   };
 }
 
-/**
- * The evidence id uses the original names ("RNA<f<nucleotides") while our
- * link key uses the artifact names too, so this is identity — but keep as a
- * named function in case we ever need to normalise.
- */
 function evidenceKeyFromArtifactId(id: string): string {
   const { childName, type, parentName } = parseLinkId(id);
   return `${childName}<${type}<${parentName}`;
 }
 
-/**
- * Count how many *distinct link ids* in EVIDENCE resolve, regardless of how
- * many concrete links each id maps to. The acceptance criterion in
- * IMPLEMENTATION.md is "354 evidenced links", which matches EVIDENCE.links.length.
- */
+/** Count how many distinct `child<type<parent` ids appear across all
+ *  evidence records. */
 export function countEvidencedLinkIds(
-  evidenceLinks: ParsedEvidenceLink[],
+  evidenceLinks: LoadedEvidenceLink[],
 ): number {
   const ids = new Set<string>();
   for (const l of evidenceLinks) for (const id of l.ids) ids.add(id);
   return ids.size;
-}
-
-/** For diagnostics: build the artifact's `items` structure from parsed rows. */
-export function itemsByName(parsed: ParsedPrototype): Map<string, ParsedItem> {
-  return new Map(parsed.items.map((i) => [i.name, i]));
 }

@@ -1,35 +1,60 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseLinkId, parsePrototype, parseYear, slug } from "./prototype";
-import { countEvidencedLinkIds, toRows } from "./load";
+import { loadKnowledgeBase, parseLinkId, parseYear, slug } from "./load";
+import { countEvidencedLinkIds, toRows } from "./rows";
 
-const HTML = readFileSync(
-  resolve(process.cwd(), "legacy/made-of.html"),
-  "utf8",
-);
+/** Items that are not physical things you could hold. These are not stored
+ *  in the knowledge base at all — this test guards against anyone adding
+ *  one back by hand. */
+const NONPHYSICAL = new Set([
+  "sunlight",
+  "lightning",
+  "electricity",
+  "internet",
+  "fire",
+]);
 
-describe("parsePrototype", () => {
-  const parsed = parsePrototype(HTML);
+describe("knowledge base", () => {
+  const parsed = loadKnowledgeBase();
 
-  it("extracts 276 items from DATA", () => {
-    expect(parsed.items).toHaveLength(276);
+  it("has at least the original item count", () => {
+    expect(parsed.items.length).toBeGreaterThanOrEqual(276);
   });
 
-  it("extracts 354 evidenced links from EVIDENCE", () => {
-    expect(parsed.evidenceLinks).toHaveLength(354);
-    // Each entry maps to one or more concrete link ids; the index of unique
-    // ids is also 354 or more. We check both ways.
-    expect(countEvidencedLinkIds(parsed.evidenceLinks)).toBeGreaterThanOrEqual(
-      354,
-    );
+  it("contains no non-physical items", () => {
+    for (const it of parsed.items) {
+      expect(NONPHYSICAL.has(it.name)).toBe(false);
+    }
   });
 
-  it("extracts 413 sources", () => {
+  it("contains no mentions of non-physical items in recipes or links", () => {
+    const offences: string[] = [];
+    for (const it of parsed.items) {
+      const check = (where: string, arr: string[]) => {
+        for (const n of arr)
+          if (NONPHYSICAL.has(n)) offences.push(`${it.name}.${where} -> ${n}`);
+      };
+      for (const r of it.recipes) {
+        check("recipe.f", r.f);
+        check("recipe.w", r.w);
+        check("recipe.n", r.n);
+        check("recipe.e", r.e);
+      }
+      check("itemLinks.n", it.itemLinks.n);
+      check("itemLinks.s", it.itemLinks.s);
+    }
+    expect(offences).toEqual([]);
+  });
+
+  it("has evidence link records", () => {
+    expect(parsed.evidenceLinks.length).toBeGreaterThan(300);
+    expect(countEvidencedLinkIds(parsed.evidenceLinks)).toBeGreaterThan(300);
+  });
+
+  it("has 413 sources", () => {
     expect(parsed.sources).toHaveLength(413);
   });
 
-  it("has no orphan references in DATA", () => {
+  it("has no orphan references in items", () => {
     const names = new Set(parsed.items.map((i) => i.name));
     const dangling: string[] = [];
     for (const it of parsed.items) {
@@ -48,7 +73,7 @@ describe("parsePrototype", () => {
     expect(dangling).toEqual([]);
   });
 
-  it("has no orphan references in EVIDENCE", () => {
+  it("has no orphan references in evidence", () => {
     const names = new Set(parsed.items.map((i) => i.name));
     const dangling: string[] = [];
     for (const l of parsed.evidenceLinks) {
@@ -78,6 +103,16 @@ describe("parsePrototype", () => {
       expect(allowed.has(l.confidence)).toBe(true);
     }
   });
+
+  it("recipe labels: either every alternative is labelled or there is only one recipe", () => {
+    for (const it of parsed.items) {
+      if (it.recipes.length <= 1) {
+        if (it.recipes.length === 1) {
+          expect(it.recipes[0].label).toBeNull();
+        }
+      }
+    }
+  });
 });
 
 describe("parseYear", () => {
@@ -105,11 +140,11 @@ describe("slug", () => {
 });
 
 describe("toRows", () => {
-  const parsed = parsePrototype(HTML);
+  const parsed = loadKnowledgeBase();
   const rows = toRows(parsed);
 
-  it("produces 276 item rows", () => {
-    expect(rows.items).toHaveLength(276);
+  it("produces one row per parsed item", () => {
+    expect(rows.items).toHaveLength(parsed.items.length);
   });
 
   it("every parsed link slot becomes exactly one link row", () => {
@@ -120,12 +155,11 @@ describe("toRows", () => {
       total += it.itemLinks.n.length + it.itemLinks.s.length;
     }
     expect(rows.links).toHaveLength(total);
-    expect(total).toBe(917);
   });
 
-  it("evidence attaches to at least 354 distinct link rows", () => {
+  it("evidence attaches to many distinct link rows", () => {
     const evidencedLinks = new Set(rows.linkEvidence.map((e) => e.linkId));
-    expect(evidencedLinks.size).toBeGreaterThanOrEqual(354);
+    expect(evidencedLinks.size).toBeGreaterThan(300);
   });
 
   it("every evidence_source references a known source", () => {

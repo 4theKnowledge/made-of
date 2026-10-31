@@ -1,22 +1,17 @@
 /**
- * Load the artifact at legacy/made-of.html into Postgres.
+ * Load the knowledge base at src/data/*.data.ts into Postgres.
  *
  * Idempotent on a fresh database. Not safe to run against a database that
- * already contains edited content (the round-trip test asserts a clean seed).
+ * already contains edited content.
  */
 
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { parsePrototype } from "../parser/prototype";
-import { toRows } from "../parser/load";
-import { buildCanaryLinks } from "../parser/canaries";
+import { loadKnowledgeBase } from "../data/load";
+import { toRows } from "../data/rows";
+import { buildCanaryLinks } from "../data/canaries";
 import { closeDb, getDb, schema } from "./client";
 
-const HTML_PATH = resolve(process.cwd(), "legacy/made-of.html");
-
 async function main() {
-  const html = await readFile(HTML_PATH, "utf8");
-  const parsed = parsePrototype(html);
+  const parsed = loadKnowledgeBase();
   const rows = toRows(parsed);
 
   if (rows.stats.unresolvedEvidenceIds.length > 0) {
