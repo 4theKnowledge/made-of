@@ -125,16 +125,21 @@ export function pickOne(view: DealerView): string | null {
  * within two placements. Target distribution: ~75% of trays have a move
  * on the first placement; the rest need one set-up move.
  *
- * Mutates `view.tray` in place and returns it.
+ * Writes the result in-place into `view.tray` (so callers that share the
+ * tray array see the changes), then returns the same array.
  */
 export function dealTray(view: DealerView): Array<string | null> {
+  const writeTray = (next: Array<string | null>): Array<string | null> => {
+    for (let i = 0; i < view.tray.length; i++) view.tray[i] = next[i];
+    return view.tray;
+  };
   const wantOne = rand(view.rng) < 0.75;
   let fallback: Array<string | null> | null = null;
 
   for (let k = 0; k < 60; k++) {
     const next: Array<string | null> = [];
     for (let s = 0; s < 3; s++) next.push(pickOne({ ...view, tray: next }));
-    view.tray = next;
+    writeTray(next);
 
     // Avoid trays of three-of-the-same for the first 40 tries.
     const nonNull = next.filter((v): v is string => Boolean(v));
@@ -149,8 +154,7 @@ export function dealTray(view: DealerView): Array<string | null> {
   }
 
   if (fallback) {
-    view.tray = fallback;
-    return view.tray;
+    return writeTray(fallback);
   }
 
   // Last resort: hand over both halves of a two-ingredient recipe from the
@@ -174,8 +178,7 @@ export function dealTray(view: DealerView): Array<string | null> {
         const j = Math.floor(rand(view.rng) * (i + 1));
         [trial[i], trial[j]] = [trial[j], trial[i]];
       }
-      view.tray = trial;
-      return view.tray;
+      return writeTray(trial);
     }
   }
 
