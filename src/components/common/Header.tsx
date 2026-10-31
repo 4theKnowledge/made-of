@@ -1,17 +1,16 @@
 import Link from "next/link";
-import { getSession } from "@/lib/session";
+import { AuthNavLink } from "./AuthNavLink";
 
 /**
  * Shared header, used by static pages and anywhere a page doesn't need to
- * compute per-item tab targets.
+ * compute per-item tab targets. AuthNavLink is a client component so this
+ * header stays safe to render during static prerendering.
  */
-export async function Header({
+export function Header({
   current,
 }: {
   current?: "daily" | "explore" | "scratch" | "pricing" | "about" | "account";
 }) {
-  const session = await getSession();
-
   return (
     <header>
       <div className="brand">
@@ -39,17 +38,7 @@ export async function Header({
         <Link href="/about" className={current === "about" ? "on" : ""}>
           About
         </Link>
-        {session ? (
-          <Link
-            href="/account"
-            className={current === "account" ? "on" : ""}
-            title={session.user.email}
-          >
-            Account
-          </Link>
-        ) : (
-          <Link href="/sign-in">Sign in</Link>
-        )}
+        <AuthNavLink />
       </nav>
     </header>
   );

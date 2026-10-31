@@ -11,6 +11,7 @@ import type { GraphNode } from "../graph/types";
 import { THEMES, isCombineExcluded, isEveryday } from "./filters";
 import { computeRefine } from "./levels";
 import type {
+  AgeSets,
   CombineItem,
   CombineRecipe,
   ThemeBundle,
@@ -249,6 +250,29 @@ export function buildThemeBundle(
     sameIngredients,
     items,
   };
+}
+
+/**
+ * The slice of a theme "in play" at a given age (0-based index).
+ *
+ * The dealer picks only from tiles whose recipes live in bands [age, age+1]
+ * (1-based). Crumbling clears tiles that aren't useful across bands
+ * [age, age+1, age+2].
+ *
+ * Mirrors `cbAgeSets` in legacy/made-of.html line 3290.
+ */
+export function ageSets(bundle: ThemeBundle, age: number): AgeSets {
+  const k = age + 1; // 1-based band to match the prototype
+  const dealBands = new Set<number>([k - 1, k]);
+  const useBands = new Set<number>([k - 1, k, k + 1]);
+  const recipes = bundle.recipes.filter((r) => dealBands.has(r.band));
+  const useRecipes = bundle.recipes.filter((r) => useBands.has(r.band));
+  const ING = new Set<string>(recipes.flatMap((r) => r.all));
+  const BASE = [...ING].filter((x) => !bundle.outputs.has(x));
+  const MID = [...ING].filter((x) => bundle.outputs.has(x));
+  const USE = new Set<string>(useRecipes.flatMap((r) => r.all));
+  const NEXT = bundle.recipes.filter((r) => r.band === k + 1);
+  return { age, recipes, ING, BASE, MID, USE, NEXT };
 }
 
 export function buildAllBundles(

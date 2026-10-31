@@ -41,6 +41,26 @@ export interface CombineItem {
   kind: string;
 }
 
+/** The subset of a theme that is "in play" at a given age index (0-based).
+ *  Tiles are dealt from bands [age, age+1]; tiles are "useful" (don't
+ *  crumble) if they appear in bands [age, age+1, age+2]. */
+export interface AgeSets {
+  /** Age index (0-based). */
+  age: number;
+  /** Recipes whose band is `age+1` or `age` (1-based). */
+  recipes: CombineRecipe[];
+  /** All ingredients used by `recipes`. */
+  ING: Set<string>;
+  /** Raw (not outputs) within `ING`. */
+  BASE: string[];
+  /** Made (outputs) within `ING`. */
+  MID: string[];
+  /** Everything useful across bands [age, age+1, age+2]. */
+  USE: Set<string>;
+  /** Recipes in the band after the current one. */
+  NEXT: CombineRecipe[];
+}
+
 export interface ThemeBundle {
   theme: ThemeMeta;
   recipes: CombineRecipe[];
