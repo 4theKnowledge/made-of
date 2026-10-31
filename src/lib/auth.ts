@@ -5,23 +5,14 @@ import { Resend } from "resend";
 import { getDb, schema } from "@/db/client";
 
 // Construct the Better Auth instance lazily so that `next build` (which
-// evaluates route modules without DATABASE_URL in the environment) doesn't
-// trip over getDb()'s hard check. First real request triggers construction.
+// evaluates route modules without DATABASE_URL / RESEND_API_KEY) doesn't
+// trip over getDb() or new Resend() at module load. Callers must invoke
+// getAuth() at request time, not at import time.
 let _auth: ReturnType<typeof buildAuth> | null = null;
-function getAuth() {
+export function getAuth() {
   if (!_auth) _auth = buildAuth();
   return _auth;
 }
-
-// Proxy that forwards every property access to the real instance built on
-// first use. Callers can import `auth` and use it like a normal object.
-export const auth = new Proxy({} as ReturnType<typeof buildAuth>, {
-  get(_target, prop) {
-    const target = getAuth() as unknown as Record<string | symbol, unknown>;
-    const value = target[prop];
-    return typeof value === "function" ? value.bind(target) : value;
-  },
-});
 
 function buildAuth() {
   const from = process.env.RESEND_FROM ?? "Made Of <login@madeof.app>";
