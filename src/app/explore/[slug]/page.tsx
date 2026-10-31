@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { Footer } from "@/components/common/Footer";
 import { getExploreView } from "@/graph/explore";
 import { ExploreShell } from "@/components/explore/ExploreShell";
 
@@ -49,6 +50,7 @@ export default async function ExplorePage({
       </header>
 
       <ExploreShell view={view} />
+      <Footer />
     </main>
   );
 }

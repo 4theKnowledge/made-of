@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Pictogram } from "@/pictograms/Pictogram";
 import { Bowtie } from "@/components/bowtie/Bowtie";
 import { flyPictogram } from "@/components/bowtie/fly";
@@ -433,7 +434,7 @@ export function DailyBoard({
           </div>
           <p className="msg nudge">
             Want to play this with a class?{" "}
-            <a href="/pricing">See what's coming for classrooms</a>.
+            <Link href="/pricing">See what&rsquo;s coming for classrooms</Link>.
           </p>
         </section>
       )}

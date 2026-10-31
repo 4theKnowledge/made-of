@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { Footer } from "@/components/common/Footer";
 import { getItemPage, type PageEdge } from "@/graph/queries";
 import { Chip } from "@/components/Chip";
 import { Pictogram } from "@/pictograms/Pictogram";
@@ -206,6 +207,7 @@ export default async function ItemPage({
         // Trusted static content — safe to inject.
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <Footer />
     </main>
   );
 }

@@ -1,41 +1,102 @@
 import Link from "next/link";
 import { getLiveSnapshot } from "@/graph/live";
+import { Header } from "@/components/common/Header";
+import { Footer } from "@/components/common/Footer";
+import { Chip } from "@/components/Chip";
+import { cap } from "@/lib/taxonomy";
+
+/** Familiar items we'd like to suggest first on the 404. Any that aren't
+ * live in the current snapshot are silently skipped. */
+const POPULAR = [
+  "water",
+  "steel",
+  "bread",
+  "pencil",
+  "smartphone",
+  "tree",
+  "internet",
+  "gold",
+];
 
 export default async function NotFound() {
-  // Pick a random live item for the "browse" button so repeat visits don't
-  // always suggest water.
-  let randomSlug = "water";
+  let picks: Array<{
+    id: string;
+    name: string;
+    tier: Parameters<typeof Chip>[0]["tier"];
+    kind: Parameters<typeof Chip>[0]["kind"];
+    symbol: string | null;
+  }> = [];
   try {
     const live = await getLiveSnapshot();
-    const slugs = [...live.snapshot.nodes.keys()];
-    if (slugs.length > 0) {
-      randomSlug = slugs[Math.floor(Math.random() * slugs.length)];
-    }
+    picks = POPULAR.map((slug) => live.snapshot.nodes.get(slug))
+      .filter((n): n is NonNullable<typeof n> => Boolean(n))
+      .slice(0, 6)
+      .map((n) => ({
+        id: n.id,
+        name: n.name,
+        tier: n.tier,
+        kind: n.kind,
+        symbol: n.symbol,
+      }));
   } catch {
-    /* fallback to water if the snapshot can't load */
+    /* Snapshot can be unavailable in some error paths; fall back to buttons. */
   }
+
   return (
     <main className="wrap">
-      <header>
-        <div className="brand">
-          <h1>Made Of</h1>
-          <span>Everything is made of something.</span>
-        </div>
-      </header>
-      <section className="panel">
-        <h3>That page isn&rsquo;t on the map.</h3>
-        <p className="sub">
-          Maybe a typo, maybe something that doesn&rsquo;t exist here yet.
+      <Header />
+
+      <section className="phero">
+        <span className="eyebrow">404</span>
+        <h2>That page isn&rsquo;t on the map.</h2>
+        <p>
+          Maybe a typo, maybe something that doesn&rsquo;t exist here yet. Pick
+          up a thread from one of these, or play today&rsquo;s puzzle.
         </p>
-        <div className="row">
+      </section>
+
+      {picks.length > 0 && (
+        <section className="feat">
+          <h3>Start somewhere familiar</h3>
+          <div
+            className="chips"
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 8,
+              alignItems: "flex-start",
+            }}
+          >
+            {picks.map((p) => (
+              <Chip
+                key={p.id}
+                slug={p.id}
+                name={cap(p.name)}
+                tier={p.tier}
+                kind={p.kind}
+                symbol={p.symbol}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="feat">
+        <h3>Or try a mode</h3>
+        <div className="row" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <Link href="/" className="btn primary">
             Play today&rsquo;s Daily link
           </Link>
-          <Link href={`/i/${randomSlug}`} className="btn">
-            Browse an item ({randomSlug.replace(/-/g, " ")})
+          <Link href="/explore/water" className="btn">
+            Explore
+          </Link>
+          <Link href="/scratch" className="btn">
+            From scratch
           </Link>
         </div>
       </section>
+
+      <Footer />
     </main>
   );
 }

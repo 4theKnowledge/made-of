@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Footer } from "@/components/common/Footer";
 import { getLiveSnapshot } from "@/graph/live";
 import {
   generatePuzzle,
@@ -75,6 +76,7 @@ export default async function HomePage() {
       </header>
 
       <DailyBoard puzzle={puzzle} initialView={initialView} />
+      <Footer />
     </main>
   );
 }

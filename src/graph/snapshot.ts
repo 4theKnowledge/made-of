@@ -151,6 +151,36 @@ function recipeOwner(rows: LoadedRows, recipeId: string): string | null {
  * ====================================================================== */
 
 /**
+ * Ancestors of an item within `depth` BFS hops along `up` edges. Returns the
+ * set of visited ids excluding `id` itself. Mirrors `upstreamWithin` in the
+ * artifact (used by the pricing page's difficulty-levels visualisation).
+ */
+export function upstreamWithin(
+  snapshot: Snapshot,
+  id: string,
+  depth: number,
+): Set<string> {
+  const seen = new Set<string>([id]);
+  let frontier: string[] = [id];
+  for (let d = 0; d < depth && frontier.length; d++) {
+    const next: string[] = [];
+    for (const x of frontier) {
+      const node = snapshot.nodes.get(x);
+      if (!node) continue;
+      for (const e of node.up) {
+        if (!seen.has(e.id)) {
+          seen.add(e.id);
+          next.push(e.id);
+        }
+      }
+    }
+    frontier = next;
+  }
+  seen.delete(id);
+  return seen;
+}
+
+/**
  * All ancestors of an item (what it is ultimately made from, following `up`
  * edges). Mirrors `ancestors` in the artifact.
  */

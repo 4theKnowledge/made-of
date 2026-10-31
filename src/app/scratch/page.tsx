@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Footer } from "@/components/common/Footer";
 import { getLiveSnapshot } from "@/graph/live";
 import {
   bestRecipe,
@@ -105,6 +106,7 @@ export default async function ScratchPage() {
       </header>
 
       <ScratchBoard initial={initial} />
+      <Footer />
     </main>
   );
 }
