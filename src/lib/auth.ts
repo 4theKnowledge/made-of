@@ -125,18 +125,11 @@ function magicLinkEmail(url: string): string {
     ? `${emailAssetBase.replace(/\/$/, "")}/email/humans.png`
     : "";
 
-  // Full element card for "you", mirroring the Explore chips: pastel-tier
-  // tile with the humans pictogram, mono name tag beside it, ink border.
-  // The PNG itself includes the tile background and border, so the <td>
-  // just needs to size and position it. If the image fails to load, the
-  // alt text still reads sensibly next to the name.
-  const youCard = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;border-collapse:collapse;"><tr>
-    <td width="72" height="72" style="width:72px;height:72px;padding:0;vertical-align:middle;" valign="middle"><img src="${humansSrc}" width="72" height="72" alt="You" style="display:block;width:72px;height:72px;border:0;outline:none;text-decoration:none;background:${tileFill};border-radius:4px;" /></td>
-    <td style="padding-left:12px;vertical-align:middle;" valign="middle">
-      <div style="font-family:${display};font-weight:700;font-size:18px;letter-spacing:-0.01em;color:${ink};line-height:1;">You</div>
-      <div style="font-family:${mono};font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:${muted};margin-top:5px;">Natural &middot; Living</div>
-    </td>
-  </tr></table>`;
+  // The pictogram sits beside the "Made Of" masthead, like a chip in the
+  // brand lockup. The PNG itself carries the pastel tile and ink border, so
+  // the <td> only needs to size and vertically centre it. The pastel-fill
+  // background on the <img> is a graceful fallback if the PNG is blocked.
+  const tilePx = 56;
 
   return `<!doctype html>
 <html lang="en">
@@ -158,13 +151,19 @@ function magicLinkEmail(url: string): string {
           <table role="presentation" width="540" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:540px;">
             <tr>
               <td style="padding:0 4px 20px 4px;">
-                <div style="font-family:${display};font-weight:800;font-size:30px;letter-spacing:-0.02em;line-height:1;color:${ink};">Made Of</div>
-                <div style="font-family:${mono};font-size:12px;color:${muted};letter-spacing:0.04em;margin-top:6px;">Everything is made of something.</div>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                  <tr>
+                    <td width="${tilePx}" height="${tilePx}" style="width:${tilePx}px;height:${tilePx}px;padding:0;vertical-align:middle;" valign="middle"><img src="${humansSrc}" width="${tilePx}" height="${tilePx}" alt="" style="display:block;width:${tilePx}px;height:${tilePx}px;border:0;outline:none;text-decoration:none;background:${tileFill};border-radius:4px;" /></td>
+                    <td style="padding-left:14px;vertical-align:middle;" valign="middle">
+                      <div style="font-family:${display};font-weight:800;font-size:30px;letter-spacing:-0.02em;line-height:1;color:${ink};">Made Of</div>
+                      <div style="font-family:${mono};font-size:12px;color:${muted};letter-spacing:0.04em;margin-top:6px;">Everything is made of something.</div>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
             <tr>
               <td style="background:${surface};border:1px solid ${line};padding:36px 32px;">
-                ${youCard}
                 <div style="font-family:${mono};font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:${muted};margin-bottom:14px;">Sign in</div>
                 <h1 style="margin:0 0 14px 0;font-family:${display};font-weight:800;font-size:28px;letter-spacing:-0.025em;line-height:1.08;color:${ink};">Here&rsquo;s your sign-in link.</h1>
                 <p style="margin:0 0 28px 0;font-family:${display};font-size:15px;line-height:1.5;color:${ink};">Click the button to sign in. The link expires in 15 minutes and can only be used once.</p>
