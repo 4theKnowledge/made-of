@@ -98,17 +98,25 @@ function magicLinkEmail(url: string): string {
     "'Chivo', 'Helvetica Neue', Arial, system-ui, sans-serif";
   const mono = "'Chivo Mono', ui-monospace, 'SF Mono', Menlo, monospace";
 
-  // Humans pictogram from src/pictograms/data.ts. Stroke/fill inlined
-  // because most email clients strip <style> and class-based SVG CSS.
-  const humansSvg = `<svg width="56" height="56" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" style="display:block;" aria-hidden="true"><circle cx="16" cy="8" r="5" fill="#ffffff" stroke="${ink}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M6 29v-6c0-5 4-8 10-8s10 3 10 8v6z" fill="#ffffff" stroke="${ink}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  // Gmail web blocks data: URIs in <img src>, so we host the pictogram as
+  // a PNG under /public/email/. The URL must be a public origin reachable
+  // by Gmail's image proxy. For local testing without a public URL, the
+  // tile falls back to the pastel-fill background + text label.
+  // Regenerate the PNG by running: node scripts/build-email-pictograms.mjs
+  const emailAssetBase =
+    process.env.EMAIL_ASSET_BASE ?? process.env.BETTER_AUTH_URL ?? "";
+  const humansSrc = emailAssetBase
+    ? `${emailAssetBase.replace(/\/$/, "")}/email/humans.png`
+    : "";
 
   // Full element card for "you", mirroring the Explore chips: pastel-tier
   // tile with the humans pictogram, mono name tag beside it, ink border.
-  // Lives above the headline so the viewer feels like the email arrived
-  // from the map, not from a generic transactional template.
-  const youCard = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;"><tr>
-    <td style="width:72px;height:72px;background:${tileFill};border:1.5px solid ${ink};border-radius:4px;text-align:center;vertical-align:middle;" align="center">${humansSvg}</td>
-    <td style="padding-left:10px;vertical-align:middle;">
+  // The PNG itself includes the tile background and border, so the <td>
+  // just needs to size and position it. If the image fails to load, the
+  // alt text still reads sensibly next to the name.
+  const youCard = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;border-collapse:collapse;"><tr>
+    <td width="72" height="72" style="width:72px;height:72px;padding:0;vertical-align:middle;" valign="middle"><img src="${humansSrc}" width="72" height="72" alt="You" style="display:block;width:72px;height:72px;border:0;outline:none;text-decoration:none;background:${tileFill};border-radius:4px;" /></td>
+    <td style="padding-left:12px;vertical-align:middle;" valign="middle">
       <div style="font-family:${display};font-weight:700;font-size:18px;letter-spacing:-0.01em;color:${ink};line-height:1;">You</div>
       <div style="font-family:${mono};font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:${muted};margin-top:5px;">Natural &middot; Living</div>
     </td>
