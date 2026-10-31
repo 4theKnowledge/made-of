@@ -43,6 +43,21 @@ function buildAuth() {
         ageConfirmedAt: { type: "date", required: false, input: false },
       },
     },
+    databaseHooks: {
+      user: {
+        create: {
+          // Stamp ageConfirmedAt on first sign-in. The sign-in form gates the
+          // magic-link request on a 13+ (16+ EU) checkbox, so by the time
+          // this hook fires the user has already confirmed. We record the
+          // moment of consent in the DB for audit purposes.
+          before: async (user) => {
+            return {
+              data: { ...user, ageConfirmedAt: new Date() },
+            };
+          },
+        },
+      },
+    },
     session: {
       expiresIn: 60 * 60 * 24 * 30,
       updateAge: 60 * 60 * 24,
