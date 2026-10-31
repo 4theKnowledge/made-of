@@ -1,6 +1,9 @@
 import { toNextJsHandler } from "better-auth/next-js";
 import { getAuth } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // Build handlers lazily so `next build` doesn't construct the Better Auth
 // instance (which would call getDb() + new Resend() with no env vars).
 let handlers: ReturnType<typeof toNextJsHandler> | null = null;

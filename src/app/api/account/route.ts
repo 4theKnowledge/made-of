@@ -3,6 +3,9 @@ import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 import { getDb, schema } from "@/db/client";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function DELETE() {
   const session = await getSession();
   if (!session) return new NextResponse("Unauthorized", { status: 401 });
