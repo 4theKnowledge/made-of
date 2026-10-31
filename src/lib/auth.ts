@@ -4,75 +4,95 @@ import { magicLink } from "better-auth/plugins";
 import { Resend } from "resend";
 import { getDb, schema } from "@/db/client";
 
-const resend = new Resend(process.env.RESEND_API_KEY ?? "");
+// Construct the Better Auth instance lazily so that `next build` (which
+// evaluates route modules without DATABASE_URL in the environment) doesn't
+// trip over getDb()'s hard check. First real request triggers construction.
+let _auth: ReturnType<typeof buildAuth> | null = null;
+function getAuth() {
+  if (!_auth) _auth = buildAuth();
+  return _auth;
+}
 
-const from = process.env.RESEND_FROM ?? "Made Of <login@madeof.app>";
+// Proxy that forwards every property access to the real instance built on
+// first use. Callers can import `auth` and use it like a normal object.
+export const auth = new Proxy({} as ReturnType<typeof buildAuth>, {
+  get(_target, prop) {
+    const target = getAuth() as unknown as Record<string | symbol, unknown>;
+    const value = target[prop];
+    return typeof value === "function" ? value.bind(target) : value;
+  },
+});
 
-export const auth = betterAuth({
-  database: drizzleAdapter(getDb(), {
-    provider: "pg",
-    schema: {
-      user: schema.authUser,
-      session: schema.authSession,
-      account: schema.authAccount,
-      verification: schema.authVerification,
-    },
-  }),
-  baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
-  secret: process.env.BETTER_AUTH_SECRET,
-  emailAndPassword: { enabled: false },
-  user: {
-    additionalFields: {
-      tier: { type: "string", defaultValue: "free", input: false },
-      ageConfirmedAt: { type: "date", required: false, input: false },
-    },
-  },
-  session: {
-    expiresIn: 60 * 60 * 24 * 30,
-    updateAge: 60 * 60 * 24,
-    cookieCache: { enabled: true, maxAge: 60 * 5 },
-  },
-  advanced: {
-    cookiePrefix: "madeof",
-    useSecureCookies: process.env.NODE_ENV === "production",
-    defaultCookieAttributes: {
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-    },
-  },
-  plugins: [
-    magicLink({
-      expiresIn: 60 * 15,
-      sendMagicLink: async ({ email, url }) => {
-        if (!process.env.RESEND_API_KEY) {
-          console.log(`[auth] magic link for ${email}: ${url}`);
-          return;
-        }
-        const { error } = await resend.emails.send({
-          from,
-          to: email,
-          subject: "Your Made Of sign-in link",
-          text: [
-            "Made Of — Everything is made of something.",
-            "",
-            "Here's your sign-in link. It expires in 15 minutes and can only be used once:",
-            "",
-            url,
-            "",
-            "Didn't ask for this? You can ignore the email — the link won't do anything until it's clicked.",
-            "",
-            "madeof.app",
-          ].join("\n"),
-          html: magicLinkEmail(url),
-        });
-        if (error) {
-          throw new Error(`Resend error: ${error.message}`);
-        }
+function buildAuth() {
+  const resend = new Resend(process.env.RESEND_API_KEY ?? "");
+  const from = process.env.RESEND_FROM ?? "Made Of <login@madeof.app>";
+
+  return betterAuth({
+    database: drizzleAdapter(getDb(), {
+      provider: "pg",
+      schema: {
+        user: schema.authUser,
+        session: schema.authSession,
+        account: schema.authAccount,
+        verification: schema.authVerification,
       },
     }),
-  ],
-});
+    baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+    secret: process.env.BETTER_AUTH_SECRET,
+    emailAndPassword: { enabled: false },
+    user: {
+      additionalFields: {
+        tier: { type: "string", defaultValue: "free", input: false },
+        ageConfirmedAt: { type: "date", required: false, input: false },
+      },
+    },
+    session: {
+      expiresIn: 60 * 60 * 24 * 30,
+      updateAge: 60 * 60 * 24,
+      cookieCache: { enabled: true, maxAge: 60 * 5 },
+    },
+    advanced: {
+      cookiePrefix: "madeof",
+      useSecureCookies: process.env.NODE_ENV === "production",
+      defaultCookieAttributes: {
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
+      },
+    },
+    plugins: [
+      magicLink({
+        expiresIn: 60 * 15,
+        sendMagicLink: async ({ email, url }) => {
+          if (!process.env.RESEND_API_KEY) {
+            console.log(`[auth] magic link for ${email}: ${url}`);
+            return;
+          }
+          const { error } = await resend.emails.send({
+            from,
+            to: email,
+            subject: "Your Made Of sign-in link",
+            text: [
+              "Made Of — Everything is made of something.",
+              "",
+              "Here's your sign-in link. It expires in 15 minutes and can only be used once:",
+              "",
+              url,
+              "",
+              "Didn't ask for this? You can ignore the email — the link won't do anything until it's clicked.",
+              "",
+              "madeof.app",
+            ].join("\n"),
+            html: magicLinkEmail(url),
+          });
+          if (error) {
+            throw new Error(`Resend error: ${error.message}`);
+          }
+        },
+      }),
+    ],
+  });
+}
 
 /**
  * Magic-link email. Styled to match the app's "phero" section: Chivo display
@@ -102,7 +122,6 @@ function magicLinkEmail(url: string): string {
   // a PNG under /public/email/. The URL must be a public origin reachable
   // by Gmail's image proxy. For local testing without a public URL, the
   // tile falls back to the pastel-fill background + text label.
-  // Regenerate the PNG by running: node scripts/build-email-pictograms.mjs
   const emailAssetBase =
     process.env.EMAIL_ASSET_BASE ?? process.env.BETTER_AUTH_URL ?? "";
   const humansSrc = emailAssetBase
@@ -181,4 +200,4 @@ function magicLinkEmail(url: string): string {
 </html>`;
 }
 
-export type Session = typeof auth.$Infer.Session;
+export type Session = ReturnType<typeof buildAuth>["$Infer"]["Session"];
