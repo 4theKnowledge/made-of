@@ -14,7 +14,7 @@ export const THEMES: Record<ThemeKey, ThemeMeta> = {
     k: "everything",
     name: "Everything",
     desc: "The whole map: atoms, stars, life, food, factories, machines.",
-    ages: ["Cosmos", "Earth", "Craft", "Industry", "Machines", "Modern"],
+    ages: ["I", "II", "III", "IV", "V", "VI"],
   },
 };
 

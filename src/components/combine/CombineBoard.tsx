@@ -577,7 +577,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
       Array.from({ length: bundles.everything.theme.ages.length }, (_, k) =>
         k <= dr.age ? "🟩" : "⬜",
       ).join("") +
-      ` reached ${dr.ageName}\n` +
+      ` reached Age ${dr.ageName}\n` +
       `${dr.score.toLocaleString("en")} points · ${dr.made} made${
         dr.top ? ` · best: ${dr.top}` : ""
       }\n` +
@@ -1375,7 +1375,7 @@ function GameOverCard({
             ? "A new best!"
             : best > state.score
               ? `Your best is ${best.toLocaleString("en")}. ${(best - state.score).toLocaleString("en")} to go.`
-              : `You reached the ${ageName.toLowerCase()} age.`}
+              : `You reached Age ${ageName}.`}
         </span>
         <div className="cb3">
           <div>
@@ -1383,8 +1383,8 @@ function GameOverCard({
             <span>finished things</span>
           </div>
           <div>
-            <b>{state.age + 1}</b>
-            <span>{ageName.toLowerCase()} age</span>
+            <b>{ageName}</b>
+            <span>age reached</span>
           </div>
           <div>
             <b>{state.found.length}</b>
@@ -1495,7 +1495,7 @@ function ThemeMenu({
           <div className="cbtopt cbdaily done">
             <b>Daily game · done</b>
             <span>
-              {dailyDone.score.toLocaleString("en")} points · reached{" "}
+              {dailyDone.score.toLocaleString("en")} points · reached Age{" "}
               {dailyDone.ageName}. A new one tomorrow.
             </span>
             <button
@@ -1819,9 +1819,7 @@ function AgeToast({
     <div className="cbdisc cbagetoast" role="status" onClick={onDismiss}>
       <div>
         <span className="k">New age · tap to close</span>
-        <b>
-          Age {toast.age + 1}: {ageName}
-        </b>
+        <b>Age {ageName}</b>
         <p>
           New things start arriving. Old ones nobody needs will crumble
           away.
@@ -2176,8 +2174,8 @@ function AgeBar({
   const last = state.age >= ages.length - 1;
   const need = 6 + 2 * state.age;
   const pct = last ? 100 : Math.min(100, Math.round((state.ageMade / need) * 100));
-  const ariaLabel = `Age ${state.age + 1} of ${ages.length}: ${ages[state.age]}${
-    last ? "" : `. Make ${need - state.ageMade} more to reach ${ages[state.age + 1]}`
+  const ariaLabel = `Age ${ages[state.age]} of ${ages.length}${
+    last ? "" : `. Make ${need - state.ageMade} more to reach Age ${ages[state.age + 1]}`
   }. Tap for details.`;
   return (
     <div className="cbage">
@@ -2264,13 +2262,11 @@ function AgesSheet({
         aria-label="Ages"
       >
         <span className="k">Ages</span>
-        <h3>
-          Age {current + 1}: {ages[current]}
-        </h3>
+        <h3>Age {ages[current]}</h3>
         <p>
           {last
             ? "Final age. Keep combining to push your score higher."
-            : `Make ${left} more thing${left === 1 ? "" : "s"} from this age or later to reach ${ages[current + 1]}.`}
+            : `Make ${left} more thing${left === 1 ? "" : "s"} from this age or later to reach Age ${ages[current + 1]}.`}
         </p>
         <ol className="cbagelist">
           {ages.map((name, i) => {
@@ -2289,8 +2285,7 @@ function AgesSheet({
                 key={name}
                 className={`cbagerow${isNow ? " on" : ""}${isPast ? " past" : ""}`}
               >
-                <span className="cbageno">{i + 1}</span>
-                <b>{name}</b>
+                <b className="cbageno">{name}</b>
                 <span className="cbagemeta">{meta}</span>
               </li>
             );
