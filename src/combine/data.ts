@@ -133,11 +133,33 @@ function assignAges(
 
   for (const r of recipes) r.lvl = value(r, true);
 
-  // Cut sorted levels into equal-ish bands.
-  const levels = recipes.map((r) => r.lvl).sort((a, b) => a - b);
+  // Cut recipes into bands so each band holds a similar number of recipes.
+  // Walk the sorted level list, starting a new band whenever accumulated
+  // size reaches a running target (recomputed per remaining band so an
+  // early overshoot doesn't starve later bands). This gives smoother sizes
+  // than quantile cuts on the raw rank array (which can dump all recipes
+  // at a popular level into one band) and degrades gracefully as the KB
+  // grows: more content → bands fill out evenly.
+  const byLevel = new Map<number, number>();
+  for (const r of recipes) byLevel.set(r.lvl, (byLevel.get(r.lvl) ?? 0) + 1);
+  const uniqueLevels = [...byLevel.keys()].sort((a, b) => a - b);
   const cuts: number[] = [];
-  for (let b = 1; b < numAges; b++) {
-    cuts.push(levels[Math.floor((levels.length * b) / numAges)]);
+  let remaining = recipes.length;
+  let acc = 0;
+  for (let i = 0; i < uniqueLevels.length && cuts.length < numAges - 1; i++) {
+    const lvl = uniqueLevels[i];
+    const n = byLevel.get(lvl) ?? 0;
+    acc += n;
+    remaining -= n;
+    const bandsLeft = numAges - cuts.length;
+    const target = Math.ceil((acc + remaining) / bandsLeft);
+    // Cut here unless the final bands wouldn't get at least one level each.
+    const levelsLeft = uniqueLevels.length - 1 - i;
+    const bandsAfterCut = bandsLeft - 1;
+    if (acc >= target && levelsLeft >= bandsAfterCut) {
+      cuts.push(lvl);
+      acc = 0;
+    }
   }
   for (const r of recipes) {
     let band = 1;

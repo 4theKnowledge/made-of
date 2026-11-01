@@ -171,10 +171,13 @@ function fullness(board: Board): number {
   return board.filter(Boolean).length / board.length;
 }
 
-/** Count of items made in each age (0-based) before leaving: 6, 8, 10, 12…
- *  Mirrors `cbAgeNeed` line 3298. */
+/** Count of on-or-ahead items made in each age (0-based) before leaving:
+ *  7, 9, 11, 13… Up from the prototype's 6+2n so each era has room to
+ *  breathe (playtests reported 50-60 discoveries per run and ages flashing
+ *  by in 10-25 moves). Only combines whose output lives in the current
+ *  age's band or newer count toward this — see `finishResolve`. */
 function ageNeed(age: number): number {
-  return 6 + 2 * age;
+  return 7 + 2 * age;
 }
 
 /** Tier value for scoring. Falls back to M=2 for unknown tiers. */
@@ -254,7 +257,11 @@ function finishResolve(
   if (choice == null) return;
   state.board[choice] = recipe.out;
   state.made++;
-  state.ageMade++;
+  // Only on-or-ahead combines advance the age bar. Making a band-1 "glue"
+  // in the Modern age doesn't flip you forward — but making anything from
+  // the current band or newer does. Mirrors the player intuition that
+  // "ages should be about reaching new things, not re-crafting old ones".
+  if (recipe.band >= state.age + 1) state.ageMade++;
   state.longest = Math.max(state.longest, mult);
 
   const pts = Math.round(
@@ -330,6 +337,17 @@ function afterMove(
     const A = ageSets(bundle, state.age);
     const sample = [...new Set(A.recipes.filter((r) => r.band === state.age + 1).map((r) => r.out))].slice(0, 4);
     events.push({ type: "age-up", age: state.age, sample });
+  } else if (
+    state.age === totalAges - 1 &&
+    state.ageMade >= ageNeed(state.age)
+  ) {
+    // Final-age victory: once the player has made enough on-band things in
+    // the last era, end the run with a flourish rather than letting the
+    // board clog. Playtests showed the final age soaking 70% of total
+    // moves with diminishing returns — this gives a satisfying stop.
+    state.over = true;
+    events.push({ type: "over" });
+    return;
   }
 
   // 2. Crumble.

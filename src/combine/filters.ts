@@ -14,13 +14,13 @@ export const THEMES: Record<ThemeKey, ThemeMeta> = {
     k: "everyday",
     name: "Everyday",
     desc: "Food, drink, clothes, toys and things around the house.",
-    ages: ["Gathering", "Kitchen", "Workshop", "Home", "Finishing"],
+    ages: ["Gathering", "Hearth", "Kitchen", "Workshop", "Home", "Modern"],
   },
   everything: {
     k: "everything",
     name: "Everything",
     desc: "The whole map: atoms, stars, life, food, factories, machines.",
-    ages: ["Beginnings", "Earth", "Craft", "Industry", "Machines", "Modern"],
+    ages: ["Cosmos", "Earth", "Craft", "Industry", "Machines", "Modern"],
   },
 };
 
