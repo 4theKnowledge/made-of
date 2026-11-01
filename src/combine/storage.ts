@@ -185,6 +185,21 @@ export function loadGame(
   // shifted between runs).
   for (const v of s.board) if (v && !bundle.items.has(v)) return null;
   for (const v of s.tray) if (v && !bundle.items.has(v)) return null;
+  // An empty, unplayed save (board + tray all null, zero moves) is useless
+  // to resume — it was written from a transient initial render during a
+  // past bug. Drop it so the player gets a fresh game.
+  const boardEmpty = s.board.every((v) => v == null);
+  const trayEmpty = s.tray.every((v) => v == null);
+  if (boardEmpty && trayEmpty && s.moves === 0 && s.score === 0) {
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(key);
+      } catch {
+        // ignore
+      }
+    }
+    return null;
+  }
   return s;
 }
 
