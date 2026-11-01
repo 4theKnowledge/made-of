@@ -12,6 +12,7 @@ import type {
   SortMode,
 } from "./types";
 import { PENALTY } from "./types";
+import { HelpButton, HowToPlay } from "@/components/common/HowToPlay";
 
 interface GameState {
   targetCode: string;
@@ -105,6 +106,7 @@ export function ScratchBoard({
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [nowTick, setNowTick] = useState(0);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // Hydrate from localStorage on first render.
   useEffect(() => {
@@ -422,6 +424,7 @@ export function ScratchBoard({
           <button className="btn" type="button" onClick={onReset}>
             Start over
           </button>
+          <HelpButton onClick={() => setHelpOpen(true)} />
           <p className="msg">{notice}</p>
         </div>
       </section>
@@ -654,7 +657,136 @@ export function ScratchBoard({
         onPick={onNewTarget}
         onClose={() => setPickerOpen(false)}
       />
+
+      <HowToPlay
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        gameLabel="From scratch"
+        title={
+          <>
+            Build <b>{state.target.name}</b> from the big bang.
+          </>
+        }
+        steps={[
+          {
+            glyph: <GlyphBigBang />,
+            title: "You start with the big bang",
+            body: "Everything else is made from things you've already made. The clock starts on your first click.",
+          },
+          {
+            glyph: <GlyphReady />,
+            title: "Click something to make it",
+            body: `"Ready to make" lists everything whose ingredients you already have. Click one and it's yours — and new things open up.`,
+          },
+          {
+            glyph: <GlyphTarget />,
+            title: "Follow the target card",
+            body: "The card at the top shows what you're building and what it still needs. Ingredients tick off as you make them.",
+          },
+          {
+            glyph: <GlyphRecipes />,
+            title: "Multiple recipes, your choice",
+            body: "Some things can be made more than one way. The highlighted recipe is a shortest path, but any legal one wins.",
+          },
+          {
+            glyph: <GlyphHint />,
+            title: "Hints point to a next step",
+            body: `A hint reveals a useful next thing to make. It costs ${PENALTY.hint} points and the clock keeps running.`,
+          },
+        ]}
+        footnote={`Fewest steps from the start is about ${state.par}. Three stars for finishing close to that.`}
+      />
     </>
+  );
+}
+
+function GlyphBigBang() {
+  return (
+    <span className="mbb anim-spin" aria-hidden="true" />
+  );
+}
+
+function GlyphReady() {
+  return (
+    <span className="mrl" aria-hidden="true">
+      <span className="rr on">
+        <span className="mt sm F anim-pulse">
+          <span className="d" />
+        </span>
+        <span className="bar" />
+      </span>
+      <span className="rr">
+        <span className="mt sm N">
+          <span className="d" />
+        </span>
+        <span className="bar" />
+      </span>
+      <span className="rr">
+        <span className="mt sm M">
+          <span className="d" />
+        </span>
+        <span className="bar" />
+      </span>
+    </span>
+  );
+}
+
+function GlyphTarget() {
+  return (
+    <span className="mtc" aria-hidden="true">
+      <span className="mt md P anim-pulse">
+        <span className="d" />
+      </span>
+      <span className="bar">
+        <i className="anim-fill" />
+      </span>
+    </span>
+  );
+}
+
+function GlyphRecipes() {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+        padding: 3,
+        border: "1.3px solid var(--ink)",
+        borderRadius: 2,
+        background: "var(--surface)",
+      }}
+    >
+      <span style={{ display: "flex", gap: 3, alignItems: "center" }}>
+        <span className="mt sm F">
+          <span className="d" />
+        </span>
+        <span className="mt sm N anim-tick">
+          <span className="d" />
+        </span>
+        <span className="mt sm M">
+          <span className="d" />
+        </span>
+      </span>
+      <span style={{ display: "flex", gap: 3, alignItems: "center", opacity: 0.5 }}>
+        <span className="mt sm C">
+          <span className="d" />
+        </span>
+        <span className="mt sm P">
+          <span className="d" />
+        </span>
+      </span>
+    </span>
+  );
+}
+
+function GlyphHint() {
+  return (
+    <span className="ml anim-glow" aria-hidden="true">
+      <b />
+      <i />
+    </span>
   );
 }
 
