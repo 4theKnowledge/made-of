@@ -562,12 +562,10 @@ export function CombineBoard({ bundles: serialised }: Props) {
       if (saved && saved.theme === which) {
         setState(hydrateGame(saved));
       } else {
-        const size =
-          typeof window !== "undefined" && window.innerWidth <= 600 ? 5 : 6;
         setState(
           newGame(which, nextBundle, {
             seed: freshEndlessSeed(),
-            size,
+            size: 6,
           }).state,
         );
       }
@@ -588,7 +586,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
       setState(
         newGame("everything", bundles.everything, {
           daily: day,
-          size: 5,
+          size: 6,
           seed: dailySeed(day),
         }).state,
       );
@@ -1113,15 +1111,11 @@ export function CombineBoard({ bundles: serialised }: Props) {
               // endless game. From endless, start another endless.
               const nextTheme = state.theme;
               const nextDaily = null;
-              const size =
-                typeof window !== "undefined" && window.innerWidth <= 600
-                  ? 5
-                  : 6;
               setState(
                 newGame(nextTheme, bundles[nextTheme], {
                   daily: nextDaily,
                   seed: freshEndlessSeed(),
-                  size,
+                  size: 6,
                 }).state,
               );
               resetTransient();
@@ -2353,20 +2347,76 @@ function AgesSheet({
   const last = current >= ages.length - 1;
   const need = 7 + 2 * current;
   const left = Math.max(0, need - state.ageMade);
-  // Pick up to 4 example outputs from the current age's band. Prefer unfound
-  // ones so the hint stays useful; fall back to any current-band output.
-  const currentBand = current + 1;
-  const bandOutputs: string[] = [];
-  const seenEx = new Set<string>();
-  for (const r of bundle.recipes) {
-    if (r.band !== currentBand) continue;
-    if (seenEx.has(r.out)) continue;
-    seenEx.add(r.out);
-    bandOutputs.push(r.out);
-  }
-  const foundSet = new Set(state.found);
-  const unfound = bandOutputs.filter((id) => !foundSet.has(id));
-  const examples = (unfound.length >= 3 ? unfound : bandOutputs).slice(0, 4);
+  // Rotate which example chain we show each time the dialog opens. useRef on a
+  // random seed set at mount keeps the chain stable while the dialog is open.
+  const seedRef = useRef<number>(Math.floor(Math.random() * 1_000_000));
+  // Build an index: output id → recipes that make it.
+  const chain = useMemo(() => {
+    const currentBand = current + 1;
+    const makers = new Map<string, CombineRecipe[]>();
+    for (const r of bundle.recipes) {
+      let list = makers.get(r.out);
+      if (!list) {
+        list = [];
+        makers.set(r.out, list);
+      }
+      list.push(r);
+    }
+    const bandOutputs: string[] = [];
+    const seen = new Set<string>();
+    for (const r of bundle.recipes) {
+      if (r.band !== currentBand) continue;
+      if (seen.has(r.out)) continue;
+      seen.add(r.out);
+      bandOutputs.push(r.out);
+    }
+    // Prefer terminals so the chain lands on a shelf-worthy goal.
+    const terminals = bandOutputs.filter((id) => bundle.terminal.has(id));
+    const pool = terminals.length ? terminals : bandOutputs;
+    if (pool.length === 0) return [] as string[];
+    const pick = pool[seedRef.current % pool.length];
+    const chainIds: string[] = [pick];
+    const visited = new Set<string>([pick]);
+    let cursor: string | undefined = pick;
+    for (let step = 0; step < 5 && cursor; step++) {
+      const rs = makers.get(cursor);
+      if (!rs || rs.length === 0) break;
+      // Pick the recipe whose deepest `from` part is the most refined.
+      let best: CombineRecipe | undefined;
+      let bestBand = -1;
+      for (const r of rs) {
+        const b = r.from.length
+          ? Math.max(
+              ...r.from.map((id) => {
+                const m = makers.get(id);
+                return m && m.length ? m[0].band : 0;
+              }),
+            )
+          : 0;
+        if (b > bestBand) {
+          bestBand = b;
+          best = r;
+        }
+      }
+      if (!best || best.from.length === 0) break;
+      let nextId: string | undefined;
+      let nextBand = -1;
+      for (const id of best.from) {
+        if (visited.has(id)) continue;
+        const m = makers.get(id);
+        const b = m && m.length ? m[0].band : 0;
+        if (b > nextBand) {
+          nextBand = b;
+          nextId = id;
+        }
+      }
+      if (!nextId) break;
+      chainIds.unshift(nextId);
+      visited.add(nextId);
+      cursor = makers.has(nextId) ? nextId : undefined;
+    }
+    return chainIds;
+  }, [bundle, current]);
   return (
     <>
       <div className="cbscrim" onClick={onDismiss} />
@@ -2378,36 +2428,42 @@ function AgesSheet({
         <span className="k">Ages</span>
         <h3>Age {ages[current]}</h3>
         <p>
-          Ages are tiers from raw stuff to finished things. Each combine that
-          lands on the current age or later fills the bar; reach the target
-          and the next age unlocks with new recipes.
-        </p>
-        <p>
+          Each age is a step from raw materials toward finished things.
+          You&apos;re on step {current + 1}
           {last
-            ? "Final age. Keep combining to push your score higher."
-            : `Make ${left} more thing${left === 1 ? "" : "s"} from this age or later to reach Age ${ages[current + 1]}.`}
+            ? " — the last one. Keep combining to push your score higher."
+            : ` — make ${left} more thing${left === 1 ? "" : "s"} from this step or later to reach ${ages[current + 1]}.`}
         </p>
-        {examples.length > 0 && (
+        {chain.length >= 2 && (
           <div className="cbageex">
-            <b>Try to make</b>
-            <div className="cbageexrow">
-              {examples.map((id) => {
+            <b>How deep things get here</b>
+            <div className="cbagechain" aria-label="Example chain from raw to this age">
+              {chain.map((id, i) => {
                 const it = bundle.items.get(id);
                 if (!it) return null;
+                const label = i === 0 ? "raw" : `age ${i}`;
                 return (
-                  <span
-                    key={id}
-                    className="cbslot"
-                    style={fillVar(it)}
-                    title={cap(it.name)}
-                    aria-label={cap(it.name)}
-                  >
-                    <Pictogram
-                      name={it.name}
-                      tier={it.tier}
-                      kind={it.kind}
-                      symbol={it.symbol}
-                    />
+                  <span key={id} className="cbagechainnode">
+                    <span
+                      className="cbslot"
+                      style={fillVar(it)}
+                      title={cap(it.name)}
+                      aria-label={cap(it.name)}
+                    >
+                      <Pictogram
+                        name={it.name}
+                        tier={it.tier}
+                        kind={it.kind}
+                        symbol={it.symbol}
+                      />
+                    </span>
+                    <em>{cap(it.name)}</em>
+                    <small>{label}</small>
+                    {i < chain.length - 1 && (
+                      <span className="cbagechainarrow" aria-hidden="true">
+                        →
+                      </span>
+                    )}
                   </span>
                 );
               })}

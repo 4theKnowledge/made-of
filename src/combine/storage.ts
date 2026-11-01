@@ -139,7 +139,7 @@ function readStored(key: string): StoredGame | null {
     // to the key manually.
     if (
       parsed.v !== SAVE_VERSION ||
-      typeof parsed.n !== "number" ||
+      parsed.n !== 6 ||
       !Array.isArray(parsed.board) ||
       parsed.board.length !== parsed.n * parsed.n ||
       !Array.isArray(parsed.tray) ||

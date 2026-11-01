@@ -403,7 +403,7 @@ export function newGame(
   opts: { daily?: string | null; size?: number; seed?: number } = {},
 ): ReduceResult {
   const daily = opts.daily ?? null;
-  const size = daily ? 5 : opts.size ?? 6;
+  const size = opts.size ?? 6;
   const seed =
     opts.seed ?? (daily ? dailySeed(daily) : freshEndlessSeed());
   const state: GameState = {

@@ -115,7 +115,7 @@ describe("newGame", () => {
     const b = newGame("everything", everything, { daily: "2026-11-01" });
     expect(a.state.board).toEqual(b.state.board);
     expect(a.state.tray).toEqual(b.state.tray);
-    expect(a.state.n).toBe(5);
+    expect(a.state.n).toBe(6);
   });
 });
 
