@@ -2508,49 +2508,108 @@ function fillVar(item: CombineItem): React.CSSProperties {
 
 function GlyphDrag() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="4" y="4" width="7" height="7" rx="1" />
-      <path d="M13 13l7 7M13 20h7v-7" />
-    </svg>
+    <span className="mc" aria-hidden="true">
+      <span className="bd">
+        <span className="cl" />
+        <span className="cl tgt anim-target" />
+        <span className="cl full" />
+        <span className="cl" />
+      </span>
+      <span className="tr">
+        <span className="mt sm M anim-fly">
+          <span className="d" />
+        </span>
+        <span className="mt sm P">
+          <span className="d" />
+        </span>
+        <span className="mt sm S">
+          <span className="d" />
+        </span>
+      </span>
+    </span>
   );
 }
 
 function GlyphCombine() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="7" width="7" height="10" rx="1" />
-      <rect x="14" y="7" width="7" height="10" rx="1" />
-      <path d="M10 12h4" />
-    </svg>
+    <span className="mc" aria-hidden="true">
+      <span className="bd">
+        <span className="cl full anim-fuse" />
+        <span className="cl full anim-fuse" style={{ animationDelay: ".2s" }} />
+        <span className="cl" />
+        <span className="cl" />
+      </span>
+      <span className="tr">
+        <span className="mt sm C anim-rise">
+          <span className="d" />
+        </span>
+      </span>
+    </span>
   );
 }
 
 function GlyphShelf() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 18h18" />
-      <rect x="5" y="9" width="4" height="9" />
-      <rect x="11" y="6" width="4" height="12" />
-      <rect x="17" y="11" width="2.8" height="7" />
-    </svg>
+    <span
+      aria-hidden="true"
+      style={{
+        display: "flex",
+        gap: 5,
+        padding: "0 6px 5px",
+        borderBottom: "2px solid var(--ink)",
+        alignItems: "flex-end",
+      }}
+    >
+      <span className="mt sm M anim-rise">
+        <span className="d" />
+      </span>
+      <span className="mt md P anim-rise" style={{ animationDelay: ".25s" }}>
+        <span className="d" />
+      </span>
+      <span className="mt sm S anim-rise" style={{ animationDelay: ".5s" }}>
+        <span className="d" />
+      </span>
+    </span>
   );
 }
 
 function GlyphGlow() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="6" y="6" width="12" height="12" rx="1" />
-      <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.5 4.5l1.4 1.4M18.1 18.1l1.4 1.4M4.5 19.5l1.4-1.4M18.1 5.9l1.4-1.4" />
-    </svg>
+    <span className="mc" aria-hidden="true">
+      <span className="bd">
+        <span className="cl full anim-glow" />
+        <span className="cl" />
+        <span className="cl" />
+        <span className="cl full anim-glow" style={{ animationDelay: ".7s" }} />
+      </span>
+    </span>
   );
 }
 
 function GlyphAges() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="10" width="18" height="5" rx="1" />
-      <path d="M3 12.5h12" />
-      <path d="M18 7l3 3-3 3" />
-    </svg>
+    <span
+      aria-hidden="true"
+      style={{
+        width: 58,
+        height: 12,
+        border: "1.5px solid var(--ink)",
+        borderRadius: 2,
+        background: "var(--surface)",
+        overflow: "hidden",
+        boxShadow: "1.5px 1.5px 0 var(--ink)",
+        position: "relative",
+      }}
+    >
+      <i
+        className="anim-fill"
+        style={{
+          display: "block",
+          height: "100%",
+          width: "20%",
+          background: "var(--accent)",
+        }}
+      />
+    </span>
   );
 }
