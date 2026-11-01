@@ -37,6 +37,22 @@ import type {
 import { cap } from "@/lib/taxonomy";
 import { HowToPlay } from "@/components/common/HowToPlay";
 
+/** Hand-picked example chains shown in the Ages dialog, keyed by theme and
+ *  then by 0-based age index. One canonical chain per age so the dialog is
+ *  deterministic — rotating examples made players think the rules were
+ *  changing. The last node is an item that lives in that band in the current
+ *  KB; if the KB changes an id, the row is dropped and we re-pick here. */
+const AGE_CHAINS: Partial<Record<ThemeKey, string[][]>> = {
+  everything: [
+    ["hydrogen", "star"],
+    ["clay", "brick"],
+    ["wheat", "flour", "bread"],
+    ["crude oil", "plastic", "tyre"],
+    ["copper", "copper wire", "light bulb"],
+    ["cotton", "thread", "fabric", "shirt"],
+  ],
+};
+
 /** Per-cell preview when a tray tile is selected. Mirrors cbPreview from
  *  the prototype. Each entry is either a found output to render as a ghost
  *  on an empty cell, or an "on" marker for a valid drop-on-top target. */
@@ -2347,76 +2363,12 @@ function AgesSheet({
   const last = current >= ages.length - 1;
   const need = 7 + 2 * current;
   const left = Math.max(0, need - state.ageMade);
-  // Rotate which example chain we show each time the dialog opens. useRef on a
-  // random seed set at mount keeps the chain stable while the dialog is open.
-  const seedRef = useRef<number>(Math.floor(Math.random() * 1_000_000));
-  // Build an index: output id → recipes that make it.
-  const chain = useMemo(() => {
-    const currentBand = current + 1;
-    const makers = new Map<string, CombineRecipe[]>();
-    for (const r of bundle.recipes) {
-      let list = makers.get(r.out);
-      if (!list) {
-        list = [];
-        makers.set(r.out, list);
-      }
-      list.push(r);
-    }
-    const bandOutputs: string[] = [];
-    const seen = new Set<string>();
-    for (const r of bundle.recipes) {
-      if (r.band !== currentBand) continue;
-      if (seen.has(r.out)) continue;
-      seen.add(r.out);
-      bandOutputs.push(r.out);
-    }
-    // Prefer terminals so the chain lands on a shelf-worthy goal.
-    const terminals = bandOutputs.filter((id) => bundle.terminal.has(id));
-    const pool = terminals.length ? terminals : bandOutputs;
-    if (pool.length === 0) return [] as string[];
-    const pick = pool[seedRef.current % pool.length];
-    const chainIds: string[] = [pick];
-    const visited = new Set<string>([pick]);
-    let cursor: string | undefined = pick;
-    for (let step = 0; step < 5 && cursor; step++) {
-      const rs = makers.get(cursor);
-      if (!rs || rs.length === 0) break;
-      // Pick the recipe whose deepest `from` part is the most refined.
-      let best: CombineRecipe | undefined;
-      let bestBand = -1;
-      for (const r of rs) {
-        const b = r.from.length
-          ? Math.max(
-              ...r.from.map((id) => {
-                const m = makers.get(id);
-                return m && m.length ? m[0].band : 0;
-              }),
-            )
-          : 0;
-        if (b > bestBand) {
-          bestBand = b;
-          best = r;
-        }
-      }
-      if (!best || best.from.length === 0) break;
-      let nextId: string | undefined;
-      let nextBand = -1;
-      for (const id of best.from) {
-        if (visited.has(id)) continue;
-        const m = makers.get(id);
-        const b = m && m.length ? m[0].band : 0;
-        if (b > nextBand) {
-          nextBand = b;
-          nextId = id;
-        }
-      }
-      if (!nextId) break;
-      chainIds.unshift(nextId);
-      visited.add(nextId);
-      cursor = makers.has(nextId) ? nextId : undefined;
-    }
-    return chainIds;
-  }, [bundle, current]);
+  // One canonical chain per theme + age index. Hand-picked so the diagram
+  // tells a clear "raw → refined → made" story at a scale that fits that era.
+  // Each chain's last node is an item that genuinely lives in that band in
+  // the current KB; if the KB shifts something and an id goes missing, the
+  // dialog filters the row out and we fix it here.
+  const chain = AGE_CHAINS[state.theme]?.[current] ?? [];
   return (
     <>
       <div className="cbscrim" onClick={onDismiss} />
