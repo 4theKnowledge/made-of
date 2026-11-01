@@ -996,3 +996,212 @@ a.btn.primary{color:var(--bg)}
 .bk .no{position:absolute;top:2px;left:3px;font-style:normal;font-family:var(--mono);font-size:7.5px;font-weight:600;opacity:.65}
 .bk small{font-family:var(--mono);font-size:8px;font-weight:600;opacity:.7;line-height:1}
 .bk.unk .no{opacity:.5}
+
+/* ================= How to play ================= */
+/* Shared modal used by Daily, Combine and Scratch. Modelled on the prototype's
+   .how dialog (legacy/made-of.html:832-835) but mode-agnostic. */
+.ibtn{width:36px;height:36px;padding:0;border:1.5px solid var(--ink);background:var(--surface);border-radius:3px;cursor:pointer;display:inline-grid;place-items:center;color:var(--ink);flex:none}
+.ibtn:hover{box-shadow:2px 2px 0 var(--ink);transform:translate(-1px,-1px)}
+.ibtn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+.howto-scrim{position:fixed;inset:0;z-index:90;background:rgba(17,20,23,.38);backdrop-filter:blur(2px)}
+.howto{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:91;width:min(460px,calc(100vw - 28px));max-height:calc(100dvh - 28px);overflow:auto;box-sizing:border-box;background:var(--surface);border:2.5px solid var(--ink);border-radius:4px;box-shadow:5px 5px 0 var(--ink);padding:16px;display:flex;flex-direction:column;gap:12px;animation:howtoin .25s ease-out}
+@keyframes howtoin{from{opacity:.3;transform:translate(-50%,-47%)}to{opacity:1;transform:translate(-50%,-50%)}}
+.howto-hd{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.howto-k{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--muted)}
+.howto-x{width:32px;height:32px;padding:0;border:0;background:none;border-radius:3px;cursor:pointer;display:grid;place-items:center;color:var(--ink);flex:none}
+.howto-x:hover{background:var(--soft)}
+.howto-x svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.howto-ttl{margin:0;font-family:var(--display);font-weight:800;font-size:22px;line-height:1.15;letter-spacing:-.02em;text-wrap:balance}
+.howto-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.howto-step{display:flex;gap:16px;align-items:center;font-size:14px;line-height:1.4}
+.howto-glyph{flex:none;width:84px;height:84px;padding:10px;box-sizing:border-box;position:relative;display:grid;place-items:center;border:1.5px solid var(--ink);border-radius:4px;background:var(--bg);color:var(--ink);box-shadow:3px 3px 0 var(--ink);overflow:hidden}
+.howto-glyph .sq{width:14px;height:14px;border-radius:2px;border:1.5px solid var(--ink);display:block}
+.howto-glyph .sq.g{background:var(--good)}
+.howto-glyph .sq.y{background:var(--fM)}
+.howto-glyph .sq.r{background:var(--bad)}
+.howto-glyph .row{display:flex;gap:3px}
+
+/* ----- Mini-UI parts (shared, scoped to .howto-glyph) ----- */
+
+/* Mini pictogram tile — a shrunk version of a bowtie chip / combine cell. */
+.howto-glyph .mt{display:inline-grid;place-items:center;border:1.3px solid var(--ink);border-radius:2px;background:var(--surface);box-shadow:1.5px 1.5px 0 var(--ink);color:var(--ink);font-size:0}
+.howto-glyph .mt.sm{width:14px;height:14px}
+.howto-glyph .mt.md{width:20px;height:20px}
+.howto-glyph .mt.lg{width:28px;height:28px}
+.howto-glyph .mt.F{background:var(--fF)}
+.howto-glyph .mt.N{background:var(--fN)}
+.howto-glyph .mt.M{background:var(--fM)}
+.howto-glyph .mt.C{background:var(--fC)}
+.howto-glyph .mt.P{background:var(--fP)}
+.howto-glyph .mt.S{background:var(--fS)}
+.howto-glyph .mt .d{width:60%;height:60%;background:currentColor;border-radius:1px;opacity:.72}
+.howto-glyph .mt.o .d{border-radius:50%}
+
+/* Mini bowtie: three tiles with little stroke links. */
+.howto-glyph .mb{display:grid;grid-template-columns:auto 12px auto 12px auto;align-items:center;gap:0}
+.howto-glyph .mb .lk{height:1.5px;background:var(--ink)}
+
+/* Mini combine board (2×2 slice) with tray row underneath. */
+.howto-glyph .mc{display:flex;flex-direction:column;align-items:center;gap:4px}
+.howto-glyph .mc .bd{display:grid;grid-template-columns:repeat(2,18px);grid-auto-rows:18px;gap:2px;padding:2px;border:1.3px solid var(--ink);border-radius:2px;background:var(--soft)}
+.howto-glyph .mc .bd .cl{width:18px;height:18px;border:1.2px dashed color-mix(in srgb, var(--ink) 35%, transparent);border-radius:2px;background:color-mix(in srgb, var(--surface) 60%, transparent);box-sizing:border-box;position:relative}
+.howto-glyph .mc .bd .cl.full{border:1.2px solid var(--ink);background:var(--fN);box-shadow:1px 1px 0 var(--ink)}
+.howto-glyph .mc .bd .cl.tgt{border:1.3px solid var(--accent);background:color-mix(in srgb, var(--accent) 15%, var(--surface))}
+.howto-glyph .mc .tr{display:flex;gap:3px;justify-content:center;padding:1px 3px;border:1.2px solid var(--ink);border-radius:2px;background:var(--surface);min-height:16px;align-items:center}
+
+/* Mini target card for scratch. */
+.howto-glyph .mtc{width:56px;padding:4px;border:1.3px solid var(--ink);border-radius:2px;background:var(--surface);box-shadow:1.5px 1.5px 0 var(--ink);display:flex;flex-direction:column;align-items:center;gap:3px}
+.howto-glyph .mtc .bar{width:100%;height:2px;background:var(--line);border-radius:1px;overflow:hidden}
+.howto-glyph .mtc .bar i{display:block;height:100%;background:var(--good)}
+
+/* Mini "ready list" rows. */
+.howto-glyph .mrl{display:flex;flex-direction:column;gap:3px;padding:3px;border:1.3px solid var(--ink);border-radius:2px;background:var(--surface)}
+.howto-glyph .mrl .rr{display:flex;align-items:center;gap:3px}
+.howto-glyph .mrl .rr .bar{width:22px;height:4px;background:var(--line);border-radius:1px}
+.howto-glyph .mrl .rr.on .bar{background:var(--accent)}
+
+/* Mini "squares" result row. */
+.howto-glyph .ms{display:flex;gap:3px}
+
+/* Mini bulb for hint. Dome on top, screw base below, rays optional. */
+.howto-glyph .ml{position:relative;width:34px;height:40px;display:block}
+.howto-glyph .ml b{position:absolute;top:4px;left:50%;transform:translateX(-50%);display:block;width:22px;height:22px;border:1.6px solid var(--ink);border-radius:50%;background:var(--fM);box-shadow:1.5px 1.5px 0 var(--ink)}
+.howto-glyph .ml i{position:absolute;top:24px;left:50%;transform:translateX(-50%);width:12px;height:9px;border:1.6px solid var(--ink);border-top:0;border-radius:0 0 2px 2px;background:var(--surface);box-shadow:1.5px 1.5px 0 var(--ink)}
+.howto-glyph .ml i::before{content:"";position:absolute;top:3px;left:50%;transform:translateX(-50%);width:8px;height:1.3px;background:var(--ink);border-radius:1px}
+.howto-glyph .ml::before,.howto-glyph .ml::after{content:"";position:absolute;top:12px;width:5px;height:1.5px;background:var(--ink);border-radius:1px;opacity:.55}
+.howto-glyph .ml::before{left:-3px;transform:rotate(-18deg)}
+.howto-glyph .ml::after{right:-3px;transform:rotate(18deg)}
+
+/* Big-bang starburst. */
+.howto-glyph .mbb{position:relative;width:40px;height:40px}
+.howto-glyph .mbb::before{content:"";position:absolute;inset:16px;border-radius:50%;background:var(--ink)}
+.howto-glyph .mbb::after{content:"";position:absolute;inset:0;background:
+  conic-gradient(from 0deg,
+    var(--ink) 0 6deg, transparent 6deg 44deg,
+    var(--ink) 44deg 50deg, transparent 50deg 88deg,
+    var(--ink) 88deg 94deg, transparent 94deg 132deg,
+    var(--ink) 132deg 138deg, transparent 138deg 176deg,
+    var(--ink) 176deg 182deg, transparent 182deg 220deg,
+    var(--ink) 220deg 226deg, transparent 226deg 264deg,
+    var(--ink) 264deg 270deg, transparent 270deg 308deg,
+    var(--ink) 308deg 314deg, transparent 314deg 360deg);
+  -webkit-mask:radial-gradient(circle, transparent 0 10px, #000 10.5px 19px, transparent 19.5px 100%);
+          mask:radial-gradient(circle, transparent 0 10px, #000 10.5px 19px, transparent 19.5px 100%);
+}
+
+/* Lock glyph. */
+.howto-glyph .mlk{width:22px;height:22px;position:relative}
+.howto-glyph .mlk::before{content:"";position:absolute;left:5px;top:3px;width:12px;height:8px;border:1.5px solid var(--ink);border-bottom:0;border-radius:6px 6px 0 0}
+.howto-glyph .mlk::after{content:"";position:absolute;left:3px;top:10px;width:16px;height:10px;border:1.5px solid var(--ink);border-radius:2px;background:var(--muted)}
+
+/* Pointer / hand pointing. */
+.howto-glyph .mp{width:26px;height:26px;border:1.5px solid var(--ink);border-radius:50%;position:relative;background:var(--surface);box-shadow:1.5px 1.5px 0 var(--ink)}
+.howto-glyph .mp::before{content:"";position:absolute;left:50%;top:50%;width:1.5px;height:9px;background:var(--ink);transform:translate(-50%,-80%) rotate(0deg);transform-origin:bottom center}
+
+/* ----- Motion ----- */
+@keyframes howtoPulse{
+  0%,100%{transform:scale(1);box-shadow:1.5px 1.5px 0 var(--ink)}
+  50%{transform:scale(1.08);box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent),1.5px 1.5px 0 var(--ink)}
+}
+@keyframes howtoNudge{
+  0%,100%{transform:translate(0,0)}
+  40%{transform:translate(6px,-3px)}
+  70%{transform:translate(6px,-3px)}
+}
+@keyframes howtoDrop{
+  0%{transform:translate(0,-8px);opacity:0}
+  60%{opacity:1}
+  100%{transform:translate(0,0);opacity:1}
+}
+@keyframes howtoFuse{
+  0%{transform:scale(1)}
+  40%{transform:scale(1.14);filter:brightness(1.1)}
+  100%{transform:scale(1)}
+}
+@keyframes howtoGlow{
+  0%,100%{box-shadow:1.5px 1.5px 0 var(--ink)}
+  50%{box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent),1.5px 1.5px 0 var(--ink)}
+}
+@keyframes howtoShimmer{
+  0%,100%{filter:brightness(1)}
+  50%{filter:brightness(1.25)}
+}
+@keyframes howtoAgeFill{
+  0%{width:20%}
+  100%{width:85%}
+}
+@keyframes howtoRise{
+  0%{transform:translateY(10px);opacity:0}
+  100%{transform:translateY(0);opacity:1}
+}
+@keyframes howtoTick{
+  0%{background:var(--line)}
+  100%{background:var(--accent)}
+}
+@keyframes howtoSpin{
+  from{transform:rotate(0)}
+  to{transform:rotate(360deg)}
+}
+@keyframes howtoPointer{
+  0%,100%{transform:translate(0,0)}
+  40%{transform:translate(14px,10px)}
+  70%{transform:translate(14px,10px)}
+}
+/* Travels from tray position (0,0) up to the top-right empty cell and back. */
+@keyframes howtoFly{
+  0%{transform:translate(0,0) scale(1)}
+  35%{transform:translate(10px,-26px) scale(1.05)}
+  60%{transform:translate(10px,-26px) scale(1.05)}
+  70%{transform:translate(10px,-26px) scale(1)}
+  100%{transform:translate(0,0) scale(1)}
+}
+@keyframes howtoTargetBlink{
+  0%,100%{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 15%, var(--surface))}
+  40%{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 32%, var(--surface));box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent)}
+}
+
+.howto-glyph .anim-pulse{animation:howtoPulse 1.8s ease-in-out infinite}
+.howto-glyph .anim-nudge{animation:howtoNudge 1.6s ease-in-out infinite}
+.howto-glyph .anim-drop{animation:howtoDrop .9s ease-out infinite alternate}
+.howto-glyph .anim-fuse{animation:howtoFuse 1.6s ease-in-out infinite}
+.howto-glyph .anim-glow{animation:howtoGlow 1.4s ease-in-out infinite}
+.howto-glyph .anim-shimmer{animation:howtoShimmer 1.6s ease-in-out infinite}
+.howto-glyph .anim-fill{animation:howtoAgeFill 2.2s ease-in-out infinite alternate}
+.howto-glyph .anim-rise{animation:howtoRise .9s ease-out infinite alternate}
+.howto-glyph .anim-tick{animation:howtoTick 1.8s ease-in-out infinite}
+.howto-glyph .anim-spin{animation:howtoSpin 6s linear infinite}
+.howto-glyph .anim-pointer{animation:howtoPointer 1.8s ease-in-out infinite}
+.howto-glyph .anim-fly{animation:howtoFly 2.4s cubic-bezier(.4,.1,.3,1.2) infinite}
+.howto-glyph .anim-target{animation:howtoTargetBlink 2.4s ease-in-out infinite}
+
+@media (prefers-reduced-motion: reduce){
+  .howto-glyph .anim-pulse,
+  .howto-glyph .anim-nudge,
+  .howto-glyph .anim-drop,
+  .howto-glyph .anim-fuse,
+  .howto-glyph .anim-glow,
+  .howto-glyph .anim-shimmer,
+  .howto-glyph .anim-fill,
+  .howto-glyph .anim-rise,
+  .howto-glyph .anim-tick,
+  .howto-glyph .anim-spin,
+  .howto-glyph .anim-pointer,
+  .howto-glyph .anim-fly,
+  .howto-glyph .anim-target{animation:none}
+}
+.howto-text{min-width:0;display:flex;flex-direction:column;gap:2px}
+.howto-text b{font-family:var(--display);font-weight:700;font-size:14.5px;line-height:1.2}
+.howto-text p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.4}
+.howto-foot{margin:0;padding:10px 12px;border:1.5px dashed var(--line);border-radius:3px;background:var(--bg);color:var(--muted);font-size:12.5px;line-height:1.4}
+.howto-cta{align-self:stretch;justify-content:center}
+@media (max-width:520px){
+  .howto{padding:14px 12px;gap:10px}
+  .howto-ttl{font-size:19px}
+  .howto-steps{gap:12px}
+  .howto-step{gap:12px}
+  .howto-glyph{width:72px;height:72px;padding:8px}
+}
+@media (prefers-reduced-motion: reduce){
+  .howto{animation:none}
+}
