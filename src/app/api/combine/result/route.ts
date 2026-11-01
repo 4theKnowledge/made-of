@@ -15,7 +15,10 @@ type Theme = typeof THEMES extends Set<infer T> ? T : never;
  * authoritative server-side game loop for Combine) but clamp them to defend
  * against stat poisoning.
  *
- * Body: { theme: "everyday" | "everything", score, made, age }
+ * Body: { theme, score, made, age, daily? }
+ *   `daily` is the ISO day key the puzzle was for, or null/absent for endless
+ *   runs. Stored on `result.daily` so future daily leaderboards can filter
+ *   without a schema change.
  */
 export async function POST(req: Request) {
   const session = await getSession();
@@ -26,6 +29,7 @@ export async function POST(req: Request) {
     score?: unknown;
     made?: unknown;
     age?: unknown;
+    daily?: unknown;
   };
   try {
     body = await req.json();
@@ -43,6 +47,10 @@ export async function POST(req: Request) {
   const score = clampInt(body.score, 0, 1_000_000);
   const made = clampInt(body.made, 0, 100_000);
   const age = clampInt(body.age, 0, 100);
+  const daily =
+    typeof body.daily === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.daily)
+      ? body.daily
+      : null;
 
   await getDb()
     .insert(schema.progress)
@@ -51,7 +59,7 @@ export async function POST(req: Request) {
       userId: session.user.id,
       kind: "combine",
       ref: theme,
-      result: { score, made, age },
+      result: daily ? { score, made, age, daily } : { score, made, age },
     });
 
   return NextResponse.json({ ok: true });

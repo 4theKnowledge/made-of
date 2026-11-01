@@ -43,6 +43,7 @@ export async function loadAccountStats(userId: string): Promise<AccountStats> {
       .select({
         itemId: schema.combineDiscoveries.itemId,
         firstFoundAt: schema.combineDiscoveries.firstFoundAt,
+        scope: schema.combineDiscoveries.scope,
         tier: schema.items.tier,
       })
       .from(schema.combineDiscoveries)

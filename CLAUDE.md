@@ -1,6 +1,12 @@
 # Made Of
 
-Made Of is a web app that shows what anything is made of, traced all the way back to the big bang, with sourced evidence for every link. It has three modes: the **Daily link** puzzle (the home page), **Explore** (the bowtie view of one item's inputs and outputs) and **From scratch** (a crafting game).
+Made Of is a web app that shows what anything is made of, traced all the way back to the big bang, with sourced evidence for every link. It has three original modes from the prototype — the **Daily link** puzzle (`/link`), **Explore** (bowtie view at `/i/[slug]` and `/explore/[slug]`) and **From scratch** / Craft (`/craft`) — plus **Combine** (`/combine`), a tile-combining mode added after the prototype.
+
+### Combine, in short
+
+- Combine is a **high-score game first**. Each run has a score; `account/stats` leaderboards and the Combine total/best are what players care about. The item collection and discovery badges are a progression aid along the way, not the goal.
+- Combine has multiple themes (Everyday and Everything today, more later) plus a daily puzzle under the same board. All endless themes share one lifetime collection; the daily puzzle has **its own** collection so endless grinding can't walk a daily into pre-unlocked items. Scope lives on `combine_discoveries.scope` (`endless` | `daily`); existing rows were backfilled to `endless`.
+- Finished-run records go to `progress` with `kind='combine'`, `ref=<theme>`, and `result.daily=<day key>` for daily runs. Future daily leaderboards filter on `result.daily`.
 
 ## Current state
 

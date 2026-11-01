@@ -73,6 +73,8 @@ export const sourceKindEnum = pgEnum("source_kind", [
 // path), so we keep the set small on purpose.
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 
+export const combineScopeEnum = pgEnum("combine_scope", ["endless", "daily"]);
+
 /* ========================================================================
  * Items.
  *
@@ -388,8 +390,11 @@ export const progress = pgTable(
  * Combine discoveries.
  *
  * Signed-in users accumulate a lifetime collection of items first discovered
- * across every Combine run. Keyed on (userId, itemId); `firstFoundAt` is the
- * timestamp of the first discovery and never changes.
+ * across Combine runs. Collections are partitioned by `scope` so the daily
+ * puzzle has its own fair-start collection — endless grinding doesn't let a
+ * player walk into a daily with items pre-unlocked. Keyed on
+ * (userId, itemId, scope); `firstFoundAt` is set on first discovery per
+ * scope and never changes.
  *
  * Signed-out users keep an in-memory collection for the current session only.
  * ====================================================================== */
@@ -403,13 +408,15 @@ export const combineDiscoveries = pgTable(
     itemId: uuid("item_id")
       .notNull()
       .references(() => items.id, { onDelete: "cascade" }),
+    scope: combineScopeEnum("scope").notNull().default("endless"),
     firstFoundAt: timestamp("first_found_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [
-    primaryKey({ columns: [t.userId, t.itemId] }),
+    primaryKey({ columns: [t.userId, t.itemId, t.scope] }),
     index("combine_discoveries_user_idx").on(t.userId),
+    index("combine_discoveries_user_scope_idx").on(t.userId, t.scope),
   ],
 );
 

@@ -5,8 +5,13 @@ import {
   type CombineRun,
 } from "./combine";
 
-function row(itemId: string, tier: CombineRow["tier"], iso: string): CombineRow {
-  return { itemId, tier, firstFoundAt: new Date(iso) };
+function row(
+  itemId: string,
+  tier: CombineRow["tier"],
+  iso: string,
+  scope: CombineRow["scope"] = "endless",
+): CombineRow {
+  return { itemId, tier, scope, firstFoundAt: new Date(iso) };
 }
 
 function run(ref: string, score: number, extras: Partial<CombineRun["result"]> = {}): CombineRun {
@@ -75,6 +80,7 @@ describe("computeCombineStats", () => {
     );
     expect(s.totalRuns).toBe(4);
     expect(s.bestScoreEver).toBe(300);
+    expect(s.totalScoreEver).toBe(546);
     expect(s.bestByTheme.everyday).toEqual({
       bestScore: 120,
       totalRuns: 3,
@@ -85,5 +91,22 @@ describe("computeCombineStats", () => {
       totalRuns: 1,
       totalScore: 300,
     });
+  });
+
+  it("splits discoveries by scope", () => {
+    const s = computeCombineStats([
+      row("a", "F", "2026-01-01T00:00:00Z", "endless"),
+      row("b", "N", "2026-01-02T00:00:00Z", "endless"),
+      row("c", "M", "2026-01-03T00:00:00Z", "daily"),
+    ]);
+    expect(s.byScope.endless.total).toBe(2);
+    expect(s.byScope.endless.byTier.F).toBe(1);
+    expect(s.byScope.endless.byTier.N).toBe(1);
+    expect(s.byScope.daily.total).toBe(1);
+    expect(s.byScope.daily.byTier.M).toBe(1);
+    // Combined counts still reflect everything.
+    expect(s.totalDiscovered).toBe(3);
+    expect(s.byTier.F).toBe(1);
+    expect(s.byTier.M).toBe(1);
   });
 });

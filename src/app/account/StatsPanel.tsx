@@ -1,6 +1,10 @@
 import Link from "next/link";
 import type { AccountStats } from "@/lib/stats/load";
 
+function titleCase(s: string): string {
+  return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1);
+}
+
 function fmtTime(ms: number): string {
   if (ms <= 0) return "—";
   const sec = Math.floor(ms / 1000);
@@ -45,6 +49,10 @@ export function StatsPanel({ stats }: { stats: AccountStats }) {
     .sort((a, b) => b[1].bestScore - a[1].bestScore)
     .slice(0, 5);
 
+  const themeEntries = Object.entries(combine.bestByTheme).sort(
+    (a, b) => b[1].bestScore - a[1].bestScore,
+  );
+
   return (
     <div style={{ display: "grid", gap: 20 }}>
       <div>
@@ -86,9 +94,26 @@ export function StatsPanel({ stats }: { stats: AccountStats }) {
         </h4>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
           <Stat label="Best score" value={combine.bestScoreEver.toLocaleString()} hint={combine.totalRuns > 0 ? `across ${combine.totalRuns} runs` : "no runs yet"} />
-          <Stat label="Best — Everyday" value={(combine.bestByTheme.everyday?.bestScore ?? 0).toLocaleString()} />
-          <Stat label="Best — Everything" value={(combine.bestByTheme.everything?.bestScore ?? 0).toLocaleString()} />
-          <Stat label="Items discovered" value={String(combine.totalDiscovered)} />
+          <Stat label="Total score" value={combine.totalScoreEver.toLocaleString()} />
+          {themeEntries.map(([theme, best]) => (
+            <Stat
+              key={theme}
+              label={`Best — ${titleCase(theme)}`}
+              value={best.bestScore.toLocaleString()}
+            />
+          ))}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16, marginTop: 16 }}>
+          <Stat
+            label="Endless collection"
+            value={String(combine.byScope.endless.total)}
+            hint="shared across endless themes"
+          />
+          <Stat
+            label="Daily collection"
+            value={String(combine.byScope.daily.total)}
+            hint="daily puzzle only"
+          />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 16, marginTop: 16 }}>
           <Stat label="Fundamental" value={String(combine.byTier.F)} />

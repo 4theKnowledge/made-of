@@ -50,6 +50,13 @@
       "when": 1793520735388,
       "tag": "0006_violet_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793533842448,
+      "tag": "0007_late_magneto",
+      "breakpoints": true
     }
   ]
 }

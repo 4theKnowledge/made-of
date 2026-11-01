@@ -145,14 +145,16 @@ export function CombineBoard({ bundles: serialised }: Props) {
 
   const [state, setState] = useState<GameState>(initial);
   const bundle = bundles[state.theme];
-  // Lifetime collection: Postgres-backed for signed-in users, in-memory for
-  // everyone else. See useCollection for the full persistence contract.
+  // Collection is partitioned by scope: endless (both endless themes share
+  // one bucket) vs. daily (its own bucket so daily puzzles are a fair start,
+  // not fed by endless grinding). See useCollection for the full contract.
+  const collectionScope = state.daily ? "daily" : "endless";
   const {
     collection,
     authed: collectionAuthed,
     isPending: collectionPending,
     record: recordDiscoveries,
-  } = useCollection();
+  } = useCollection(collectionScope);
   // Per-theme best scores + today's daily result. Loaded in an effect so
   // SSR/hydration stay deterministic.
   const [best, setBest] = useState<Record<ThemeKey, number>>({
@@ -473,6 +475,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
             score: r.state.score,
             made: r.state.made,
             age: r.state.age,
+            daily: r.state.daily,
           }),
         }).catch(() => {});
         if (r.state.daily) {
