@@ -43,6 +43,13 @@
       "when": 1793506396951,
       "tag": "0005_bitter_molecule_man",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793520735388,
+      "tag": "0006_violet_captain_cross",
+      "breakpoints": true
     }
   ]
 }

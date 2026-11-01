@@ -291,34 +291,63 @@ export function saveSound(s: SoundSettings): void {
   }
 }
 
-/** Items ever found by this device, across games. Phase 3 keeps this in
- *  localStorage; later it moves to the authed catalogue table. */
-export function loadFound(): Set<string> {
-  if (typeof window === "undefined") return new Set();
+/** Items ever found by this device, across games, keyed by item id with the
+ *  epoch-ms of first discovery. Used to show "X ago" badges on collection
+ *  tiles and to persist discoveries across games for signed-in users.
+ *
+ *  Shape on disk is `Record<string, number>`. We tolerate the older
+ *  `string[]` shape (pre-timestamp) by falling back to 0 for each id, which
+ *  the UI renders as an undated find. */
+export function loadFound(): Map<string, number> {
+  if (typeof window === "undefined") return new Map();
   try {
     const raw = window.localStorage.getItem(FOUND_KEY);
-    if (!raw) return new Set();
-    const arr = JSON.parse(raw) as string[];
-    return new Set(arr);
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as Record<string, number> | string[];
+    if (Array.isArray(parsed)) {
+      return new Map(parsed.map((id) => [id, 0]));
+    }
+    return new Map(Object.entries(parsed));
   } catch {
-    return new Set();
+    return new Map();
   }
 }
 
-export function markFound(ids: Iterable<string>): void {
+export function saveFound(found: Map<string, number>): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      FOUND_KEY,
+      JSON.stringify(Object.fromEntries(found)),
+    );
+  } catch {
+    // ignore
+  }
+}
+
+export function clearFound(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(FOUND_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** Add new discoveries to the stored collection, stamping each with `now`.
+ *  Existing entries keep their original timestamp. */
+export function markFound(ids: Iterable<string>, now: number = Date.now()): void {
   if (typeof window === "undefined") return;
   try {
     const cur = loadFound();
     let changed = false;
     for (const id of ids) {
       if (!cur.has(id)) {
-        cur.add(id);
+        cur.set(id, now);
         changed = true;
       }
     }
-    if (changed) {
-      window.localStorage.setItem(FOUND_KEY, JSON.stringify([...cur]));
-    }
+    if (changed) saveFound(cur);
   } catch {
     // ignore
   }

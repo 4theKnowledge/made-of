@@ -384,6 +384,35 @@ export const progress = pgTable(
   ],
 );
 
+/* ========================================================================
+ * Combine discoveries.
+ *
+ * Signed-in users accumulate a lifetime collection of items first discovered
+ * across every Combine run. Keyed on (userId, itemId); `firstFoundAt` is the
+ * timestamp of the first discovery and never changes.
+ *
+ * Signed-out users keep an in-memory collection for the current session only.
+ * ====================================================================== */
+
+export const combineDiscoveries = pgTable(
+  "combine_discoveries",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => authUser.id, { onDelete: "cascade" }),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => items.id, { onDelete: "cascade" }),
+    firstFoundAt: timestamp("first_found_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.itemId] }),
+    index("combine_discoveries_user_idx").on(t.userId),
+  ],
+);
+
 export const reports = pgTable(
   "reports",
   {

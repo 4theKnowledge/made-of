@@ -996,6 +996,10 @@ a.btn.primary{color:var(--bg)}
 .bk .no{position:absolute;top:2px;left:3px;font-style:normal;font-family:var(--mono);font-size:7.5px;font-weight:600;opacity:.65}
 .bk small{font-family:var(--mono);font-size:8px;font-weight:600;opacity:.7;line-height:1}
 .bk.unk .no{opacity:.5}
+.cbcta{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:14px;row-gap:3px;width:calc(100% - 4px);margin:8px 2px;padding:12px 14px;border:1.5px dashed var(--ink);border-radius:6px;background:color-mix(in srgb, var(--ink) 4%, var(--surface));text-align:left;box-sizing:border-box}
+.cbcta b{grid-column:1;font-size:13px}
+.cbcta span{grid-column:1;font-size:12px;color:var(--muted);line-height:1.35}
+.cbcta .cbh{grid-column:2;grid-row:1 / span 2;align-self:center;height:34px;text-decoration:none;white-space:nowrap}
 
 /* ================= How to play ================= */
 /* Shared modal used by Daily, Combine and Scratch. Modelled on the prototype's

@@ -18,7 +18,6 @@ import {
   loadDailyDone,
   loadGame,
   loadSound,
-  markFound,
   saveBest,
   saveDailyDone,
   saveGame,
@@ -26,6 +25,7 @@ import {
   type DailyResult,
   type MusicTrack,
 } from "@/combine/storage";
+import { useCollection } from "@/combine/useCollection";
 import { dailyShareText, endlessShareText, shareText } from "@/combine/share";
 import type {
   CombineItem,
@@ -52,12 +52,16 @@ function computePreview(
   bundle: ThemeBundle,
   state: GameState,
   slot: number | null,
+  extraKnown: Iterable<string>,
 ): Map<number, Preview> {
   const out = new Map<number, Preview>();
   if (slot == null) return out;
   const x = state.tray[slot];
   if (x == null) return out;
+  // "Known" = anything found this game or anywhere in the player's lifetime
+  // collection. Signed-out players will see the latter as empty.
   const found = new Set(state.found);
+  for (const id of extraKnown) found.add(id);
   const altsOf = (r: CombineRecipe): CombineRecipe[] => {
     const key = [...r.all].sort().join("+");
     return bundle.sameIngredients.get(key) ?? [r];
@@ -140,6 +144,14 @@ export function CombineBoard({ bundles: serialised }: Props) {
 
   const [state, setState] = useState<GameState>(initial);
   const bundle = bundles[state.theme];
+  // Lifetime collection: Postgres-backed for signed-in users, in-memory for
+  // everyone else. See useCollection for the full persistence contract.
+  const {
+    collection,
+    authed: collectionAuthed,
+    isPending: collectionPending,
+    record: recordDiscoveries,
+  } = useCollection();
   // Per-theme best scores + today's daily result. Loaded in an effect so
   // SSR/hydration stay deterministic.
   const [best, setBest] = useState<Record<ThemeKey, number>>({
@@ -477,14 +489,16 @@ export function CombineBoard({ bundles: serialised }: Props) {
           setDailyDone(dr);
         }
       }
-      // Markers for the device-wide found set (will migrate to the authed
-      // catalogue once that ships).
+      // Record new discoveries into the lifetime collection. For signed-in
+      // users this persists to Postgres; for signed-out users it accumulates
+      // in memory only (lost on next game / reload — this is the gated
+      // behaviour that makes signing in valuable).
       const found = r.events
         .filter((e): e is Extract<Event, { type: "discovery" }> => e.type === "discovery")
         .map((e) => e.out);
-      if (found.length) markFound(found);
+      if (found.length) recordDiscoveries(found);
     },
-    [state, bundle, applyEvents, best],
+    [state, bundle, applyEvents, best, recordDiscoveries],
   );
 
   // Save after every settled state transition. Skip while a choice is open
@@ -868,6 +882,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
       state.tray.filter((t): t is string => Boolean(t)),
     );
     const found = new Set(state.found);
+    for (const id of collection.keys()) found.add(id);
     const scored = A.recipes
       .map((r) => {
         const touchesTray = r.all.some((x) => trayHas.has(x));
@@ -878,7 +893,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
     const pick = scored[0]?.r;
     if (!pick) return null;
     return { out: pick.out, recipe: pick.all };
-  }, [bundle, state.age, state.tray, state.found]);
+  }, [bundle, state.age, state.tray, state.found, collection]);
 
   const onHelper = useCallback(
     (which: "hint" | "swap" | "clear" | "move") => {
@@ -919,9 +934,18 @@ export function CombineBoard({ bundles: serialised }: Props) {
   );
 
   const preview = useMemo(
-    () => computePreview(bundle, state, selectedSlot),
-    [bundle, state, selectedSlot],
+    () => computePreview(bundle, state, selectedSlot, collection.keys()),
+    [bundle, state, selectedSlot, collection],
   );
+
+  // Merged "known" set for UI affordances (preview glow, info card goes-into
+  // list, choice picker ordering). Signed-in players carry their lifetime
+  // collection in here; signed-out players only have this-game finds.
+  const knownIds = useMemo(() => {
+    const s = new Set<string>(state.found);
+    for (const id of collection.keys()) s.add(id);
+    return s;
+  }, [state.found, collection]);
 
   return (
     <div className="cbwrap">
@@ -1000,6 +1024,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
           <ChoicePicker
             state={state}
             bundle={bundle}
+            known={knownIds}
             onChoose={onChoose}
           />
         )}
@@ -1061,6 +1086,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
             tileId={infoTile}
             bundle={bundle}
             state={state}
+            known={knownIds}
             onDismiss={() => setInfoTile(null)}
           />
         )}
@@ -1088,6 +1114,9 @@ export function CombineBoard({ bundles: serialised }: Props) {
           <CollectionBook
             bundle={bundle}
             state={state}
+            collection={collection}
+            authed={collectionAuthed}
+            authPending={collectionPending}
             onInfo={(id) => setInfoTile(id)}
             onDismiss={() => setBookOpen(false)}
           />
@@ -1196,11 +1225,14 @@ function DetailCard({
   tileId,
   bundle,
   state,
+  known,
   onDismiss,
 }: {
   tileId: string;
   bundle: ThemeBundle;
   state: GameState;
+  /** Everything the player knows (this game + lifetime collection). */
+  known: Set<string>;
   onDismiss: () => void;
 }) {
   const item = bundle.items.get(tileId);
@@ -1215,7 +1247,7 @@ function DetailCard({
   const goesInto = (bundle.byIngredient.get(tileId) ?? []).filter(
     (r) => r.out !== tileId,
   );
-  const foundGoesInto = goesInto.filter((r) => state.found.includes(r.out));
+  const foundGoesInto = goesInto.filter((r) => known.has(r.out));
   const unfoundCount = goesInto.length - foundGoesInto.length;
   return (
     <>
@@ -1594,17 +1626,40 @@ function SoundMenu({
 function CollectionBook({
   bundle,
   state,
+  collection,
+  authed,
+  authPending,
   onInfo,
   onDismiss,
 }: {
   bundle: ThemeBundle;
   state: GameState;
+  /** Lifetime finds: itemId → firstFoundAt epoch ms. Signed-in users carry
+   *  this across games; signed-out users accumulate it only in memory. */
+  collection: Map<string, number>;
+  authed: boolean;
+  authPending: boolean;
   onInfo: (id: string) => void;
   onDismiss: () => void;
 }) {
   const cat = useMemo(() => catalogue(bundle), [bundle]);
   const total = bundle.outputs.size;
-  const got = state.found.filter((x) => bundle.outputs.has(x)).length;
+  // Merge the current game's new discoveries with the lifetime collection
+  // so a signed-out player's in-game progress still shows in the book even
+  // if the collection map hasn't caught up yet (both are driven by the same
+  // record() call, but merging keeps the UI robust).
+  const findsForTheme = useMemo(() => {
+    const now = Date.now();
+    const merged = new Map<string, number>();
+    for (const [id, t] of collection) {
+      if (bundle.outputs.has(id)) merged.set(id, t);
+    }
+    for (const id of state.found) {
+      if (!merged.has(id) && bundle.outputs.has(id)) merged.set(id, now);
+    }
+    return merged;
+  }, [collection, state.found, bundle.outputs]);
+  const got = findsForTheme.size;
   const pct = Math.round((100 * got) / Math.max(1, total));
   return (
     <>
@@ -1621,10 +1676,12 @@ function CollectionBook({
         <div className="cbbar">
           <i style={{ width: `${pct}%` }} />
         </div>
+        {!authPending && !authed && (
+          <SignInCTA count={got} />
+        )}
         <div className="cbbookages">
           {cat.byAge.map((list, k) => {
-            const ageGot = list.filter((x) => state.found.includes(x))
-              .length;
+            const ageGot = list.filter((x) => findsForTheme.has(x)).length;
             return (
               <div key={k} className="cbbage">
                 <div className="bh">
@@ -1637,9 +1694,9 @@ function CollectionBook({
                   {list.map((id) => {
                     const it = bundle.items.get(id);
                     if (!it) return null;
-                    const found = state.found.includes(id);
+                    const foundAt = findsForTheme.get(id);
                     const no = String(cat.no.get(id)).padStart(3, "0");
-                    if (!found) {
+                    if (foundAt === undefined) {
                       return (
                         <span
                           key={id}
@@ -1678,7 +1735,7 @@ function CollectionBook({
                           symbol={it.symbol}
                         />
                         <span>{cap(it.name)}</span>
-                        <small>early find</small>
+                        <small>{relativeTime(foundAt)}</small>
                       </button>
                     );
                   })}
@@ -1692,6 +1749,52 @@ function CollectionBook({
         </button>
       </section>
     </>
+  );
+}
+
+/** Compact relative-time label for collection tiles. `foundAt` is epoch ms.
+ *  A `0` sentinel (older migrated entries without a timestamp) renders as a
+ *  dash so the tile doesn't lie about recency. */
+function relativeTime(foundAt: number): string {
+  if (!foundAt) return "—";
+  const diff = Date.now() - foundAt;
+  if (diff < 60_000) return "just now";
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(days / 365);
+  return `${years}y ago`;
+}
+
+/** Collection CTA for signed-out players. The collection they're building
+ *  right now won't carry over to the next game until they sign in. */
+function SignInCTA({ count }: { count: number }) {
+  return (
+    <div
+      className="cbcta"
+      role="note"
+      aria-label="Sign in to save your collection"
+    >
+      <b>
+        {count > 0
+          ? `${count} discover${count === 1 ? "y" : "ies"} this session`
+          : "Sign in to keep your collection"}
+      </b>
+      <span>
+        Discoveries reset when you start a new game. Sign in to keep them
+        across every game, forever.
+      </span>
+      <a className="cbh" href="/sign-in">
+        Sign in
+      </a>
+    </div>
   );
 }
 
@@ -2435,14 +2538,16 @@ function Tray({
 function ChoicePicker({
   state,
   bundle,
+  known,
   onChoose,
 }: {
   state: GameState;
   bundle: ThemeBundle;
+  known: Set<string>;
   onChoose: (outputIndex: number) => void;
 }) {
   if (!state.choosing) return null;
-  const found = (id: string) => state.found.includes(id);
+  const found = (id: string) => known.has(id);
   // Found options first, then unknown ("?") options.
   const indexed = state.choosing.options.map((r, i) => ({ r, i }));
   const sorted = indexed
