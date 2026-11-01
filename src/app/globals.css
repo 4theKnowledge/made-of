@@ -1201,6 +1201,7 @@ a.btn.primary{color:var(--bg)}
   .howto-steps{gap:12px}
   .howto-step{gap:12px}
   .howto-glyph{width:72px;height:72px;padding:8px}
+  .howto-glyph > *{zoom:.72}
 }
 @media (prefers-reduced-motion: reduce){
   .howto{animation:none}
