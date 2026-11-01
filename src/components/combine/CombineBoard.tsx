@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
-import { catalogue } from "@/combine/data";
+import { ageSets, catalogue } from "@/combine/data";
 import { newGame, reduce } from "@/combine/engine";
 import type { Action, Event, GameState } from "@/combine/engine";
 import { matchAt, matchOn } from "@/combine/match";
@@ -14,11 +14,14 @@ import {
   loadBest,
   loadDailyDone,
   loadGame,
+  loadSound,
   markFound,
   saveBest,
   saveDailyDone,
   saveGame,
+  saveSound,
   type DailyResult,
+  type MusicTrack,
 } from "@/combine/storage";
 import { dailyShareText, endlessShareText, shareText } from "@/combine/share";
 import type {
@@ -152,6 +155,18 @@ export function CombineBoard({ bundles: serialised }: Props) {
   }, [bundles.everyday]);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [helpersOpen, setHelpersOpen] = useState(false);
+  // Clear-mode: next tap on a full cell removes that tile.
+  const [clearMode, setClearMode] = useState(false);
+  // Move-mode: null = inactive. {from:null} = pick a tile. {from:cell} = pick
+  // the destination.
+  const [moveMode, setMoveMode] = useState<{ from: number | null } | null>(
+    null,
+  );
+  // Hint toast — a card with a recipe to try when nothing fits.
+  const [hintToast, setHintToast] = useState<{
+    out: string;
+    recipe: string[];
+  } | null>(null);
   const [fx, setFx] = useState<Fx>({});
   const [discovery, setDiscovery] = useState<{
     out: string;
@@ -381,6 +396,29 @@ export function CombineBoard({ bundles: serialised }: Props) {
 
   const onCellTap = useCallback(
     (cell: number) => {
+      // Clear mode: tap a full cell to remove it.
+      if (clearMode) {
+        if (state.board[cell] == null) return;
+        act({ type: "clear", cell });
+        setClearMode(false);
+        return;
+      }
+      // Move mode: first tap picks the source, second tap drops it.
+      if (moveMode) {
+        if (moveMode.from == null) {
+          if (state.board[cell] == null) return;
+          setMoveMode({ from: cell });
+          return;
+        }
+        if (moveMode.from === cell) {
+          // Tap the picked tile again to cancel.
+          setMoveMode({ from: null });
+          return;
+        }
+        act({ type: "move", from: moveMode.from, to: cell });
+        setMoveMode(null);
+        return;
+      }
       if (selectedSlot == null) return;
       const target = state.board[cell];
       if (target == null) {
@@ -389,7 +427,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
         act({ type: "drop-on", slot: selectedSlot, cell });
       }
     },
-    [act, selectedSlot, state.board],
+    [act, selectedSlot, state.board, clearMode, moveMode],
   );
 
   // When a drag completed via drop or a long-press fired, we don't want
@@ -421,8 +459,9 @@ export function CombineBoard({ bundles: serialised }: Props) {
   }, [helpersOpen]);
 
   // Escape closes the top overlay in prototype order: info card, discovery
-  // toast, age toast, helpers menu, selected tray tile. Doesn't dismiss the
-  // choice picker (the engine is paused and needs a decision).
+  // toast, age toast, hint toast, helpers menu, helper mode, selected tray
+  // tile. Doesn't dismiss the choice picker (the engine is paused and
+  // needs a decision).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -438,8 +477,32 @@ export function CombineBoard({ bundles: serialised }: Props) {
         setAgeToast(null);
         return;
       }
+      if (hintToast) {
+        setHintToast(null);
+        return;
+      }
+      if (themeOpen) {
+        setThemeOpen(false);
+        return;
+      }
+      if (bookOpen) {
+        setBookOpen(false);
+        return;
+      }
+      if (soundOpen) {
+        setSoundOpen(false);
+        return;
+      }
       if (helpersOpen) {
         setHelpersOpen(false);
+        return;
+      }
+      if (clearMode) {
+        setClearMode(false);
+        return;
+      }
+      if (moveMode) {
+        setMoveMode(null);
         return;
       }
       if (selectedSlot != null) {
@@ -448,7 +511,19 @@ export function CombineBoard({ bundles: serialised }: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [infoTile, discovery, ageToast, helpersOpen, selectedSlot]);
+  }, [
+    infoTile,
+    discovery,
+    ageToast,
+    hintToast,
+    themeOpen,
+    bookOpen,
+    soundOpen,
+    helpersOpen,
+    clearMode,
+    moveMode,
+    selectedSlot,
+  ]);
 
   // Drag state is held in a ref for the hot path (pointermove), mirrored
   // to React state only when the over-cell changes so cells can light up.
@@ -603,17 +678,64 @@ export function CombineBoard({ bundles: serialised }: Props) {
     [act],
   );
 
+  const findHint = useCallback(() => {
+    // Teach a recipe from the current age that uses a tile we have in the
+    // tray (preferring unfound outputs). Mirrors step 4 of cbFindHint. If
+    // nothing in the tray is relevant, fall back to any recipe from this
+    // age with an unfound output; else any recipe from this age.
+    const A = ageSets(bundle, state.age);
+    const trayHas = new Set(
+      state.tray.filter((t): t is string => Boolean(t)),
+    );
+    const found = new Set(state.found);
+    const scored = A.recipes
+      .map((r) => {
+        const touchesTray = r.all.some((x) => trayHas.has(x));
+        const unfound = !found.has(r.out);
+        return { r, score: (touchesTray ? 2 : 0) + (unfound ? 1 : 0) };
+      })
+      .sort((a, b) => b.score - a.score);
+    const pick = scored[0]?.r;
+    if (!pick) return null;
+    return { out: pick.out, recipe: pick.all };
+  }, [bundle, state.age, state.tray, state.found]);
+
   const onHelper = useCallback(
     (which: "hint" | "swap" | "clear" | "move") => {
       setHelpersOpen(false);
-      // Clear and Move require a second tap on the board — those arrive in a
-      // later patch. For now swap and hint just decrement counters via the
-      // engine (hint content is Phase 4+).
-      if (which === "hint" || which === "swap") {
-        act({ type: which });
+      // Entering move/clear cancels selection and any opposing mode.
+      if (which === "clear") {
+        if (state.clears <= 0 || state.over) return;
+        setMoveMode(null);
+        setSelectedSlot(null);
+        setClearMode((m) => !m);
+        return;
+      }
+      if (which === "move") {
+        if (state.mv <= 0 || state.over) return;
+        setClearMode(false);
+        setSelectedSlot(null);
+        setMoveMode((m) => (m ? null : { from: null }));
+        return;
+      }
+      if (which === "swap") {
+        if (state.swaps <= 0) return;
+        setClearMode(false);
+        setMoveMode(null);
+        act({ type: "swap" });
+        return;
+      }
+      if (which === "hint") {
+        if (state.hints <= 0 || state.over) return;
+        const h = findHint();
+        if (!h) return;
+        act({ type: "hint" });
+        setHintToast(h);
+        const id = window.setTimeout(() => setHintToast(null), 9000);
+        timers.current.push(id);
       }
     },
-    [act],
+    [act, state.clears, state.mv, state.swaps, state.hints, state.over, findHint],
   );
 
   const preview = useMemo(
@@ -629,7 +751,20 @@ export function CombineBoard({ bundles: serialised }: Props) {
           fx={fx}
           best={best[state.theme] ?? 0}
           helpersOpen={helpersOpen}
-          onToggleHelpers={() => setHelpersOpen((o) => !o)}
+          clearMode={clearMode}
+          moveMode={moveMode != null}
+          onToggleHelpers={() => {
+            // If a mode is active, the button is Cancel: exit the mode.
+            if (clearMode) {
+              setClearMode(false);
+              return;
+            }
+            if (moveMode) {
+              setMoveMode(null);
+              return;
+            }
+            setHelpersOpen((o) => !o);
+          }}
           onHelper={onHelper}
           onTheme={() => setThemeOpen(true)}
         />
@@ -637,6 +772,8 @@ export function CombineBoard({ bundles: serialised }: Props) {
           state={state}
           selectedSlot={selectedSlot}
           preview={preview}
+          clearMode={clearMode}
+          moveMode={moveMode}
         />
         <AgeBar
           state={state}
@@ -666,6 +803,8 @@ export function CombineBoard({ bundles: serialised }: Props) {
           }
           preview={preview}
           dragOver={drag ? { cell: drag.overCell, ok: drag.overOk } : null}
+          clearMode={clearMode}
+          moveMode={moveMode}
           onCellTap={onCellTap}
         />
         <Tray
@@ -733,6 +872,13 @@ export function CombineBoard({ bundles: serialised }: Props) {
             discovery={discovery}
             bundle={bundle}
             onDismiss={() => setDiscovery(null)}
+          />
+        )}
+        {hintToast && (
+          <HintToast
+            hint={hintToast}
+            bundle={bundle}
+            onDismiss={() => setHintToast(null)}
           />
         )}
         {infoTile && (
@@ -1149,12 +1295,15 @@ function ThemeMenu({
 /* ---------- Sound menu ---------- */
 
 function SoundMenu({ onDismiss }: { onDismiss: () => void }) {
-  // Phase 3 ships no actual audio engine; this menu holds the three
-  // settings in local state so controls feel real. Phase 6 wires them up.
-  const [music, setMusic] = useState<"piano" | "handpan" | "off">("off");
-  const [sfx, setSfx] = useState(false);
-  const [vol, setVol] = useState(80);
-  const tracks: Array<["piano" | "handpan" | "off", string, string]> = [
+  // Settings persist via localStorage. Phase 6 wires actual audio.
+  const initial = useMemo(() => loadSound(), []);
+  const [music, setMusic] = useState<MusicTrack>(initial.music);
+  const [sfx, setSfx] = useState(initial.sfx);
+  const [vol, setVol] = useState(initial.vol);
+  useEffect(() => {
+    saveSound({ music, sfx, vol });
+  }, [music, sfx, vol]);
+  const tracks: Array<[MusicTrack, string, string]> = [
     ["piano", "Calm piano", "Slow, soft and roomy"],
     ["handpan", "Handpan", "Gentle and a bit busier"],
     ["off", "No music", ""],
@@ -1370,6 +1519,54 @@ function AgeToast({
   );
 }
 
+function HintToast({
+  hint,
+  bundle,
+  onDismiss,
+}: {
+  hint: { out: string; recipe: string[] };
+  bundle: ThemeBundle;
+  onDismiss: () => void;
+}) {
+  const item = bundle.items.get(hint.out);
+  if (!item) return null;
+  return (
+    <div className="cbdisc" role="status" onClick={onDismiss}>
+      <Pictogram
+        name={item.name}
+        tier={item.tier}
+        kind={item.kind}
+        symbol={item.symbol}
+      />
+      <div>
+        <span className="k">Hint · tap to close</span>
+        <b>Nothing fits right now. Try this:</b>
+        <div className="cbrcp">
+          {hint.recipe.map((pid, k) => {
+            const p = bundle.items.get(pid);
+            if (!p) return null;
+            return (
+              <span key={pid}>
+                <Pictogram
+                  name={p.name}
+                  tier={p.tier}
+                  kind={p.kind}
+                  symbol={p.symbol}
+                />
+                {cap(p.name)}
+                {k < hint.recipe.length - 1 && <i>+</i>}
+              </span>
+            );
+          })}
+          <i>=</i>
+          <span>{cap(item.name)}</span>
+        </div>
+        <p>Keep the pieces you have, and watch your tray for the rest.</p>
+      </div>
+    </div>
+  );
+}
+
 function DiscoveryToast({
   discovery,
   bundle,
@@ -1430,6 +1627,8 @@ function TopBar({
   fx,
   best,
   helpersOpen,
+  clearMode,
+  moveMode,
   onToggleHelpers,
   onHelper,
   onTheme,
@@ -1438,6 +1637,8 @@ function TopBar({
   fx: Fx;
   best: number;
   helpersOpen: boolean;
+  clearMode: boolean;
+  moveMode: boolean;
   onToggleHelpers: () => void;
   onHelper: (which: "hint" | "swap" | "clear" | "move") => void;
   onTheme: () => void;
@@ -1445,6 +1646,7 @@ function TopBar({
   const helpersLeft = state.swaps + state.clears + state.hints + state.mv;
   const themeName = state.daily ? "Daily" : state.theme === "everyday" ? "Everyday" : "Everything";
   const bestDisplay = Math.max(best, state.over ? state.score : 0);
+  const modeActive = clearMode || moveMode;
   return (
     <div className="cbtop">
       <div className="cbscore">
@@ -1474,20 +1676,31 @@ function TopBar({
       </button>
       <div className="cbhelpwrap">
         <button
-          className={`cbh${helpersOpen ? " open" : ""}`}
+          className={`cbh${modeActive ? " on" : ""}${helpersOpen ? " open" : ""}`}
           id="cbHelp"
           type="button"
           aria-haspopup="menu"
           aria-expanded={helpersOpen}
-          aria-label="Helpers"
+          aria-label={modeActive ? "Cancel" : "Helpers"}
           onClick={onToggleHelpers}
-          disabled={state.over || helpersLeft === 0}
+          disabled={state.over || (!modeActive && helpersLeft === 0)}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M3 9h18v11H3zM8 9V5h8v4M3 13h18M11 12v3h2v-3" />
-          </svg>
-          <span className="lbl">Helpers</span>
-          <b>{helpersLeft}</b>
+          {modeActive ? (
+            <>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+              <span className="lbl">Cancel</span>
+            </>
+          ) : (
+            <>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 9h18v11H3zM8 9V5h8v4M3 13h18M11 12v3h2v-3" />
+              </svg>
+              <span className="lbl">Helpers</span>
+              <b>{helpersLeft}</b>
+            </>
+          )}
         </button>
         {helpersOpen && !state.over && (
           <div className="cbhelpmenu" role="menu" aria-label="Helpers">
@@ -1513,7 +1726,7 @@ function TopBar({
               type="button"
               className="cbhm"
               onClick={() => onHelper("move")}
-              disabled
+              disabled={state.mv === 0}
               aria-label={`Move a tile on the board, ${state.mv} left`}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1547,7 +1760,7 @@ function TopBar({
               type="button"
               className="cbhm"
               onClick={() => onHelper("clear")}
-              disabled
+              disabled={state.clears === 0}
               aria-label={`Clear a tile, ${state.clears} left`}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1570,15 +1783,26 @@ function TipLine({
   state,
   selectedSlot,
   preview,
+  clearMode,
+  moveMode,
 }: {
   state: GameState;
   selectedSlot: number | null;
   preview: Map<number, Preview>;
+  clearMode: boolean;
+  moveMode: { from: number | null } | null;
 }) {
   let tip: string;
   if (state.over) tip = "Game over.";
   else if (state.choosing) tip = "These make more than one thing. Pick one.";
-  else if (selectedSlot != null) {
+  else if (clearMode) tip = "Tap a tile to clear it.";
+  else if (moveMode) {
+    if (moveMode.from == null) tip = "Tap the tile you want to move.";
+    else {
+      const name = state.board[moveMode.from];
+      tip = `Now tap where the ${name ? cap(name).toLowerCase() : "tile"} should go. Moving isn't a turn.`;
+    }
+  } else if (selectedSlot != null) {
     if (preview.size > 0) {
       tip =
         "Glowing squares make things you've found before. New combos don't glow: try things.";
@@ -1719,6 +1943,8 @@ function Board({
   fx,
   preview,
   dragOver,
+  clearMode,
+  moveMode,
   onCellTap,
 }: {
   state: GameState;
@@ -1726,6 +1952,8 @@ function Board({
   fx: Fx;
   preview: Map<number, Preview>;
   dragOver: { cell: number | null; ok: boolean } | null;
+  clearMode: boolean;
+  moveMode: { from: number | null } | null;
   onCellTap: (cell: number) => void;
 }) {
   const size = state.n;
@@ -1745,6 +1973,10 @@ function Board({
               ? "ok"
               : "no"
             : null;
+        const isClearable = clearMode && v != null;
+        const isMovable =
+          moveMode != null && moveMode.from == null && v != null;
+        const isMoving = moveMode != null && moveMode.from === i;
         return (
           <Cell
             key={i}
@@ -1755,6 +1987,9 @@ function Board({
             fx={fx}
             preview={preview.get(i)}
             over={over}
+            clearable={isClearable}
+            movable={isMovable}
+            moving={isMoving}
             onTap={() => onCellTap(i)}
           />
         );
@@ -1773,6 +2008,9 @@ function Cell({
   fx,
   preview,
   over,
+  clearable,
+  movable,
+  moving,
   onTap,
 }: {
   cell: number;
@@ -1782,6 +2020,9 @@ function Cell({
   fx: Fx;
   preview: Preview | undefined;
   over: "ok" | "no" | null;
+  clearable: boolean;
+  movable: boolean;
+  moving: boolean;
   onTap: () => void;
 }) {
   const empty = !id;
@@ -1812,6 +2053,10 @@ function Cell({
   // Drag-ghost over highlighting takes precedence over preview.
   if (over === "ok") classes.push("over");
   if (over === "no") classes.push("overno");
+  // Helper modes.
+  if (clearable) classes.push("clearable");
+  if (movable) classes.push("movable");
+  if (moving) classes.push("moving");
 
   const words = id ? id.split("-") : [];
   const longest = Math.max(0, ...words.map((w) => w.length));

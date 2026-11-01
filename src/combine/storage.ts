@@ -20,6 +20,18 @@ const BEST_KEY = "madeof:cbbest";
 const BEST_PREFIX = "madeof:cbbest:";
 const DAILY_DONE_KEY = "madeof:cbdaily";
 const FOUND_KEY = "madeof:cbfound";
+const MUSIC_KEY = "madeof:music";
+const SFX_KEY = "madeof:sfx";
+const VOL_KEY = "madeof:vol";
+
+export type MusicTrack = "piano" | "handpan" | "off";
+export interface SoundSettings {
+  music: MusicTrack;
+  sfx: boolean;
+  vol: number; // 0..100
+}
+
+const SOUND_DEFAULT: SoundSettings = { music: "off", sfx: false, vol: 80 };
 
 export interface StoredGame {
   theme: ThemeKey;
@@ -218,6 +230,36 @@ export function saveBest(theme: ThemeKey, score: number): void {
   try {
     const key = theme === "everyday" ? BEST_KEY : BEST_PREFIX + theme;
     window.localStorage.setItem(key, String(score));
+  } catch {
+    // ignore
+  }
+}
+
+export function loadSound(): SoundSettings {
+  if (typeof window === "undefined") return SOUND_DEFAULT;
+  try {
+    const music = window.localStorage.getItem(MUSIC_KEY);
+    const sfx = window.localStorage.getItem(SFX_KEY);
+    const vol = window.localStorage.getItem(VOL_KEY);
+    return {
+      music:
+        music === "piano" || music === "handpan" || music === "off"
+          ? (music as MusicTrack)
+          : SOUND_DEFAULT.music,
+      sfx: sfx == null ? SOUND_DEFAULT.sfx : sfx === "1",
+      vol: vol == null ? SOUND_DEFAULT.vol : Math.max(0, Math.min(100, Number(vol))),
+    };
+  } catch {
+    return SOUND_DEFAULT;
+  }
+}
+
+export function saveSound(s: SoundSettings): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(MUSIC_KEY, s.music);
+    window.localStorage.setItem(SFX_KEY, s.sfx ? "1" : "0");
+    window.localStorage.setItem(VOL_KEY, String(Math.round(s.vol)));
   } catch {
     // ignore
   }
