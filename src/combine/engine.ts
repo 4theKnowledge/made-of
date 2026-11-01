@@ -579,11 +579,30 @@ export function reduce(
     case "move": {
       const tile = state.board[action.from];
       if (!tile) return { state: prev, events: [] };
-      // Moving onto an empty cell: just relocate.
+      // Moving onto an empty cell: relocate, then check for a combine at
+      // the new cell (symmetric with `place`).
       if (state.board[action.to] == null) {
         state.board[action.from] = null;
         state.crumb[action.from] = null;
         state.board[action.to] = tile;
+        const m = matchAt(bundle, state.board, action.to, tile, state.n);
+        if (m) {
+          const cells = [action.to, ...m.cells];
+          const r = resolveMatch(
+            state,
+            bundle,
+            { recipe: m.recipe, cells, mult: 1, auto: false },
+            events,
+          );
+          if (r.needsChoice) {
+            state.choosing = {
+              options: alternatives(bundle, m.recipe).slice(),
+              cells,
+              mult: 1,
+            };
+            return { state, events };
+          }
+        }
         return { state, events };
       }
       // Moving onto a tile: try drop-on-top.
