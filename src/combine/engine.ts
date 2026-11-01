@@ -173,11 +173,10 @@ function fullness(board: Board): number {
   return board.filter(Boolean).length / board.length;
 }
 
-/** Count of on-or-ahead items made in each age (0-based) before leaving:
- *  7, 9, 11, 13… Up from the prototype's 6+2n so each era has room to
- *  breathe (playtests reported 50-60 discoveries per run and ages flashing
- *  by in 10-25 moves). Only combines whose output lives in the current
- *  age's band or newer count toward this — see `finishResolve`. */
+/** On-or-ahead makes needed to leave each age (0-based): 7, 9, 11, 13, 15, 17.
+ *  Up from the prototype's 6+2n so each era has room to breathe. Only
+ *  combines whose output lives in the current band or newer count — see
+ *  `finishResolve`. */
 function ageNeed(age: number): number {
   return 7 + 2 * age;
 }

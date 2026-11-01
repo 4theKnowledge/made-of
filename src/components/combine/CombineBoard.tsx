@@ -2117,7 +2117,10 @@ function TopBar({
           )}
         </button>
         {helpersOpen && !state.over && (
-          <div className="cbhelpmenu" role="menu" aria-label="Helpers">
+          <>
+            <div className="cbscrim cbhelpscrim" aria-hidden="true" />
+            <div className="cbhelpmenu" role="menu" aria-label="Helpers">
+            <span className="k cbhelptitle">Helpers</span>
             <button
               type="button"
               className="cbhm"
@@ -2204,7 +2207,8 @@ function TopBar({
               </span>
               <b className="c">{state.shore}</b>
             </button>
-          </div>
+            </div>
+          </>
         )}
       </div>
       <button
@@ -2310,7 +2314,7 @@ function AgeBar({
 }) {
   const ages = bundle.theme.ages;
   const last = state.age >= ages.length - 1;
-  const need = 6 + 2 * state.age;
+  const need = 7 + 2 * state.age;
   const pct = last ? 100 : Math.min(100, Math.round((state.ageMade / need) * 100));
   const ariaLabel = `Age ${ages[state.age]} of ${ages.length}${
     last ? "" : `. Make ${need - state.ageMade} more to reach Age ${ages[state.age + 1]}`
@@ -2347,8 +2351,22 @@ function AgesSheet({
   const ages = bundle.theme.ages;
   const current = state.age;
   const last = current >= ages.length - 1;
-  const need = 6 + 2 * current;
+  const need = 7 + 2 * current;
   const left = Math.max(0, need - state.ageMade);
+  // Pick up to 4 example outputs from the current age's band. Prefer unfound
+  // ones so the hint stays useful; fall back to any current-band output.
+  const currentBand = current + 1;
+  const bandOutputs: string[] = [];
+  const seenEx = new Set<string>();
+  for (const r of bundle.recipes) {
+    if (r.band !== currentBand) continue;
+    if (seenEx.has(r.out)) continue;
+    seenEx.add(r.out);
+    bandOutputs.push(r.out);
+  }
+  const foundSet = new Set(state.found);
+  const unfound = bandOutputs.filter((id) => !foundSet.has(id));
+  const examples = (unfound.length >= 3 ? unfound : bandOutputs).slice(0, 4);
   return (
     <>
       <div className="cbscrim" onClick={onDismiss} />
@@ -2360,15 +2378,47 @@ function AgesSheet({
         <span className="k">Ages</span>
         <h3>Age {ages[current]}</h3>
         <p>
+          Ages are tiers from raw stuff to finished things. Each combine that
+          lands on the current age or later fills the bar; reach the target
+          and the next age unlocks with new recipes.
+        </p>
+        <p>
           {last
             ? "Final age. Keep combining to push your score higher."
             : `Make ${left} more thing${left === 1 ? "" : "s"} from this age or later to reach Age ${ages[current + 1]}.`}
         </p>
+        {examples.length > 0 && (
+          <div className="cbageex">
+            <b>Try to make</b>
+            <div className="cbageexrow">
+              {examples.map((id) => {
+                const it = bundle.items.get(id);
+                if (!it) return null;
+                return (
+                  <span
+                    key={id}
+                    className="cbslot"
+                    style={fillVar(it)}
+                    title={cap(it.name)}
+                    aria-label={cap(it.name)}
+                  >
+                    <Pictogram
+                      name={it.name}
+                      tier={it.tier}
+                      kind={it.kind}
+                      symbol={it.symbol}
+                    />
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <ol className="cbagelist">
           {ages.map((name, i) => {
             const isNow = i === current;
             const isPast = i < current;
-            const metaNeed = 6 + 2 * i;
+            const metaNeed = 7 + 2 * i;
             const meta = isNow
               ? last
                 ? "Final"
@@ -2387,9 +2437,6 @@ function AgesSheet({
             );
           })}
         </ol>
-        <p>
-          Each combine fills the bar. New ages unlock new recipes.
-        </p>
         <div className="cbagecrumble">
           <span className="howto-glyph" aria-hidden="true">
             <GlyphCrumble />

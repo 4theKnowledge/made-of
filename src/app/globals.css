@@ -773,6 +773,9 @@ a.btn.primary{color:var(--bg)}
 .cbagecrumble p{margin:0;font-size:12.5px;line-height:1.4;color:var(--muted)}
 .cbagerow b{font-size:14px}
 .cbagemeta{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);justify-self:end;text-align:right}
+.cbageex{display:flex;flex-direction:column;gap:6px;width:100%}
+.cbageex b{font-size:12px;font-family:var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.cbageexrow{display:flex;flex-wrap:wrap;gap:5px}
 
 .cbshelf{display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-height:34px;padding:4px 6px;border:1.5px dashed color-mix(in srgb, var(--ink) 30%, transparent);border-radius:4px}
 .cbshelf.none{justify-content:center;background:color-mix(in srgb, var(--ink) 3%, transparent);border-color:color-mix(in srgb, var(--ink) 20%, transparent)}
@@ -863,13 +866,6 @@ a.btn.primary{color:var(--bg)}
   .cbh.cbtheme{padding:0 5px 0 8px}
 }
 
-/* On narrow viewports the Helpers wrap sits mid-row, so right:0 anchored to
-   the wrap can push the menu off the left edge. Pin to the viewport instead,
-   below the top bar (top bar + a little breathing room). */
-@media (max-width: 600px){
-  .cbhelpmenu{position:fixed;right:8px;left:auto;top:calc(env(safe-area-inset-top, 0px) + 56px);width:min(300px, calc(100vw - 16px))}
-}
-
 /* Helpers dropdown — ported from legacy/made-of.html 893–907. */
 .cbhelpwrap{position:relative}
 #cbHelp{gap:5px}
@@ -877,6 +873,20 @@ a.btn.primary{color:var(--bg)}
 #cbHelp.on b{background:var(--bg);color:var(--ink)}
 #cbHelp.open{background:var(--soft)}
 .cbhelpmenu{position:absolute;right:0;top:calc(100% + 6px);z-index:30;width:min(300px, calc(100vw - 32px));display:flex;flex-direction:column;padding:6px;border:2px solid var(--ink);border-radius:4px;background:var(--bg);box-shadow:4px 4px 0 var(--ink);animation:mdin .18s ease-out}
+
+/* Scrim and title are only shown with the touch centered-modal variant. */
+.cbhelpscrim{display:none}
+.cbhelptitle{display:none}
+
+/* Touch devices get a centered modal — the popover is awkward to anchor on a
+   mid-row button and the dialog matches Combine's other overlays. Mouse users
+   keep the lightweight popover. These rules must come AFTER the base
+   .cbhelpmenu rule so the media-query overrides win on same-specificity. */
+@media (pointer: coarse){
+  .cbhelpscrim{display:block}
+  .cbhelpmenu{position:fixed;left:50%;right:auto;top:50%;transform:translate(-50%,-50%);width:min(360px, calc(100vw - 28px));max-height:calc(100dvh - 28px);overflow:auto;padding:10px 12px 10px;border-width:2.5px;box-shadow:5px 5px 0 var(--ink);z-index:81}
+  .cbhelptitle{display:block;align-self:center;margin:2px 0 6px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--ink)}
+}
 .cbhm{display:flex;align-items:center;gap:10px;width:100%;padding:9px 8px;border:0;border-radius:3px;background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
 .cbhm + .cbhm{border-top:1px solid var(--line)}
 .cbhm:hover:not(:disabled){background:var(--soft)}
