@@ -1205,8 +1205,12 @@ function DetailCard({
 }) {
   const item = bundle.items.get(tileId);
   if (!item) return null;
-  // Knowledge-base recipe: find the first recipe whose output is this tile.
-  const madeFrom = bundle.recipes.find((r) => r.out === tileId);
+  // Prefer the gameplay recipe. If the theme filtered it out (e.g. water
+  // in Everyday — H and O aren't everyday-tagged), fall back to the item's
+  // knowledge-base lore so the card still reads "hydrogen + oxygen = water".
+  const bundleRecipe = bundle.recipes.find((r) => r.out === tileId);
+  const madeFrom: { all: string[] } | null =
+    bundleRecipe ?? (item.lore ? { all: item.lore } : null);
   // Goes into: recipes that use this tile as an ingredient.
   const goesInto = (bundle.byIngredient.get(tileId) ?? []).filter(
     (r) => r.out !== tileId,

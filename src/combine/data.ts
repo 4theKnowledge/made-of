@@ -174,6 +174,21 @@ function assignAges(
 }
 
 function makeItemView(node: GraphNode): CombineItem {
+  const first = node.recipes[0];
+  let lore: string[] | undefined;
+  if (first) {
+    const parts: string[] = [];
+    const seen = new Set<string>();
+    for (const e of node.up) {
+      if (e.recipeId !== first.id) continue;
+      if (e.type !== "f") continue;
+      if (e.id === node.id) continue;
+      if (seen.has(e.id)) continue;
+      seen.add(e.id);
+      parts.push(e.id);
+    }
+    if (parts.length > 0) lore = parts;
+  }
   return {
     id: node.id,
     name: node.name,
@@ -181,6 +196,7 @@ function makeItemView(node: GraphNode): CombineItem {
     symbol: node.symbol,
     fact: node.fact,
     kind: node.kind,
+    ...(lore ? { lore } : {}),
   };
 }
 
@@ -231,10 +247,20 @@ export function buildThemeBundle(
   }
 
   const items = new Map<string, CombineItem>();
-  const touched = new Set<string>([...outputs, ...ingredients]);
-  for (const id of touched) {
+  // Adding an item may surface lore parts (e.g. water's hydrogen+oxygen)
+  // that aren't ingredients in this theme; they still need an item view
+  // so the detail card can render them.
+  const queue: string[] = [...outputs, ...ingredients];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (items.has(id)) continue;
     const node = snapshot.nodes.get(id);
-    if (node) items.set(id, makeItemView(node));
+    if (!node) continue;
+    const view = makeItemView(node);
+    items.set(id, view);
+    if (view.lore) {
+      for (const p of view.lore) if (!items.has(p)) queue.push(p);
+    }
   }
 
   return {

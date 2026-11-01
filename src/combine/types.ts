@@ -39,6 +39,10 @@ export interface CombineItem {
   symbol: string | null;
   fact: string;
   kind: ItemKind;
+  /** The item's first `f` recipe parts (ids), straight from the knowledge
+   *  base. Shown by the detail card when the gameplay bundle has filtered
+   *  the recipe out — e.g. water's hydrogen+oxygen in the Everyday theme. */
+  lore?: string[];
 }
 
 /** The subset of a theme that is "in play" at a given age index (0-based).
