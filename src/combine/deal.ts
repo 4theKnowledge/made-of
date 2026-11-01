@@ -5,6 +5,15 @@
  * moving. Every tray is checked before it is dealt: ~3 in 4 trays have a
  * tile that combines straight away, the rest need one set-up move.
  *
+ * Ports `cbPick` + `cbDeal` from legacy/made-of.html lines 3377–3449, with
+ * four congestion-breaking additions on top:
+ *   1. Pile detection widens with pile size — a pile of 4 is 3x more likely
+ *      to trigger partner-picking than a pile of 2.
+ *   2. Layer 2 prefers recipes that actually consume the heaviest pile tile.
+ *   3. The dealer remembers the last few trays and rejects obvious repeats.
+ *   4. A pathological-pile escape hatch forces a diversifying pick when the
+ *      recent trays have all been pile-adjacent.
+ *
  * Ports `cbPick` + `cbDeal` from legacy/made-of.html lines 3377–3449.
  */
 
@@ -17,6 +26,9 @@ import type { ThemeBundle } from "./types";
  *  cbPick line 3380–3381. */
 const MAX_TOOLS_ON_BOARD = 4;
 
+/** How many trays back the dealer remembers for anti-repetition. */
+const RECENT_TRAY_WINDOW = 2;
+
 /** The dealer only knows about the state it needs — not the whole game. */
 export interface DealerView {
   bundle: ThemeBundle;
@@ -26,6 +38,36 @@ export interface DealerView {
   /** 0-based age index. */
   age: number;
   rng: RngState;
+  /** Short memory of recent trays as sorted multisets, newest first. The
+   *  caller owns this array; `dealTray` reads and mutates it in place. */
+  recentTrays?: string[][];
+  /** Internal: non-null when the current pick should avoid partners of
+   *  this piled tile. Set by the escape hatch. */
+  _diversifyAway?: string | null;
+}
+
+/** Count how many of each in-age, non-tool tile are on the board. */
+function tallyBoard(view: DealerView): Map<string, number> {
+  const A = ageSets(view.bundle, view.age);
+  const counts = new Map<string, number>();
+  for (const v of view.board) {
+    if (!v) continue;
+    if (view.bundle.tools.has(v)) continue;
+    if (!A.USE.has(v)) continue;
+    counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** The heaviest pile on the board, or null if nothing is piling. */
+function heaviestPile(view: DealerView): { tile: string; count: number } | null {
+  const counts = tallyBoard(view);
+  let best: { tile: string; count: number } | null = null;
+  for (const [tile, count] of counts) {
+    if (count < 2) continue;
+    if (!best || count > best.count) best = { tile, count };
+  }
+  return best;
 }
 
 /** Pick ONE tile for the tray. Prefers tiles that fit the board; falls
@@ -45,29 +87,49 @@ export function pickOne(view: DealerView): string | null {
     (!onBoard.has(x) && !inTray.has(x) && toolsOut < MAX_TOOLS_ON_BOARD);
 
   const roll = rand(view.rng);
+  const pile = heaviestPile(view);
 
-  // 0. If something is piling up on the board, pick a partner for it.
-  const counts = new Map<string, number>();
-  for (const v of view.board) {
-    if (!v) continue;
-    if (view.bundle.tools.has(v)) continue;
-    if (!A.USE.has(v)) continue;
-    counts.set(v, (counts.get(v) ?? 0) + 1);
-  }
-  const pile = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
-  if (pile && pile[1] >= 2 && roll >= 0.45 && roll < 0.6) {
-    const need: string[] = [];
+  // Escape hatch (diversify): the caller detected a pathological pile and
+  // flagged this pick to avoid anything that touches it. Fall straight to
+  // Layer 4-style raw/base picks, skipping anything from a recipe that
+  // includes the piled tile.
+  const divAway = view._diversifyAway ?? null;
+  if (divAway) {
+    const forbidden = new Set<string>([divAway]);
     for (const r of A.recipes) {
-      if (!r.all.includes(pile[0])) continue;
-      for (const x of r.all) {
-        if (x === pile[0]) continue;
-        if (!okTool(x)) continue;
-        if (inTray.has(x)) continue;
-        if (onBoard.has(x) && view.bundle.tools.has(x)) continue;
-        need.push(x);
-      }
+      if (!r.all.includes(divAway)) continue;
+      for (const x of r.all) forbidden.add(x);
     }
-    if (need.length) return pick(view.rng, need) ?? null;
+    const safe = A.BASE.filter(
+      (x) => okTool(x) && !view.bundle.tools.has(x) && !forbidden.has(x) && !inTray.has(x),
+    );
+    if (safe.length) return pick(view.rng, safe) ?? null;
+    const safeAny = [...A.ING].filter((x) => okTool(x) && !forbidden.has(x) && !inTray.has(x));
+    if (safeAny.length) return pick(view.rng, safeAny) ?? null;
+    // Nothing diversifying available — fall through to normal picks.
+  }
+
+  // 0. If something is piling up on the board, pick a partner for it. The
+  //    trigger window widens with pile size: pile 2 keeps the original ~15%
+  //    window, pile 3 doubles it, pile 4+ triples it. Larger piles are
+  //    more disruptive and the dealer should push harder to clear them.
+  if (pile && pile.count >= 2) {
+    const windowSize = pile.count >= 4 ? 0.45 : pile.count === 3 ? 0.30 : 0.15;
+    const windowStart = 0.45;
+    if (roll >= windowStart && roll < windowStart + windowSize) {
+      const need: string[] = [];
+      for (const r of A.recipes) {
+        if (!r.all.includes(pile.tile)) continue;
+        for (const x of r.all) {
+          if (x === pile.tile) continue;
+          if (!okTool(x)) continue;
+          if (inTray.has(x)) continue;
+          if (onBoard.has(x) && view.bundle.tools.has(x)) continue;
+          need.push(x);
+        }
+      }
+      if (need.length) return pick(view.rng, need) ?? null;
+    }
   }
 
   // 1. Something that would combine right now on some empty cell.
@@ -90,19 +152,34 @@ export function pickOne(view: DealerView): string | null {
     if (cands.length) return pick(view.rng, cands) ?? null;
   }
 
-  // 2. A partner for something already on the board.
+  // 2. A partner for something already on the board. When there is a pile,
+  //    prefer recipes that *consume the piled tile specifically* over
+  //    recipes that merely share any ingredient with the board — otherwise
+  //    the pool is dominated by irrelevant partners that keep the pile
+  //    stuck.
   if (roll < 0.8) {
-    const helpful: string[] = [];
+    const pileFirst: string[] = [];
+    const otherOnBoard: string[] = [];
     for (const r of A.recipes) {
-      if (!r.all.some((x) => onBoard.has(x))) continue;
+      const includesPile = pile ? r.all.includes(pile.tile) : false;
+      const touchesBoard = r.all.some((x) => onBoard.has(x));
+      if (!includesPile && !touchesBoard) continue;
       for (const x of r.all) {
         if (onBoard.has(x)) continue;
         if (!okTool(x)) continue;
         if (inTray.has(x)) continue;
-        helpful.push(x);
+        if (includesPile) pileFirst.push(x);
+        else otherOnBoard.push(x);
       }
     }
-    if (helpful.length) return pick(view.rng, helpful) ?? null;
+    // If there's a pile and we've got pile-combining partners, weight
+    // heavily toward them (3:1) rather than all-or-nothing — occasional
+    // "wrong" partners still help by introducing variety.
+    if (pileFirst.length && otherOnBoard.length && rand(view.rng) < 0.75) {
+      return pick(view.rng, pileFirst) ?? null;
+    }
+    if (pileFirst.length) return pick(view.rng, pileFirst) ?? null;
+    if (otherOnBoard.length) return pick(view.rng, otherOnBoard) ?? null;
   }
 
   // 3. A made thing from this age — starts a chain next time.
@@ -120,6 +197,40 @@ export function pickOne(view: DealerView): string | null {
   return pick(view.rng, [...A.ING]) ?? null;
 }
 
+/** Canonical fingerprint for a tray — sorted multiset of non-null tiles. */
+function trayKey(tray: Array<string | null>): string[] {
+  return tray.filter((v): v is string => Boolean(v)).sort();
+}
+
+/** Two tray fingerprints match exactly? */
+function sameTray(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+/** Should we trigger the pathological-pile escape hatch? Fires when:
+ *   - a pile of ≥4 is on the board, and
+ *   - every tray in `recentTrays` was pile-adjacent (contained the pile
+ *     tile or one of its partners).
+ *  In that case, at least one slot in the next tray will be a diversifying
+ *  pick that avoids the pile's recipe graph. */
+function shouldDiversify(
+  view: DealerView,
+  pile: { tile: string; count: number } | null,
+): boolean {
+  if (!pile || pile.count < 4) return false;
+  const recent = view.recentTrays ?? [];
+  if (recent.length < RECENT_TRAY_WINDOW) return false;
+  const A = ageSets(view.bundle, view.age);
+  const partners = new Set<string>([pile.tile]);
+  for (const r of A.recipes) {
+    if (!r.all.includes(pile.tile)) continue;
+    for (const x of r.all) partners.add(x);
+  }
+  return recent.every((t) => t.some((id) => partners.has(id)));
+}
+
 /**
  * Fill the tray with three tiles so that at least one combine is reachable
  * within two placements. Target distribution: ~75% of trays have a move
@@ -133,28 +244,57 @@ export function dealTray(view: DealerView): Array<string | null> {
     for (let i = 0; i < view.tray.length; i++) view.tray[i] = next[i];
     return view.tray;
   };
+  const recordTray = (final: Array<string | null>): void => {
+    if (!view.recentTrays) return;
+    view.recentTrays.unshift(trayKey(final));
+    while (view.recentTrays.length > RECENT_TRAY_WINDOW) view.recentTrays.pop();
+  };
   const wantOne = rand(view.rng) < 0.75;
+  const pile = heaviestPile(view);
+  const diversify = shouldDiversify(view, pile);
   let fallback: Array<string | null> | null = null;
 
   for (let k = 0; k < 60; k++) {
     const next: Array<string | null> = [];
-    for (let s = 0; s < 3; s++) next.push(pickOne({ ...view, tray: next }));
+    for (let s = 0; s < 3; s++) {
+      // On diversify runs, force the first slot off the pile's recipe
+      // graph. The remaining slots pick normally so the tray still has
+      // some board-aware tiles.
+      const diversifyAway = diversify && s === 0 && pile ? pile.tile : null;
+      next.push(
+        pickOne({ ...view, tray: next, _diversifyAway: diversifyAway }),
+      );
+    }
     writeTray(next);
 
     // Avoid trays of three-of-the-same for the first 40 tries.
     const nonNull = next.filter((v): v is string => Boolean(v));
     if (k < 40 && new Set(nonNull).size < nonNull.length) continue;
 
+    // Avoid obvious repeats of recent trays for the first 40 tries.
+    if (k < 40 && view.recentTrays?.length) {
+      const key = trayKey(next);
+      if (view.recentTrays.some((t) => sameTray(t, key))) continue;
+    }
+
     const one = playsInOne(view.bundle, view.board, next, view.size);
-    if (one && (wantOne || k > 30)) return view.tray;
+    if (one && (wantOne || k > 30)) {
+      recordTray(next);
+      return view.tray;
+    }
     if (!one && playsInTwo(view.bundle, view.board, next, view.size)) {
-      if (!wantOne) return view.tray;
+      if (!wantOne) {
+        recordTray(next);
+        return view.tray;
+      }
       if (!fallback) fallback = next.slice();
     }
   }
 
   if (fallback) {
-    return writeTray(fallback);
+    writeTray(fallback);
+    recordTray(fallback);
+    return view.tray;
   }
 
   // Last resort: hand over both halves of a two-ingredient recipe from the
@@ -178,7 +318,9 @@ export function dealTray(view: DealerView): Array<string | null> {
         const j = Math.floor(rand(view.rng) * (i + 1));
         [trial[i], trial[j]] = [trial[j], trial[i]];
       }
-      return writeTray(trial);
+      writeTray(trial);
+      recordTray(trial);
+      return view.tray;
     }
   }
 

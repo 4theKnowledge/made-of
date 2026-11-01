@@ -16,7 +16,7 @@ import type { ThemeBundle, ThemeKey } from "./types";
 
 /** Bump when the StoredGame shape changes so older saves fall through to
  *  a fresh game instead of hydrating into a broken state. */
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 
 const ENDLESS_KEY = "madeof:cbsave";
 const DAILY_KEY = "madeof:cbsave:daily";
@@ -62,6 +62,7 @@ export interface StoredGame {
   ageMade: number;
   crumb: Array<CrumbleCounter | null>;
   closeCalls: number;
+  recentTrays: string[][];
 }
 
 export interface DailyResult {
@@ -104,6 +105,7 @@ function toStored(state: GameState): StoredGame {
     ageMade: state.ageMade,
     crumb: state.crumb.map((c) => (c ? { ...c } : null)),
     closeCalls: state.closeCalls,
+    recentTrays: state.recentTrays.map((t) => t.slice()),
   };
 }
 
@@ -203,6 +205,7 @@ export function hydrateGame(s: StoredGame): GameState {
     ageMade: s.ageMade,
     crumb: s.crumb.map((c) => (c ? { ...c } : null)),
     closeCalls: s.closeCalls,
+    recentTrays: (s.recentTrays ?? []).map((t) => t.slice()),
     choosing: null,
   };
 }

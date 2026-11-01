@@ -2426,22 +2426,23 @@ function AgesSheet({
         aria-label="Ages"
       >
         <span className="k">Ages</span>
-        <h3>Age {ages[current]}</h3>
+        <h3>
+          Age {ages[current]} — step {current + 1} of {ages.length}
+        </h3>
         <p>
-          Each age is a step from raw materials toward finished things.
-          You&apos;re on step {current + 1}
+          Combine tiles to make things at least this advanced.
           {last
-            ? " — the last one. Keep combining to push your score higher."
-            : ` — make ${left} more thing${left === 1 ? "" : "s"} from this step or later to reach ${ages[current + 1]}.`}
+            ? " You're on the final step — keep combining to push your score higher."
+            : ` ${left} more ${ages[current]}-or-later make${left === 1 ? "" : "s"} and you unlock ${ages[current + 1]}.`}
         </p>
         {chain.length >= 2 && (
           <div className="cbageex">
-            <b>How deep things get here</b>
-            <div className="cbagechain" aria-label="Example chain from raw to this age">
+            <b>Age {ages[current]} looks like this</b>
+            <div className="cbagechain" aria-label={`Example chain from raw to Age ${ages[current]}`}>
               {chain.map((id, i) => {
                 const it = bundle.items.get(id);
                 if (!it) return null;
-                const label = i === 0 ? "raw" : `age ${i}`;
+                const label = i === 0 ? "raw" : `step ${i}`;
                 return (
                   <span key={id} className="cbagechainnode">
                     <span
@@ -2468,6 +2469,17 @@ function AgesSheet({
                 );
               })}
             </div>
+            {(() => {
+              const terminalId = chain[chain.length - 1];
+              const it = bundle.items.get(terminalId);
+              if (!it) return null;
+              return (
+                <small className="cbagechaincap">
+                  {cap(it.name)} is {ages[current]} — {chain.length - 1} step
+                  {chain.length - 1 === 1 ? "" : "s"} from raw.
+                </small>
+              );
+            })()}
           </div>
         )}
         <ol className="cbagelist">

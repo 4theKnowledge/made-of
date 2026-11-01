@@ -94,6 +94,9 @@ export interface GameState {
   /** Per-cell crumble counters. Null means useful / no counter. */
   crumb: Array<CrumbleCounter | null>;
   closeCalls: number;
+  /** Short memory of recently-dealt trays as sorted multisets, newest first.
+   *  Lets the dealer detect "the user keeps getting the same tray". */
+  recentTrays: string[][];
   /** Non-null while the engine is waiting for the player to pick an
    *  output. */
   choosing: ChoosingState | null;
@@ -162,6 +165,7 @@ function cloneState(s: GameState): GameState {
     found: [...s.found],
     shelf: [...s.shelf],
     crumb: cloneCrumb(s.crumb),
+    recentTrays: s.recentTrays.map((t) => t.slice()),
     choosing: s.choosing
       ? { options: [...s.choosing.options], cells: [...s.choosing.cells], mult: s.choosing.mult }
       : null,
@@ -382,6 +386,7 @@ function afterMove(
       size: state.n,
       age: state.age,
       rng: state.rng,
+      recentTrays: state.recentTrays,
     });
     events.push({ type: "dealt" });
   }
@@ -430,6 +435,7 @@ export function newGame(
     ageMade: 0,
     crumb: Array(size * size).fill(null),
     closeCalls: 0,
+    recentTrays: [],
     choosing: null,
   };
 
@@ -463,6 +469,7 @@ export function newGame(
     size: state.n,
     age: state.age,
     rng: state.rng,
+    recentTrays: state.recentTrays,
   });
   events.push({ type: "dealt" });
 
@@ -577,6 +584,7 @@ export function reduce(
         size: state.n,
         age: state.age,
         rng: state.rng,
+        recentTrays: state.recentTrays,
       });
       events.push({ type: "dealt" });
       return { state, events };
