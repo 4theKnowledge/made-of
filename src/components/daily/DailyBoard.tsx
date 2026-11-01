@@ -14,6 +14,7 @@ import type {
   PathStep,
 } from "./types";
 import { EMPTY_GAME } from "./types";
+import { HelpButton, HowToPlay } from "@/components/common/HowToPlay";
 
 /**
  * The daily game, rendered as the shared Bowtie plus a puzzle bar.
@@ -46,6 +47,7 @@ export function DailyBoard({
   const [moving, setMoving] = useState(false);
   const [giveUpSteps, setGiveUpSteps] = useState<ExploreView["originChain"] | null>(null);
   const [copyMsg, setCopyMsg] = useState<string>("");
+  const [helpOpen, setHelpOpen] = useState<boolean>(false);
 
   // Fly-ghost rect sources, captured on chip click.
   const focusHeadRef = useRef<HTMLDivElement | null>(null);
@@ -345,6 +347,7 @@ export function DailyBoard({
           >
             Show me the way
           </button>
+          <HelpButton onClick={() => setHelpOpen(true)} />
           <p className="msg">
             {hintMsg ||
               (game.done
@@ -468,7 +471,100 @@ export function DailyBoard({
           </div>
         </section>
       )}
+
+      <HowToPlay
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        gameLabel={`Daily link #${puzzle.number}`}
+        title={
+          <>
+            Get from <b>{cap(puzzle.start.name)}</b> to{" "}
+            <b>{puzzle.goal.name}</b> in {puzzle.par} moves.
+          </>
+        }
+        steps={[
+          {
+            glyph: <GlyphCard />,
+            title: "You're on the coloured card",
+            body: "The pictogram in the middle is where you are. Everything around it is one link away.",
+          },
+          {
+            glyph: <GlyphBowtie />,
+            title: "Tap a chip to move",
+            body: "The left side is what the current thing comes from. The right side is what it goes into.",
+          },
+          {
+            glyph: <GlyphSquares />,
+            title: "Watch the squares",
+            body: "A green square means that move got you closer, yellow is level, red is further away.",
+          },
+          {
+            glyph: <GlyphLock />,
+            title: "Some things are closed",
+            body: "Busy hubs like water and steel, and the elements, are closed in puzzles so you have to find a real route.",
+          },
+          {
+            glyph: <GlyphHint />,
+            title: "Stuck? Take a free hint",
+            body: "Hints point at a neighbour that gets you closer. You can also undo your last move, or ask to see one shortest way.",
+          },
+        ]}
+        footnote={`Par is ${puzzle.par} moves. Hints are free, but they show up on your result card.`}
+      />
     </>
+  );
+}
+
+function GlyphCard() {
+  return (
+    <span className="mt lg N anim-pulse" aria-hidden="true">
+      <span className="d" />
+    </span>
+  );
+}
+
+function GlyphBowtie() {
+  return (
+    <span className="mb" aria-hidden="true">
+      <span className="mt md F">
+        <span className="d" />
+      </span>
+      <span className="lk" />
+      <span className="mt lg N anim-pulse">
+        <span className="d" />
+      </span>
+      <span className="lk" />
+      <span className="mt md M anim-nudge">
+        <span className="d" />
+      </span>
+    </span>
+  );
+}
+
+function GlyphSquares() {
+  return (
+    <span className="ms" aria-hidden="true">
+      <i className="sq g anim-rise" style={{ animationDelay: "0s" }} />
+      <i className="sq y anim-rise" style={{ animationDelay: ".3s" }} />
+      <i className="sq r anim-rise" style={{ animationDelay: ".6s" }} />
+    </span>
+  );
+}
+
+function GlyphLock() {
+  return (
+    <span className="mt lg C anim-shimmer" style={{ opacity: 0.55 }} aria-hidden="true">
+      <span className="mlk" />
+    </span>
+  );
+}
+
+function GlyphHint() {
+  return (
+    <span className="ml anim-glow" aria-hidden="true">
+      <b />
+      <i />
+    </span>
   );
 }
 
