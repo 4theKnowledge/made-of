@@ -85,13 +85,16 @@ export default async function NotFound() {
         <h3>Or try a mode</h3>
         <div className="row" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <Link href="/" className="btn primary">
-            Play today&rsquo;s Daily link
+            Play Combine
+          </Link>
+          <Link href="/link" className="btn">
+            Today&rsquo;s Link puzzle
           </Link>
           <Link href="/explore/water" className="btn">
             Explore
           </Link>
-          <Link href="/scratch" className="btn">
-            From scratch
+          <Link href="/craft" className="btn">
+            Craft
           </Link>
         </div>
       </section>

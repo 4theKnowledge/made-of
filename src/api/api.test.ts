@@ -5,7 +5,7 @@ import { toRows } from "../data/rows";
 import { buildCanaryLinks } from "../data/canaries";
 import { buildSnapshot } from "../graph/snapshot";
 import { buildCodeMap } from "../graph/codes";
-import { buildClosedSet } from "../graph/daily";
+import { buildClosedSet } from "../graph/link";
 import {
   setLiveSnapshotForTesting,
   type LiveSnapshot,

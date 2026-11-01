@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
   // typedRoutes stayed experimental in Next 15 and makes dynamic `/[slug]`
   // links painful; the extra safety isn't worth it at this phase.
   experimental: {},
+  async redirects() {
+    return [
+      { source: "/scratch", destination: "/craft", permanent: true },
+      { source: "/daily", destination: "/link", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

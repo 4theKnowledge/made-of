@@ -27,7 +27,7 @@ export interface BowtieViewProps {
   /**
    * Chip click handler.
    *  - Explore: not called (chips are <Link>s).
-   *  - Daily: called with the target item code; the parent fires /api/daily/move.
+   *  - Daily: called with the target item code; the parent fires /api/link/move.
    * The HTMLElement is the clicked chip, used for fly-ghost source rect.
    */
   onChipClick?: (targetCode: string, el: HTMLElement) => void;

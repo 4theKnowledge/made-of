@@ -5,7 +5,7 @@ import { getItemPage } from "@/graph/queries";
  * Soft forwarder: `/<slug>` → `/i/<slug>` for known item slugs. External
  * links written before the `/i/<slug>` move still work. Unknown slugs 404.
  *
- * Reserved paths (/explore, /scratch, /pricing, /about, /api, /i, etc.)
+ * Reserved paths (/explore, /combine, /link, /craft, /pricing, /about, /api, /i, etc.)
  * resolve to their own route and never hit this catch-all because Next's
  * router picks static > dynamic.
  */
@@ -16,7 +16,11 @@ const RESERVED = new Set([
   "api",
   "i",
   "explore",
+  "combine",
+  "link",
+  "craft",
   "scratch",
+  "daily",
   "pricing",
   "about",
   "privacy",
@@ -24,6 +28,7 @@ const RESERVED = new Set([
   "method",
   "account",
   "admin",
+  "sign-in",
   "sitemap.xml",
   "robots.txt",
   "llms.txt",

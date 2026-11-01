@@ -195,28 +195,28 @@ export default async function AboutPage() {
             </Link>
           </article>
           <article className="feat">
-            <h3>Daily link</h3>
+            <h3>Link</h3>
             <p>
               A new puzzle each day: get from one thing to another in as few
               links as you can.
             </p>
             <Link
               className="btn"
-              href="/"
+              href="/link"
               style={{ alignSelf: "flex-start" }}
             >
               Play today&rsquo;s puzzle
             </Link>
           </article>
           <article className="feat">
-            <h3>From scratch</h3>
+            <h3>Craft</h3>
             <p>
               Start with only the big bang and build your way to a pencil, a
               phone or a city.
             </p>
             <Link
               className="btn"
-              href="/scratch"
+              href="/craft"
               style={{ alignSelf: "flex-start" }}
             >
               Start building
