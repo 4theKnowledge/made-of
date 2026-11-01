@@ -8,6 +8,9 @@ import { newGame, reduce } from "@/combine/engine";
 import type { Action, Event, GameState } from "@/combine/engine";
 import { matchAt, matchOn } from "@/combine/match";
 import { dealTray } from "@/combine/deal";
+import { ensureContext, suspend as suspendAudio, hasContext } from "@/combine/audio/core";
+import { startMusic, stopMusic } from "@/combine/audio/music";
+import { fx as playFx } from "@/combine/audio/sfx";
 import { todayKey, dailySeed, freshEndlessSeed } from "@/combine/rng";
 import { hydrateBundle, type SerialisedBundle } from "@/combine/serialise";
 import {
@@ -218,6 +221,61 @@ export function CombineBoard({ bundles: serialised }: Props) {
   } | null>(null);
   const [infoTile, setInfoTile] = useState<string | null>(null);
   const [themeOpen, setThemeOpen] = useState(false);
+  // Sound settings. Loaded on mount from localStorage, then applied to the
+  // live audio graph. SoundMenu dispatches updates up to the parent so the
+  // audio context sees them without needing a bus.
+  const [sound, setSound] = useState<{
+    music: MusicTrack;
+    sfx: boolean;
+    vol: number;
+  }>({ music: "off", sfx: false, vol: 80 });
+  useEffect(() => {
+    setSound(loadSound());
+  }, []);
+
+  // Apply sound settings to the live audio graph if it exists. Music starts
+  // only after the first user gesture (browsers block earlier starts); the
+  // pointerdown listener below handles that first-run case.
+  useEffect(() => {
+    if (!hasContext()) return;
+    ensureContext({ ...sound, vol: sound.vol / 100 });
+    if (sound.music === "off") stopMusic();
+    else startMusic({ busyGetter: () => state.age });
+  }, [sound, state.age]);
+
+  // First pointerdown: create the audio context and start music if the
+  // user has chosen a track. We attach a one-shot listener to the document.
+  useEffect(() => {
+    const onDown = () => {
+      ensureContext({ ...sound, vol: sound.vol / 100 });
+      if (sound.music !== "off") {
+        startMusic({ busyGetter: () => state.age });
+      }
+    };
+    document.addEventListener("pointerdown", onDown, {
+      passive: true,
+      once: true,
+    });
+    return () => document.removeEventListener("pointerdown", onDown);
+    // We intentionally use the latest `sound` and `state.age` captured on
+    // mount; the effect above handles later changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pause music when the tab is hidden.
+  useEffect(() => {
+    const onVis = () => {
+      if (document.hidden) {
+        stopMusic();
+        const core = hasContext() ? ensureContext({ ...sound, vol: sound.vol / 100 }) : null;
+        if (core) suspendAudio(core);
+      } else if (sound.music !== "off" && hasContext()) {
+        startMusic({ busyGetter: () => state.age });
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [sound, state.age]);
   const [bookOpen, setBookOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
   // Pending clears so overlapping actions don't orphan timers.
@@ -246,22 +304,45 @@ export function CombineBoard({ bundles: serialised }: Props) {
       let latestDiscovery: { out: string; recipe: string[] } | null = null;
       let latestAgeUp: { age: number; sample: string[] } | null = null;
       for (const e of events) {
-        if (e.type === "placed") patch.placed = e.at;
-        else if (e.type === "nope") patch.nope = e.at;
-        else if (e.type === "combine") {
+        if (e.type === "placed") {
+          patch.placed = e.at;
+          playFx("place");
+          vibrate(6);
+        } else if (e.type === "nope") {
+          patch.nope = e.at;
+          playFx("nope");
+          vibrate([8, 40, 8]);
+        } else if (e.type === "combine") {
           patch.fuse = new Set([...(patch.fuse ?? []), ...e.cells]);
           patch.pop = e.at;
           patch.burst = { at: e.at, pts: e.pts, mult: e.mult };
           if (e.mult > 1) patch.chain = e.mult;
           if (e.close) patch.close = e.close;
+          playFx("fuse", e.mult);
+          vibrate(e.mult > 1 ? [15, 30, 25] : 14);
+          if (e.close) {
+            playFx("discover");
+            vibrate([10, 30, 10, 30, 40]);
+          }
         } else if (e.type === "shipped") {
           patch.shipped = { at: e.at, bonus: e.bonus };
+          playFx("ship");
         } else if (e.type === "crumble") {
           patch.crumble = new Set(e.cells);
+          playFx("crumble");
         } else if (e.type === "discovery") {
           latestDiscovery = { out: e.out, recipe: e.recipe };
+          // Discovery jingle is scheduled slightly after the combine so the
+          // two don't collide. The engine fires discovery before combine,
+          // but the fuse sfx fires at `t = now + 0.01`, so this delay keeps
+          // the ordering musical.
+          window.setTimeout(() => playFx("discover"), 250);
         } else if (e.type === "age-up") {
           latestAgeUp = { age: e.age, sample: e.sample };
+          playFx("age");
+          vibrate([15, 30, 15, 30, 30]);
+        } else if (e.type === "over") {
+          playFx("over");
         }
       }
       if (latestDiscovery) {
@@ -808,6 +889,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
         <AgeBar
           state={state}
           bundle={bundle}
+          soundOn={sound.music !== "off" || sound.sfx}
           onBook={() => setBookOpen(true)}
           onSound={() => setSoundOpen(true)}
         />
@@ -948,7 +1030,17 @@ export function CombineBoard({ bundles: serialised }: Props) {
           />
         )}
         {soundOpen && (
-          <SoundMenu onDismiss={() => setSoundOpen(false)} />
+          <SoundMenu
+            value={sound}
+            onChange={(next) => {
+              setSound(next);
+              saveSound(next);
+              // Play a confirmation when SFX is toggled on, matching the
+              // prototype's setSfx behaviour.
+              if (next.sfx && !sound.sfx) playFx("place");
+            }}
+            onDismiss={() => setSoundOpen(false)}
+          />
         )}
       </div>
       {drag && drag.slot != null && state.tray[drag.slot] != null && (
@@ -1324,15 +1416,15 @@ function ThemeMenu({
 
 /* ---------- Sound menu ---------- */
 
-function SoundMenu({ onDismiss }: { onDismiss: () => void }) {
-  // Settings persist via localStorage. Phase 6 wires actual audio.
-  const initial = useMemo(() => loadSound(), []);
-  const [music, setMusic] = useState<MusicTrack>(initial.music);
-  const [sfx, setSfx] = useState(initial.sfx);
-  const [vol, setVol] = useState(initial.vol);
-  useEffect(() => {
-    saveSound({ music, sfx, vol });
-  }, [music, sfx, vol]);
+function SoundMenu({
+  value,
+  onChange,
+  onDismiss,
+}: {
+  value: { music: MusicTrack; sfx: boolean; vol: number };
+  onChange: (next: { music: MusicTrack; sfx: boolean; vol: number }) => void;
+  onDismiss: () => void;
+}) {
   const tracks: Array<[MusicTrack, string, string]> = [
     ["piano", "Calm piano", "Slow, soft and roomy"],
     ["handpan", "Handpan", "Gentle and a bit busier"],
@@ -1351,8 +1443,8 @@ function SoundMenu({ onDismiss }: { onDismiss: () => void }) {
           <button
             key={k}
             type="button"
-            className={`cbtopt${music === k ? " on" : ""}`}
-            onClick={() => setMusic(k)}
+            className={`cbtopt${value.music === k ? " on" : ""}`}
+            onClick={() => onChange({ ...value, music: k })}
           >
             <b>{n}</b>
             {d && <span>{d}</span>}
@@ -1361,13 +1453,13 @@ function SoundMenu({ onDismiss }: { onDismiss: () => void }) {
         <span className="k">Sound</span>
         <button
           type="button"
-          className={`cbtopt cbsw${sfx ? " on" : ""}`}
+          className={`cbtopt cbsw${value.sfx ? " on" : ""}`}
           role="switch"
-          aria-checked={sfx}
-          onClick={() => setSfx((s) => !s)}
+          aria-checked={value.sfx}
+          onClick={() => onChange({ ...value, sfx: !value.sfx })}
         >
           <b>Sound effects</b>
-          <span>{sfx ? "On" : "Off"}</span>
+          <span>{value.sfx ? "On" : "Off"}</span>
         </button>
         <label className="cbvol">
           <span>Volume</span>
@@ -1375,8 +1467,10 @@ function SoundMenu({ onDismiss }: { onDismiss: () => void }) {
             type="range"
             min={0}
             max={100}
-            value={vol}
-            onChange={(e) => setVol(Number(e.currentTarget.value))}
+            value={value.vol}
+            onChange={(e) =>
+              onChange({ ...value, vol: Number(e.currentTarget.value) })
+            }
             aria-label="Volume"
           />
         </label>
@@ -1857,11 +1951,13 @@ function TipLine({
 function AgeBar({
   state,
   bundle,
+  soundOn,
   onBook,
   onSound,
 }: {
   state: GameState;
   bundle: ThemeBundle;
+  soundOn: boolean;
   onBook: () => void;
   onSound: () => void;
 }) {
@@ -1897,14 +1993,18 @@ function AgeBar({
       </button>
       <button
         type="button"
-        className="cbsnd"
+        className={`cbsnd${soundOn ? " on" : ""}`}
         aria-label="Music and sound settings"
         title="Music and sound"
         onClick={onSound}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4 9h4l5-4v14l-5-4H4z" />
-          <path d="M17 9l5 6M22 9l-5 6" />
+          {soundOn ? (
+            <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
+          ) : (
+            <path d="M17 9l5 6M22 9l-5 6" />
+          )}
         </svg>
       </button>
     </div>
@@ -2267,6 +2367,17 @@ function ChoicePicker({
       </div>
     </div>
   );
+}
+
+/** navigator.vibrate wrapper that silently no-ops on unsupported devices. */
+function vibrate(pattern: number | number[]): void {
+  if (typeof navigator === "undefined") return;
+  if (typeof navigator.vibrate !== "function") return;
+  try {
+    navigator.vibrate(pattern);
+  } catch {
+    // ignore
+  }
 }
 
 function fillVar(item: CombineItem): React.CSSProperties {
