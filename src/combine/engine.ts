@@ -105,6 +105,10 @@ export type Event =
   | {
       type: "combine";
       cells: number[];
+      /** Ingredient tile ids in the same order as `cells`. The UI uses these
+       *  to overlay the ingredients during the fuse pulse, since the engine
+       *  has already consumed them by the time the UI applies this state. */
+      inputs: string[];
       /** Cell the output tile landed on. */
       at: number;
       out: string;
@@ -229,6 +233,10 @@ function finishResolve(
   events: Event[],
 ): void {
   const fullBefore = fullness(state.board);
+  // Snapshot the ingredient tiles before we consume them; the UI uses these
+  // to animate a brief fuse pulse on the input cells (which are already
+  // nulled by the time the UI applies this state).
+  const inputs = cells.map((j) => state.board[j] ?? "");
   // Every cell in the group is consumed (tools too — Combine does not keep
   // "made with" items).
   for (const j of cells) state.board[j] = null;
@@ -271,6 +279,7 @@ function finishResolve(
   events.push({
     type: "combine",
     cells: cells.slice(),
+    inputs,
     at: choice,
     out: recipe.out,
     pts,

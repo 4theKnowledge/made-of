@@ -34,6 +34,7 @@ import type {
   ThemeKey,
 } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
+import { HowToPlay } from "@/components/common/HowToPlay";
 
 /** Per-cell preview when a tray tile is selected. Mirrors cbPreview from
  *  the prototype. Each entry is either a found output to render as a ghost
@@ -93,9 +94,17 @@ interface Fx {
   placed?: number;
   nope?: number;
   fuse?: Set<number>;
+  /** Pre-consume tile ids keyed by cell, rendered as overlays during the
+   *  fuse pulse so the player sees the ingredients glow and shrink into
+   *  the result. The engine has already nulled these cells in state. */
+  fuseGhosts?: Map<number, string>;
   pop?: number;
   burst?: { at: number; pts: number; mult: number };
-  shipped?: { at: number; bonus: number };
+  /** Ghost output tile shown at `pop` while the result pops into place —
+   *  only needed when the engine has already cleared the cell (e.g. a
+   *  terminal result that shipped straight off the board). */
+  popGhost?: string;
+  shipped?: { at: number; bonus: number; out: string };
   crumble?: Set<number>;
   /** Chain multiplier for the top-row ×N badge. */
   chain?: number;
@@ -255,6 +264,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
   }, [sound, state.age]);
   const [bookOpen, setBookOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   // Pending clears so overlapping actions don't orphan timers.
   const timers = useRef<number[]>([]);
   useEffect(() => () => {
@@ -276,43 +286,108 @@ export function CombineBoard({ bundles: serialised }: Props) {
 
   const applyEvents = useCallback(
     (events: Event[]) => {
-      // Fold events into one fx patch so React batches a single render.
-      const patch: Fx = {};
+      // Combine events animate in two phases per step: a fuse pulse on the
+      // ingredient cells (300ms), then a pop/burst on the output cell
+      // (420ms). Chain steps queue after each other, so we build a timeline
+      // of fx patches and schedule them with setTimeout.
       let latestDiscovery: { out: string; recipe: string[] } | null = null;
       let latestAgeUp: { age: number; sample: string[] } | null = null;
+
+      // Immediate (non-combine) patch — placed/nope/crumble/discovery/age-up.
+      const immediate: Fx = {};
+      // Timeline of combine phases, each scheduled relative to time 0.
+      const schedule: Array<{ at: number; patch: Fx; clearAt: number; clearKeys: (keyof Fx)[] }> = [];
+      let cursor = 0;
+      const FUSE_MS = 300;
+      const POP_MS = 420;
+
       for (const e of events) {
         if (e.type === "placed") {
-          patch.placed = e.at;
+          immediate.placed = e.at;
           playFx("place");
           vibrate(6);
         } else if (e.type === "nope") {
-          patch.nope = e.at;
+          immediate.nope = e.at;
           playFx("nope");
           vibrate([8, 40, 8]);
         } else if (e.type === "combine") {
-          patch.fuse = new Set([...(patch.fuse ?? []), ...e.cells]);
-          patch.pop = e.at;
-          patch.burst = { at: e.at, pts: e.pts, mult: e.mult };
-          if (e.mult > 1) patch.chain = e.mult;
-          if (e.close) patch.close = e.close;
-          playFx("fuse", e.mult);
-          vibrate(e.mult > 1 ? [15, 30, 25] : 14);
-          if (e.close) {
-            playFx("discover");
-            vibrate([10, 30, 10, 30, 40]);
+          const ghosts = new Map<number, string>();
+          for (let k = 0; k < e.cells.length; k++) {
+            ghosts.set(e.cells[k], e.inputs[k] ?? "");
           }
+          // Phase 1: fuse pulse on ingredient cells (with ghost tiles so the
+          // player sees them glow while the engine has already consumed them).
+          const fusePatch: Fx = {
+            fuse: new Set(e.cells),
+            fuseGhosts: ghosts,
+          };
+          if (e.mult > 1) fusePatch.chain = e.mult;
+          const fuseAt = cursor;
+          schedule.push({
+            at: fuseAt,
+            patch: fusePatch,
+            clearAt: fuseAt + FUSE_MS,
+            clearKeys: ["fuse", "fuseGhosts"],
+          });
+          // Audio + haptic at the fuse strike.
+          const sfxDelay = fuseAt;
+          const scheduleAudio = (fn: () => void) => {
+            if (sfxDelay <= 0) fn();
+            else {
+              const id = window.setTimeout(fn, sfxDelay);
+              timers.current.push(id);
+            }
+          };
+          scheduleAudio(() => {
+            playFx("fuse", e.mult);
+            vibrate(e.mult > 1 ? [15, 30, 25] : 14);
+          });
+
+          // Phase 2: pop + burst on the output cell. If this combine's result
+          // was immediately shipped (terminal, consumed in the same reduce),
+          // the engine has nulled the cell — pass popGhost so the UI still
+          // has something to pop before the ship animation starts.
+          const popAt = fuseAt + FUSE_MS;
+          const nextIsShip = events.indexOf(e) + 1 < events.length &&
+            events[events.indexOf(e) + 1].type === "shipped" &&
+            (events[events.indexOf(e) + 1] as { at: number }).at === e.at;
+          const popPatch: Fx = {
+            pop: e.at,
+            burst: { at: e.at, pts: e.pts, mult: e.mult },
+          };
+          if (nextIsShip) popPatch.popGhost = e.out;
+          if (e.close) popPatch.close = e.close;
+          if (e.close) {
+            const id = window.setTimeout(() => {
+              playFx("discover");
+              vibrate([10, 30, 10, 30, 40]);
+            }, popAt);
+            timers.current.push(id);
+          }
+          schedule.push({
+            at: popAt,
+            patch: popPatch,
+            clearAt: popAt + POP_MS + 180,
+            clearKeys: ["pop", "burst", "popGhost", "chain", "close"],
+          });
+          cursor = popAt + POP_MS;
         } else if (e.type === "shipped") {
-          patch.shipped = { at: e.at, bonus: e.bonus };
-          playFx("ship");
+          // The ship animation starts right after the pop finishes.
+          const shipAt = cursor;
+          schedule.push({
+            at: shipAt,
+            patch: { shipped: { at: e.at, bonus: e.bonus, out: e.out } },
+            clearAt: shipAt + 480,
+            clearKeys: ["shipped"],
+          });
+          const id = window.setTimeout(() => playFx("ship"), shipAt);
+          timers.current.push(id);
+          cursor = shipAt + 380;
         } else if (e.type === "crumble") {
-          patch.crumble = new Set(e.cells);
+          immediate.crumble = new Set(e.cells);
           playFx("crumble");
         } else if (e.type === "discovery") {
           latestDiscovery = { out: e.out, recipe: e.recipe };
-          // Discovery jingle is scheduled slightly after the combine so the
-          // two don't collide. The engine fires discovery before combine,
-          // but the fuse sfx fires at `t = now + 0.01`, so this delay keeps
-          // the ordering musical.
           window.setTimeout(() => playFx("discover"), 250);
         } else if (e.type === "age-up") {
           latestAgeUp = { age: e.age, sample: e.sample };
@@ -322,6 +397,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
           playFx("over");
         }
       }
+
       if (latestDiscovery) {
         setDiscovery(latestDiscovery);
         const id = window.setTimeout(() => setDiscovery(null), 4600);
@@ -332,19 +408,28 @@ export function CombineBoard({ bundles: serialised }: Props) {
         const id = window.setTimeout(() => setAgeToast(null), 4200);
         timers.current.push(id);
       }
-      if (Object.keys(patch).length === 0) return;
-      setFx((cur) => ({ ...cur, ...patch }));
-      // Durations roughly match the prototype's cbWait timings.
-      if (patch.placed != null) scheduleClear({ placed: 0 }, 260);
-      if (patch.nope != null) scheduleClear({ nope: 0 }, 380);
-      if (patch.fuse || patch.pop || patch.burst || patch.chain || patch.close) {
-        scheduleClear(
-          { fuse: undefined, pop: 0, burst: undefined, chain: 0, close: 0 },
-          900,
-        );
+
+      if (Object.keys(immediate).length) {
+        setFx((cur) => ({ ...cur, ...immediate }));
+        if (immediate.placed != null) scheduleClear({ placed: 0 }, 260);
+        if (immediate.nope != null) scheduleClear({ nope: 0 }, 380);
+        if (immediate.crumble) scheduleClear({ crumble: undefined }, 500);
       }
-      if (patch.shipped) scheduleClear({ shipped: undefined }, 480);
-      if (patch.crumble) scheduleClear({ crumble: undefined }, 500);
+
+      for (const step of schedule) {
+        const applyId = window.setTimeout(() => {
+          setFx((cur) => ({ ...cur, ...step.patch }));
+        }, step.at);
+        timers.current.push(applyId);
+        const clearId = window.setTimeout(() => {
+          setFx((cur) => {
+            const next: Fx = { ...cur };
+            for (const k of step.clearKeys) delete next[k];
+            return next;
+          });
+        }, step.clearAt);
+        timers.current.push(clearId);
+      }
     },
     [scheduleClear],
   );
@@ -876,6 +961,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
           soundOn={sound.music !== "off" || sound.sfx}
           onBook={() => setBookOpen(true)}
           onSound={() => setSoundOpen(true)}
+          onHelp={() => setHelpOpen(true)}
         />
         <Shelf
           state={state}
@@ -910,13 +996,6 @@ export function CombineBoard({ bundles: serialised }: Props) {
           onSlotTap={onSlotTap}
           onSlotPointerDown={onSlotPointerDown}
         />
-        <p className="cbkey">
-          <span>Everything that combines is used up</span>
-          <span>
-            <i className="k2" />
-            Finished things go to your shelf
-          </span>
-        </p>
         {state.choosing && (
           <ChoicePicker
             state={state}
@@ -1026,6 +1105,40 @@ export function CombineBoard({ bundles: serialised }: Props) {
             onDismiss={() => setSoundOpen(false)}
           />
         )}
+        <HowToPlay
+          open={helpOpen}
+          onClose={() => setHelpOpen(false)}
+          gameLabel={`Combine · ${bundle.theme.name}`}
+          title={<>Place things that touch. Watch the world combine.</>}
+          steps={[
+            {
+              glyph: <GlyphDrag />,
+              title: "Drop or tap-to-place",
+              body: "Drag a tray tile onto the board, or tap it and then tap a square. Pieces on the board can also be moved.",
+            },
+            {
+              glyph: <GlyphCombine />,
+              title: "Touching things combine",
+              body: "When neighbouring tiles make a recipe, they fuse and the result lands in their place. Everything used is spent.",
+            },
+            {
+              glyph: <GlyphShelf />,
+              title: "Finished things go to your shelf",
+              body: "Big, lasting things get shipped and keep for the rest of the run. Tap the book to see your collection.",
+            },
+            {
+              glyph: <GlyphGlow />,
+              title: "Glow means you've found it",
+              body: "A glowing square is a combo you've made before. New combos never glow — try things in new places.",
+            },
+            {
+              glyph: <GlyphAges />,
+              title: "Fill the bar to reach the next age",
+              body: "Every combine fills the age bar. New ages unlock new recipes. Run out of moves and the game is over.",
+            },
+          ]}
+          footnote="Need a nudge mid-run? Use the Helpers button for a hint, a swap, a clear or a move."
+        />
       </div>
       {drag && drag.slot != null && state.tray[drag.slot] != null && (
         <DragGhost
@@ -1934,12 +2047,14 @@ function AgeBar({
   soundOn,
   onBook,
   onSound,
+  onHelp,
 }: {
   state: GameState;
   bundle: ThemeBundle;
   soundOn: boolean;
   onBook: () => void;
   onSound: () => void;
+  onHelp: () => void;
 }) {
   const ages = bundle.theme.ages;
   const last = state.age >= ages.length - 1;
@@ -1985,6 +2100,19 @@ function AgeBar({
           ) : (
             <path d="M17 9l5 6M22 9l-5 6" />
           )}
+        </svg>
+      </button>
+      <button
+        type="button"
+        className="cbsnd"
+        aria-label="How to play"
+        title="How to play"
+        onClick={onHelp}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9.3 9.2a2.7 2.7 0 1 1 4.2 2.4c-1 .6-1.5 1.2-1.5 2.4" />
+          <circle cx="12" cy="17.2" r="0.9" fill="currentColor" stroke="none" />
         </svg>
       </button>
     </div>
@@ -2135,16 +2263,26 @@ function Cell({
   moving: boolean;
   onTap: () => void;
 }) {
-  const empty = !id;
-  const item = id ? bundle.items.get(id) : null;
+  // Visual-only overlays: the engine has already mutated state (consumed
+  // ingredients, placed/removed outputs) by the time the UI applies fx, so
+  // for the animation window we may need to render a tile the engine no
+  // longer has. In priority order: fuseGhost (ingredient during pulse) →
+  // popGhost (output that will ship this frame) → shipped (output flying
+  // off) → actual state tile.
+  const fuseGhostId = fx.fuseGhosts?.get(cell);
+  const isPop = fx.pop === cell;
+  const popGhostId = isPop ? fx.popGhost : undefined;
+  const isShipped = fx.shipped?.at === cell;
+  const shipGhostId = isShipped ? fx.shipped?.out : undefined;
+  const displayId = fuseGhostId || popGhostId || id || shipGhostId || null;
+  const empty = !displayId;
+  const item = displayId ? bundle.items.get(displayId) : null;
   const ghostItem = preview?.out ? bundle.items.get(preview.out) : null;
 
   const inFuse = fx.fuse?.has(cell) ?? false;
   const inCrumble = fx.crumble?.has(cell) ?? false;
-  const isPop = fx.pop === cell;
   const isPlaced = fx.placed === cell;
   const isNope = fx.nope === cell;
-  const isShipped = fx.shipped?.at === cell;
   const burst = fx.burst?.at === cell ? fx.burst : null;
 
   const classes = ["cbc"];
@@ -2168,7 +2306,7 @@ function Cell({
   if (movable) classes.push("movable");
   if (moving) classes.push("moving");
 
-  const words = id ? id.split("-") : [];
+  const words = displayId ? displayId.split("-") : [];
   const longest = Math.max(0, ...words.map((w) => w.length));
   const lenClass = longest >= 10 ? " l2" : longest >= 7 ? " l1" : "";
 
@@ -2367,3 +2505,52 @@ function fillVar(item: CombineItem): React.CSSProperties {
   return { "--fill": `var(--f${item.tier})` } as React.CSSProperties;
 }
 
+
+function GlyphDrag() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4" y="4" width="7" height="7" rx="1" />
+      <path d="M13 13l7 7M13 20h7v-7" />
+    </svg>
+  );
+}
+
+function GlyphCombine() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="7" width="7" height="10" rx="1" />
+      <rect x="14" y="7" width="7" height="10" rx="1" />
+      <path d="M10 12h4" />
+    </svg>
+  );
+}
+
+function GlyphShelf() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 18h18" />
+      <rect x="5" y="9" width="4" height="9" />
+      <rect x="11" y="6" width="4" height="12" />
+      <rect x="17" y="11" width="2.8" height="7" />
+    </svg>
+  );
+}
+
+function GlyphGlow() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="6" y="6" width="12" height="12" rx="1" />
+      <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.5 4.5l1.4 1.4M18.1 18.1l1.4 1.4M4.5 19.5l1.4-1.4M18.1 5.9l1.4-1.4" />
+    </svg>
+  );
+}
+
+function GlyphAges() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="10" width="18" height="5" rx="1" />
+      <path d="M3 12.5h12" />
+      <path d="M18 7l3 3-3 3" />
+    </svg>
+  );
+}
