@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getLiveSnapshot } from "@/graph/live";
 import { Footer } from "@/components/common/Footer";
 import { AuthNavLink } from "@/components/common/AuthNavLink";
-import { buildThemeBundle } from "@/combine/data";
+import { buildAllBundles } from "@/combine/data";
 import { serialiseBundle } from "@/combine/serialise";
 import { CombineBoard } from "@/components/combine/CombineBoard";
 
@@ -18,9 +18,11 @@ export const metadata: Metadata = {
 
 export default async function CombinePage() {
   const live = await getLiveSnapshot();
-  // Phase 3 ships Everyday only. Everything will land with the theme menu.
-  const bundle = buildThemeBundle(live.snapshot, "everyday");
-  const serialised = serialiseBundle(bundle);
+  const bundles = buildAllBundles(live.snapshot);
+  const serialised = {
+    everyday: serialiseBundle(bundles.everyday),
+    everything: serialiseBundle(bundles.everything),
+  };
 
   return (
     <main className="wrap">
@@ -42,7 +44,7 @@ export default async function CombinePage() {
         </nav>
       </header>
 
-      <CombineBoard bundle={serialised} />
+      <CombineBoard bundles={serialised} />
       <Footer />
     </main>
   );

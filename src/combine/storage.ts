@@ -1,0 +1,257 @@
+/**
+ * localStorage saves for Combine.
+ *
+ * Two slots: one endless game (keyed by theme), one daily (keyed by date).
+ * The stored shape is a plain-JSON projection of GameState — Sets and Maps
+ * are expanded to arrays/objects. Loading rebuilds the richer shape.
+ *
+ * Writes happen after every settled action (not during animation). Loads
+ * are strict: any mismatch (unknown theme, stale daily date, finished
+ * endless, tile ids that no longer exist in the knowledge base) → the save
+ * is dropped.
+ */
+
+import type { CrumbleCounter, GameState } from "./engine";
+import type { ThemeBundle, ThemeKey } from "./types";
+
+const ENDLESS_KEY = "madeof:cbsave";
+const DAILY_KEY = "madeof:cbsave:daily";
+const BEST_KEY = "madeof:cbbest";
+const BEST_PREFIX = "madeof:cbbest:";
+const DAILY_DONE_KEY = "madeof:cbdaily";
+const FOUND_KEY = "madeof:cbfound";
+
+export interface StoredGame {
+  theme: ThemeKey;
+  daily: string | null;
+  n: number;
+  /** RNG state as a 32-bit int. */
+  rs: number;
+  board: Array<string | null>;
+  tray: Array<string | null>;
+  score: number;
+  made: number;
+  longest: number;
+  found: string[];
+  swaps: number;
+  clears: number;
+  hints: number;
+  mv: number;
+  over: boolean;
+  newBest: boolean;
+  moves: number;
+  shelf: string[];
+  age: number;
+  ageMade: number;
+  crumb: Array<CrumbleCounter | null>;
+  closeCalls: number;
+}
+
+export interface DailyResult {
+  key: string;
+  score: number;
+  age: number;
+  ageName: string;
+  made: number;
+  /** Top-tier output on the shelf, or null. */
+  top: string | null;
+}
+
+/* ========================================================================
+ * Save
+ * ====================================================================== */
+
+function toStored(state: GameState): StoredGame {
+  return {
+    theme: state.theme,
+    daily: state.daily,
+    n: state.n,
+    rs: state.rng.rs,
+    board: state.board.slice(),
+    tray: state.tray.slice(),
+    score: state.score,
+    made: state.made,
+    longest: state.longest,
+    found: state.found.slice(),
+    swaps: state.swaps,
+    clears: state.clears,
+    hints: state.hints,
+    mv: state.mv,
+    over: state.over,
+    newBest: state.newBest,
+    moves: state.moves,
+    shelf: state.shelf.slice(),
+    age: state.age,
+    ageMade: state.ageMade,
+    crumb: state.crumb.map((c) => (c ? { ...c } : null)),
+    closeCalls: state.closeCalls,
+  };
+}
+
+export function saveGame(state: GameState): void {
+  if (typeof window === "undefined") return;
+  try {
+    const key = state.daily ? DAILY_KEY : ENDLESS_KEY;
+    if (state.over && !state.daily) {
+      // A finished endless game has nothing to resume into.
+      window.localStorage.removeItem(key);
+      return;
+    }
+    window.localStorage.setItem(key, JSON.stringify(toStored(state)));
+  } catch {
+    // Quota or privacy mode: silently ignore.
+  }
+}
+
+/* ========================================================================
+ * Load
+ * ====================================================================== */
+
+function readStored(key: string): StoredGame | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredGame;
+    if (!parsed || !Array.isArray(parsed.board) || !Array.isArray(parsed.tray))
+      return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/** Load the saved game for the given mode, if one is valid for the given
+ *  theme/day and all its tiles still exist in the bundle. */
+export function loadGame(
+  bundle: ThemeBundle,
+  opts: { daily: string | null },
+): StoredGame | null {
+  const key = opts.daily ? DAILY_KEY : ENDLESS_KEY;
+  const s = readStored(key);
+  if (!s) return null;
+  // Theme must match (endless can be stored under either theme; both bundles
+  // ship so this check is per-save).
+  if (s.theme !== bundle.theme.k) return null;
+  // Daily: the save must belong to today's puzzle.
+  if (opts.daily && s.daily !== opts.daily) return null;
+  // Endless: a finished game is nothing to resume.
+  if (!opts.daily && s.over) return null;
+  // All referenced tiles must still exist (the knowledge base may have
+  // shifted between runs).
+  for (const v of s.board) if (v && !bundle.items.has(v)) return null;
+  for (const v of s.tray) if (v && !bundle.items.has(v)) return null;
+  return s;
+}
+
+/** Rebuild a full GameState from the stored projection. */
+export function hydrateGame(s: StoredGame): GameState {
+  return {
+    theme: s.theme,
+    daily: s.daily,
+    n: s.n,
+    rng: { rs: s.rs | 0 },
+    board: s.board.slice(),
+    tray: s.tray.slice(),
+    score: s.score,
+    made: s.made,
+    longest: s.longest,
+    found: s.found.slice(),
+    swaps: s.swaps,
+    clears: s.clears,
+    hints: s.hints,
+    mv: s.mv,
+    over: s.over,
+    newBest: s.newBest,
+    moves: s.moves,
+    shelf: s.shelf.slice(),
+    age: s.age,
+    ageMade: s.ageMade,
+    crumb: s.crumb.map((c) => (c ? { ...c } : null)),
+    closeCalls: s.closeCalls,
+    choosing: null,
+  };
+}
+
+/* ========================================================================
+ * Side tables
+ * ====================================================================== */
+
+/** Daily result for the given day, if played. */
+export function loadDailyDone(dayKey: string): DailyResult | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(DAILY_DONE_KEY);
+    if (!raw) return null;
+    const r = JSON.parse(raw) as DailyResult;
+    if (r?.key !== dayKey) return null;
+    return r;
+  } catch {
+    return null;
+  }
+}
+
+export function saveDailyDone(r: DailyResult): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(DAILY_DONE_KEY, JSON.stringify(r));
+    // The daily save slot is only interesting while the game is in progress.
+    window.localStorage.removeItem(DAILY_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** Best score for the given theme. */
+export function loadBest(theme: ThemeKey): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const key = theme === "everyday" ? BEST_KEY : BEST_PREFIX + theme;
+    return Number(window.localStorage.getItem(key) ?? 0) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function saveBest(theme: ThemeKey, score: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    const key = theme === "everyday" ? BEST_KEY : BEST_PREFIX + theme;
+    window.localStorage.setItem(key, String(score));
+  } catch {
+    // ignore
+  }
+}
+
+/** Items ever found by this device, across games. Phase 3 keeps this in
+ *  localStorage; later it moves to the authed catalogue table. */
+export function loadFound(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(FOUND_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as string[];
+    return new Set(arr);
+  } catch {
+    return new Set();
+  }
+}
+
+export function markFound(ids: Iterable<string>): void {
+  if (typeof window === "undefined") return;
+  try {
+    const cur = loadFound();
+    let changed = false;
+    for (const id of ids) {
+      if (!cur.has(id)) {
+        cur.add(id);
+        changed = true;
+      }
+    }
+    if (changed) {
+      window.localStorage.setItem(FOUND_KEY, JSON.stringify([...cur]));
+    }
+  } catch {
+    // ignore
+  }
+}

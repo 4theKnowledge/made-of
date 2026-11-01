@@ -7,7 +7,20 @@ import { catalogue } from "@/combine/data";
 import { newGame, reduce } from "@/combine/engine";
 import type { Action, Event, GameState } from "@/combine/engine";
 import { matchAt, matchOn } from "@/combine/match";
+import { todayKey, dailySeed, freshEndlessSeed } from "@/combine/rng";
 import { hydrateBundle, type SerialisedBundle } from "@/combine/serialise";
+import {
+  hydrateGame,
+  loadBest,
+  loadDailyDone,
+  loadGame,
+  markFound,
+  saveBest,
+  saveDailyDone,
+  saveGame,
+  type DailyResult,
+} from "@/combine/storage";
+import { dailyShareText, endlessShareText, shareText } from "@/combine/share";
 import type {
   CombineItem,
   CombineRecipe,
@@ -85,21 +98,58 @@ interface Fx {
 }
 
 interface Props {
-  bundle: SerialisedBundle;
+  bundles: {
+    everyday: SerialisedBundle;
+    everything: SerialisedBundle;
+  };
 }
 
 /** The top-level client component that owns engine state. */
-export function CombineBoard({ bundle: serialised }: Props) {
-  const bundle = useMemo(() => hydrateBundle(serialised), [serialised]);
-  const initial = useMemo(() => {
-    // Deterministic start on the client. Daily seeding lands in Phase 5.
-    // 6×6 for everyone until the responsive 5×5 on phones + daily arrives
-    // (hydration-safe: don't read window during the initial render).
-    return newGame("everyday", bundle, { seed: 42, size: 6 }).state;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+export function CombineBoard({ bundles: serialised }: Props) {
+  const bundles = useMemo<Record<ThemeKey, ThemeBundle>>(
+    () => ({
+      everyday: hydrateBundle(serialised.everyday),
+      everything: hydrateBundle(serialised.everything),
+    }),
+    [serialised],
+  );
+  // The initial render must be deterministic across SSR and the first
+  // client paint — read nothing that depends on window/localStorage here.
+  // A deterministic Everyday 6×6 seed=42 game is used as the hydration
+  // target; after mount we may replace it with a saved game or kick off
+  // a daily, both of which happen in an effect below.
+  const initial = useMemo(
+    () => newGame("everyday", bundles.everyday, { seed: 42, size: 6 }).state,
+    [bundles.everyday],
+  );
 
   const [state, setState] = useState<GameState>(initial);
+  const bundle = bundles[state.theme];
+  // Per-theme best scores + today's daily result. Loaded in an effect so
+  // SSR/hydration stay deterministic.
+  const [best, setBest] = useState<Record<ThemeKey, number>>({
+    everyday: 0,
+    everything: 0,
+  });
+  const [dailyDone, setDailyDone] = useState<DailyResult | null>(null);
+
+  // On mount: load best scores + today's daily result, and resume the
+  // endless save if any (daily resume lives on the user's explicit tap
+  // of the Daily button in ThemeMenu).
+  const didResume = useRef(false);
+  useEffect(() => {
+    if (didResume.current) return;
+    didResume.current = true;
+    setBest({
+      everyday: loadBest("everyday"),
+      everything: loadBest("everything"),
+    });
+    setDailyDone(loadDailyDone(todayKey()));
+    const saved = loadGame(bundles.everyday, { daily: null });
+    if (saved) {
+      setState(hydrateGame(saved));
+    }
+  }, [bundles.everyday]);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [helpersOpen, setHelpersOpen] = useState(false);
   const [fx, setFx] = useState<Fx>({});
@@ -203,9 +253,131 @@ export function CombineBoard({ bundle: serialised }: Props) {
       setState(r.state);
       applyEvents(r.events);
       setSelectedSlot(null);
+
+      // If the game just ended, write best + daily done.
+      if (r.state.over && !state.over) {
+        const prevBest = best[r.state.theme] ?? 0;
+        if (r.state.score > prevBest) {
+          saveBest(r.state.theme, r.state.score);
+          setBest((b) => ({ ...b, [r.state.theme]: r.state.score }));
+          r.state.newBest = true;
+        }
+        if (r.state.daily) {
+          const bestShelfId =
+            [...r.state.shelf].sort((a, b) => {
+              const ta = bundle.items.get(a)?.tier ?? "M";
+              const tb = bundle.items.get(b)?.tier ?? "M";
+              const tv: Record<string, number> = {
+                F: 1,
+                N: 1,
+                M: 2,
+                C: 3,
+                P: 4,
+                S: 5,
+              };
+              return (tv[tb] ?? 2) - (tv[ta] ?? 2);
+            })[0] ?? null;
+          const dr: DailyResult = {
+            key: r.state.daily,
+            score: r.state.score,
+            age: r.state.age,
+            ageName: bundle.theme.ages[r.state.age] ?? "",
+            made: r.state.made,
+            top: bestShelfId,
+          };
+          saveDailyDone(dr);
+          setDailyDone(dr);
+        }
+      }
+      // Markers for the device-wide found set (will migrate to the authed
+      // catalogue once that ships).
+      const found = r.events
+        .filter((e): e is Extract<Event, { type: "discovery" }> => e.type === "discovery")
+        .map((e) => e.out);
+      if (found.length) markFound(found);
     },
-    [state, bundle, applyEvents],
+    [state, bundle, applyEvents, best],
   );
+
+  // Save after every settled state transition. Skip while a choice is open
+  // or a drag is in flight so we don't persist half-moves.
+  useEffect(() => {
+    if (!didResume.current) return;
+    if (state.choosing) return;
+    saveGame(state);
+  }, [state]);
+
+  const resetTransient = useCallback(() => {
+    setFx({});
+    setDiscovery(null);
+    setAgeToast(null);
+    setInfoTile(null);
+    setSelectedSlot(null);
+  }, []);
+
+  const switchTheme = useCallback(
+    (which: ThemeKey) => {
+      // If we're already playing this theme in endless, nothing to do.
+      if (which === state.theme && !state.daily) return;
+      // Save the current game before swapping; try to resume the chosen
+      // theme's endless save, otherwise start fresh.
+      saveGame(state);
+      const nextBundle = bundles[which];
+      const saved = loadGame(nextBundle, { daily: null });
+      if (saved && saved.theme === which) {
+        setState(hydrateGame(saved));
+      } else {
+        const size =
+          typeof window !== "undefined" && window.innerWidth <= 600 ? 5 : 6;
+        setState(
+          newGame(which, nextBundle, {
+            seed: freshEndlessSeed(),
+            size,
+          }).state,
+        );
+      }
+      resetTransient();
+    },
+    [state, bundles, resetTransient],
+  );
+
+  const startDaily = useCallback(() => {
+    const day = todayKey();
+    // Resume today's daily save if any, otherwise start a fresh daily.
+    const saved = loadGame(bundles.everyday, { daily: day });
+    if (saved) {
+      saveGame(state);
+      setState(hydrateGame(saved));
+    } else {
+      saveGame(state);
+      setState(
+        newGame("everyday", bundles.everyday, {
+          daily: day,
+          size: 5,
+          seed: dailySeed(day),
+        }).state,
+      );
+    }
+    resetTransient();
+  }, [bundles, state, resetTransient]);
+
+  const shareDaily = useCallback(async () => {
+    const dr = dailyDone;
+    if (!dr) return;
+    // Rebuild a share text from the stored result.
+    const text =
+      `Made Of · Daily Combine ${dr.key}\n` +
+      // One square per Everyday age, green up to the age reached.
+      Array.from({ length: bundles.everyday.theme.ages.length }, (_, k) =>
+        k <= dr.age ? "🟩" : "⬜",
+      ).join("") +
+      ` reached ${dr.ageName}\n` +
+      `${dr.score.toLocaleString("en")} points · ${dr.made} made${
+        dr.top ? ` · best: ${dr.top}` : ""
+      }\n` +
+      "https://madeof.app/combine";
+    await shareText(text);
+  }, [dailyDone, bundles.everyday]);
 
   const onCellTap = useCallback(
     (cell: number) => {
@@ -455,6 +627,7 @@ export function CombineBoard({ bundle: serialised }: Props) {
         <TopBar
           state={state}
           fx={fx}
+          best={best[state.theme] ?? 0}
           helpersOpen={helpersOpen}
           onToggleHelpers={() => setHelpersOpen((o) => !o)}
           onHelper={onHelper}
@@ -520,17 +693,31 @@ export function CombineBoard({ bundle: serialised }: Props) {
           <GameOverCard
             state={state}
             bundle={bundle}
+            best={best[state.theme] ?? 0}
             onPlayAgain={() => {
-              // Fresh deterministic game with a different seed each run.
-              const next = newGame("everyday", bundle, {
-                seed: (Math.random() * 4294967296) | 0,
-                size: state.n,
-              }).state;
-              setState(next);
-              setFx({});
-              setDiscovery(null);
-              setAgeToast(null);
-              setInfoTile(null);
+              // From a finished daily, "Play endless" starts a fresh
+              // endless Everyday game. From endless, start another endless
+              // in the same theme.
+              const nextTheme = state.theme;
+              const nextDaily = null;
+              const size =
+                typeof window !== "undefined" && window.innerWidth <= 600
+                  ? 5
+                  : 6;
+              setState(
+                newGame(nextTheme, bundles[nextTheme], {
+                  daily: nextDaily,
+                  seed: freshEndlessSeed(),
+                  size,
+                }).state,
+              );
+              resetTransient();
+            }}
+            onShare={async () => {
+              const text = state.daily
+                ? dailyShareText(state.daily, state, bundle)
+                : endlessShareText(state, bundle);
+              await shareText(text);
             }}
           />
         )}
@@ -558,28 +745,20 @@ export function CombineBoard({ bundle: serialised }: Props) {
         )}
         {themeOpen && (
           <ThemeMenu
-            bundle={bundle}
+            bundles={bundles}
             daily={state.daily}
-            onPick={(which) => {
+            current={state.theme}
+            dailyDone={dailyDone}
+            onPickTheme={(which) => {
               setThemeOpen(false);
-              if (which === state.theme && !state.daily) return;
-              // Switching restarts the game under the chosen theme.
-              const nextBundle =
-                which === state.theme
-                  ? bundle
-                  : // When Everything is picked we still only have Everyday
-                    // bundle on the client. Phase 5 ships both bundles over
-                    // the wire; for now ignore.
-                    bundle;
-              const next = newGame(which, nextBundle, {
-                seed: (Math.random() * 4294967296) | 0,
-                size: state.n,
-              }).state;
-              setState(next);
-              setFx({});
-              setDiscovery(null);
-              setAgeToast(null);
-              setInfoTile(null);
+              switchTheme(which);
+            }}
+            onPickDaily={() => {
+              setThemeOpen(false);
+              startDaily();
+            }}
+            onShareDaily={() => {
+              shareDaily();
             }}
             onDismiss={() => setThemeOpen(false)}
           />
@@ -754,17 +933,18 @@ function DetailCard({
 function GameOverCard({
   state,
   bundle,
+  best,
   onPlayAgain,
+  onShare,
 }: {
   state: GameState;
   bundle: ThemeBundle;
+  best: number;
   onPlayAgain: () => void;
+  onShare: () => void;
 }) {
   const ages = bundle.theme.ages;
   const ageName = ages[state.age];
-  // Best score is a Phase 5 persistence concern; for now compare against
-  // this session only, which is always == score, so just show the current.
-  const best = state.score;
   const newBest = state.newBest;
   // Mini-shelf: group by output.
   const shelfCounts = new Map<string, number>();
@@ -860,8 +1040,11 @@ function GameOverCard({
           {bundle.theme.name} so far.
         </p>
         <div className="row2">
+          <button type="button" className="cbh" onClick={onShare}>
+            Share
+          </button>
           <button type="button" className="cbh" onClick={onPlayAgain}>
-            Play again
+            {state.daily ? "Play endless" : "Play again"}
           </button>
         </div>
       </section>
@@ -872,20 +1055,24 @@ function GameOverCard({
 /* ---------- Theme menu ---------- */
 
 function ThemeMenu({
-  bundle,
+  bundles,
   daily,
-  onPick,
+  current,
+  dailyDone,
+  onPickTheme,
+  onPickDaily,
+  onShareDaily,
   onDismiss,
 }: {
-  bundle: ThemeBundle;
+  bundles: Record<ThemeKey, ThemeBundle>;
   daily: string | null;
-  onPick: (which: ThemeKey) => void;
+  current: ThemeKey;
+  dailyDone: DailyResult | null;
+  onPickTheme: (which: ThemeKey) => void;
+  onPickDaily: () => void;
+  onShareDaily: () => void;
   onDismiss: () => void;
 }) {
-  // Phase 3 ships only the Everyday bundle, so the Everything option is
-  // present but disabled with a note. Phase 5 ships both.
-  const current = bundle.theme.k;
-  const everydayCount = bundle.outputs.size;
   return (
     <>
       <div className="cbscrim" onClick={onDismiss} />
@@ -895,41 +1082,51 @@ function ThemeMenu({
         aria-label="Choose a theme"
       >
         <span className="k">Today</span>
-        <button
-          type="button"
-          className={`cbtopt cbdaily${daily ? " on" : ""}`}
-          disabled
-        >
-          <b>Daily game</b>
-          <span>
-            Same start and same tiles for everyone today. One go. Everyday
-            theme, 5×5.
-          </span>
-          <em>Coming soon</em>
-        </button>
+        {dailyDone ? (
+          <div className="cbtopt cbdaily done">
+            <b>Daily game · done</b>
+            <span>
+              {dailyDone.score.toLocaleString("en")} points · reached{" "}
+              {dailyDone.ageName}. A new one tomorrow.
+            </span>
+            <button
+              type="button"
+              className="cbh"
+              onClick={onShareDaily}
+              style={{ marginTop: 6, height: 36 }}
+            >
+              Share result
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={`cbtopt cbdaily${daily ? " on" : ""}`}
+            onClick={onPickDaily}
+          >
+            <b>Daily game{daily ? " · playing" : ""}</b>
+            <span>
+              Same start and same tiles for everyone today. One go. Everyday
+              theme, 5×5.
+            </span>
+          </button>
+        )}
         <span className="k">Endless</span>
-        <button
-          type="button"
-          className={`cbtopt${current === "everyday" && !daily ? " on" : ""}`}
-          onClick={() => onPick("everyday")}
-        >
-          <b>Everyday</b>
-          <span>
-            Food, drink, clothes, toys and things around the house.
-          </span>
-          <em>{everydayCount} things to make</em>
-        </button>
-        <button
-          type="button"
-          className={`cbtopt${current === "everything" && !daily ? " on" : ""}`}
-          disabled
-        >
-          <b>Everything</b>
-          <span>
-            The whole map: atoms, stars, life, food, factories, machines.
-          </span>
-          <em>Available with the daily release</em>
-        </button>
+        {(Object.keys(bundles) as ThemeKey[]).map((key) => {
+          const b = bundles[key];
+          return (
+            <button
+              key={key}
+              type="button"
+              className={`cbtopt${key === current && !daily ? " on" : ""}`}
+              onClick={() => onPickTheme(key)}
+            >
+              <b>{b.theme.name}</b>
+              <span>{b.theme.desc}</span>
+              <em>{b.outputs.size} things to make</em>
+            </button>
+          );
+        })}
         <p className="sub">
           Games are saved as you go. Switching picks up where you left off.
         </p>
@@ -1231,6 +1428,7 @@ function DiscoveryToast({
 function TopBar({
   state,
   fx,
+  best,
   helpersOpen,
   onToggleHelpers,
   onHelper,
@@ -1238,6 +1436,7 @@ function TopBar({
 }: {
   state: GameState;
   fx: Fx;
+  best: number;
   helpersOpen: boolean;
   onToggleHelpers: () => void;
   onHelper: (which: "hint" | "swap" | "clear" | "move") => void;
@@ -1245,11 +1444,12 @@ function TopBar({
 }) {
   const helpersLeft = state.swaps + state.clears + state.hints + state.mv;
   const themeName = state.daily ? "Daily" : state.theme === "everyday" ? "Everyday" : "Everything";
+  const bestDisplay = Math.max(best, state.over ? state.score : 0);
   return (
     <div className="cbtop">
       <div className="cbscore">
         <b>{state.score.toLocaleString("en")}</b>
-        <span>best 0</span>
+        <span>best {bestDisplay.toLocaleString("en")}</span>
       </div>
       {fx.chain && fx.chain > 1 ? (
         <span className="cbchain" aria-live="polite">

@@ -63,3 +63,12 @@ export function dailySeed(localDate: string): number {
 export function freshEndlessSeed(): number {
   return (Math.random() * 4294967296) | 0;
 }
+
+/** Local-date key in YYYY-MM-DD form, used to seed the daily game and
+ *  to key the daily save slot. */
+export function todayKey(now: Date = new Date()): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
