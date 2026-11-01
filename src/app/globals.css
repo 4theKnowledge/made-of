@@ -509,6 +509,18 @@ a.btn.primary{color:var(--bg)}
   .foot .support{align-self:flex-start}
   .foot .footLinks{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;row-gap:10px}
   .foot .footLinks a{padding:4px 0}
+  /* Game pages (Combine, Explore, Scratch) opt into a one-row footer on
+     mobile so the board doesn't get pushed down. Desktop ignores this. */
+  .foot[data-compact-on-mobile]{flex-direction:row;flex-wrap:nowrap;align-items:center;gap:10px;font-size:12.5px;padding-top:12px}
+  .foot[data-compact-on-mobile] .fsep{display:block}
+  .foot[data-compact-on-mobile] .ftag,
+  .foot[data-compact-on-mobile] .support{display:none}
+  .foot[data-compact-on-mobile] .fbrand{font-size:13.5px}
+  .foot[data-compact-on-mobile] .footLinks{display:inline-flex;flex-wrap:nowrap;gap:10px;grid-template-columns:none}
+  .foot[data-compact-on-mobile] .footLinks a{padding:0;font-size:12.5px}
+  /* In compact mode, drop the two Pricing-related links to keep the row
+     short. About / Privacy / Terms / Method remain reachable. */
+  .foot[data-compact-on-mobile] .footLinks a[href^="/pricing"]{display:none}
 }
 
 /* The details of the centre card live inside it on wide screens, and under the bowtie on phones */

@@ -95,7 +95,7 @@ export default async function ScratchPage() {
       />
 
       <ScratchBoard initial={initial} />
-      <Footer />
+      <Footer compactOnMobile />
     </main>
   );
 }

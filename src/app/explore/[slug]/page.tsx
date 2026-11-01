@@ -36,7 +36,7 @@ export default async function ExplorePage({
       <Header current="explore" exploreHref={`/explore/${slug}`} />
 
       <ExploreShell view={view} />
-      <Footer />
+      <Footer compactOnMobile />
     </main>
   );
 }

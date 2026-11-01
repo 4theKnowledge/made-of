@@ -28,7 +28,7 @@ export default async function CombinePage() {
       <Header current="combine" />
 
       <CombineBoard bundles={serialised} />
-      <Footer />
+      <Footer compactOnMobile />
     </main>
   );
 }

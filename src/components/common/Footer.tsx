@@ -3,10 +3,14 @@ import Link from "next/link";
 /**
  * Shared footer. Ported from legacy/made-of.html line 1083, with legal
  * links appended (Privacy, Terms, Method) for the live site.
+ *
+ * `compactOnMobile` collapses to a single row on mobile for game pages
+ * (Combine, Explore, Scratch) so the board isn't pushed down by a tall
+ * stacked footer. Desktop is unchanged.
  */
-export function Footer() {
+export function Footer({ compactOnMobile = false }: { compactOnMobile?: boolean } = {}) {
   return (
-    <footer className="foot">
+    <footer className="foot" data-compact-on-mobile={compactOnMobile ? "" : undefined}>
       <div className="footBrand">
         <span className="fbrand">Made Of</span>
         <span className="ftag">Free for everyone. No ads.</span>
