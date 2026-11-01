@@ -101,6 +101,17 @@ export function CombineBoard({ bundle: serialised }: Props) {
     out: string;
     recipe: string[];
   } | null>(null);
+  // The tile pressed and currently being held / dragged. Mirrors the
+  // prototype's cbDrag record. Ghost x/y are in viewport coords.
+  const [drag, setDrag] = useState<{
+    slot: number;
+    x: number;
+    y: number;
+    tileWidth: number;
+    overCell: number | null;
+    overOk: boolean;
+  } | null>(null);
+  const [infoTile, setInfoTile] = useState<string | null>(null);
   // Pending clears so overlapping actions don't orphan timers.
   const timers = useRef<number[]>([]);
   useEffect(() => () => {
@@ -188,9 +199,164 @@ export function CombineBoard({ bundle: serialised }: Props) {
     [act, selectedSlot, state.board],
   );
 
+  // When a drag completed via drop or a long-press fired, we don't want
+  // the trailing click to toggle selection. Set when either path consumes
+  // the pointerup, cleared on the next pointerdown.
+  const suppressClick = useRef(false);
+
   const onSlotTap = useCallback((slot: number) => {
+    if (suppressClick.current) {
+      suppressClick.current = false;
+      return;
+    }
     setSelectedSlot((s) => (s === slot ? null : slot));
   }, []);
+
+  // Drag state is held in a ref for the hot path (pointermove), mirrored
+  // to React state only when the over-cell changes so cells can light up.
+  const dragRef = useRef<{
+    slot: number;
+    x0: number;
+    y0: number;
+    moved: boolean;
+    tileWidth: number;
+    holdTimer: number | null;
+    overCell: number | null;
+  } | null>(null);
+
+  const endDrag = useCallback(() => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d) return;
+    if (d.holdTimer != null) window.clearTimeout(d.holdTimer);
+    const snapshot = drag;
+    setDrag(null);
+    if (!d.moved) return; // tap: handled on click
+    suppressClick.current = true;
+    if (snapshot?.overCell != null && snapshot.overOk) {
+      const cell = snapshot.overCell;
+      const target = state.board[cell];
+      if (target == null) {
+        act({ type: "place", slot: d.slot, cell });
+      } else {
+        act({ type: "drop-on", slot: d.slot, cell });
+      }
+    } else {
+      setSelectedSlot(null);
+    }
+  }, [act, drag, state.board]);
+
+  // Capture the tile under the pointer and whether a drop there would combine.
+  const captureOver = useCallback(
+    (x: number, y: number): { cell: number | null; ok: boolean } => {
+      const el = document.elementFromPoint(x, y);
+      const cellEl = el?.closest("[data-cb]") as HTMLElement | null;
+      if (!cellEl) return { cell: null, ok: false };
+      const cell = Number(cellEl.dataset.cb);
+      const d = dragRef.current;
+      if (d == null) return { cell: null, ok: false };
+      const tile = state.tray[d.slot];
+      if (tile == null) return { cell, ok: false };
+      const target = state.board[cell];
+      // Any empty cell is a valid drop target; occupied cells need a
+      // recipe to form on drop-on-top. Mirrors cbOnOK in the prototype.
+      const ok =
+        target == null
+          ? true
+          : Boolean(matchOn(bundle, state.board, cell, tile, state.n));
+      return { cell, ok };
+    },
+    [bundle, state.board, state.n, state.tray],
+  );
+
+  // Global pointermove / pointerup once a drag is in flight.
+  useEffect(() => {
+    if (!drag) return;
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      if (!d.moved) {
+        if (
+          Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 7
+        )
+          return;
+        d.moved = true;
+        if (d.holdTimer != null) {
+          window.clearTimeout(d.holdTimer);
+          d.holdTimer = null;
+        }
+        setSelectedSlot(d.slot);
+      }
+      const over = captureOver(e.clientX, e.clientY);
+      d.overCell = over.cell;
+      setDrag((cur) =>
+        cur
+          ? {
+              ...cur,
+              x: e.clientX,
+              y: e.clientY,
+              overCell: over.cell,
+              overOk: over.ok,
+            }
+          : cur,
+      );
+    };
+    const onUp = () => endDrag();
+    const onCancel = () => {
+      const d = dragRef.current;
+      if (d?.holdTimer != null) window.clearTimeout(d.holdTimer);
+      dragRef.current = null;
+      setDrag(null);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+    };
+  }, [drag, endDrag, captureOver]);
+
+  const onSlotPointerDown = useCallback(
+    (slot: number, e: React.PointerEvent<HTMLButtonElement>) => {
+      const target = e.currentTarget;
+      const rect = target.getBoundingClientRect();
+      const tile = state.tray[slot];
+      if (tile == null) return;
+      suppressClick.current = false;
+      // Start a drag record.
+      dragRef.current = {
+        slot,
+        x0: e.clientX,
+        y0: e.clientY,
+        moved: false,
+        tileWidth: rect.width,
+        holdTimer: null,
+        overCell: null,
+      };
+      setDrag({
+        slot,
+        x: e.clientX,
+        y: e.clientY,
+        tileWidth: rect.width,
+        overCell: null,
+        overOk: false,
+      });
+      // 450ms long-press opens the detail card unless movement starts.
+      const holdId = window.setTimeout(() => {
+        const d = dragRef.current;
+        if (!d || d.moved) return;
+        setInfoTile(tile);
+        setSelectedSlot(null);
+        dragRef.current = null;
+        setDrag(null);
+        suppressClick.current = true;
+      }, 450);
+      dragRef.current.holdTimer = holdId;
+    },
+    [state.tray],
+  );
 
   const onChoose = useCallback(
     (outputIndex: number) => {
@@ -236,6 +402,7 @@ export function CombineBoard({ bundle: serialised }: Props) {
           selectedSlot={selectedSlot}
           fx={fx}
           preview={preview}
+          dragOver={drag ? { cell: drag.overCell, ok: drag.overOk } : null}
           onCellTap={onCellTap}
         />
         <Tray
@@ -243,6 +410,7 @@ export function CombineBoard({ bundle: serialised }: Props) {
           bundle={bundle}
           selected={selectedSlot}
           onSlotTap={onSlotTap}
+          onSlotPointerDown={onSlotPointerDown}
         />
         <p className="cbkey">
           <span>Everything that combines is used up</span>
@@ -265,8 +433,100 @@ export function CombineBoard({ bundle: serialised }: Props) {
             onDismiss={() => setDiscovery(null)}
           />
         )}
+        {infoTile && (
+          <DetailCard
+            tileId={infoTile}
+            bundle={bundle}
+            onDismiss={() => setInfoTile(null)}
+          />
+        )}
       </div>
+      {drag && drag.slot != null && state.tray[drag.slot] != null && (
+        <DragGhost
+          tileId={state.tray[drag.slot]!}
+          bundle={bundle}
+          x={drag.x}
+          y={drag.y}
+          size={64}
+        />
+      )}
     </div>
+  );
+}
+
+function DragGhost({
+  tileId,
+  bundle,
+  x,
+  y,
+  size,
+}: {
+  tileId: string;
+  bundle: ThemeBundle;
+  x: number;
+  y: number;
+  size: number;
+}) {
+  const item = bundle.items.get(tileId);
+  if (!item) return null;
+  // Centre horizontally on finger, lift it so the finger doesn't cover it.
+  const style: React.CSSProperties = {
+    left: `${x - size / 2}px`,
+    top: `${y - size * 0.9}px`,
+    width: `${size}px`,
+    height: `${size}px`,
+    ...fillVar(item),
+  };
+  const words = tileId.split("-");
+  const longest = Math.max(0, ...words.map((w) => w.length));
+  const lenClass = longest >= 10 ? " l2" : longest >= 7 ? " l1" : "";
+  return (
+    <div className="cbghost" style={style} aria-hidden="true">
+      <Pictogram
+        name={item.name}
+        tier={item.tier}
+        kind={item.kind}
+        symbol={item.symbol}
+      />
+      <span className={`cbn${lenClass}`}>{cap(item.name)}</span>
+    </div>
+  );
+}
+
+function DetailCard({
+  tileId,
+  bundle,
+  onDismiss,
+}: {
+  tileId: string;
+  bundle: ThemeBundle;
+  onDismiss: () => void;
+}) {
+  const item = bundle.items.get(tileId);
+  if (!item) return null;
+  return (
+    <>
+      <div className="cbscrim" onClick={onDismiss} />
+      <section
+        className="cbover cbinfo"
+        role="dialog"
+        aria-label={cap(item.name)}
+      >
+        <div className="cbinfohd" style={fillVar(item)}>
+          <Pictogram
+            name={item.name}
+            tier={item.tier}
+            kind={item.kind}
+            symbol={item.symbol}
+          />
+        </div>
+        <div className="nm">{cap(item.name)}</div>
+        {item.fact && <p className="fact">{item.fact}</p>}
+        <button type="button" className="cbh" onClick={onDismiss}>
+          Close
+        </button>
+      </section>
+    </>
   );
 }
 
@@ -596,6 +856,7 @@ function Board({
   selectedSlot,
   fx,
   preview,
+  dragOver,
   onCellTap,
 }: {
   state: GameState;
@@ -603,6 +864,7 @@ function Board({
   selectedSlot: number | null;
   fx: Fx;
   preview: Map<number, Preview>;
+  dragOver: { cell: number | null; ok: boolean } | null;
   onCellTap: (cell: number) => void;
 }) {
   const size = state.n;
@@ -616,6 +878,12 @@ function Board({
       {state.board.map((v, i) => {
         const crumbleTick =
           v && state.crumb[i]?.id === v ? state.crumb[i]!.n : 0;
+        const over =
+          dragOver && dragOver.cell === i
+            ? dragOver.ok
+              ? "ok"
+              : "no"
+            : null;
         return (
           <Cell
             key={i}
@@ -626,6 +894,7 @@ function Board({
             crumbleTick={crumbleTick}
             fx={fx}
             preview={preview.get(i)}
+            over={over}
             onTap={() => onCellTap(i)}
           />
         );
@@ -644,6 +913,7 @@ function Cell({
   crumbleTick,
   fx,
   preview,
+  over,
   onTap,
 }: {
   cell: number;
@@ -653,6 +923,7 @@ function Cell({
   crumbleTick: number;
   fx: Fx;
   preview: Preview | undefined;
+  over: "ok" | "no" | null;
   onTap: () => void;
 }) {
   const empty = !id;
@@ -680,6 +951,9 @@ function Cell({
   // occupied cells where drop-on-top would combine → .over (via .full.over).
   if (empty && preview) classes.push("can");
   if (!empty && preview?.on) classes.push("over");
+  // Drag-ghost over highlighting takes precedence over preview.
+  if (over === "ok") classes.push("over");
+  if (over === "no") classes.push("overno");
 
   const words = id ? id.split("-") : [];
   const longest = Math.max(0, ...words.map((w) => w.length));
@@ -752,11 +1026,16 @@ function Tray({
   bundle,
   selected,
   onSlotTap,
+  onSlotPointerDown,
 }: {
   state: GameState;
   bundle: ThemeBundle;
   selected: number | null;
   onSlotTap: (slot: number) => void;
+  onSlotPointerDown: (
+    slot: number,
+    e: React.PointerEvent<HTMLButtonElement>,
+  ) => void;
 }) {
   return (
     <div className="cbtray" aria-label="Tray">
@@ -777,7 +1056,9 @@ function Tray({
             type="button"
             className={classes.join(" ")}
             style={fillVar(item)}
+            onPointerDown={(e) => onSlotPointerDown(slot, e)}
             onClick={() => onSlotTap(slot)}
+            onContextMenu={(e) => e.preventDefault()}
             aria-label={`Tray slot ${slot + 1}: ${cap(item.name)}${selected === slot ? ", selected" : ""}`}
             aria-pressed={selected === slot}
           >
