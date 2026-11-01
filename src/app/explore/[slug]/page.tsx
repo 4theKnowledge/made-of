@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import type { Metadata } from "next";
 import { Footer } from "@/components/common/Footer";
-import { AuthNavLink } from "@/components/common/AuthNavLink";
+import { Header } from "@/components/common/Header";
 import { getExploreView } from "@/graph/explore";
 import { ExploreShell } from "@/components/explore/ExploreShell";
 
@@ -34,22 +33,7 @@ export default async function ExplorePage({
 
   return (
     <main className="wrap">
-      <header>
-        <div className="brand">
-          <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
-            <h1>Made Of</h1>
-          </Link>
-          <span>Everything is made of something.</span>
-        </div>
-        <nav className="tabs" aria-label="Modes">
-          <Link href="/">Daily link</Link>
-          <Link href={`/explore/${slug}`} className="on">
-            Explore
-          </Link>
-          <Link href="/scratch">From scratch</Link>
-          <AuthNavLink />
-        </nav>
-      </header>
+      <Header current="explore" exploreHref={`/explore/${slug}`} />
 
       <ExploreShell view={view} />
       <Footer />

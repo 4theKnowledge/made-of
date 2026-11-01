@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getLiveSnapshot } from "@/graph/live";
 import { Footer } from "@/components/common/Footer";
-import { AuthNavLink } from "@/components/common/AuthNavLink";
+import { Header } from "@/components/common/Header";
 import { buildAllBundles } from "@/combine/data";
 import { serialiseBundle } from "@/combine/serialise";
 import { CombineBoard } from "@/components/combine/CombineBoard";
@@ -26,23 +25,7 @@ export default async function CombinePage() {
 
   return (
     <main className="wrap">
-      <header>
-        <div className="brand">
-          <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
-            <h1>Made Of</h1>
-          </Link>
-          <span>Everything is made of something.</span>
-        </div>
-        <nav className="tabs" aria-label="Modes">
-          <Link href="/">Daily link</Link>
-          <Link href="/explore/water">Explore</Link>
-          <Link href="/scratch">From scratch</Link>
-          <Link href="/combine" className="on">
-            Combine
-          </Link>
-          <AuthNavLink />
-        </nav>
-      </header>
+      <Header current="combine" />
 
       <CombineBoard bundles={serialised} />
       <Footer />

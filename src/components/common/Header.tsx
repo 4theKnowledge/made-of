@@ -14,16 +14,27 @@ type Current =
   | "about"
   | "account";
 
-const LINKS: Array<{ href: string; label: string; key: Current }> = [
-  { href: "/", label: "Daily link", key: "daily" },
-  { href: "/explore/water", label: "Explore", key: "explore" },
-  { href: "/scratch", label: "From scratch", key: "scratch" },
-  { href: "/combine", label: "Combine", key: "combine" },
-  { href: "/pricing", label: "Pricing", key: "pricing" },
-  { href: "/about", label: "About", key: "about" },
-];
+function buildLinks(
+  exploreHref: string,
+): Array<{ href: string; label: string; key: Current }> {
+  return [
+    { href: "/", label: "Daily link", key: "daily" },
+    { href: exploreHref, label: "Explore", key: "explore" },
+    { href: "/scratch", label: "From scratch", key: "scratch" },
+    { href: "/combine", label: "Combine", key: "combine" },
+    { href: "/pricing", label: "Pricing", key: "pricing" },
+    { href: "/about", label: "About", key: "about" },
+  ];
+}
 
-export function Header({ current }: { current?: Current }) {
+export function Header({
+  current,
+  exploreHref = "/explore/water",
+}: {
+  current?: Current;
+  exploreHref?: string;
+}) {
+  const links = buildLinks(exploreHref);
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const drawerId = useId();
@@ -55,7 +66,7 @@ export function Header({ current }: { current?: Current }) {
         <span>Everything is made of something.</span>
       </div>
       <nav className="tabs" aria-label="Modes">
-        {LINKS.map((l) => (
+        {links.map((l) => (
           <Link
             key={l.key}
             href={l.href}
@@ -89,7 +100,7 @@ export function Header({ current }: { current?: Current }) {
         hidden={!open}
       >
         <nav className="navDrawerList" aria-label="Modes">
-          {LINKS.map((l) => (
+          {links.map((l) => (
             <Link
               key={l.key}
               href={l.href}

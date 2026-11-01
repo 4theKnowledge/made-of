@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { Footer } from "@/components/common/Footer";
-import { AuthNavLink } from "@/components/common/AuthNavLink";
+import { Header } from "@/components/common/Header";
 import { getLiveSnapshot } from "@/graph/live";
 import {
   generatePuzzle,
@@ -62,20 +61,7 @@ export default async function HomePage() {
 
   return (
     <main className="wrap">
-      <header>
-        <div className="brand">
-          <h1>Made Of</h1>
-          <span>Everything is made of something.</span>
-        </div>
-        <nav className="tabs" aria-label="Modes">
-          <Link href="/" className="on">
-            Daily link
-          </Link>
-          <Link href={`/explore/${start.id}`}>Explore</Link>
-          <Link href="/scratch">From scratch</Link>
-          <AuthNavLink />
-        </nav>
-      </header>
+      <Header current="daily" exploreHref={`/explore/${start.id}`} />
 
       <DailyBoard puzzle={puzzle} initialView={initialView} />
       <Footer />

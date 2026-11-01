@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Footer } from "@/components/common/Footer";
+import { Header } from "@/components/common/Header";
 import { getItemPage, type PageEdge } from "@/graph/queries";
 import { Chip } from "@/components/Chip";
 import { Pictogram } from "@/pictograms/Pictogram";
@@ -94,19 +95,7 @@ export default async function ItemPage({
         } as React.CSSProperties
       }
     >
-      <header>
-        <div className="brand">
-          <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
-            <h1>Made Of</h1>
-          </Link>
-          <span>Everything is made of something.</span>
-        </div>
-        <nav className="tabs" aria-label="Modes">
-          <Link href="/">Daily link</Link>
-          <Link href={`/explore/${item.slug}`}>Explore</Link>
-          <Link href="/scratch">From scratch</Link>
-        </nav>
-      </header>
+      <Header exploreHref={`/explore/${item.slug}`} />
 
       {/* Focus card. Simplified from the Explore bowtie: just the item itself,
           with its fact and timeline. Panels below carry inputs and outputs. */}

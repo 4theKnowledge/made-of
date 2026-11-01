@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { Footer } from "@/components/common/Footer";
-import { AuthNavLink } from "@/components/common/AuthNavLink";
+import { Header } from "@/components/common/Header";
 import { getLiveSnapshot } from "@/graph/live";
 import {
   bestRecipe,
@@ -90,22 +89,10 @@ export default async function ScratchPage() {
         } as React.CSSProperties
       }
     >
-      <header>
-        <div className="brand">
-          <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
-            <h1>Made Of</h1>
-          </Link>
-          <span>Everything is made of something.</span>
-        </div>
-        <nav className="tabs" aria-label="Modes">
-          <Link href="/">Daily link</Link>
-          <Link href={`/explore/${targetNode.id}`}>Explore</Link>
-          <Link href="/scratch" className="on">
-            From scratch
-          </Link>
-          <AuthNavLink />
-        </nav>
-      </header>
+      <Header
+        current="scratch"
+        exploreHref={`/explore/${targetNode.id}`}
+      />
 
       <ScratchBoard initial={initial} />
       <Footer />
