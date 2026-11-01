@@ -6,10 +6,10 @@ import { useEffect, useId, useState } from "react";
 import { AuthNavLink } from "./AuthNavLink";
 
 type Current =
-  | "daily"
-  | "explore"
-  | "scratch"
   | "combine"
+  | "link"
+  | "craft"
+  | "explore"
   | "pricing"
   | "about"
   | "account";
@@ -18,10 +18,10 @@ function buildLinks(
   exploreHref: string,
 ): Array<{ href: string; label: string; key: Current }> {
   return [
-    { href: "/", label: "Daily link", key: "daily" },
-    { href: exploreHref, label: "Explore", key: "explore" },
-    { href: "/scratch", label: "From scratch", key: "scratch" },
     { href: "/combine", label: "Combine", key: "combine" },
+    { href: "/link", label: "Link", key: "link" },
+    { href: "/craft", label: "Craft", key: "craft" },
+    { href: exploreHref, label: "Explore", key: "explore" },
     { href: "/pricing", label: "Pricing", key: "pricing" },
     { href: "/about", label: "About", key: "about" },
   ];

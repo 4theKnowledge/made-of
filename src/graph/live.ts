@@ -11,7 +11,7 @@ import { randomBytes } from "node:crypto";
 import { loadRowsFromDb } from "./load";
 import { buildSnapshot, type Snapshot } from "./snapshot";
 import { buildCodeMap, type CodeMap } from "./codes";
-import { buildClosedSet } from "./daily";
+import { buildClosedSet } from "./link";
 
 export interface LiveSnapshot {
   snapshot: Snapshot;
