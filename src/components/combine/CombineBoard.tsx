@@ -2363,12 +2363,19 @@ function AgesSheet({
   const last = current >= ages.length - 1;
   const need = 7 + 2 * current;
   const left = Math.max(0, need - state.ageMade);
-  // One canonical chain per theme + age index. Hand-picked so the diagram
-  // tells a clear "raw → refined → made" story at a scale that fits that era.
-  // Each chain's last node is an item that genuinely lives in that band in
-  // the current KB; if the KB shifts something and an id goes missing, the
-  // dialog filters the row out and we fix it here.
-  const chain = AGE_CHAINS[state.theme]?.[current] ?? [];
+  // One canonical chain per theme + age index. Hand-picked by item name so
+  // the diagram tells a clear "raw → refined → made" story. Items in the
+  // bundle are keyed by UUID; we resolve name → id here. If a name goes
+  // missing (KB rename, etc.) we drop that node and the row still renders.
+  const nameToId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const [id, it] of bundle.items) m.set(it.name.toLowerCase(), id);
+    return m;
+  }, [bundle]);
+  const chainNames = AGE_CHAINS[state.theme]?.[current] ?? [];
+  const chain = chainNames
+    .map((name) => nameToId.get(name.toLowerCase()))
+    .filter((id): id is string => id != null);
   return (
     <>
       <div className="cbscrim" onClick={onDismiss} />
@@ -2394,7 +2401,6 @@ function AgesSheet({
               {chain.map((id, i) => {
                 const it = bundle.items.get(id);
                 if (!it) return null;
-                const label = i === 0 ? "raw" : `step ${i}`;
                 return (
                   <span key={id} className="cbagechainnode">
                     <span
@@ -2411,7 +2417,6 @@ function AgesSheet({
                       />
                     </span>
                     <em>{cap(it.name)}</em>
-                    <small>{label}</small>
                     {i < chain.length - 1 && (
                       <span className="cbagechainarrow" aria-hidden="true">
                         →
@@ -2421,17 +2426,6 @@ function AgesSheet({
                 );
               })}
             </div>
-            {(() => {
-              const terminalId = chain[chain.length - 1];
-              const it = bundle.items.get(terminalId);
-              if (!it) return null;
-              return (
-                <small className="cbagechaincap">
-                  {cap(it.name)} is {ages[current]} — {chain.length - 1} step
-                  {chain.length - 1 === 1 ? "" : "s"} from raw.
-                </small>
-              );
-            })()}
           </div>
         )}
         <ol className="cbagelist">
