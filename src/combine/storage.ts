@@ -16,7 +16,7 @@ import type { ThemeBundle, ThemeKey } from "./types";
 
 /** Bump when the StoredGame shape changes so older saves fall through to
  *  a fresh game instead of hydrating into a broken state. */
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
 
 const ENDLESS_KEY = "madeof:cbsave";
 const DAILY_KEY = "madeof:cbsave:daily";
@@ -53,6 +53,7 @@ export interface StoredGame {
   clears: number;
   hints: number;
   mv: number;
+  shore: number;
   over: boolean;
   newBest: boolean;
   moves: number;
@@ -94,6 +95,7 @@ function toStored(state: GameState): StoredGame {
     clears: state.clears,
     hints: state.hints,
     mv: state.mv,
+    shore: state.shore,
     over: state.over,
     newBest: state.newBest,
     moves: state.moves,
@@ -192,6 +194,7 @@ export function hydrateGame(s: StoredGame): GameState {
     clears: s.clears,
     hints: s.hints,
     mv: s.mv,
+    shore: s.shore,
     over: s.over,
     newBest: s.newBest,
     moves: s.moves,

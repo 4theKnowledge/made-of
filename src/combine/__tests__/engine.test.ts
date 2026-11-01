@@ -357,6 +357,50 @@ describe("helpers (swap, clear, move)", () => {
     expect(state.board[8]).toBe("dough");
     expect(state.board[0]).toBeNull();
   });
+
+  it("shore resets a crumble counter without consuming a turn", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    s0.board[4] = "flour";
+    s0.crumb[4] = { id: "flour", n: 2 };
+    const beforeShore = s0.shore;
+    const beforeMoves = s0.moves;
+    const { state } = reduce(s0, bundle, { type: "shore", cell: 4 });
+    expect(state.crumb[4]).toBeNull();
+    expect(state.board[4]).toBe("flour");
+    expect(state.shore).toBe(beforeShore - 1);
+    expect(state.moves).toBe(beforeMoves);
+  });
+
+  it("shore refuses tiles with no crumble counter", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    s0.board[4] = "flour";
+    s0.crumb[4] = null;
+    const beforeShore = s0.shore;
+    const { state } = reduce(s0, bundle, { type: "shore", cell: 4 });
+    expect(state.shore).toBe(beforeShore);
+    expect(state).toEqual(s0);
+  });
+
+  it("shore refuses empty cells", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    const beforeShore = s0.shore;
+    const { state } = reduce(s0, bundle, { type: "shore", cell: 4 });
+    expect(state.shore).toBe(beforeShore);
+  });
+
+  it("shore refuses when the counter is zero", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    s0.board[4] = "flour";
+    s0.crumb[4] = { id: "flour", n: 2 };
+    s0.shore = 0;
+    const { state } = reduce(s0, bundle, { type: "shore", cell: 4 });
+    expect(state.crumb[4]).not.toBeNull();
+    expect(state.shore).toBe(0);
+  });
 });
 
 describe("purity (no shared references with input)", () => {

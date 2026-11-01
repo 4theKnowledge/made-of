@@ -82,6 +82,7 @@ export interface GameState {
   clears: number;
   hints: number;
   mv: number;
+  shore: number;
   over: boolean;
   newBest: boolean;
   moves: number;
@@ -131,7 +132,8 @@ export type Action =
   | { type: "swap" }
   | { type: "clear"; cell: number }
   | { type: "hint" }
-  | { type: "move"; from: number; to: number };
+  | { type: "move"; from: number; to: number }
+  | { type: "shore"; cell: number };
 
 export interface ReduceResult {
   state: GameState;
@@ -420,6 +422,7 @@ export function newGame(
     clears: 1,
     hints: 2,
     mv: 2,
+    shore: 2,
     over: false,
     newBest: false,
     moves: 0,
@@ -654,8 +657,21 @@ export function reduce(
       state.hints--;
       return { state, events };
     }
+
+    case "shore": {
+      // Reset the crumble counter on one tile, giving it another full TTL
+      // before it crumbles. Only works on a tile that's actually counting
+      // down — on-age tiles have a null counter and gain nothing.
+      if (state.shore <= 0) return { state: prev, events: [] };
+      const tile = state.board[action.cell];
+      if (!tile) return { state: prev, events: [] };
+      const c = state.crumb[action.cell];
+      if (!c || c.id !== tile) return { state: prev, events: [] };
+      state.shore--;
+      state.crumb[action.cell] = null;
+      return { state, events };
+    }
   }
-  return { state: prev, events: [] };
 }
 
 /* --- Convenience exports for the UI / tests --------------------------- */

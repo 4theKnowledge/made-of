@@ -9,7 +9,7 @@ import { newGame, reduce } from "@/combine/engine";
 import type { Action, Event, GameState } from "@/combine/engine";
 import { matchAt, matchOn } from "@/combine/match";
 import { ensureContext, suspend as suspendAudio, hasContext } from "@/combine/audio/core";
-import { startMusic, stopMusic } from "@/combine/audio/music";
+import { fadeOutMusic, startMusic } from "@/combine/audio/music";
 import { fx as playFx } from "@/combine/audio/sfx";
 import { todayKey, dailySeed, freshEndlessSeed } from "@/combine/rng";
 import { hydrateBundle, type SerialisedBundle } from "@/combine/serialise";
@@ -185,6 +185,8 @@ export function CombineBoard({ bundles: serialised }: Props) {
   const [moveMode, setMoveMode] = useState<{ from: number | null } | null>(
     null,
   );
+  // Shore-mode: next tap on a crumbling tile resets its counter.
+  const [shoreMode, setShoreMode] = useState(false);
   // Hint toast — a card with a recipe to try when nothing fits.
   const [hintToast, setHintToast] = useState<{
     out: string;
@@ -229,7 +231,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
   useEffect(() => {
     if (!hasContext()) return;
     ensureContext({ ...sound, vol: sound.vol / 100 });
-    if (sound.music === "off") stopMusic();
+    if (sound.music === "off") fadeOutMusic();
     else startMusic({ busyGetter: () => state.age });
   }, [sound, state.age]);
 
@@ -252,19 +254,45 @@ export function CombineBoard({ bundles: serialised }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pause music when the tab is hidden.
+  // Pause music when the tab is hidden, and silence it before the page is
+  // torn down. Both paths fade the music bus first so already-scheduled
+  // oscillators don't get cut off mid-cycle (which clicks on close).
   useEffect(() => {
+    let suspendTimer: number | null = null;
+    const silence = () => {
+      if (suspendTimer != null) {
+        window.clearTimeout(suspendTimer);
+        suspendTimer = null;
+      }
+      const fade = fadeOutMusic();
+      const core = hasContext()
+        ? ensureContext({ ...sound, vol: sound.vol / 100 })
+        : null;
+      if (!core) return;
+      suspendTimer = window.setTimeout(() => {
+        suspendAudio(core);
+        suspendTimer = null;
+      }, Math.ceil(fade * 1000) + 20);
+    };
     const onVis = () => {
       if (document.hidden) {
-        stopMusic();
-        const core = hasContext() ? ensureContext({ ...sound, vol: sound.vol / 100 }) : null;
-        if (core) suspendAudio(core);
+        silence();
       } else if (sound.music !== "off" && hasContext()) {
+        if (suspendTimer != null) {
+          window.clearTimeout(suspendTimer);
+          suspendTimer = null;
+        }
         startMusic({ busyGetter: () => state.age });
       }
     };
+    const onHide = () => silence();
     document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pagehide", onHide);
+      if (suspendTimer != null) window.clearTimeout(suspendTimer);
+    };
   }, [sound, state.age]);
   const [bookOpen, setBookOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
@@ -274,6 +302,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
   const timers = useRef<number[]>([]);
   useEffect(() => () => {
     for (const t of timers.current) window.clearTimeout(t);
+    fadeOutMusic();
   }, []);
 
   const scheduleClear = useCallback((patch: Partial<Fx>, delay: number) => {
@@ -594,6 +623,15 @@ export function CombineBoard({ bundles: serialised }: Props) {
         setClearMode(false);
         return;
       }
+      // Shore mode: tap a crumbling tile to reset its counter.
+      if (shoreMode) {
+        const v = state.board[cell];
+        const c = state.crumb[cell];
+        if (!v || !c || c.id !== v) return;
+        act({ type: "shore", cell });
+        setShoreMode(false);
+        return;
+      }
       // Move mode: first tap picks the source, second tap drops it.
       if (moveMode) {
         if (moveMode.from == null) {
@@ -625,7 +663,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
         act({ type: "drop-on", slot: selectedSlot, cell });
       }
     },
-    [act, selectedSlot, state.board, clearMode, moveMode],
+    [act, selectedSlot, state.board, state.crumb, clearMode, moveMode, shoreMode],
   );
 
   // When a drag completed via drop or a long-press fired, we don't want
@@ -703,6 +741,10 @@ export function CombineBoard({ bundles: serialised }: Props) {
         setMoveMode(null);
         return;
       }
+      if (shoreMode) {
+        setShoreMode(false);
+        return;
+      }
       if (selectedSlot != null) {
         setSelectedSlot(null);
       }
@@ -720,6 +762,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
     helpersOpen,
     clearMode,
     moveMode,
+    shoreMode,
     selectedSlot,
   ]);
 
@@ -900,12 +943,13 @@ export function CombineBoard({ bundles: serialised }: Props) {
   }, [bundle, state.age, state.tray, state.found, collection]);
 
   const onHelper = useCallback(
-    (which: "hint" | "swap" | "clear" | "move") => {
+    (which: "hint" | "swap" | "clear" | "move" | "shore") => {
       setHelpersOpen(false);
-      // Entering move/clear cancels selection and any opposing mode.
+      // Entering move/clear/shore cancels selection and any opposing mode.
       if (which === "clear") {
         if (state.clears <= 0 || state.over) return;
         setMoveMode(null);
+        setShoreMode(false);
         setSelectedSlot(null);
         setClearMode((m) => !m);
         return;
@@ -913,14 +957,24 @@ export function CombineBoard({ bundles: serialised }: Props) {
       if (which === "move") {
         if (state.mv <= 0 || state.over) return;
         setClearMode(false);
+        setShoreMode(false);
         setSelectedSlot(null);
         setMoveMode((m) => (m ? null : { from: null }));
+        return;
+      }
+      if (which === "shore") {
+        if (state.shore <= 0 || state.over) return;
+        setClearMode(false);
+        setMoveMode(null);
+        setSelectedSlot(null);
+        setShoreMode((m) => !m);
         return;
       }
       if (which === "swap") {
         if (state.swaps <= 0) return;
         setClearMode(false);
         setMoveMode(null);
+        setShoreMode(false);
         act({ type: "swap" });
         return;
       }
@@ -934,7 +988,16 @@ export function CombineBoard({ bundles: serialised }: Props) {
         timers.current.push(id);
       }
     },
-    [act, state.clears, state.mv, state.swaps, state.hints, state.over, findHint],
+    [
+      act,
+      state.clears,
+      state.mv,
+      state.swaps,
+      state.hints,
+      state.shore,
+      state.over,
+      findHint,
+    ],
   );
 
   const preview = useMemo(
@@ -961,6 +1024,8 @@ export function CombineBoard({ bundles: serialised }: Props) {
           helpersOpen={helpersOpen}
           clearMode={clearMode}
           moveMode={moveMode != null}
+          shoreMode={shoreMode}
+          soundOn={sound.music !== "off" || sound.sfx}
           onToggleHelpers={() => {
             // If a mode is active, the button is Cancel: exit the mode.
             if (clearMode) {
@@ -971,10 +1036,17 @@ export function CombineBoard({ bundles: serialised }: Props) {
               setMoveMode(null);
               return;
             }
+            if (shoreMode) {
+              setShoreMode(false);
+              return;
+            }
             setHelpersOpen((o) => !o);
           }}
           onHelper={onHelper}
           onTheme={() => setThemeOpen(true)}
+          onBook={() => setBookOpen(true)}
+          onSound={() => setSoundOpen(true)}
+          onHelp={() => setHelpOpen(true)}
         />
         <TipLine
           state={state}
@@ -982,14 +1054,11 @@ export function CombineBoard({ bundles: serialised }: Props) {
           preview={preview}
           clearMode={clearMode}
           moveMode={moveMode}
+          shoreMode={shoreMode}
         />
         <AgeBar
           state={state}
           bundle={bundle}
-          soundOn={sound.music !== "off" || sound.sfx}
-          onBook={() => setBookOpen(true)}
-          onSound={() => setSoundOpen(true)}
-          onHelp={() => setHelpOpen(true)}
           onAges={() => setAgesOpen(true)}
         />
         <Shelf
@@ -1016,6 +1085,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
           dragOver={drag ? { cell: drag.overCell, ok: drag.overOk } : null}
           clearMode={clearMode}
           moveMode={moveMode}
+          shoreMode={shoreMode}
           onCellTap={onCellTap}
         />
         <Tray
@@ -1175,8 +1245,13 @@ export function CombineBoard({ bundles: serialised }: Props) {
               title: "Fill the bar to reach the next age",
               body: "Every combine fills the age bar. New ages unlock new recipes. Run out of moves and the game is over.",
             },
+            {
+              glyph: <GlyphCrumble />,
+              title: "Old things crumble away",
+              body: "When nothing in the current age needs a tile, a red counter ticks down from 3. On the 4th turn it falls off the board — combine it, move it on, or shore it up before it goes.",
+            },
           ]}
-          footnote="Need a nudge mid-run? Use the Helpers button for a hint, a swap, a clear or a move."
+          footnote="Need a nudge mid-run? Use the Helpers button for a hint, a swap, a clear, a move or a shore."
         />
       </div>
       {drag && drag.slot != null && state.tray[drag.slot] != null && (
@@ -1502,7 +1577,6 @@ function ThemeMenu({
               type="button"
               className="cbh"
               onClick={onShareDaily}
-              style={{ marginTop: 6, height: 36 }}
             >
               Share result
             </button>
@@ -1958,9 +2032,14 @@ function TopBar({
   helpersOpen,
   clearMode,
   moveMode,
+  shoreMode,
+  soundOn,
   onToggleHelpers,
   onHelper,
   onTheme,
+  onBook,
+  onSound,
+  onHelp,
 }: {
   state: GameState;
   fx: Fx;
@@ -1968,14 +2047,20 @@ function TopBar({
   helpersOpen: boolean;
   clearMode: boolean;
   moveMode: boolean;
+  shoreMode: boolean;
+  soundOn: boolean;
   onToggleHelpers: () => void;
-  onHelper: (which: "hint" | "swap" | "clear" | "move") => void;
+  onHelper: (which: "hint" | "swap" | "clear" | "move" | "shore") => void;
   onTheme: () => void;
+  onBook: () => void;
+  onSound: () => void;
+  onHelp: () => void;
 }) {
-  const helpersLeft = state.swaps + state.clears + state.hints + state.mv;
+  const helpersLeft =
+    state.swaps + state.clears + state.hints + state.mv + state.shore;
   const themeName = state.daily ? "Daily" : "Everything";
   const bestDisplay = Math.max(best, state.over ? state.score : 0);
-  const modeActive = clearMode || moveMode;
+  const modeActive = clearMode || moveMode || shoreMode;
   return (
     <div className="cbtop">
       <div className="cbscore">
@@ -2101,100 +2186,27 @@ function TopBar({
               </span>
               <b className="c">{state.clears}</b>
             </button>
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("shore")}
+              disabled={state.shore === 0}
+              aria-label={`Shore up a crumbling tile, ${state.shore} left`}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 20h16M6 20V11l6-6 6 6v9M9 20v-6h6v6" />
+              </svg>
+              <span className="nm">
+                <b className="t">Shore</b>
+                <em>
+                  Steady a crumbling tile so it holds for another few turns.
+                </em>
+              </span>
+              <b className="c">{state.shore}</b>
+            </button>
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function TipLine({
-  state,
-  selectedSlot,
-  preview,
-  clearMode,
-  moveMode,
-}: {
-  state: GameState;
-  selectedSlot: number | null;
-  preview: Map<number, Preview>;
-  clearMode: boolean;
-  moveMode: { from: number | null } | null;
-}) {
-  let tip: string;
-  if (state.over) tip = "Game over.";
-  else if (state.choosing) tip = "These make more than one thing. Pick one.";
-  else if (clearMode) tip = "Tap a tile to clear it.";
-  else if (moveMode) {
-    if (moveMode.from == null) tip = "Tap the tile you want to move.";
-    else {
-      const name = state.board[moveMode.from];
-      tip = `Now tap where the ${name ? cap(name).toLowerCase() : "tile"} should go. Moving isn't a turn.`;
-    }
-  } else if (selectedSlot != null) {
-    if (preview.size > 0) {
-      tip =
-        "Glowing squares make things you've found before. New combos don't glow: try things.";
-    } else if (state.found.length) {
-      tip =
-        "No combo you know of. Try somewhere new, or place it where it can wait.";
-    } else {
-      tip =
-        "Nothing glows until you've found it. Drop it on, or beside, things that might go with it.";
-    }
-  } else {
-    tip =
-      "Drag a tile onto the board, or tap it and then a square. Things that touch combine.";
-  }
-  return (
-    <p className="cbtip" aria-live="polite">
-      {tip}
-    </p>
-  );
-}
-
-function AgeBar({
-  state,
-  bundle,
-  soundOn,
-  onBook,
-  onSound,
-  onHelp,
-  onAges,
-}: {
-  state: GameState;
-  bundle: ThemeBundle;
-  soundOn: boolean;
-  onBook: () => void;
-  onSound: () => void;
-  onHelp: () => void;
-  onAges: () => void;
-}) {
-  const ages = bundle.theme.ages;
-  const last = state.age >= ages.length - 1;
-  const need = 6 + 2 * state.age;
-  const pct = last ? 100 : Math.min(100, Math.round((state.ageMade / need) * 100));
-  const ariaLabel = `Age ${ages[state.age]} of ${ages.length}${
-    last ? "" : `. Make ${need - state.ageMade} more to reach Age ${ages[state.age + 1]}`
-  }. Tap for details.`;
-  return (
-    <div className="cbage">
-      <button
-        type="button"
-        className="cbageinfo"
-        aria-label={ariaLabel}
-        onClick={onAges}
-      >
-        <span className="an">
-          <b>{ages[state.age]}</b>
-        </span>
-        <span className="bar">
-          <i style={{ width: `${pct}%` }} />
-        </span>
-        <span className="nx">
-          {last ? "Final age" : `${state.ageMade}/${need} → ${ages[state.age + 1]}`}
-        </span>
-      </button>
       <button
         type="button"
         className="cbsnd"
@@ -2234,6 +2246,90 @@ function AgeBar({
           <path d="M9.3 9.2a2.7 2.7 0 1 1 4.2 2.4c-1 .6-1.5 1.2-1.5 2.4" />
           <circle cx="12" cy="17.2" r="0.9" fill="currentColor" stroke="none" />
         </svg>
+      </button>
+    </div>
+  );
+}
+
+function TipLine({
+  state,
+  selectedSlot,
+  preview,
+  clearMode,
+  moveMode,
+  shoreMode,
+}: {
+  state: GameState;
+  selectedSlot: number | null;
+  preview: Map<number, Preview>;
+  clearMode: boolean;
+  moveMode: { from: number | null } | null;
+  shoreMode: boolean;
+}) {
+  let tip: string;
+  if (state.over) tip = "Game over.";
+  else if (state.choosing) tip = "These make more than one thing. Pick one.";
+  else if (clearMode) tip = "Tap a tile to clear it.";
+  else if (shoreMode) tip = "Tap a crumbling tile to steady it.";
+  else if (moveMode) {
+    if (moveMode.from == null) tip = "Tap the tile you want to move.";
+    else {
+      const name = state.board[moveMode.from];
+      tip = `Now tap where the ${name ? cap(name).toLowerCase() : "tile"} should go. Moving isn't a turn.`;
+    }
+  } else if (selectedSlot != null) {
+    if (preview.size > 0) {
+      tip =
+        "Glowing squares make things you've found before. New combos don't glow: try things.";
+    } else if (state.found.length) {
+      tip =
+        "No combo you know of. Try somewhere new, or place it where it can wait.";
+    } else {
+      tip =
+        "Nothing glows until you've found it. Drop it on, or beside, things that might go with it.";
+    }
+  } else {
+    tip =
+      "Drag a tile onto the board, or tap it and then a square. Things that touch combine.";
+  }
+  return (
+    <p className="cbtip" aria-live="polite">
+      {tip}
+    </p>
+  );
+}
+
+function AgeBar({
+  state,
+  bundle,
+  onAges,
+}: {
+  state: GameState;
+  bundle: ThemeBundle;
+  onAges: () => void;
+}) {
+  const ages = bundle.theme.ages;
+  const last = state.age >= ages.length - 1;
+  const need = 6 + 2 * state.age;
+  const pct = last ? 100 : Math.min(100, Math.round((state.ageMade / need) * 100));
+  const ariaLabel = `Age ${ages[state.age]} of ${ages.length}${
+    last ? "" : `. Make ${need - state.ageMade} more to reach Age ${ages[state.age + 1]}`
+  }. Tap for details.`;
+  return (
+    <div className="cbage">
+      <button
+        type="button"
+        className="cbageinfo"
+        aria-label={ariaLabel}
+        onClick={onAges}
+      >
+        <span className="bar">
+          <i style={{ width: `${pct}%` }} />
+          <span className="an">{ages[state.age]}</span>
+          <span className="nx">
+            {last ? "Final age" : `${state.ageMade}/${need} → ${ages[state.age + 1]}`}
+          </span>
+        </span>
       </button>
     </div>
   );
@@ -2292,11 +2388,23 @@ function AgesSheet({
           })}
         </ol>
         <p>
-          Each combine fills the bar. New ages unlock new recipes. Tiles
-          that nothing in the current age needs start to crumble — a red
-          number counts down from 3, and on the 4th turn they fall off the
-          board.
+          Each combine fills the bar. New ages unlock new recipes.
         </p>
+        <div className="cbagecrumble">
+          <span className="howto-glyph" aria-hidden="true">
+            <GlyphCrumble />
+          </span>
+          <div>
+            <b>Crumbling</b>
+            <p>
+              When nothing in the current age needs a tile, a red counter
+              appears and ticks down from 3 each turn. On the 4th turn the
+              tile falls off the board. Combine it, move it, or clear a
+              space before then — stale tiles don&apos;t score and they take
+              up room.
+            </p>
+          </div>
+        </div>
         <button
           type="button"
           className="cbh"
@@ -2358,9 +2466,14 @@ function Shelf({
           </button>
         );
       })}
-      <span className="cbslot cbslot-next" aria-hidden="true" />
+      {!empty && <span className="cbslot cbslot-next" aria-hidden="true" />}
       {empty && (
-        <span className="cbshelf-empty">Finished things land here</span>
+        <span className="cbshelf-empty">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 4v12M7 11l5 5 5-5M4 20h16" />
+          </svg>
+          <em>Finished things land here</em>
+        </span>
       )}
     </div>
   );
@@ -2374,6 +2487,7 @@ function Board({
   dragOver,
   clearMode,
   moveMode,
+  shoreMode,
   onCellTap,
 }: {
   state: GameState;
@@ -2383,6 +2497,7 @@ function Board({
   dragOver: { cell: number | null; ok: boolean } | null;
   clearMode: boolean;
   moveMode: { from: number | null } | null;
+  shoreMode: boolean;
   onCellTap: (cell: number) => void;
 }) {
   const size = state.n;
@@ -2406,6 +2521,7 @@ function Board({
         const isMovable =
           moveMode != null && moveMode.from == null && v != null;
         const isMoving = moveMode != null && moveMode.from === i;
+        const isShoreable = shoreMode && crumbleTick > 0;
         return (
           <Cell
             key={i}
@@ -2419,6 +2535,7 @@ function Board({
             clearable={isClearable}
             movable={isMovable}
             moving={isMoving}
+            shoreable={isShoreable}
             onTap={() => onCellTap(i)}
           />
         );
@@ -2440,6 +2557,7 @@ function Cell({
   clearable,
   movable,
   moving,
+  shoreable,
   onTap,
 }: {
   cell: number;
@@ -2452,6 +2570,7 @@ function Cell({
   clearable: boolean;
   movable: boolean;
   moving: boolean;
+  shoreable: boolean;
   onTap: () => void;
 }) {
   // Visual-only overlays: the engine has already mutated state (consumed
@@ -2496,6 +2615,7 @@ function Cell({
   if (clearable) classes.push("clearable");
   if (movable) classes.push("movable");
   if (moving) classes.push("moving");
+  if (shoreable) classes.push("shoreable");
 
   const words = displayId ? displayId.split("-") : [];
   const longest = Math.max(0, ...words.map((w) => w.length));
@@ -2774,6 +2894,21 @@ function GlyphGlow() {
         <span className="cl" />
         <span className="cl" />
         <span className="cl full anim-glow" style={{ animationDelay: ".7s" }} />
+      </span>
+    </span>
+  );
+}
+
+function GlyphCrumble() {
+  return (
+    <span className="mc" aria-hidden="true">
+      <span className="bd">
+        <span className="cl full anim-crumble">
+          <span className="crk anim-tick">3</span>
+        </span>
+        <span className="cl" />
+        <span className="cl" />
+        <span className="cl full" />
       </span>
     </span>
   );

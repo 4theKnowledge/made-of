@@ -327,7 +327,7 @@ function clamp01(x: number): number {
 
 /** Per-track music bus gain. Drift's pad voice is already sustained and
  *  wet, so it needs the least gain to sit at the same perceived level. */
-function musicBusGain(track: AudioSettings["music"]): number {
+export function musicBusGain(track: AudioSettings["music"]): number {
   if (track === "piano") return 0.2;
   if (track === "drift") return 0.13;
   return 0.16;

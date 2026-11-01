@@ -12,6 +12,7 @@
 import {
   getContext,
   midiToFreq,
+  musicBusGain,
   playHandpan,
   playPad,
   playPiano,
@@ -193,6 +194,7 @@ export function startMusic(opts?: { busyGetter?: () => number }): void {
   if (state.timer) return;
   if (opts?.busyGetter) state.busyGetter = opts.busyGetter;
   if (core.ctx.state === "suspended") void core.ctx.resume();
+  restoreMusicBusGain();
   state.nextT = core.ctx.currentTime + 0.2;
   state.step = 0;
   state.walk = 4;
@@ -211,6 +213,34 @@ export function startMusic(opts?: { busyGetter?: () => number }): void {
 export function stopMusic(): void {
   if (state.timer) clearInterval(state.timer);
   state.timer = null;
+}
+
+/** Fade the music bus to silence over `seconds`, then stop scheduling. Returns
+ *  the fade length so callers can time any follow-up suspend/teardown. Notes
+ *  already in the Web Audio queue keep ringing; the fade on the bus silences
+ *  them without clicking. */
+export function fadeOutMusic(seconds = 0.08): number {
+  const core = getContext();
+  if (state.timer) clearInterval(state.timer);
+  state.timer = null;
+  if (!core) return 0;
+  const { ctx, musicBus } = core;
+  const now = ctx.currentTime;
+  musicBus.gain.cancelScheduledValues(now);
+  musicBus.gain.setValueAtTime(musicBus.gain.value, now);
+  musicBus.gain.linearRampToValueAtTime(0.0001, now + seconds);
+  return seconds;
+}
+
+/** Restore the music bus gain for the current track. Call before resuming
+ *  music after a fade-out. */
+export function restoreMusicBusGain(): void {
+  const core = getContext();
+  if (!core) return;
+  const { ctx, musicBus, settings } = core;
+  const now = ctx.currentTime;
+  musicBus.gain.cancelScheduledValues(now);
+  musicBus.gain.setValueAtTime(musicBusGain(settings.music), now);
 }
 
 export function musicRunning(): boolean {
