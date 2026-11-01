@@ -40,6 +40,7 @@ function buildAuth() {
     user: {
       additionalFields: {
         tier: { type: "string", defaultValue: "free", input: false },
+        role: { type: "string", defaultValue: "user", input: false },
         ageConfirmedAt: { type: "date", required: false, input: false },
       },
     },

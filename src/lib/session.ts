@@ -10,3 +10,10 @@ export async function requireUser() {
   if (!s) throw new Error("unauthorized");
   return s.user;
 }
+
+/** True if the current session belongs to an admin. Falls back to false on
+ *  anonymous or non-admin sessions — callers decide the response code. */
+export async function isAdmin(): Promise<boolean> {
+  const s = await getSession();
+  return (s?.user as { role?: string } | undefined)?.role === "admin";
+}

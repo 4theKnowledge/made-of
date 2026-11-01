@@ -267,6 +267,7 @@ export const authUser = pgTable("user", {
   name: text("name"),
   image: text("image"),
   tier: text("tier").notNull().default("free"),
+  role: userRoleEnum("role").notNull().default("user"),
   ageConfirmedAt: timestamp("age_confirmed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -461,6 +462,7 @@ export type LinkType = (typeof linkTypeEnum.enumValues)[number];
 export type Confidence = (typeof confidenceEnum.enumValues)[number];
 export type EvidenceStance = (typeof evidenceStanceEnum.enumValues)[number];
 export type SourceKind = (typeof sourceKindEnum.enumValues)[number];
+export type UserRole = (typeof userRoleEnum.enumValues)[number];
 
 export type Item = typeof items.$inferSelect;
 export type NewItem = typeof items.$inferInsert;
