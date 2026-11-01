@@ -785,3 +785,40 @@ a.btn.primary{color:var(--bg)}
   .cbh.cbtheme span{max-width:62px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
   .cbh.cbtheme{padding:0 5px 0 8px}
 }
+
+/* Helpers dropdown — ported from legacy/made-of.html 893–907. */
+.cbhelpwrap{position:relative}
+#cbHelp{gap:5px}
+#cbHelp b{min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:var(--ink);color:var(--bg);font-size:11px;line-height:18px;text-align:center}
+#cbHelp.on b{background:var(--bg);color:var(--ink)}
+#cbHelp.open{background:var(--soft)}
+.cbhelpmenu{position:absolute;right:0;top:calc(100% + 6px);z-index:30;width:min(300px, calc(100vw - 32px));display:flex;flex-direction:column;padding:6px;border:2px solid var(--ink);border-radius:4px;background:var(--bg);box-shadow:4px 4px 0 var(--ink);animation:mdin .18s ease-out}
+.cbhm{display:flex;align-items:center;gap:10px;width:100%;padding:9px 8px;border:0;border-radius:3px;background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.cbhm + .cbhm{border-top:1px solid var(--line)}
+.cbhm:hover:not(:disabled){background:var(--soft)}
+.cbhm:disabled{opacity:.4;cursor:default}
+.cbhm svg{flex:none;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.cbhm .nm{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0}
+.cbhm .nm .t{font-size:14px}
+.cbhm .nm em{font-style:normal;font-size:12px;color:var(--muted);line-height:1.25}
+.cbhm .c{flex:none;font-family:var(--mono);font-size:15px;min-width:22px;text-align:right}
+
+/* Discovery toast — ported from legacy/made-of.html 1098–1103 + 953–956. */
+.cbdisc{position:absolute;left:0;right:0;top:52%;z-index:5;display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:2.5px solid var(--pk);border-radius:4px;background:var(--fM);color:#111417;box-shadow:4px 4px 0 var(--pk);cursor:pointer;animation:mdin .25s ease-out}
+.cbdisc .ic{width:48px;height:48px;flex:none;border:0;background:transparent}
+.cbdisc .ic svg{width:100%;height:100%}
+.cbdisc .k{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.cbdisc b{display:block;font-size:20px;line-height:1.1}
+.cbdisc p{margin:4px 0 0;font-size:13px;line-height:1.35}
+.cbdisc .cbrcp{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:6px;font-size:12.5px;font-weight:700}
+.cbdisc .cbrcp span{display:inline-flex;align-items:center;gap:3px;padding:2px 6px 2px 3px;border:1.5px solid #111417;border-radius:3px;background:rgba(255,255,255,.55)}
+.cbdisc .cbrcp .ic{width:18px;height:18px;border:0;background:transparent}
+.cbdisc .cbrcp i{font-style:normal;font-weight:800}
+
+/* Ghost preview + preview badges */
+.cbc .ghost2{opacity:.38;width:62%;display:grid;place-items:center}
+.cbc .ghost2 .ic{width:100%}
+.cbc .alts{position:absolute;right:3px;bottom:2px;font-family:var(--mono);font-size:9px;font-weight:700;color:var(--accent)}
+
+/* Modal animation reused by the helpers menu and toasts */
+@keyframes mdin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}

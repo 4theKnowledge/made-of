@@ -5,9 +5,59 @@ import type React from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import { newGame, reduce } from "@/combine/engine";
 import type { Action, Event, GameState } from "@/combine/engine";
+import { matchAt, matchOn } from "@/combine/match";
 import { hydrateBundle, type SerialisedBundle } from "@/combine/serialise";
-import type { CombineItem, ThemeBundle } from "@/combine/types";
+import type { CombineItem, CombineRecipe, ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
+
+/** Per-cell preview when a tray tile is selected. Mirrors cbPreview from
+ *  the prototype. Each entry is either a found output to render as a ghost
+ *  on an empty cell, or an "on" marker for a valid drop-on-top target. */
+interface Preview {
+  /** Output id if we have one to show (found alternatives only). */
+  out?: string;
+  /** True for drop-on-top targets. */
+  on?: boolean;
+  /** How many alternatives exist for this recipe (for the +N badge). */
+  n?: number;
+}
+
+function computePreview(
+  bundle: ThemeBundle,
+  state: GameState,
+  slot: number | null,
+): Map<number, Preview> {
+  const out = new Map<number, Preview>();
+  if (slot == null) return out;
+  const x = state.tray[slot];
+  if (x == null) return out;
+  const found = new Set(state.found);
+  const altsOf = (r: CombineRecipe): CombineRecipe[] => {
+    const key = [...r.all].sort().join("+");
+    return bundle.sameIngredients.get(key) ?? [r];
+  };
+  const knownAlt = (r: CombineRecipe): CombineRecipe | null => {
+    const alts = altsOf(r);
+    return alts.find((q) => found.has(q.out)) ?? null;
+  };
+  for (let i = 0; i < state.board.length; i++) {
+    const v = state.board[i];
+    if (v) {
+      const m = matchOn(bundle, state.board, i, x, state.n);
+      if (!m) continue;
+      const k = knownAlt(m.recipe);
+      if (k) out.set(i, { out: k.out, on: true, n: altsOf(m.recipe).length });
+    }
+  }
+  for (let i = 0; i < state.board.length; i++) {
+    if (state.board[i]) continue;
+    const m = matchAt(bundle, state.board, i, x, state.n);
+    if (!m) continue;
+    const k = knownAlt(m.recipe);
+    if (k) out.set(i, { out: k.out, n: altsOf(m.recipe).length });
+  }
+  return out;
+}
 
 /**
  * Transient per-move visual state. Keys match the prototype's `renderCB(fx)`
@@ -45,7 +95,12 @@ export function CombineBoard({ bundle: serialised }: Props) {
 
   const [state, setState] = useState<GameState>(initial);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [helpersOpen, setHelpersOpen] = useState(false);
   const [fx, setFx] = useState<Fx>({});
+  const [discovery, setDiscovery] = useState<{
+    out: string;
+    recipe: string[];
+  } | null>(null);
   // Pending clears so overlapping actions don't orphan timers.
   const timers = useRef<number[]>([]);
   useEffect(() => () => {
@@ -69,6 +124,7 @@ export function CombineBoard({ bundle: serialised }: Props) {
     (events: Event[]) => {
       // Fold events into one fx patch so React batches a single render.
       const patch: Fx = {};
+      let latestDiscovery: { out: string; recipe: string[] } | null = null;
       for (const e of events) {
         if (e.type === "placed") patch.placed = e.at;
         else if (e.type === "nope") patch.nope = e.at;
@@ -82,7 +138,14 @@ export function CombineBoard({ bundle: serialised }: Props) {
           patch.shipped = { at: e.at, bonus: e.bonus };
         } else if (e.type === "crumble") {
           patch.crumble = new Set(e.cells);
+        } else if (e.type === "discovery") {
+          latestDiscovery = { out: e.out, recipe: e.recipe };
         }
+      }
+      if (latestDiscovery) {
+        setDiscovery(latestDiscovery);
+        const id = window.setTimeout(() => setDiscovery(null), 4600);
+        timers.current.push(id);
       }
       if (Object.keys(patch).length === 0) return;
       setFx((cur) => ({ ...cur, ...patch }));
@@ -136,10 +199,34 @@ export function CombineBoard({ bundle: serialised }: Props) {
     [act],
   );
 
+  const onHelper = useCallback(
+    (which: "hint" | "swap" | "clear" | "move") => {
+      setHelpersOpen(false);
+      // Clear and Move require a second tap on the board — those arrive in a
+      // later patch. For now swap and hint just decrement counters via the
+      // engine (hint content is Phase 4+).
+      if (which === "hint" || which === "swap") {
+        act({ type: which });
+      }
+    },
+    [act],
+  );
+
+  const preview = useMemo(
+    () => computePreview(bundle, state, selectedSlot),
+    [bundle, state, selectedSlot],
+  );
+
   return (
     <div className="cbwrap">
       <div id="cb">
-        <TopBar state={state} fx={fx} />
+        <TopBar
+          state={state}
+          fx={fx}
+          helpersOpen={helpersOpen}
+          onToggleHelpers={() => setHelpersOpen((o) => !o)}
+          onHelper={onHelper}
+        />
         <TipLine state={state} selectedSlot={selectedSlot} />
         <AgeBar state={state} bundle={bundle} />
         <Shelf state={state} bundle={bundle} fx={fx} />
@@ -148,6 +235,7 @@ export function CombineBoard({ bundle: serialised }: Props) {
           bundle={bundle}
           selectedSlot={selectedSlot}
           fx={fx}
+          preview={preview}
           onCellTap={onCellTap}
         />
         <Tray
@@ -170,6 +258,66 @@ export function CombineBoard({ bundle: serialised }: Props) {
             onChoose={onChoose}
           />
         )}
+        {discovery && (
+          <DiscoveryToast
+            discovery={discovery}
+            bundle={bundle}
+            onDismiss={() => setDiscovery(null)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DiscoveryToast({
+  discovery,
+  bundle,
+  onDismiss,
+}: {
+  discovery: { out: string; recipe: string[] };
+  bundle: ThemeBundle;
+  onDismiss: () => void;
+}) {
+  const item = bundle.items.get(discovery.out);
+  if (!item) return null;
+  return (
+    <div
+      className="cbdisc"
+      role="status"
+      onClick={onDismiss}
+      style={fillVar(item)}
+    >
+      <Pictogram
+        name={item.name}
+        tier={item.tier}
+        kind={item.kind}
+        symbol={item.symbol}
+      />
+      <div>
+        <span className="k">New discovery · tap to close</span>
+        <b>{cap(item.name)}</b>
+        <div className="cbrcp">
+          {discovery.recipe.map((pid, k) => {
+            const p = bundle.items.get(pid);
+            if (!p) return null;
+            return (
+              <span key={pid}>
+                <Pictogram
+                  name={p.name}
+                  tier={p.tier}
+                  kind={p.kind}
+                  symbol={p.symbol}
+                />
+                {cap(p.name)}
+                {k < discovery.recipe.length - 1 && <i>+</i>}
+              </span>
+            );
+          })}
+          <i>=</i>
+          <span>{cap(item.name)}</span>
+        </div>
+        {item.fact && <p>{item.fact}</p>}
       </div>
     </div>
   );
@@ -177,7 +325,19 @@ export function CombineBoard({ bundle: serialised }: Props) {
 
 /* --- Top row: score + helpers (count badges only, menu lands later) --- */
 
-function TopBar({ state, fx }: { state: GameState; fx: Fx }) {
+function TopBar({
+  state,
+  fx,
+  helpersOpen,
+  onToggleHelpers,
+  onHelper,
+}: {
+  state: GameState;
+  fx: Fx;
+  helpersOpen: boolean;
+  onToggleHelpers: () => void;
+  onHelper: (which: "hint" | "swap" | "clear" | "move") => void;
+}) {
   const helpersLeft = state.swaps + state.clears + state.hints + state.mv;
   const themeName = state.daily ? "Daily" : state.theme === "everyday" ? "Everyday" : "Everything";
   return (
@@ -209,11 +369,14 @@ function TopBar({ state, fx }: { state: GameState; fx: Fx }) {
       </button>
       <div className="cbhelpwrap">
         <button
-          className="cbh"
+          className={`cbh${helpersOpen ? " open" : ""}`}
           id="cbHelp"
           type="button"
+          aria-haspopup="menu"
+          aria-expanded={helpersOpen}
           aria-label="Helpers"
-          disabled
+          onClick={onToggleHelpers}
+          disabled={state.over || helpersLeft === 0}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3 9h18v11H3zM8 9V5h8v4M3 13h18M11 12v3h2v-3" />
@@ -221,6 +384,78 @@ function TopBar({ state, fx }: { state: GameState; fx: Fx }) {
           <span className="lbl">Helpers</span>
           <b>{helpersLeft}</b>
         </button>
+        {helpersOpen && !state.over && (
+          <div className="cbhelpmenu" role="menu" aria-label="Helpers">
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("hint")}
+              disabled={state.hints === 0}
+              aria-label={`Hint: show one new combo, ${state.hints} left`}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z" />
+              </svg>
+              <span className="nm">
+                <b className="t">Hint</b>
+                <em>
+                  Point out a combo, new ones first. If nothing fits, it teaches a recipe.
+                </em>
+              </span>
+              <b className="c">{state.hints}</b>
+            </button>
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("move")}
+              disabled
+              aria-label={`Move a tile on the board, ${state.mv} left`}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" />
+              </svg>
+              <span className="nm">
+                <b className="t">Move</b>
+                <em>
+                  Pick up a tile on the board and put it somewhere else. Not a turn.
+                </em>
+              </span>
+              <b className="c">{state.mv}</b>
+            </button>
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("swap")}
+              disabled={state.swaps === 0}
+              aria-label={`Swap the tray, ${state.swaps} left`}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 7h11l-3-3M17 17H6l3 3" />
+              </svg>
+              <span className="nm">
+                <b className="t">Swap</b>
+                <em>Trade your three tiles for three new ones</em>
+              </span>
+              <b className="c">{state.swaps}</b>
+            </button>
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("clear")}
+              disabled
+              aria-label={`Clear a tile, ${state.clears} left`}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 6l4 4M12 8l6-6 4 4-6 6M13 11 4 20" />
+              </svg>
+              <span className="nm">
+                <b className="t">Clear</b>
+                <em>Remove one tile from the board</em>
+              </span>
+              <b className="c">{state.clears}</b>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -360,12 +595,14 @@ function Board({
   bundle,
   selectedSlot,
   fx,
+  preview,
   onCellTap,
 }: {
   state: GameState;
   bundle: ThemeBundle;
   selectedSlot: number | null;
   fx: Fx;
+  preview: Map<number, Preview>;
   onCellTap: (cell: number) => void;
 }) {
   const size = state.n;
@@ -388,6 +625,7 @@ function Board({
             selectedSlot={selectedSlot}
             crumbleTick={crumbleTick}
             fx={fx}
+            preview={preview.get(i)}
             onTap={() => onCellTap(i)}
           />
         );
@@ -405,6 +643,7 @@ function Cell({
   selectedSlot,
   crumbleTick,
   fx,
+  preview,
   onTap,
 }: {
   cell: number;
@@ -413,10 +652,12 @@ function Cell({
   selectedSlot: number | null;
   crumbleTick: number;
   fx: Fx;
+  preview: Preview | undefined;
   onTap: () => void;
 }) {
   const empty = !id;
   const item = id ? bundle.items.get(id) : null;
+  const ghostItem = preview?.out ? bundle.items.get(preview.out) : null;
 
   const inFuse = fx.fuse?.has(cell) ?? false;
   const inCrumble = fx.crumble?.has(cell) ?? false;
@@ -435,6 +676,10 @@ function Cell({
   if (isShipped) classes.push("ship");
   if (crumbleTick > 0 && !inCrumble) classes.push("crumbling");
   if (inCrumble) classes.push("crumble");
+  // Preview classes: empty cells where the selected tile would combine → .can;
+  // occupied cells where drop-on-top would combine → .over (via .full.over).
+  if (empty && preview) classes.push("can");
+  if (!empty && preview?.on) classes.push("over");
 
   const words = id ? id.split("-") : [];
   const longest = Math.max(0, ...words.map((w) => w.length));
@@ -446,7 +691,9 @@ function Cell({
           ? `, crumbling: nothing in this age uses it, gone in ${CRUMBLE_TTL + 1 - crumbleTick} turns`
           : ""
       }`
-    : `Empty cell ${cell}`;
+    : preview?.out
+      ? `Empty. Placing here makes ${cap(preview.out)}`
+      : `Empty cell ${cell}`;
 
   return (
     <button
@@ -467,6 +714,23 @@ function Cell({
             symbol={item.symbol}
           />
           <span className={`cbn${lenClass}`}>{cap(item.name)}</span>
+        </>
+      )}
+      {empty && ghostItem && (
+        <>
+          <span className="ghost2">
+            <Pictogram
+              name={ghostItem.name}
+              tier={ghostItem.tier}
+              kind={ghostItem.kind}
+              symbol={ghostItem.symbol}
+            />
+          </span>
+          {preview && preview.n && preview.n > 1 && (
+            <span className="alts" aria-hidden="true">
+              +{preview.n - 1}
+            </span>
+          )}
         </>
       )}
       {burst && <span className="pts">+{burst.pts}</span>}
@@ -592,10 +856,9 @@ function ChoicePicker({
 }
 
 function fillVar(item: CombineItem): React.CSSProperties {
-  // Reuse the tier-fill variables defined in globals.css (--fF, --fN, …).
-  return {
-    "--fill": `var(--f${item.tier})`,
-    "--pk": `var(--t${item.tier})`,
-  } as React.CSSProperties;
+  // Pastel tier fill, with --pk left as the global ink colour — matches the
+  // prototype's `icon()` which only sets --fill. Borders and drop shadows
+  // on .cbc.full / .cbp are already keyed to --pk through the stylesheet.
+  return { "--fill": `var(--f${item.tier})` } as React.CSSProperties;
 }
 
