@@ -38,13 +38,11 @@ const PLATE=`<ellipse class="b" cx="16" cy="18" rx="13" ry="5"/><ellipse class="
 const BOWL=`<path class="b" d="M3 15h26a13 10 0 0 1-26 0z"/><path class="l" d="M2 15h28"/>`;
 const BOX=`<path class="b" d="M4 10h24v18H4z"/><path class="l" d="M4 10l6-6h12l6 6M16 10v18"/>`;
 const BAG=`<path class="b" d="M8 11h16l-1 17H9z"/><path class="l" d="M12 11V8a4 4 0 0 1 8 0v3"/>`;
-const FRUIT_ROUND=`<circle class="b" cx="16" cy="18" r="10"/><path class="l" d="M16 8V5M16 5c-2-2-5-1-5 2M16 5c2-2 5-1 5 2"/>`;
 const TREE_LEAFY=`<rect class="b" x="14" y="19" width="4" height="9"/><circle class="b" cx="16" cy="12" r="9"/><path class="l" d="M10 28h12"/>`;
 const PLANT_ROW=`<path class="l" d="M3 28h26"/><path class="b" d="M11 28V14c0-4 2-6 5-6s5 2 5 6v14z"/><path class="l" d="M16 8V3"/>`;
 const GAS_CYLINDER=`<rect class="b" x="10" y="7" width="12" height="20" rx="2"/><rect class="b" x="13" y="3" width="6" height="4"/><path class="l" d="M10 12h12M10 22h12"/>`;
 const ORE_CHUNK=`<path class="k" d="M5 22l4-9 8-4 9 4 2 9-6 5H10z"/><path class="w" d="M11 14l5-2.5M20 13l3 2M15 20h6"/>`;
 const METAL_BAR=`<path class="b" d="M4 20l6-6h18v6l-6 6H4z"/><path class="l" d="M4 20h18M10 14l-6 6M22 20l6-6"/>`;
-const PLANT_STALK=`<path class="l" d="M16 29V5"/><path class="b" d="M16 10c-4 0-6-2-6-6 4 0 6 2 6 6zM16 10c0-4 2-6 6-6 0 4-2 6-6 6zM16 18c-4 0-6-2-6-6 4 0 6 2 6 6zM16 18c0-4 2-6 6-6 0 4-2 6-6 6z"/>`;
 
 const PICTO={
   "big bang":`<path class="b" d="M16 2l3 8 8-3-4 8 7 3-8 3 3 8-8-4-3 8-3-8-8 4 3-8-8-3 7-3-4-8 8 3z"/><circle class="k" cx="16" cy="16" r="2.5"/>`,
@@ -332,7 +330,6 @@ const PICTO={
   "wheelbarrow":`<path class="b" d="M3 10h8l5 12h8l3-6"/><circle class="k" cx="12" cy="25" r="3"/><path class="l" d="M27 16l-5-6M16 22h7"/>`,
 
   // --- Living (16) ---
-  "LUCA":`<circle class="b" cx="16" cy="16" r="12"/><path class="l" d="M10 13c2-3 4 3 6 0s4 3 6 0M10 19c2-3 4 3 6 0s4 3 6 0"/>`,
   "apple tree":TREE_LEAFY+`<circle class="k" cx="12" cy="10" r="1.3"/><circle class="k" cx="19" cy="9" r="1.3"/><circle class="k" cx="14" cy="14" r="1.3"/><circle class="k" cx="20" cy="14" r="1.3"/>`,
   "bamboo":`<rect class="b" x="12" y="3" width="3" height="26" rx="1"/><rect class="b" x="18" y="3" width="3" height="26" rx="1"/><path class="l" d="M12 10h3M12 17h3M12 24h3M18 7h3M18 14h3M18 21h3"/><path class="b" d="M8 11c-3-1-5-1-5 2 3 1 5 1 7-1zM24 15c3-1 5-1 5 2-3 1-5 1-7-1z"/>`,
   "barley":`<path class="l" d="M16 30V8"/><ellipse class="b" cx="13" cy="12" rx="2.2" ry="3.5" transform="rotate(-25 13 12)"/><ellipse class="b" cx="19" cy="12" rx="2.2" ry="3.5" transform="rotate(25 19 12)"/><ellipse class="b" cx="13" cy="18" rx="2.2" ry="3.5" transform="rotate(-25 13 18)"/><ellipse class="b" cx="19" cy="18" rx="2.2" ry="3.5" transform="rotate(25 19 18)"/><ellipse class="b" cx="16" cy="7" rx="2" ry="3"/><path class="l" d="M13 8L10 3M19 8l3-5M13 14l-4-4M19 14l4-4"/>`,
