@@ -29,6 +29,13 @@
       "when": 1793491070147,
       "tag": "0003_wild_boomer",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793503079000,
+      "tag": "0004_tan_princess_powerful",
+      "breakpoints": true
     }
   ]
 }

@@ -16,7 +16,7 @@
     "db:seed-if-empty": "tsx scripts/seed-if-empty.ts",
     "db:studio": "drizzle-kit studio",
     "build:scripts": "node scripts/build-scripts.mjs",
-    "predeploy": "node dist-scripts/migrate.js && node dist-scripts/seed-if-empty.js"
+    "predeploy": "node dist-scripts/migrate.js && node dist-scripts/seed-if-empty.js && node dist-scripts/backfill-handles.js"
   },
   "dependencies": {
     "better-auth": "^1.7.14",

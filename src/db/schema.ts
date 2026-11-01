@@ -260,22 +260,31 @@ export const dailyPuzzles = pgTable(
  * ageConfirmedAt records the 13+ confirmation collected at sign-up.
  * ====================================================================== */
 
-export const authUser = pgTable("user", {
-  id: text("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").notNull().default(false),
-  name: text("name"),
-  image: text("image"),
-  tier: text("tier").notNull().default("free"),
-  role: userRoleEnum("role").notNull().default("user"),
-  ageConfirmedAt: timestamp("age_confirmed_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const authUser = pgTable(
+  "user",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull().unique(),
+    emailVerified: boolean("email_verified").notNull().default(false),
+    name: text("name"),
+    image: text("image"),
+    tier: text("tier").notNull().default("free"),
+    role: userRoleEnum("role").notNull().default("user"),
+    ageConfirmedAt: timestamp("age_confirmed_at", { withTimezone: true }),
+    // Public display name, e.g. "swift-quartz". Auto-assigned on sign-up and
+    // immutable once the user locks it in with handleLockedAt. Nullable so a
+    // transient blank window during the create hook isn't a hard failure.
+    handle: text("handle"),
+    handleLockedAt: timestamp("handle_locked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("user_handle_lower_idx").on(sql`lower(${t.handle})`)],
+);
 
 export const authSession = pgTable(
   "session",

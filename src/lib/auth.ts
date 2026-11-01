@@ -3,6 +3,8 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { magicLink } from "better-auth/plugins";
 import { Resend } from "resend";
 import { getDb, schema } from "@/db/client";
+import { suggestAvailableHandle } from "./handle";
+import { randomHandleCandidate } from "./handle-words";
 
 // Construct the Better Auth instance lazily so that `next build` (which
 // evaluates route modules without DATABASE_URL / RESEND_API_KEY) doesn't
@@ -42,6 +44,8 @@ function buildAuth() {
         tier: { type: "string", defaultValue: "free", input: false },
         role: { type: "string", defaultValue: "user", input: false },
         ageConfirmedAt: { type: "date", required: false, input: false },
+        handle: { type: "string", required: false, input: false },
+        handleLockedAt: { type: "date", required: false, input: false },
       },
     },
     databaseHooks: {
@@ -51,9 +55,21 @@ function buildAuth() {
           // magic-link request on a 13+ (16+ EU) checkbox, so by the time
           // this hook fires the user has already confirmed. We record the
           // moment of consent in the DB for audit purposes.
+          //
+          // Also auto-assign a random adjective-noun handle. It stays
+          // unlocked (handleLockedAt null) so the user can reroll from
+          // /account until they confirm. If every attempt collides (effectively
+          // never — ~14k combos), fall back to a bare candidate; the unique
+          // index will reject it and the user will see an error on first load.
           before: async (user) => {
+            const suggested =
+              (await suggestAvailableHandle()) ?? randomHandleCandidate();
             return {
-              data: { ...user, ageConfirmedAt: new Date() },
+              data: {
+                ...user,
+                ageConfirmedAt: new Date(),
+                handle: suggested,
+              },
             };
           },
         },

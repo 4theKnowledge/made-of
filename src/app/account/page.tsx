@@ -4,6 +4,7 @@ import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { getSession } from "@/lib/session";
 import { AccountActions } from "./AccountActions";
+import { HandlePicker } from "./HandlePicker";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +21,12 @@ export default async function AccountPage() {
 
   const user = session.user as typeof session.user & {
     tier?: string;
+    handle?: string | null;
+    handleLockedAt?: string | Date | null;
   };
   const tier = user.tier ?? "free";
+  const handle = user.handle ?? null;
+  const handleLocked = Boolean(user.handleLockedAt);
 
   return (
     <main className="wrap">
@@ -44,6 +49,10 @@ export default async function AccountPage() {
               {new Date(user.createdAt).toLocaleDateString()}
             </dd>
           </dl>
+        </section>
+        <section className="feat">
+          <h3 style={{ marginTop: 0 }}>Display name</h3>
+          <HandlePicker initialHandle={handle} locked={handleLocked} />
         </section>
         <section className="feat">
           <h3 style={{ marginTop: 0 }}>Manage</h3>
