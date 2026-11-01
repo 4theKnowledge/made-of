@@ -1570,12 +1570,7 @@ function CollectionBook({
             );
           })}
         </div>
-        <button
-          type="button"
-          className="cbh"
-          onClick={onDismiss}
-          style={{ width: "100%", justifyContent: "center", flex: "none" }}
-        >
+        <button type="button" className="cbh cbback" onClick={onDismiss}>
           Back to the game
         </button>
       </section>

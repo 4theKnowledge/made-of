@@ -918,6 +918,9 @@ a.btn.primary{color:var(--bg)}
 .cbinfo .cbrcp .q{border-style:dashed;color:var(--muted);padding:2px 7px}
 .cbover .row2{display:flex;gap:8px;width:100%;margin-top:4px}
 .cbover .row2 .cbh{flex:1;justify-content:center;height:44px;font-size:14px;text-decoration:none}
+/* Full-width primary dismiss used by overlays with a single bottom action
+   (e.g. the collection book). Matches the thumb-friendly height of row2. */
+.cbover .cbh.cbback{width:100%;justify-content:center;height:48px;font-size:14px;flex:none}
 
 /* New-age toast — prototype line 1056–1059 */
 .cbdisc.cbagetoast{background:var(--fN)}
