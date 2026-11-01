@@ -5,6 +5,7 @@ import { Footer } from "@/components/common/Footer";
 import { getDb, schema } from "@/db/client";
 import type { ItemStatus, Tier } from "@/db/schema";
 import { TIER } from "@/lib/taxonomy";
+import { Breadcrumb } from "../Breadcrumb";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ export default async function AdminItemsList({
     <main className="wrap">
       <Header />
       <section className="phero">
-        <span className="eyebrow">Admin · Items</span>
+        <Breadcrumb trail={[{ label: "Admin", href: "/admin" }, { label: "Items" }]} />
         <h2>Items</h2>
       </section>
 

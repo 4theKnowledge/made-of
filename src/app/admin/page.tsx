@@ -3,6 +3,7 @@ import { count, eq } from "drizzle-orm";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { getDb, schema } from "@/db/client";
+import { Breadcrumb } from "./Breadcrumb";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function AdminHome() {
     <main className="wrap">
       <Header />
       <section className="phero">
-        <span className="eyebrow">Admin</span>
+        <Breadcrumb trail={[{ label: "Admin" }]} />
         <h2>Knowledge base</h2>
         <p>Edit items, links and evidence. Changes land as drafts; publish to make them live.</p>
       </section>

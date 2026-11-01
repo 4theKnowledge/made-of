@@ -1,6 +1,7 @@
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { ImportForm } from "./ImportForm";
+import { Breadcrumb } from "../Breadcrumb";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export default function AdminImportPage() {
     <main className="wrap">
       <Header />
       <section className="phero">
-        <span className="eyebrow">Admin · Import</span>
+        <Breadcrumb trail={[{ label: "Admin", href: "/admin" }, { label: "Import" }]} />
         <h2>Import JSON</h2>
         <p>
           Paste a <code>Data*</code>-shape payload — the same shape the Export

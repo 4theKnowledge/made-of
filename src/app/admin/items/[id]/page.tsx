@@ -7,6 +7,7 @@ import { getDb, schema } from "@/db/client";
 import { ItemEditForm } from "../ItemEditForm";
 import { LinkRow } from "../LinkRow";
 import { REL } from "@/lib/rel";
+import { Breadcrumb } from "../../Breadcrumb";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,13 @@ export default async function AdminItemEdit({ params }: { params: Promise<{ id: 
     <main className="wrap">
       <Header />
       <section className="phero">
-        <span className="eyebrow">Admin · Item</span>
+        <Breadcrumb
+          trail={[
+            { label: "Admin", href: "/admin" },
+            { label: "Items", href: "/admin/items" },
+            { label: item.name },
+          ]}
+        />
         <h2>{item.name}</h2>
         <p style={{ fontFamily: "var(--mono, monospace)", color: "var(--muted)" }}>{item.id}</p>
       </section>
