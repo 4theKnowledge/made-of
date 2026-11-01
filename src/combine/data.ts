@@ -275,6 +275,31 @@ export function ageSets(bundle: ThemeBundle, age: number): AgeSets {
   return { age, recipes, ING, BASE, MID, USE, NEXT };
 }
 
+/** Catalogue every output in the theme, grouped by age (1-based bands,
+ *  stored as 0-based index arrays). Within an age, items appear in recipe
+ *  order and are deduplicated. Returns the groups plus the catalogue number
+ *  for each output (No. 001 is the first thing you could ever make).
+ *
+ *  Mirrors `cbCatalog` in legacy/made-of.html line 3325. */
+export function catalogue(bundle: ThemeBundle): {
+  byAge: string[][];
+  no: Map<string, number>;
+} {
+  const numAges = bundle.theme.ages.length;
+  const byAge: string[][] = Array.from({ length: numAges }, () => []);
+  const seen = new Set<string>();
+  const ordered = [...bundle.recipes].sort((a, b) => a.band - b.band);
+  for (const r of ordered) {
+    if (seen.has(r.out)) continue;
+    seen.add(r.out);
+    byAge[r.band - 1].push(r.out);
+  }
+  const no = new Map<string, number>();
+  let n = 0;
+  for (const list of byAge) for (const id of list) no.set(id, ++n);
+  return { byAge, no };
+}
+
 export function buildAllBundles(
   snapshot: Snapshot,
 ): Record<ThemeKey, ThemeBundle> {

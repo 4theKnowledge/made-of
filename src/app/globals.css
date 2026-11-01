@@ -887,3 +887,57 @@ a.btn.primary{color:var(--bg)}
 .cbfound .ic{width:44px;height:44px}
 .cbfound em{font-style:normal}
 .cbfound .more{flex-basis:100%;font-size:12px;color:var(--muted);font-weight:600}
+
+/* Latent cell states — port the CSS now so the Move/Clear/Hint helpers
+   (Phase 4) only need the behavioural wiring, not more CSS. Prototype
+   lines 1003, 1014–1015, 957, 946–948. */
+.cbc.movable{cursor:pointer;outline:2px dashed var(--accent);outline-offset:-3px}
+.cbc.moving{transform:translateY(-3px) scale(1.04);box-shadow:0 0 0 3px var(--accent),3px 5px 0 var(--pk);z-index:2}
+.cbc.clearable{outline:2px dashed var(--bad);outline-offset:-4px;cursor:pointer}
+.cbc.full.canon{box-shadow:0 0 0 3px var(--accent),2px 2px 0 var(--pk)}
+.cbc.full.hinton{box-shadow:0 0 0 3px var(--accent),2px 2px 0 var(--pk);animation:cbq 1.1s ease-in-out infinite alternate}
+.cbc.mystery{border:2px dashed var(--accent);background:color-mix(in srgb, var(--accent) 16%, var(--surface));animation:cbq 1.1s ease-in-out infinite alternate}
+.cbc .q{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent)}
+@keyframes cbq{to{box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent)}}
+
+/* GameOverCard mini-shelf — prototype line 965 */
+.cbshelf.sum{border:0;justify-content:center;gap:8px;flex-wrap:wrap!important;overflow:visible!important;min-height:0}
+
+/* Theme menu / Sound menu / Collection book — prototype lines
+   1064–1068, 1023–1051 */
+.cbtopt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:10px 12px;border:2px solid var(--ink);border-radius:4px;background:var(--surface);color:var(--ink);font:inherit;cursor:pointer}
+.cbtopt b{font-size:16px}
+.cbtopt span{font-size:13px;color:var(--muted)}
+.cbtopt em{font-style:normal;font-family:var(--mono);font-size:11px}
+.cbtopt.on{background:var(--ink);color:var(--bg)}
+.cbtopt.on span{color:inherit;opacity:.8}
+.cbtopt:disabled{opacity:.5;cursor:default}
+.cbsw.on{background:var(--fN);color:#111417}
+.cbsw.on span{color:#111417}
+
+.cbvol{display:flex;align-items:center;gap:10px;width:100%;font-size:13px;font-weight:700}
+.cbvol input{flex:1;accent-color:var(--ink)}
+
+.cbdaily{border-color:var(--accent)}
+
+.cbbook{max-height:min(640px, calc(100dvh - 28px));overflow:hidden}
+.cbbook .big2{font-family:var(--mono);font-size:30px;line-height:1}
+.cbbook .big2 small{font-size:14px;color:var(--muted)}
+.cbbar{width:100%;height:8px;border:1.5px solid var(--ink);border-radius:5px;overflow:hidden;background:var(--surface);flex:none}
+.cbbar i{display:block;height:100%;background:var(--fN)}
+.cbbookages{width:100%;overflow:auto;display:flex;flex-direction:column;gap:12px;text-align:left;padding:2px}
+.cbbage .bh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+.cbbage .bh b{font-size:14px}
+.cbbage .bh span{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.cbbage .bg{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px}
+.bk{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 2px;border:1.5px solid var(--pk);border-radius:3px;background:var(--fill);color:#111417;font:inherit;font-size:9.5px;font-weight:700;line-height:1.05;text-align:center;cursor:pointer;min-width:0;position:relative}
+.bk .ic{width:28px;height:28px;border:0;background:transparent}
+.bk .ic svg{width:100%;height:100%}
+.bk span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.bk.unk{border-style:dashed;border-color:color-mix(in srgb, var(--ink) 30%, transparent);background:transparent;color:var(--muted);cursor:default}
+.bk.unk .ic{opacity:.22;filter:brightness(0)}
+:root[data-theme="dark"] .bk.unk .ic{filter:brightness(0) invert(1)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .bk.unk .ic{filter:brightness(0) invert(1)} }
+.bk .no{position:absolute;top:2px;left:3px;font-style:normal;font-family:var(--mono);font-size:7.5px;font-weight:600;opacity:.65}
+.bk small{font-family:var(--mono);font-size:8px;font-weight:600;opacity:.7;line-height:1}
+.bk.unk .no{opacity:.5}

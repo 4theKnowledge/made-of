@@ -3,11 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
+import { catalogue } from "@/combine/data";
 import { newGame, reduce } from "@/combine/engine";
 import type { Action, Event, GameState } from "@/combine/engine";
 import { matchAt, matchOn } from "@/combine/match";
 import { hydrateBundle, type SerialisedBundle } from "@/combine/serialise";
-import type { CombineItem, CombineRecipe, ThemeBundle } from "@/combine/types";
+import type {
+  CombineItem,
+  CombineRecipe,
+  ThemeBundle,
+  ThemeKey,
+} from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 
 /** Per-cell preview when a tray tile is selected. Mirrors cbPreview from
@@ -116,6 +122,9 @@ export function CombineBoard({ bundle: serialised }: Props) {
     overOk: boolean;
   } | null>(null);
   const [infoTile, setInfoTile] = useState<string | null>(null);
+  const [themeOpen, setThemeOpen] = useState(false);
+  const [bookOpen, setBookOpen] = useState(false);
+  const [soundOpen, setSoundOpen] = useState(false);
   // Pending clears so overlapping actions don't orphan timers.
   const timers = useRef<number[]>([]);
   useEffect(() => () => {
@@ -223,6 +232,51 @@ export function CombineBoard({ bundle: serialised }: Props) {
     }
     setSelectedSlot((s) => (s === slot ? null : slot));
   }, []);
+
+  // Close the helpers menu on any click outside it (except on the Helpers
+  // button itself, which toggles it).
+  useEffect(() => {
+    if (!helpersOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest(".cbhelpmenu")) return;
+      if (target.closest("#cbHelp")) return;
+      setHelpersOpen(false);
+    };
+    window.addEventListener("click", onDocClick);
+    return () => window.removeEventListener("click", onDocClick);
+  }, [helpersOpen]);
+
+  // Escape closes the top overlay in prototype order: info card, discovery
+  // toast, age toast, helpers menu, selected tray tile. Doesn't dismiss the
+  // choice picker (the engine is paused and needs a decision).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (infoTile) {
+        setInfoTile(null);
+        return;
+      }
+      if (discovery) {
+        setDiscovery(null);
+        return;
+      }
+      if (ageToast) {
+        setAgeToast(null);
+        return;
+      }
+      if (helpersOpen) {
+        setHelpersOpen(false);
+        return;
+      }
+      if (selectedSlot != null) {
+        setSelectedSlot(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [infoTile, discovery, ageToast, helpersOpen, selectedSlot]);
 
   // Drag state is held in a ref for the hot path (pointermove), mirrored
   // to React state only when the over-cell changes so cells can light up.
@@ -404,13 +458,19 @@ export function CombineBoard({ bundle: serialised }: Props) {
           helpersOpen={helpersOpen}
           onToggleHelpers={() => setHelpersOpen((o) => !o)}
           onHelper={onHelper}
+          onTheme={() => setThemeOpen(true)}
         />
         <TipLine
           state={state}
           selectedSlot={selectedSlot}
           preview={preview}
         />
-        <AgeBar state={state} bundle={bundle} />
+        <AgeBar
+          state={state}
+          bundle={bundle}
+          onBook={() => setBookOpen(true)}
+          onSound={() => setSoundOpen(true)}
+        />
         <Shelf
           state={state}
           bundle={bundle}
@@ -420,8 +480,17 @@ export function CombineBoard({ bundle: serialised }: Props) {
         <Board
           state={state}
           bundle={bundle}
-          selectedSlot={selectedSlot}
-          fx={fx}
+          fx={
+            state.choosing
+              ? {
+                  ...fx,
+                  fuse: new Set([
+                    ...(fx.fuse ?? []),
+                    ...state.choosing.cells,
+                  ]),
+                }
+              : fx
+          }
           preview={preview}
           dragOver={drag ? { cell: drag.overCell, ok: drag.overOk } : null}
           onCellTap={onCellTap}
@@ -486,6 +555,45 @@ export function CombineBoard({ bundle: serialised }: Props) {
             state={state}
             onDismiss={() => setInfoTile(null)}
           />
+        )}
+        {themeOpen && (
+          <ThemeMenu
+            bundle={bundle}
+            daily={state.daily}
+            onPick={(which) => {
+              setThemeOpen(false);
+              if (which === state.theme && !state.daily) return;
+              // Switching restarts the game under the chosen theme.
+              const nextBundle =
+                which === state.theme
+                  ? bundle
+                  : // When Everything is picked we still only have Everyday
+                    // bundle on the client. Phase 5 ships both bundles over
+                    // the wire; for now ignore.
+                    bundle;
+              const next = newGame(which, nextBundle, {
+                seed: (Math.random() * 4294967296) | 0,
+                size: state.n,
+              }).state;
+              setState(next);
+              setFx({});
+              setDiscovery(null);
+              setAgeToast(null);
+              setInfoTile(null);
+            }}
+            onDismiss={() => setThemeOpen(false)}
+          />
+        )}
+        {bookOpen && (
+          <CollectionBook
+            bundle={bundle}
+            state={state}
+            onInfo={(id) => setInfoTile(id)}
+            onDismiss={() => setBookOpen(false)}
+          />
+        )}
+        {soundOpen && (
+          <SoundMenu onDismiss={() => setSoundOpen(false)} />
         )}
       </div>
       {drag && drag.slot != null && state.tray[drag.slot] != null && (
@@ -654,14 +762,31 @@ function GameOverCard({
 }) {
   const ages = bundle.theme.ages;
   const ageName = ages[state.age];
+  // Best score is a Phase 5 persistence concern; for now compare against
+  // this session only, which is always == score, so just show the current.
+  const best = state.score;
+  const newBest = state.newBest;
+  // Mini-shelf: group by output.
+  const shelfCounts = new Map<string, number>();
+  for (const id of state.shelf) {
+    shelfCounts.set(id, (shelfCounts.get(id) ?? 0) + 1);
+  }
+  const themeDiscovered = state.found.filter((x) =>
+    bundle.outputs.has(x),
+  ).length;
+  const totalOutputs = bundle.outputs.size;
   return (
     <>
       <div className="cbscrim" />
       <section className="cbover" role="dialog" aria-label="Run over">
-        <span className="k">Board full</span>
+        <span className="k">{state.daily ? `Daily game · ${state.daily}` : "Board full"}</span>
         <b className="big">{state.score.toLocaleString("en")}</b>
         <span className="sub">
-          You reached the {ageName.toLowerCase()} age.
+          {newBest
+            ? "A new best!"
+            : best > state.score
+              ? `Your best is ${best.toLocaleString("en")}. ${(best - state.score).toLocaleString("en")} to go.`
+              : `You reached the ${ageName.toLowerCase()} age.`}
         </span>
         <div className="cb3">
           <div>
@@ -677,6 +802,30 @@ function GameOverCard({
             <span>new discoveries</span>
           </div>
         </div>
+        {state.shelf.length > 0 && (
+          <div className="cbshelf sum">
+            {[...shelfCounts.entries()].map(([id, n]) => {
+              const it = bundle.items.get(id);
+              if (!it) return null;
+              return (
+                <span
+                  key={id}
+                  className="cbslot"
+                  style={fillVar(it)}
+                  title={cap(it.name)}
+                >
+                  <Pictogram
+                    name={it.name}
+                    tier={it.tier}
+                    kind={it.kind}
+                    symbol={it.symbol}
+                  />
+                  {n > 1 && <b>{n}</b>}
+                </span>
+              );
+            })}
+          </div>
+        )}
         {state.found.length > 0 && (
           <>
             <p className="sub" style={{ marginTop: 4 }}>
@@ -706,11 +855,274 @@ function GameOverCard({
             </div>
           </>
         )}
+        <p className="sub">
+          {themeDiscovered} of {totalOutputs} things discovered in{" "}
+          {bundle.theme.name} so far.
+        </p>
         <div className="row2">
           <button type="button" className="cbh" onClick={onPlayAgain}>
             Play again
           </button>
         </div>
+      </section>
+    </>
+  );
+}
+
+/* ---------- Theme menu ---------- */
+
+function ThemeMenu({
+  bundle,
+  daily,
+  onPick,
+  onDismiss,
+}: {
+  bundle: ThemeBundle;
+  daily: string | null;
+  onPick: (which: ThemeKey) => void;
+  onDismiss: () => void;
+}) {
+  // Phase 3 ships only the Everyday bundle, so the Everything option is
+  // present but disabled with a note. Phase 5 ships both.
+  const current = bundle.theme.k;
+  const everydayCount = bundle.outputs.size;
+  return (
+    <>
+      <div className="cbscrim" onClick={onDismiss} />
+      <section
+        className="cbover cbthemes"
+        role="dialog"
+        aria-label="Choose a theme"
+      >
+        <span className="k">Today</span>
+        <button
+          type="button"
+          className={`cbtopt cbdaily${daily ? " on" : ""}`}
+          disabled
+        >
+          <b>Daily game</b>
+          <span>
+            Same start and same tiles for everyone today. One go. Everyday
+            theme, 5×5.
+          </span>
+          <em>Coming soon</em>
+        </button>
+        <span className="k">Endless</span>
+        <button
+          type="button"
+          className={`cbtopt${current === "everyday" && !daily ? " on" : ""}`}
+          onClick={() => onPick("everyday")}
+        >
+          <b>Everyday</b>
+          <span>
+            Food, drink, clothes, toys and things around the house.
+          </span>
+          <em>{everydayCount} things to make</em>
+        </button>
+        <button
+          type="button"
+          className={`cbtopt${current === "everything" && !daily ? " on" : ""}`}
+          disabled
+        >
+          <b>Everything</b>
+          <span>
+            The whole map: atoms, stars, life, food, factories, machines.
+          </span>
+          <em>Available with the daily release</em>
+        </button>
+        <p className="sub">
+          Games are saved as you go. Switching picks up where you left off.
+        </p>
+        <button
+          type="button"
+          className="cbh"
+          onClick={onDismiss}
+          style={{
+            width: "100%",
+            justifyContent: "center",
+          }}
+        >
+          Cancel
+        </button>
+      </section>
+    </>
+  );
+}
+
+/* ---------- Sound menu ---------- */
+
+function SoundMenu({ onDismiss }: { onDismiss: () => void }) {
+  // Phase 3 ships no actual audio engine; this menu holds the three
+  // settings in local state so controls feel real. Phase 6 wires them up.
+  const [music, setMusic] = useState<"piano" | "handpan" | "off">("off");
+  const [sfx, setSfx] = useState(false);
+  const [vol, setVol] = useState(80);
+  const tracks: Array<["piano" | "handpan" | "off", string, string]> = [
+    ["piano", "Calm piano", "Slow, soft and roomy"],
+    ["handpan", "Handpan", "Gentle and a bit busier"],
+    ["off", "No music", ""],
+  ];
+  return (
+    <>
+      <div className="cbscrim" onClick={onDismiss} />
+      <section
+        className="cbover cbsoundm"
+        role="dialog"
+        aria-label="Music and sound"
+      >
+        <span className="k">Music</span>
+        {tracks.map(([k, n, d]) => (
+          <button
+            key={k}
+            type="button"
+            className={`cbtopt${music === k ? " on" : ""}`}
+            onClick={() => setMusic(k)}
+          >
+            <b>{n}</b>
+            {d && <span>{d}</span>}
+          </button>
+        ))}
+        <span className="k">Sound</span>
+        <button
+          type="button"
+          className={`cbtopt cbsw${sfx ? " on" : ""}`}
+          role="switch"
+          aria-checked={sfx}
+          onClick={() => setSfx((s) => !s)}
+        >
+          <b>Sound effects</b>
+          <span>{sfx ? "On" : "Off"}</span>
+        </button>
+        <label className="cbvol">
+          <span>Volume</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={vol}
+            onChange={(e) => setVol(Number(e.currentTarget.value))}
+            aria-label="Volume"
+          />
+        </label>
+        <button
+          type="button"
+          className="cbh"
+          onClick={onDismiss}
+          style={{ width: "100%", justifyContent: "center" }}
+        >
+          Done
+        </button>
+      </section>
+    </>
+  );
+}
+
+/* ---------- Collection book ---------- */
+
+function CollectionBook({
+  bundle,
+  state,
+  onInfo,
+  onDismiss,
+}: {
+  bundle: ThemeBundle;
+  state: GameState;
+  onInfo: (id: string) => void;
+  onDismiss: () => void;
+}) {
+  const cat = useMemo(() => catalogue(bundle), [bundle]);
+  const total = bundle.outputs.size;
+  const got = state.found.filter((x) => bundle.outputs.has(x)).length;
+  const pct = Math.round((100 * got) / Math.max(1, total));
+  return (
+    <>
+      <div className="cbscrim" onClick={onDismiss} />
+      <section
+        className="cbover cbbook"
+        role="dialog"
+        aria-label="Collection"
+      >
+        <span className="k">Collection · {bundle.theme.name}</span>
+        <b className="big2">
+          {got} <small>of {total}</small>
+        </b>
+        <div className="cbbar">
+          <i style={{ width: `${pct}%` }} />
+        </div>
+        <div className="cbbookages">
+          {cat.byAge.map((list, k) => {
+            const ageGot = list.filter((x) => state.found.includes(x))
+              .length;
+            return (
+              <div key={k} className="cbbage">
+                <div className="bh">
+                  <b>{bundle.theme.ages[k]}</b>
+                  <span>
+                    {ageGot}/{list.length}
+                  </span>
+                </div>
+                <div className="bg">
+                  {list.map((id) => {
+                    const it = bundle.items.get(id);
+                    if (!it) return null;
+                    const found = state.found.includes(id);
+                    const no = String(cat.no.get(id)).padStart(3, "0");
+                    if (!found) {
+                      return (
+                        <span
+                          key={id}
+                          className="bk unk"
+                          aria-label={`No. ${no}, not found yet`}
+                        >
+                          <i className="no">{no}</i>
+                          <Pictogram
+                            name={it.name}
+                            tier={it.tier}
+                            kind={it.kind}
+                            symbol={it.symbol}
+                          />
+                          <span>?</span>
+                          <small>&nbsp;</small>
+                        </span>
+                      );
+                    }
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        className="bk"
+                        style={fillVar(it)}
+                        onClick={() => {
+                          onInfo(id);
+                          onDismiss();
+                        }}
+                        title={cap(it.name)}
+                      >
+                        <i className="no">{no}</i>
+                        <Pictogram
+                          name={it.name}
+                          tier={it.tier}
+                          kind={it.kind}
+                          symbol={it.symbol}
+                        />
+                        <span>{cap(it.name)}</span>
+                        <small>early find</small>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          className="cbh"
+          onClick={onDismiss}
+          style={{ width: "100%", justifyContent: "center", flex: "none" }}
+        >
+          Back to the game
+        </button>
       </section>
     </>
   );
@@ -822,12 +1234,14 @@ function TopBar({
   helpersOpen,
   onToggleHelpers,
   onHelper,
+  onTheme,
 }: {
   state: GameState;
   fx: Fx;
   helpersOpen: boolean;
   onToggleHelpers: () => void;
   onHelper: (which: "hint" | "swap" | "clear" | "move") => void;
+  onTheme: () => void;
 }) {
   const helpersLeft = state.swaps + state.clears + state.hints + state.mv;
   const themeName = state.daily ? "Daily" : state.theme === "everyday" ? "Everyday" : "Everything";
@@ -851,7 +1265,7 @@ function TopBar({
         className="cbh cbtheme"
         type="button"
         aria-label={`Theme: ${themeName}. Change theme`}
-        disabled
+        onClick={onTheme}
       >
         <span>{themeName}</span>
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -986,7 +1400,17 @@ function TipLine({
   );
 }
 
-function AgeBar({ state, bundle }: { state: GameState; bundle: ThemeBundle }) {
+function AgeBar({
+  state,
+  bundle,
+  onBook,
+  onSound,
+}: {
+  state: GameState;
+  bundle: ThemeBundle;
+  onBook: () => void;
+  onSound: () => void;
+}) {
   const ages = bundle.theme.ages;
   const last = state.age >= ages.length - 1;
   const need = 6 + 2 * state.age;
@@ -1011,7 +1435,7 @@ function AgeBar({ state, bundle }: { state: GameState; bundle: ThemeBundle }) {
         className="cbsnd"
         aria-label="Collection"
         title="Collection"
-        disabled
+        onClick={onBook}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4 5c3-1 6-1 8 1v14c-2-2-5-2-8-1zM20 5c-3-1-6-1-8 1v14c2-2 5-2 8-1z" />
@@ -1022,7 +1446,7 @@ function AgeBar({ state, bundle }: { state: GameState; bundle: ThemeBundle }) {
         className="cbsnd"
         aria-label="Music and sound settings"
         title="Music and sound"
-        disabled
+        onClick={onSound}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4 9h4l5-4v14l-5-4H4z" />
@@ -1092,7 +1516,6 @@ function Shelf({
 function Board({
   state,
   bundle,
-  selectedSlot,
   fx,
   preview,
   dragOver,
@@ -1100,7 +1523,6 @@ function Board({
 }: {
   state: GameState;
   bundle: ThemeBundle;
-  selectedSlot: number | null;
   fx: Fx;
   preview: Map<number, Preview>;
   dragOver: { cell: number | null; ok: boolean } | null;
@@ -1129,7 +1551,6 @@ function Board({
             cell={i}
             id={v}
             bundle={bundle}
-            selectedSlot={selectedSlot}
             crumbleTick={crumbleTick}
             fx={fx}
             preview={preview.get(i)}
@@ -1148,7 +1569,6 @@ function Cell({
   cell,
   id,
   bundle,
-  selectedSlot,
   crumbleTick,
   fx,
   preview,
@@ -1158,7 +1578,6 @@ function Cell({
   cell: number;
   id: string | null;
   bundle: ThemeBundle;
-  selectedSlot: number | null;
   crumbleTick: number;
   fx: Fx;
   preview: Preview | undefined;
@@ -1216,7 +1635,6 @@ function Cell({
       style={item ? fillVar(item) : undefined}
       onClick={onTap}
       aria-label={ariaLabel}
-      disabled={empty && selectedSlot == null}
     >
       {item && (
         <>
@@ -1294,6 +1712,7 @@ function Tray({
             key={slot}
             type="button"
             className={classes.join(" ")}
+            data-cbp={slot}
             style={fillVar(item)}
             onPointerDown={(e) => onSlotPointerDown(slot, e)}
             onClick={() => onSlotTap(slot)}
@@ -1301,7 +1720,7 @@ function Tray({
             aria-label={`Tray slot ${slot + 1}: ${cap(item.name)}${selected === slot ? ", selected" : ""}`}
             aria-pressed={selected === slot}
           >
-            {isTool && <span className="tool">Tool</span>}
+            {isTool && <span className="tool">tool</span>}
             <Pictogram
               name={item.name}
               tier={item.tier}
