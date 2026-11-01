@@ -7,10 +7,7 @@
  *      predates the data module which filters them out at parse time).
  *
  * Any of those conditions means the DB has drifted from the source of
- * truth at src/data/items.data.ts and the game won't behave right — in
- * particular, the Combine Everyday bundle depends on the combine-everyday
- * tag being present on items, and will produce a blank board + empty tray
- * if no item carries it.
+ * truth at src/data/items.data.ts and the game won't behave right.
  *
  * The seed itself is idempotent on its own transaction (delete + bulk
  * insert), so running it again is safe.

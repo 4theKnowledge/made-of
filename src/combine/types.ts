@@ -5,7 +5,7 @@
 
 import type { ItemKind, Tier } from "../db/schema";
 
-export type ThemeKey = "everyday" | "everything";
+export type ThemeKey = "everything";
 
 export interface ThemeMeta {
   k: ThemeKey;
@@ -43,7 +43,7 @@ export interface CombineItem {
   kind: ItemKind;
   /** The item's first `f` recipe parts (ids), straight from the knowledge
    *  base. Shown by the detail card when the gameplay bundle has filtered
-   *  the recipe out — e.g. water's hydrogen+oxygen in the Everyday theme. */
+   *  the recipe out. */
   lore?: string[];
 }
 

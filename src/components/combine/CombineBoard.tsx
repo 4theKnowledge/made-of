@@ -119,7 +119,6 @@ interface Fx {
 
 interface Props {
   bundles: {
-    everyday: SerialisedBundle;
     everything: SerialisedBundle;
   };
 }
@@ -128,19 +127,18 @@ interface Props {
 export function CombineBoard({ bundles: serialised }: Props) {
   const bundles = useMemo<Record<ThemeKey, ThemeBundle>>(
     () => ({
-      everyday: hydrateBundle(serialised.everyday),
       everything: hydrateBundle(serialised.everything),
     }),
     [serialised],
   );
   // The initial render must be deterministic across SSR and the first
   // client paint — read nothing that depends on window/localStorage here.
-  // A deterministic Everyday 6×6 seed=42 game is used as the hydration
-  // target; after mount we may replace it with a saved game or kick off
-  // a daily, both of which happen in an effect below.
+  // A deterministic 6×6 seed=42 game is used as the hydration target;
+  // after mount we may replace it with a saved game or kick off a daily,
+  // both of which happen in an effect below.
   const initial = useMemo(
-    () => newGame("everyday", bundles.everyday, { seed: 42, size: 6 }).state,
-    [bundles.everyday],
+    () => newGame("everything", bundles.everything, { seed: 42, size: 6 }).state,
+    [bundles.everything],
   );
 
   const [state, setState] = useState<GameState>(initial);
@@ -158,7 +156,6 @@ export function CombineBoard({ bundles: serialised }: Props) {
   // Per-theme best scores + today's daily result. Loaded in an effect so
   // SSR/hydration stay deterministic.
   const [best, setBest] = useState<Record<ThemeKey, number>>({
-    everyday: 0,
     everything: 0,
   });
   const [dailyDone, setDailyDone] = useState<DailyResult | null>(null);
@@ -171,22 +168,14 @@ export function CombineBoard({ bundles: serialised }: Props) {
     if (didResume.current) return;
     didResume.current = true;
     setBest({
-      everyday: loadBest("everyday"),
       everything: loadBest("everything"),
     });
     setDailyDone(loadDailyDone(todayKey()));
-    // Try to resume either theme's endless save (we only have the single
-    // ENDLESS slot, so whichever theme's save is there takes precedence).
-    const everydaySave = loadGame(bundles.everyday, { daily: null });
-    if (everydaySave) {
-      setState(hydrateGame(everydaySave));
-      return;
-    }
     const everythingSave = loadGame(bundles.everything, { daily: null });
     if (everythingSave) {
       setState(hydrateGame(everythingSave));
     }
-  }, [bundles.everyday, bundles.everything]);
+  }, [bundles.everything]);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [helpersOpen, setHelpersOpen] = useState(false);
   // Clear-mode: next tap on a full cell removes that tile.
@@ -280,6 +269,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
   const [bookOpen, setBookOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [agesOpen, setAgesOpen] = useState(false);
   // Pending clears so overlapping actions don't orphan timers.
   const timers = useRef<number[]>([]);
   useEffect(() => () => {
@@ -420,8 +410,6 @@ export function CombineBoard({ bundles: serialised }: Props) {
       }
       if (latestAgeUp) {
         setAgeToast(latestAgeUp);
-        const id = window.setTimeout(() => setAgeToast(null), 4200);
-        timers.current.push(id);
       }
 
       if (Object.keys(immediate).length) {
@@ -562,14 +550,14 @@ export function CombineBoard({ bundles: serialised }: Props) {
   const startDaily = useCallback(() => {
     const day = todayKey();
     // Resume today's daily save if any, otherwise start a fresh daily.
-    const saved = loadGame(bundles.everyday, { daily: day });
+    const saved = loadGame(bundles.everything, { daily: day });
     if (saved) {
       saveGame(state);
       setState(hydrateGame(saved));
     } else {
       saveGame(state);
       setState(
-        newGame("everyday", bundles.everyday, {
+        newGame("everything", bundles.everything, {
           daily: day,
           size: 5,
           seed: dailySeed(day),
@@ -585,8 +573,8 @@ export function CombineBoard({ bundles: serialised }: Props) {
     // Rebuild a share text from the stored result.
     const text =
       `Made Of · Daily Combine ${dr.key}\n` +
-      // One square per Everyday age, green up to the age reached.
-      Array.from({ length: bundles.everyday.theme.ages.length }, (_, k) =>
+      // One square per age, green up to the age reached.
+      Array.from({ length: bundles.everything.theme.ages.length }, (_, k) =>
         k <= dr.age ? "🟩" : "⬜",
       ).join("") +
       ` reached ${dr.ageName}\n` +
@@ -595,7 +583,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
       }\n` +
       "https://madeof.app/combine";
     await shareText(text);
-  }, [dailyDone, bundles.everyday]);
+  }, [dailyDone, bundles.everything]);
 
   const onCellTap = useCallback(
     (cell: number) => {
@@ -1002,6 +990,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
           onBook={() => setBookOpen(true)}
           onSound={() => setSoundOpen(true)}
           onHelp={() => setHelpOpen(true)}
+          onAges={() => setAgesOpen(true)}
         />
         <Shelf
           state={state}
@@ -1051,8 +1040,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
             best={best[state.theme] ?? 0}
             onPlayAgain={() => {
               // From a finished daily, "Play endless" starts a fresh
-              // endless Everyday game. From endless, start another endless
-              // in the same theme.
+              // endless game. From endless, start another endless.
               const nextTheme = state.theme;
               const nextDaily = null;
               const size =
@@ -1134,6 +1122,13 @@ export function CombineBoard({ bundles: serialised }: Props) {
             authPending={collectionPending}
             onInfo={(id) => setInfoTile(id)}
             onDismiss={() => setBookOpen(false)}
+          />
+        )}
+        {agesOpen && (
+          <AgesSheet
+            state={state}
+            bundle={bundle}
+            onDismiss={() => setAgesOpen(false)}
           />
         )}
         {soundOpen && (
@@ -1250,9 +1245,9 @@ function DetailCard({
 }) {
   const item = bundle.items.get(tileId);
   if (!item) return null;
-  // Prefer the gameplay recipe. If the theme filtered it out (e.g. water
-  // in Everyday — H and O aren't everyday-tagged), fall back to the item's
-  // knowledge-base lore so the card still reads "hydrogen + oxygen = water".
+  // Prefer the gameplay recipe. If the theme filtered it out, fall back to
+  // the item's knowledge-base lore so the card still reads
+  // "hydrogen + oxygen = water".
   const bundleRecipe = bundle.recipes.find((r) => r.out === tileId);
   const madeFrom: { all: string[] } | null =
     bundleRecipe ?? (item.lore ? { all: item.lore } : null);
@@ -1520,8 +1515,7 @@ function ThemeMenu({
           >
             <b>Daily game{daily ? " · playing" : ""}</b>
             <span>
-              Same start and same tiles for everyone today. One go. Everyday
-              theme, 5×5.
+              Same start and same tiles for everyone today. One go. 5×5.
             </span>
           </button>
         )}
@@ -1981,7 +1975,7 @@ function TopBar({
   onTheme: () => void;
 }) {
   const helpersLeft = state.swaps + state.clears + state.hints + state.mv;
-  const themeName = state.daily ? "Daily" : state.theme === "everyday" ? "Everyday" : "Everything";
+  const themeName = state.daily ? "Daily" : "Everything";
   const bestDisplay = Math.max(best, state.over ? state.score : 0);
   const modeActive = clearMode || moveMode;
   return (
@@ -2168,6 +2162,7 @@ function AgeBar({
   onBook,
   onSound,
   onHelp,
+  onAges,
 }: {
   state: GameState;
   bundle: ThemeBundle;
@@ -2175,6 +2170,7 @@ function AgeBar({
   onBook: () => void;
   onSound: () => void;
   onHelp: () => void;
+  onAges: () => void;
 }) {
   const ages = bundle.theme.ages;
   const last = state.age >= ages.length - 1;
@@ -2182,19 +2178,25 @@ function AgeBar({
   const pct = last ? 100 : Math.min(100, Math.round((state.ageMade / need) * 100));
   const ariaLabel = `Age ${state.age + 1} of ${ages.length}: ${ages[state.age]}${
     last ? "" : `. Make ${need - state.ageMade} more to reach ${ages[state.age + 1]}`
-  }`;
+  }. Tap for details.`;
   return (
-    <div className="cbage" aria-label={ariaLabel}>
-      <span className="an">
-        <em>Age {state.age + 1}</em>
-        <b>{ages[state.age]}</b>
-      </span>
-      <span className="bar">
-        <i style={{ width: `${pct}%` }} />
-      </span>
-      <span className="nx">
-        {last ? "Final age" : `${state.ageMade}/${need} → ${ages[state.age + 1]}`}
-      </span>
+    <div className="cbage">
+      <button
+        type="button"
+        className="cbageinfo"
+        aria-label={ariaLabel}
+        onClick={onAges}
+      >
+        <span className="an">
+          <b>{ages[state.age]}</b>
+        </span>
+        <span className="bar">
+          <i style={{ width: `${pct}%` }} />
+        </span>
+        <span className="nx">
+          {last ? "Final age" : `${state.ageMade}/${need} → ${ages[state.age + 1]}`}
+        </span>
+      </button>
       <button
         type="button"
         className="cbsnd"
@@ -2236,6 +2238,80 @@ function AgeBar({
         </svg>
       </button>
     </div>
+  );
+}
+
+function AgesSheet({
+  state,
+  bundle,
+  onDismiss,
+}: {
+  state: GameState;
+  bundle: ThemeBundle;
+  onDismiss: () => void;
+}) {
+  const ages = bundle.theme.ages;
+  const current = state.age;
+  const last = current >= ages.length - 1;
+  const need = 6 + 2 * current;
+  const left = Math.max(0, need - state.ageMade);
+  return (
+    <>
+      <div className="cbscrim" onClick={onDismiss} />
+      <section
+        className="cbover cbagesheet"
+        role="dialog"
+        aria-label="Ages"
+      >
+        <span className="k">Ages</span>
+        <h3>
+          Age {current + 1}: {ages[current]}
+        </h3>
+        <p>
+          {last
+            ? "Final age. Keep combining to push your score higher."
+            : `Make ${left} more thing${left === 1 ? "" : "s"} from this age or later to reach ${ages[current + 1]}.`}
+        </p>
+        <ol className="cbagelist">
+          {ages.map((name, i) => {
+            const isNow = i === current;
+            const isPast = i < current;
+            const metaNeed = 6 + 2 * i;
+            const meta = isNow
+              ? last
+                ? "Final"
+                : `${state.ageMade}/${metaNeed}`
+              : isPast
+                ? "Done"
+                : `Needs ${metaNeed}`;
+            return (
+              <li
+                key={name}
+                className={`cbagerow${isNow ? " on" : ""}${isPast ? " past" : ""}`}
+              >
+                <span className="cbageno">{i + 1}</span>
+                <b>{name}</b>
+                <span className="cbagemeta">{meta}</span>
+              </li>
+            );
+          })}
+        </ol>
+        <p>
+          Each combine fills the bar. New ages unlock new recipes. Tiles
+          that nothing in the current age needs start to crumble — a red
+          number counts down from 3, and on the 4th turn they fall off the
+          board.
+        </p>
+        <button
+          type="button"
+          className="cbh"
+          onClick={onDismiss}
+          style={{ width: "100%", justifyContent: "center" }}
+        >
+          Done
+        </button>
+      </section>
+    </>
   );
 }
 

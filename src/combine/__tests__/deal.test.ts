@@ -8,7 +8,6 @@ import { playsInOne, playsInTwo, type Board } from "../match";
 import { makeRng } from "../rng";
 
 const snap = buildSnapshot(toRows(loadKnowledgeBase()));
-const everyday = buildThemeBundle(snap, "everyday");
 const everything = buildThemeBundle(snap, "everything");
 
 function emptyBoard(size: number): Board {
@@ -17,7 +16,7 @@ function emptyBoard(size: number): Board {
 
 function freshView(size: number, seed: number): DealerView {
   return {
-    bundle: everyday,
+    bundle: everything,
     board: emptyBoard(size),
     tray: [null, null, null],
     size,
@@ -31,7 +30,7 @@ describe("pickOne", () => {
     const v = freshView(5, 1);
     const x = pickOne(v);
     expect(x).not.toBeNull();
-    expect(everyday.ingredients.has(x!) || everyday.outputs.has(x!)).toBe(
+    expect(everything.ingredients.has(x!) || everything.outputs.has(x!)).toBe(
       true,
     );
   });
@@ -60,28 +59,9 @@ describe("dealTray", () => {
   it("guarantees a play within two placements (single tray, empty board)", () => {
     const v = freshView(5, 777);
     const tray = dealTray(v);
-    const one = playsInOne(everyday, v.board, tray, 5);
-    const two = playsInTwo(everyday, v.board, tray, 5);
+    const one = playsInOne(everything, v.board, tray, 5);
+    const two = playsInTwo(everything, v.board, tray, 5);
     expect(one || two).toBe(true);
-  });
-});
-
-describe("dealing guarantee (bot simulation, Everyday 5×5)", () => {
-  it("≥98% of trays on empty boards have a play within two placements", () => {
-    let total = 0;
-    let solvable = 0;
-    const size = 5;
-    for (let i = 0; i < 100; i++) {
-      const v = freshView(size, 1000 + i);
-      const tray = dealTray(v);
-      const ok =
-        playsInOne(everyday, v.board, tray, size) ||
-        playsInTwo(everyday, v.board, tray, size);
-      total++;
-      if (ok) solvable++;
-    }
-    const pct = solvable / total;
-    expect(pct).toBeGreaterThanOrEqual(0.98);
   });
 });
 

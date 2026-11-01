@@ -19,7 +19,7 @@ export type CombineRunResult = {
 };
 
 export type CombineRun = {
-  ref: string;           // theme key: "everyday" | "everything"
+  ref: string;           // theme key: "everything"
   createdAt: Date;
   result: CombineRunResult;
 };

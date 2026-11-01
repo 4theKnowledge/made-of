@@ -7,7 +7,7 @@ import { newGame, reduce, type Action, type GameState } from "../engine";
 import type { CombineRecipe, ThemeBundle } from "../types";
 
 const snap = buildSnapshot(toRows(loadKnowledgeBase()));
-const everyday = buildThemeBundle(snap, "everyday");
+const everything = buildThemeBundle(snap, "everything");
 
 /* Hand-rolled bundle used by the unit tests that need exact shapes. */
 function fakeBundle(opts: {
@@ -95,7 +95,7 @@ const R = (out: string, all: string[]): CombineRecipe => ({
 
 describe("newGame", () => {
   it("fills the tray and seeds a few starting tiles", () => {
-    const { state, events } = newGame("everyday", everyday, { seed: 1, size: 5 });
+    const { state, events } = newGame("everything", everything, { seed: 1, size: 5 });
     expect(state.tray.filter((t) => t != null).length).toBe(3);
     expect(state.board.filter(Boolean).length).toBeGreaterThan(0);
     expect(state.score).toBe(0);
@@ -104,15 +104,15 @@ describe("newGame", () => {
   });
 
   it("is deterministic for a given seed", () => {
-    const a = newGame("everyday", everyday, { seed: 42, size: 5 });
-    const b = newGame("everyday", everyday, { seed: 42, size: 5 });
+    const a = newGame("everything", everything, { seed: 42, size: 5 });
+    const b = newGame("everything", everything, { seed: 42, size: 5 });
     expect(a.state.board).toEqual(b.state.board);
     expect(a.state.tray).toEqual(b.state.tray);
   });
 
   it("daily seed → identical start for everyone", () => {
-    const a = newGame("everyday", everyday, { daily: "2026-11-01" });
-    const b = newGame("everyday", everyday, { daily: "2026-11-01" });
+    const a = newGame("everything", everything, { daily: "2026-11-01" });
+    const b = newGame("everything", everything, { daily: "2026-11-01" });
     expect(a.state.board).toEqual(b.state.board);
     expect(a.state.tray).toEqual(b.state.tray);
     expect(a.state.n).toBe(5);
@@ -321,11 +321,11 @@ describe("helpers (swap, clear, move)", () => {
   const bundle = fakeBundle({ recipes: [R("dough", ["flour", "water"])] });
 
   it("swap replaces the tray and decrements the count", () => {
-    // Swap on the real Everyday bundle so there are enough recipes for the
+    // Swap on the real Everything bundle so there are enough recipes for the
     // dealer to populate three slots.
-    const s0 = newGame("everyday", everyday, { seed: 2, size: 5 }).state;
+    const s0 = newGame("everything", everything, { seed: 2, size: 5 }).state;
     const beforeSwaps = s0.swaps;
-    const { state } = reduce(s0, everyday, { type: "swap" });
+    const { state } = reduce(s0, everything, { type: "swap" });
     expect(state.swaps).toBe(beforeSwaps - 1);
     expect(state.tray.filter((t) => t != null).length).toBeGreaterThan(0);
   });

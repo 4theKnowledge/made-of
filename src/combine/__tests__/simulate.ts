@@ -5,7 +5,7 @@
  *
  *   npx tsx src/combine/__tests__/simulate.ts [theme] [games]
  *
- * Defaults: theme=everyday, games=50.
+ * Defaults: theme=everything, games=50.
  */
 
 import { loadKnowledgeBase } from "../../data/load";
@@ -407,7 +407,7 @@ function catalogueInfo(bundle: ThemeBundle) {
 }
 
 async function main() {
-  const theme = (process.argv[2] as ThemeKey) || "everyday";
+  const theme = (process.argv[2] as ThemeKey) || "everything";
   const nGames = parseInt(process.argv[3] ?? "", 10) || 50;
 
   const kb = loadKnowledgeBase();

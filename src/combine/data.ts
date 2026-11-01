@@ -8,7 +8,7 @@
 
 import type { Snapshot } from "../graph/snapshot";
 import type { GraphNode } from "../graph/types";
-import { THEMES, isCombineExcluded, isEveryday } from "./filters";
+import { THEMES, isCombineExcluded } from "./filters";
 import { computeRefine } from "./levels";
 import type {
   AgeSets,
@@ -37,15 +37,11 @@ function recipeParts(
 
 function recipesForTheme(
   snapshot: Snapshot,
-  theme: ThemeKey,
+  _theme: ThemeKey,
 ): CombineRecipe[] {
   const out: CombineRecipe[] = [];
   for (const node of snapshot.nodes.values()) {
     if (isCombineExcluded(node)) continue;
-    if (theme === "everyday") {
-      if (!isEveryday(node)) continue;
-      if (node.kind === "living") continue;
-    }
     for (const recipe of node.recipes) {
       const { from, with_, all } = recipeParts(node, recipe.id);
       if (all.length < 2 || all.length > 7) continue;
@@ -56,15 +52,6 @@ function recipesForTheme(
         .filter((n): n is GraphNode => Boolean(n));
       if (partNodes.length < all.length) continue;
       if (partNodes.some((p) => isCombineExcluded(p))) continue;
-
-      if (theme === "everyday") {
-        // Everyday recipes allow natural raw stuff and tools even when they
-        // aren't tagged into the everyday universe.
-        const ok = partNodes.every(
-          (p) => isEveryday(p) || p.tier === "N" || p.kind === "tool",
-        );
-        if (!ok) continue;
-      }
 
       out.push({
         out: node.id,
@@ -91,8 +78,7 @@ function assignAges(
   const refine = computeRefine(snapshot);
 
   // Theme outputs start at infinity; ingredients the theme doesn't make
-  // carry their knowledge-base refine value (so e.g. glass and copper wire
-  // land at a sensible age even in Everyday).
+  // carry their knowledge-base refine value.
   const d = new Map<string, number>();
   for (const r of recipes) {
     for (const x of [...r.all, r.out]) {
@@ -353,7 +339,6 @@ export function buildAllBundles(
   snapshot: Snapshot,
 ): Record<ThemeKey, ThemeBundle> {
   return {
-    everyday: buildThemeBundle(snapshot, "everyday"),
     everything: buildThemeBundle(snapshot, "everything"),
   };
 }

@@ -432,15 +432,10 @@ export function newGame(
   };
 
   // Seed a few starting tiles that don't already combine. The prototype
-  // uses fixed cells per board size (lines 3364). Preferred seeds for
-  // Everyday are stored as slugs — must match the snapshot keys.
+  // uses fixed cells per board size (lines 3364).
   const spots = size === 6 ? [7, 10, 19, 25, 28] : [6, 8, 16, 18];
   const A0 = ageSets(bundle, 0);
-  let seedTiles: string[] = [];
-  if (theme === "everyday") {
-    const prefer = ["sheep", "wheat", "clay", "milk", "cotton-plant"];
-    seedTiles = prefer.filter((x) => A0.ING.has(x));
-  }
+  const seedTiles: string[] = [];
   const events: Event[] = [];
   // Top up with random base tiles until we have enough, bounded so a tiny
   // age-0 set doesn't lock us in a loop. We only want up to `spots.length`

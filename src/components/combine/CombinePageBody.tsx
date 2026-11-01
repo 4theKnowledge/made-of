@@ -9,7 +9,6 @@ export async function CombinePageBody() {
   const live = await getLiveSnapshot();
   const bundles = buildAllBundles(live.snapshot);
   const serialised = {
-    everyday: serialiseBundle(bundles.everyday),
     everything: serialiseBundle(bundles.everything),
   };
 

@@ -10,12 +10,6 @@ import type { GraphNode } from "../graph/types";
 import type { ThemeKey, ThemeMeta } from "./types";
 
 export const THEMES: Record<ThemeKey, ThemeMeta> = {
-  everyday: {
-    k: "everyday",
-    name: "Everyday",
-    desc: "Food, drink, clothes, toys and things around the house.",
-    ages: ["Gathering", "Hearth", "Kitchen", "Workshop", "Home", "Modern"],
-  },
   everything: {
     k: "everything",
     name: "Everything",
@@ -27,12 +21,4 @@ export const THEMES: Record<ThemeKey, ThemeMeta> = {
 /** Never dealt or made in Combine (fab chain, big bang). */
 export function isCombineExcluded(node: GraphNode): boolean {
   return node.tags.includes("combine-exclude");
-}
-
-/** In Combine's Everyday universe (home, kitchen, craft, clothes, toys…).
- *  Tier-N raw stuff and tools are allowed as parts of everyday recipes even
- *  when they aren't tagged into the universe themselves — that check lives
- *  in data.ts. */
-export function isEveryday(node: GraphNode): boolean {
-  return node.tags.includes("combine-everyday");
 }

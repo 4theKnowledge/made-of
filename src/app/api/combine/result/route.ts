@@ -6,7 +6,7 @@ import { getDb, schema } from "@/db/client";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const THEMES = new Set(["everyday", "everything"] as const);
+const THEMES = new Set(["everything"] as const);
 type Theme = typeof THEMES extends Set<infer T> ? T : never;
 
 /**

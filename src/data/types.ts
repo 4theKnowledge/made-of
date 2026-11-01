@@ -30,7 +30,9 @@ import type {
  */
 export type Tag =
   // --- Combine themes ---
-  /** Output is in Combine's Everyday theme (food, home, craft, clothes…). */
+  /** Legacy marker from the Everyday theme (food, home, craft, clothes…).
+   *  The theme has been retired; the tag is kept so item data still parses
+   *  and so a future scoped theme can reuse it. */
   | "combine-everyday"
   /** Never dealt or made in Combine. Covers the semiconductor fab chain and
    *  the one surviving non-physical item (big bang). */

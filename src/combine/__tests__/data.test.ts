@@ -13,16 +13,7 @@ const id = (slug: string): string => {
 };
 
 describe("buildThemeBundle", () => {
-  const everyday = buildThemeBundle(snapshot, "everyday");
   const everything = buildThemeBundle(snapshot, "everything");
-
-  it("Everyday has a plausible number of recipes and outputs", () => {
-    // Spec target: ~143 things to make in Everyday. We allow a band because
-    // the knowledge base will drift over time.
-    expect(everyday.outputs.size).toBeGreaterThan(80);
-    expect(everyday.outputs.size).toBeLessThan(220);
-    expect(everyday.recipes.length).toBeGreaterThan(everyday.outputs.size);
-  });
 
   it("Everything has a plausible number of recipes and outputs", () => {
     // Spec target: ~203 things to make in Everything.
@@ -33,21 +24,15 @@ describe("buildThemeBundle", () => {
     );
   });
 
-  it("Everything is a superset of Everyday", () => {
-    for (const id of everyday.outputs) {
-      expect(everything.outputs.has(id)).toBe(true);
-    }
-  });
-
   it("every recipe has 2..7 ingredients", () => {
-    for (const r of [...everyday.recipes, ...everything.recipes]) {
+    for (const r of everything.recipes) {
       expect(r.all.length).toBeGreaterThanOrEqual(2);
       expect(r.all.length).toBeLessThanOrEqual(7);
     }
   });
 
   it("no recipe contains its own output", () => {
-    for (const r of [...everyday.recipes, ...everything.recipes]) {
+    for (const r of everything.recipes) {
       expect(r.all.includes(r.out)).toBe(false);
     }
   });
@@ -62,56 +47,43 @@ describe("buildThemeBundle", () => {
     }
   });
 
-  it("Everyday never includes living outputs (sheep is raw material, not output)", () => {
-    for (const id of everyday.outputs) {
-      const node = snapshot.nodes.get(id);
-      expect(node?.kind).not.toBe("living");
-    }
-  });
-
   it("no recipe needs a part made only in a later age", () => {
-    for (const bundle of [everyday, everything]) {
-      // Lowest band an output appears at.
-      const outBand = new Map<string, number>();
-      for (const r of bundle.recipes) {
-        const cur = outBand.get(r.out);
-        if (cur == null || r.band < cur) outBand.set(r.out, r.band);
-      }
-      for (const r of bundle.recipes) {
-        for (const partId of r.all) {
-          const ob = outBand.get(partId);
-          if (ob != null) {
-            expect(ob).toBeLessThanOrEqual(r.band);
-          }
+    // Lowest band an output appears at.
+    const outBand = new Map<string, number>();
+    for (const r of everything.recipes) {
+      const cur = outBand.get(r.out);
+      if (cur == null || r.band < cur) outBand.set(r.out, r.band);
+    }
+    for (const r of everything.recipes) {
+      for (const partId of r.all) {
+        const ob = outBand.get(partId);
+        if (ob != null) {
+          expect(ob).toBeLessThanOrEqual(r.band);
         }
       }
     }
   });
 
-  it("every age band is populated in both themes", () => {
-    for (const bundle of [everyday, everything]) {
-      const bands = new Set(bundle.recipes.map((r) => r.band));
-      for (let b = 1; b <= bundle.theme.ages.length; b++) {
-        expect(bands.has(b)).toBe(true);
-      }
+  it("every age band is populated", () => {
+    const bands = new Set(everything.recipes.map((r) => r.band));
+    for (let b = 1; b <= everything.theme.ages.length; b++) {
+      expect(bands.has(b)).toBe(true);
     }
   });
 
   it("derived sets are consistent", () => {
-    for (const bundle of [everyday, everything]) {
-      // base ∩ outputs = ∅
-      for (const id of bundle.base) {
-        expect(bundle.outputs.has(id)).toBe(false);
-      }
-      // mid ⊆ outputs
-      for (const id of bundle.mid) {
-        expect(bundle.outputs.has(id)).toBe(true);
-      }
-      // terminal ⊆ outputs and nothing uses them
-      for (const id of bundle.terminal) {
-        expect(bundle.outputs.has(id)).toBe(true);
-        expect(bundle.ingredients.has(id)).toBe(false);
-      }
+    // base ∩ outputs = ∅
+    for (const id of everything.base) {
+      expect(everything.outputs.has(id)).toBe(false);
+    }
+    // mid ⊆ outputs
+    for (const id of everything.mid) {
+      expect(everything.outputs.has(id)).toBe(true);
+    }
+    // terminal ⊆ outputs and nothing uses them
+    for (const id of everything.terminal) {
+      expect(everything.outputs.has(id)).toBe(true);
+      expect(everything.ingredients.has(id)).toBe(false);
     }
   });
 

@@ -41,5 +41,5 @@ function dump(theme: ThemeKey, numAgesOverride?: number) {
   void numAgesOverride;
 }
 
-const theme = (process.argv[2] as ThemeKey) || "everyday";
+const theme = (process.argv[2] as ThemeKey) || "everything";
 dump(theme);

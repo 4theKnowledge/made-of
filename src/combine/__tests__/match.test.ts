@@ -250,11 +250,11 @@ describe("playsInOne / playsInTwo", () => {
 
 describe("integration with live bundle", () => {
   const snap = buildSnapshot(toRows(loadKnowledgeBase()));
-  const bundle = buildThemeBundle(snap, "everyday");
+  const bundle = buildThemeBundle(snap, "everything");
   const size = 5;
 
   it("matches a known recipe end-to-end", () => {
-    // Pick a small Everyday recipe to test. "wheel" from steel + wood is a
+    // Pick a small recipe to test. "wheel" from steel + wood is a
     // plausible 2-ingredient recipe; we probe the bundle for one.
     const smallRecipe = bundle.recipes.find((r) => r.all.length === 2);
     expect(smallRecipe).toBeDefined();

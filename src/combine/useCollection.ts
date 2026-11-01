@@ -10,10 +10,10 @@ export type CollectionScope = "endless" | "daily";
  * The player's Combine collection for the given `scope`:
  * `itemId → firstFoundAt (epoch ms)`.
  *
- * Scopes are fully independent. Endless (shared between Everyday and
- * Everything endless runs) is the historical "lifetime collection". Daily
- * has its own collection so each daily puzzle plays out from a scoped base
- * — no walking in with hundreds of pre-unlocked items from endless grinding.
+ * Scopes are fully independent. Endless is the "lifetime collection".
+ * Daily has its own collection so each daily puzzle plays out from a scoped
+ * base — no walking in with hundreds of pre-unlocked items from endless
+ * grinding.
  *
  * Signed-in users:
  *   - Source of truth is `/api/combine/collection?scope=...` (Postgres).

@@ -20,7 +20,6 @@ const SAVE_VERSION = 1;
 
 const ENDLESS_KEY = "madeof:cbsave";
 const DAILY_KEY = "madeof:cbsave:daily";
-const BEST_KEY = "madeof:cbbest";
 const BEST_PREFIX = "madeof:cbbest:";
 const DAILY_DONE_KEY = "madeof:cbdaily";
 const FOUND_KEY = "madeof:cbfound";
@@ -238,8 +237,7 @@ export function saveDailyDone(r: DailyResult): void {
 export function loadBest(theme: ThemeKey): number {
   if (typeof window === "undefined") return 0;
   try {
-    const key = theme === "everyday" ? BEST_KEY : BEST_PREFIX + theme;
-    return Number(window.localStorage.getItem(key) ?? 0) || 0;
+    return Number(window.localStorage.getItem(BEST_PREFIX + theme) ?? 0) || 0;
   } catch {
     return 0;
   }
@@ -248,8 +246,7 @@ export function loadBest(theme: ThemeKey): number {
 export function saveBest(theme: ThemeKey, score: number): void {
   if (typeof window === "undefined") return;
   try {
-    const key = theme === "everyday" ? BEST_KEY : BEST_PREFIX + theme;
-    window.localStorage.setItem(key, String(score));
+    window.localStorage.setItem(BEST_PREFIX + theme, String(score));
   } catch {
     // ignore
   }
