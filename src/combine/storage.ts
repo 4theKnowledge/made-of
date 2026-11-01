@@ -132,30 +132,18 @@ function readStored(key: string): StoredGame | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as StoredGame;
     if (!parsed) return null;
-    // Schema version mismatch → drop so the user starts fresh.
-    if (parsed.v !== SAVE_VERSION) {
-      window.localStorage.removeItem(key);
-      return null;
-    }
-    // Required fields: a well-formed board/tray with the right length.
+    // Any schema mismatch (version, missing or wrong-shape board/tray) →
+    // drop the entry and start fresh. The version check is the primary
+    // guard; the shape checks are belt-and-braces in case someone writes
+    // to the key manually.
     if (
+      parsed.v !== SAVE_VERSION ||
       typeof parsed.n !== "number" ||
-      !Number.isFinite(parsed.n) ||
-      parsed.n < 3 ||
-      parsed.n > 12
+      !Array.isArray(parsed.board) ||
+      parsed.board.length !== parsed.n * parsed.n ||
+      !Array.isArray(parsed.tray) ||
+      parsed.tray.length !== 3
     ) {
-      window.localStorage.removeItem(key);
-      return null;
-    }
-    if (!Array.isArray(parsed.board) || parsed.board.length !== parsed.n * parsed.n) {
-      window.localStorage.removeItem(key);
-      return null;
-    }
-    if (!Array.isArray(parsed.tray) || parsed.tray.length !== 3) {
-      window.localStorage.removeItem(key);
-      return null;
-    }
-    if (parsed.theme !== "everyday" && parsed.theme !== "everything") {
       window.localStorage.removeItem(key);
       return null;
     }
@@ -185,28 +173,7 @@ export function loadGame(
   // shifted between runs).
   for (const v of s.board) if (v && !bundle.items.has(v)) return null;
   for (const v of s.tray) if (v && !bundle.items.has(v)) return null;
-  // An empty, unplayed save (board + tray all null, zero moves) is useless
-  // to resume — it was written from a transient initial render during a
-  // past bug. Drop it so the player gets a fresh game.
-  const boardEmpty = s.board.every((v) => v == null);
-  const trayEmpty = s.tray.every((v) => v == null);
-  if (boardEmpty && trayEmpty && s.moves === 0 && s.score === 0) {
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.removeItem(key);
-      } catch {
-        // ignore
-      }
-    }
-    return null;
-  }
   return s;
-}
-
-/** True if the stored state has no tray tiles — a sign the save predates
- *  the dealTray in-place fix. The caller should re-deal before showing it. */
-export function needsRedeal(s: StoredGame): boolean {
-  return s.tray.every((t) => t == null) && !s.over;
 }
 
 /** Rebuild a full GameState from the stored projection. */
