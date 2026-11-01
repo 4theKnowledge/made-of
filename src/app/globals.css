@@ -44,14 +44,26 @@ button,input,select{font:inherit;color:inherit}
 /* Mode visibility */
 
 /* Header */
-header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px}
-.brand{display:flex;align-items:baseline;gap:10px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;position:relative}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
 .brand h1{font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:-.02em;margin:0;line-height:1}
 .brand span{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.04em}
-.tabs{display:flex;gap:2px;padding:0;margin-right:auto;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.tabs{display:flex;gap:2px;padding:0;max-width:100%;overflow-x:auto;scrollbar-width:none}
 .tabs a{padding:8px 13px;border-radius:3px;font-weight:500;color:var(--ink);text-decoration:none;font-size:14px;white-space:nowrap}
 .tabs a:hover{background:var(--soft)}
 .tabs a.on{background:var(--ink);color:var(--bg);font-weight:600}
+.navToggle{display:none;width:40px;height:40px;padding:0;border:1.5px solid var(--ink);background:var(--surface);border-radius:3px;cursor:pointer;align-items:center;justify-content:center;flex:none}
+.navToggle:hover{box-shadow:2px 2px 0 var(--ink);transform:translate(-1px,-1px)}
+.navToggleBars{position:relative;display:block;width:18px;height:14px}
+.navToggleBars span{position:absolute;left:0;right:0;height:2px;background:var(--ink);border-radius:1px;transition:transform .18s ease, opacity .18s ease, top .18s ease}
+.navToggleBars span:nth-child(1){top:0}
+.navToggleBars span:nth-child(2){top:6px}
+.navToggleBars span:nth-child(3){top:12px}
+.navToggleBars.open span:nth-child(1){top:6px;transform:rotate(45deg)}
+.navToggleBars.open span:nth-child(2){opacity:0}
+.navToggleBars.open span:nth-child(3){top:6px;transform:rotate(-45deg)}
+.navDrawer{display:none}
+.navBackdrop{display:none}
 .tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-width:0}
 .search{position:relative}
 .search input{width:240px;max-width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--ink);background:var(--surface);border-radius:3px}
@@ -312,8 +324,11 @@ a.btn.primary{color:var(--bg)}
 .goal.done .gbar span{background:var(--good)}
 
 .foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;border-top:1px solid var(--line);padding-top:18px;margin-top:8px;font-size:13.5px;color:var(--muted)}
+.foot .footBrand{display:inline-flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .foot .fbrand{font-family:var(--display);font-weight:800;color:var(--ink);font-size:15px}
+.foot .ftag{color:var(--muted)}
 .foot .fsep{flex:1}
+.foot .footLinks{display:inline-flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
 .foot a{color:var(--ink);text-decoration:none;font-weight:500}
 .foot a:hover{text-decoration:underline}
 .foot .support{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--line);border-radius:3px;padding:4px 12px;color:var(--ink);font-weight:500}
@@ -466,9 +481,34 @@ a.btn.primary{color:var(--bg)}
   .search input{width:100%}
   .pbar{grid-template-columns:1fr}
   .brand span{display:none}
-  .tabs{flex-wrap:wrap;overflow:visible}
   .sgrid{grid-template-columns:1fr}
   .sbar .counts{margin-left:0}
+}
+
+/* Phone header: tabs collapse into a drawer behind a hamburger button */
+@media (max-width: 760px){
+  header{flex-wrap:nowrap;gap:10px}
+  .brand h1{font-size:24px}
+  .tabs{display:none}
+  .navToggle{display:inline-flex}
+  .navDrawer{display:block;position:absolute;top:calc(100% + 8px);right:0;left:0;z-index:40;background:var(--surface);border:1.5px solid var(--ink);border-radius:4px;box-shadow:4px 4px 0 var(--ink);padding:8px;transform-origin:top right;animation:navDrawerIn .14s ease-out}
+  .navDrawer[hidden]{display:none}
+  .navDrawerList{display:flex;flex-direction:column;gap:2px}
+  .navDrawerList a{display:block;padding:12px 14px;border-radius:3px;font-weight:500;color:var(--ink);text-decoration:none;font-size:16px}
+  .navDrawerList a:hover{background:var(--soft)}
+  .navDrawerList a.on{background:var(--ink);color:var(--bg);font-weight:600}
+  .navBackdrop{display:block;position:fixed;inset:0;z-index:30;background:transparent}
+}
+@keyframes navDrawerIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+/* Phone footer: brand on top, support pill, then a 2-col grid of links */
+@media (max-width: 600px){
+  .foot{flex-direction:column;align-items:stretch;gap:14px}
+  .foot .fsep{display:none}
+  .foot .footBrand{justify-content:flex-start}
+  .foot .support{align-self:flex-start}
+  .foot .footLinks{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;row-gap:10px}
+  .foot .footLinks a{padding:4px 0}
 }
 
 /* The details of the centre card live inside it on wide screens, and under the bowtie on phones */
