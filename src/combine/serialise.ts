@@ -66,6 +66,11 @@ export function hydrateBundle(s: SerialisedBundle): ThemeBundle {
   }
   const items = new Map<string, CombineItem>();
   for (const it of s.items) items.set(it.id, it);
+  const outBand = new Map<string, number>();
+  for (const r of s.recipes) {
+    const cur = outBand.get(r.out);
+    if (cur == null || r.band < cur) outBand.set(r.out, r.band);
+  }
   return {
     theme: s.theme,
     recipes: s.recipes,
@@ -78,5 +83,6 @@ export function hydrateBundle(s: SerialisedBundle): ThemeBundle {
     terminal: new Set(s.terminal),
     sameIngredients,
     items,
+    outBand,
   };
 }

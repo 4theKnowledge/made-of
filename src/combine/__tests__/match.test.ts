@@ -48,6 +48,14 @@ function fakeBundle(recipes: CombineRecipe[]): ThemeBundle {
     terminal: new Set(),
     sameIngredients: new Map(),
     items: new Map(),
+    outBand: (() => {
+      const m = new Map<string, number>();
+      for (const r of recipes) {
+        const cur = m.get(r.out);
+        if (cur == null || r.band < cur) m.set(r.out, r.band);
+      }
+      return m;
+    })(),
   };
 }
 

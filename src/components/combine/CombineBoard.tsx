@@ -2387,7 +2387,7 @@ function AgeBar({
   const need = 7 + 2 * state.age;
   const pct = last ? 100 : Math.min(100, Math.round((state.ageMade / need) * 100));
   const ariaLabel = `Age ${ages[state.age]} of ${ages.length}${
-    last ? "" : `. Make ${need - state.ageMade} more to reach Age ${ages[state.age + 1]}`
+    last ? "" : `. Discover ${need - state.ageMade} more to reach Age ${ages[state.age + 1]}`
   }. Tap for details.`;
   return (
     <div className="cbage">
@@ -2475,7 +2475,7 @@ function AgesSheet({
           Combine tiles to make things at least this advanced.
           {last
             ? " You're on the final step — keep combining to push your score higher."
-            : ` ${left} more ${ages[current]}-or-later make${left === 1 ? "" : "s"} and you unlock ${ages[current + 1]}.`}
+            : ` ${left} more ${ages[current]} discover${left === 1 ? "y" : "ies"} and you unlock ${ages[current + 1]}.`}
         </p>
         {chain.length >= 2 && (
           <div className="cbageex">

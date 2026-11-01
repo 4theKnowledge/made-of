@@ -89,4 +89,6 @@ export interface ThemeBundle {
   sameIngredients: Map<string, CombineRecipe[]>;
   /** Item views for everything the bundle refers to. */
   items: Map<string, CombineItem>;
+  /** Minimum band (1..n) each output can be made in. */
+  outBand: Map<string, number>;
 }

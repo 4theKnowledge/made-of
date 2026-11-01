@@ -177,10 +177,9 @@ function fullness(board: Board): number {
   return board.filter(Boolean).length / board.length;
 }
 
-/** On-or-ahead makes needed to leave each age (0-based): 7, 9, 11, 13, 15, 17.
- *  Up from the prototype's 6+2n so each era has room to breathe. Only
- *  combines whose output lives in the current band or newer count — see
- *  `finishResolve`. */
+/** Unique discoveries at the current age's band needed to leave each age
+ *  (0-based): 7, 9, 11, 13, 15, 17. Only first-time makes of items whose
+ *  minimum band is `age + 1` count — see `finishResolve`. */
 function ageNeed(age: number): number {
   return 7 + 2 * age;
 }
@@ -262,11 +261,6 @@ function finishResolve(
   if (choice == null) return;
   state.board[choice] = recipe.out;
   state.made++;
-  // Only on-or-ahead combines advance the age bar. Making a band-1 "glue"
-  // in the Modern age doesn't flip you forward — but making anything from
-  // the current band or newer does. Mirrors the player intuition that
-  // "ages should be about reaching new things, not re-crafting old ones".
-  if (recipe.band >= state.age + 1) state.ageMade++;
   state.longest = Math.max(state.longest, mult);
 
   const pts = Math.round(
@@ -286,6 +280,11 @@ function finishResolve(
   const first = !state.found.includes(recipe.out);
   if (first) {
     state.found.push(recipe.out);
+    // Age bar tracks unique discoveries whose min band is the current age's
+    // band, so the "N/need" counter matches the tiles shown in the Ages
+    // dialog for this age. Later-band discoveries belong to a future age.
+    const minBand = bundle.outBand.get(recipe.out);
+    if (minBand === state.age + 1) state.ageMade++;
     events.push({ type: "discovery", out: recipe.out, recipe: recipe.all });
   }
   events.push({

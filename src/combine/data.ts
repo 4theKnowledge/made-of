@@ -272,6 +272,12 @@ export function buildThemeBundle(
     }
   }
 
+  const outBand = new Map<string, number>();
+  for (const r of recipes) {
+    const cur = outBand.get(r.out);
+    if (cur == null || r.band < cur) outBand.set(r.out, r.band);
+  }
+
   return {
     theme: meta,
     recipes,
@@ -284,6 +290,7 @@ export function buildThemeBundle(
     terminal,
     sameIngredients,
     items,
+    outBand,
   };
 }
 

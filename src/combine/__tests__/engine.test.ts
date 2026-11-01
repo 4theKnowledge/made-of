@@ -81,6 +81,14 @@ function fakeBundle(opts: {
     terminal: new Set(opts.terminal ?? []),
     sameIngredients,
     items,
+    outBand: (() => {
+      const m = new Map<string, number>();
+      for (const r of opts.recipes) {
+        const cur = m.get(r.out);
+        if (cur == null || r.band < cur) m.set(r.out, r.band);
+      }
+      return m;
+    })(),
   };
 }
 
