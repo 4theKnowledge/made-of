@@ -502,6 +502,13 @@ a.btn.primary{color:var(--bg)}
 @keyframes navDrawerIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 
 /* Phone footer: brand on top, support pill, then a 2-col grid of links */
+/* Mobile touch targets: all tappable controls meet the 44px thumb-friendly
+   minimum (Apple HIG / WCAG 2.5.5). Padding and font-size overrides in later
+   mobile rules still apply; this only sets a floor on height. */
+@media (max-width: 600px){
+  .btn,.cbh,.seg button,.pkseg button{min-height:44px}
+}
+
 @media (max-width: 600px){
   .foot{flex-direction:column;align-items:stretch;gap:14px}
   .foot .fsep{display:none}
