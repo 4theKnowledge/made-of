@@ -590,6 +590,19 @@ export function CombineBoard({ bundles: serialised }: Props) {
     [state, bundles, resetTransient],
   );
 
+  const restartTheme = useCallback(
+    (which: ThemeKey) => {
+      setState(
+        newGame(which, bundles[which], {
+          seed: freshEndlessSeed(),
+          size: 6,
+        }).state,
+      );
+      resetTransient();
+    },
+    [bundles, resetTransient],
+  );
+
   const startDaily = useCallback(() => {
     const day = todayKey();
     // Resume today's daily save if any, otherwise start a fresh daily.
@@ -1190,6 +1203,10 @@ export function CombineBoard({ bundles: serialised }: Props) {
             onShareDaily={() => {
               shareDaily();
             }}
+            onRestart={(which) => {
+              setThemeOpen(false);
+              restartTheme(which);
+            }}
             onDismiss={() => setThemeOpen(false)}
           />
         )}
@@ -1208,6 +1225,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
           <AgesSheet
             state={state}
             bundle={bundle}
+            onInfo={(id) => setInfoTile(id)}
             onDismiss={() => setAgesOpen(false)}
           />
         )}
@@ -1556,6 +1574,7 @@ function ThemeMenu({
   onPickTheme,
   onPickDaily,
   onShareDaily,
+  onRestart,
   onDismiss,
 }: {
   bundles: Record<ThemeKey, ThemeBundle>;
@@ -1565,8 +1584,10 @@ function ThemeMenu({
   onPickTheme: (which: ThemeKey) => void;
   onPickDaily: () => void;
   onShareDaily: () => void;
+  onRestart: (which: ThemeKey) => void;
   onDismiss: () => void;
 }) {
+  const [confirmRestart, setConfirmRestart] = useState(false);
   return (
     <>
       <div className="cbscrim" onClick={onDismiss} />
@@ -1622,6 +1643,45 @@ function ThemeMenu({
         <p className="sub">
           Games are saved as you go. Switching picks up where you left off.
         </p>
+        {!daily && !confirmRestart && (
+          <button
+            type="button"
+            className="cbh cbrestart"
+            onClick={() => setConfirmRestart(true)}
+            style={{ width: "100%", justifyContent: "center" }}
+          >
+            Restart {bundles[current].theme.name}
+          </button>
+        )}
+        {!daily && confirmRestart && (
+          <div className="cbrestartconfirm">
+            <p>
+              End this run and start a fresh {bundles[current].theme.name}
+              {" "}game? Your current score and board will be lost.
+            </p>
+            <div className="cbrestartrow">
+              <button
+                type="button"
+                className="cbh"
+                onClick={() => setConfirmRestart(false)}
+                style={{ flex: 1, justifyContent: "center" }}
+              >
+                Keep playing
+              </button>
+              <button
+                type="button"
+                className="cbh cbrestart"
+                onClick={() => {
+                  setConfirmRestart(false);
+                  onRestart(current);
+                }}
+                style={{ flex: 1, justifyContent: "center" }}
+              >
+                Restart
+              </button>
+            </div>
+          </div>
+        )}
         <button
           type="button"
           className="cbh"
@@ -2352,10 +2412,12 @@ function AgeBar({
 function AgesSheet({
   state,
   bundle,
+  onInfo,
   onDismiss,
 }: {
   state: GameState;
   bundle: ThemeBundle;
+  onInfo: (id: string) => void;
   onDismiss: () => void;
 }) {
   const ages = bundle.theme.ages;
@@ -2363,6 +2425,27 @@ function AgesSheet({
   const last = current >= ages.length - 1;
   const need = 7 + 2 * current;
   const left = Math.max(0, need - state.ageMade);
+  // Group this run's discoveries by the band each item belongs to, so the
+  // dialog can show "what you've found in each age" under each row.
+  const foundByBand = useMemo(() => {
+    const bandOf = new Map<string, number>();
+    for (const r of bundle.recipes) {
+      const cur = bandOf.get(r.out);
+      if (cur == null || r.band < cur) bandOf.set(r.out, r.band);
+    }
+    const m = new Map<number, string[]>();
+    for (const id of state.found) {
+      const b = bandOf.get(id);
+      if (b == null) continue;
+      let list = m.get(b);
+      if (!list) {
+        list = [];
+        m.set(b, list);
+      }
+      list.push(id);
+    }
+    return m;
+  }, [bundle, state.found]);
   // One canonical chain per theme + age index. Hand-picked by item name so
   // the diagram tells a clear "raw → refined → made" story. Items in the
   // bundle are keyed by UUID; we resolve name → id here. If a name goes
@@ -2378,7 +2461,7 @@ function AgesSheet({
     .filter((id): id is string => id != null);
   return (
     <>
-      <div className="cbscrim" onClick={onDismiss} />
+      <div className="cbscrim cbagescrim" onClick={onDismiss} />
       <section
         className="cbover cbagesheet"
         role="dialog"
@@ -2440,13 +2523,42 @@ function AgesSheet({
               : isPast
                 ? "Done"
                 : `Needs ${metaNeed}`;
+            const finds = foundByBand.get(i + 1) ?? [];
             return (
               <li
                 key={name}
                 className={`cbagerow${isNow ? " on" : ""}${isPast ? " past" : ""}`}
               >
-                <b className="cbageno">{name}</b>
-                <span className="cbagemeta">{meta}</span>
+                <div className="cbagerow-top">
+                  <b className="cbageno">{name}</b>
+                  <span className="cbagemeta">{meta}</span>
+                </div>
+                {finds.length > 0 && (
+                  <div className="cbagefinds" aria-label={`Found in Age ${name}`}>
+                    {finds.map((id) => {
+                      const it = bundle.items.get(id);
+                      if (!it) return null;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          className="cbslot"
+                          style={fillVar(it)}
+                          title={cap(it.name)}
+                          aria-label={`${cap(it.name)}. Show how it's made`}
+                          onClick={() => onInfo(id)}
+                        >
+                          <Pictogram
+                            name={it.name}
+                            tier={it.tier}
+                            kind={it.kind}
+                            symbol={it.symbol}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </li>
             );
           })}
