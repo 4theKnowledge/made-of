@@ -38,11 +38,15 @@ async function needsReseed(): Promise<string | null> {
     .from(schema.items);
   if (count === 0) return "items table is empty";
 
+  // Separate query is simpler than FILTER (WHERE …) which the sql tag
+  // may rewrite in unexpected ways. "array_length(tags, 1)" is null for
+  // empty arrays, so compare > 0 after coalescing.
   const [{ tagged }] = await db
     .select({
-      tagged: sql<number>`count(*)::int filter (where array_length(tags, 1) > 0)`,
+      tagged: sql<number>`count(*)::int`,
     })
-    .from(schema.items);
+    .from(schema.items)
+    .where(sql`coalesce(array_length(tags, 1), 0) > 0`);
   if (tagged === 0) {
     return "no items carry any tag — predates the tag migration";
   }
