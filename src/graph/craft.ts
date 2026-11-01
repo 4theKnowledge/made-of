@@ -15,7 +15,13 @@ import type { ItemKind, Tier } from "@/db/schema";
 import type { Snapshot } from "./snapshot";
 import type { GraphEdge, GraphNode } from "./types";
 
-const ORIGIN = "big-bang";
+const ORIGIN_SLUG = "big-bang";
+
+function originId(snapshot: Snapshot): string {
+  const n = snapshot.bySlug.get(ORIGIN_SLUG);
+  if (!n) throw new Error(`origin item ${ORIGIN_SLUG} missing from snapshot`);
+  return n.id;
+}
 
 /** A recipe view suitable for both client UI and server math. */
 export interface ScratchRecipe {
@@ -177,14 +183,14 @@ export function missing(
 
 /** Par (minimum steps) for making `target` from scratch (big bang only). */
 export function parFor(snapshot: Snapshot, target: string): number {
-  const have = new Set<string>([ORIGIN]);
+  const have = new Set<string>([originId(snapshot)]);
   const c = costs(snapshot, have);
   return missing(snapshot, target, have, c).size;
 }
 
 /** The initial `have` set for a new run. */
-export function initialHave(): Set<string> {
-  return new Set<string>([ORIGIN]);
+export function initialHave(snapshot: Snapshot): Set<string> {
+  return new Set<string>([originId(snapshot)]);
 }
 
 /**
@@ -226,7 +232,7 @@ export function viewOf(
   code: string,
 ): ScratchItemView {
   return {
-    slug: node.id,
+    slug: node.slug,
     code,
     name: node.name,
     tier: node.tier,

@@ -25,12 +25,14 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "bad_request" }, { status: 400 });
       }
       const live = await getLiveSnapshot();
-      const fromId = live.itemCodes.toId(fromCode);
-      const toId = live.itemCodes.toId(toCode);
-      if (!fromId || !toId) {
+      const fromSlug = live.itemCodes.toId(fromCode);
+      const toSlug = live.itemCodes.toId(toCode);
+      const fromNode = fromSlug ? live.snapshot.bySlug.get(fromSlug) : null;
+      const toNode = toSlug ? live.snapshot.bySlug.get(toSlug) : null;
+      if (!fromNode || !toNode) {
         return NextResponse.json({ error: "not_found" }, { status: 404 });
       }
-      const path = shortestPath(live.snapshot, fromId, toId);
+      const path = shortestPath(live.snapshot, fromNode.id, toNode.id);
       if (!path) {
         return NextResponse.json({ error: "unreachable" }, { status: 404 });
       }
@@ -38,7 +40,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         length: path.length - 1,
         steps: path.map((s) => ({
-          item: live.itemCodes.toCode(s.id) ?? "",
+          item:
+            live.itemCodes.toCode(live.snapshot.nodes.get(s.id)?.slug ?? "") ??
+            "",
           edge: s.edge,
         })),
       });

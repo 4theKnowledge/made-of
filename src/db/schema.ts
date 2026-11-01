@@ -11,6 +11,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
 } from "drizzle-orm/pg-core";
 
 /* ========================================================================
@@ -75,15 +76,17 @@ export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 /* ========================================================================
  * Items.
  *
- * id is the slug (lowercase, hyphenated). The original lowercase name (which
- * may contain spaces, e.g. "big bang") is kept so recipe parsing and parity
- * tests against the prototype stay exact.
+ * id is a uuid so renames don't break foreign keys. `slug` (lowercase,
+ * hyphenated) and `name` (original casing, may contain spaces, e.g. "big
+ * bang") stay as unique columns so URL routing, seed parity and recipe
+ * parsing still work against the prototype.
  * ====================================================================== */
 
 export const items = pgTable(
   "items",
   {
-    id: text("id").primaryKey(),
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull().unique(),
     name: text("name").notNull().unique(),
     tier: tierEnum("tier").notNull(),
     kind: itemKindEnum("kind").notNull(),
@@ -125,8 +128,8 @@ export const items = pgTable(
 export const recipes = pgTable(
   "recipes",
   {
-    id: text("id").primaryKey(),
-    itemId: text("item_id")
+    id: uuid("id").primaryKey().defaultRandom(),
+    itemId: uuid("item_id")
       .notNull()
       .references(() => items.id, { onDelete: "cascade" }),
     label: text("label"),
@@ -154,13 +157,13 @@ export const recipes = pgTable(
 export const links = pgTable(
   "links",
   {
-    id: text("id").primaryKey(),
-    recipeId: text("recipe_id").references(() => recipes.id, {
+    id: uuid("id").primaryKey().defaultRandom(),
+    recipeId: uuid("recipe_id").references(() => recipes.id, {
       onDelete: "cascade",
     }),
-    itemId: text("item_id").references(() => items.id, { onDelete: "cascade" }),
+    itemId: uuid("item_id").references(() => items.id, { onDelete: "cascade" }),
     type: linkTypeEnum("type").notNull(),
-    targetItemId: text("target_item_id")
+    targetItemId: uuid("target_item_id")
       .notNull()
       .references(() => items.id, { onDelete: "restrict" }),
     confidence: confidenceEnum("confidence").notNull().default("established"),
@@ -185,8 +188,8 @@ export const links = pgTable(
 export const linkEvidence = pgTable(
   "link_evidence",
   {
-    id: text("id").primaryKey(),
-    linkId: text("link_id")
+    id: uuid("id").primaryKey().defaultRandom(),
+    linkId: uuid("link_id")
       .notNull()
       .references(() => links.id, { onDelete: "cascade" }),
     type: text("type").notNull(),
@@ -198,7 +201,12 @@ export const linkEvidence = pgTable(
 );
 
 export const sources = pgTable("sources", {
-  id: text("id").primaryKey(), // e.g. "src:martin-2008"
+  id: uuid("id").primaryKey().defaultRandom(),
+  // The author-year citation key used in the knowledge base, e.g.
+  // "src:martin-2008". Stays unique so admin edits can rely on it, but is no
+  // longer the primary key — foreign keys from evidence_sources reference the
+  // uuid instead.
+  code: text("code").notNull().unique(),
   kind: sourceKindEnum("kind").notNull(),
   title: text("title").notNull(),
   authors: text("authors"),
@@ -210,10 +218,10 @@ export const sources = pgTable("sources", {
 export const evidenceSources = pgTable(
   "evidence_sources",
   {
-    evidenceId: text("evidence_id")
+    evidenceId: uuid("evidence_id")
       .notNull()
       .references(() => linkEvidence.id, { onDelete: "cascade" }),
-    sourceId: text("source_id")
+    sourceId: uuid("source_id")
       .notNull()
       .references(() => sources.id, { onDelete: "restrict" }),
     position: integer("position").notNull().default(0),
@@ -236,10 +244,10 @@ export const dailyPuzzles = pgTable(
   "daily_puzzles",
   {
     date: text("date").primaryKey(), // yyyy-mm-dd in UTC
-    startItemId: text("start_item_id")
+    startItemId: uuid("start_item_id")
       .notNull()
       .references(() => items.id),
-    goalItemId: text("goal_item_id")
+    goalItemId: uuid("goal_item_id")
       .notNull()
       .references(() => items.id),
     par: integer("par").notNull(),
@@ -381,8 +389,8 @@ export const reports = pgTable(
   {
     id: text("id").primaryKey(),
     userId: text("user_id"),
-    itemId: text("item_id").references(() => items.id),
-    linkId: text("link_id").references(() => links.id),
+    itemId: uuid("item_id").references(() => items.id),
+    linkId: uuid("link_id").references(() => links.id),
     reason: text("reason").notNull(),
     note: text("note"),
     status: text("status").notNull().default("open"),

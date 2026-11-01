@@ -31,12 +31,12 @@ export interface AdminExport {
 export async function exportAll(): Promise<AdminExport> {
   const db = getDb();
   const [items, recipes, links, evidence, evSources, sources] = await Promise.all([
-    db.select().from(schema.items).orderBy(asc(schema.items.id)),
+    db.select().from(schema.items).orderBy(asc(schema.items.slug)),
     db.select().from(schema.recipes).orderBy(asc(schema.recipes.itemId), asc(schema.recipes.position)),
     db.select().from(schema.links),
     db.select().from(schema.linkEvidence).orderBy(asc(schema.linkEvidence.linkId), asc(schema.linkEvidence.position)),
     db.select().from(schema.evidenceSources).orderBy(asc(schema.evidenceSources.evidenceId), asc(schema.evidenceSources.position)),
-    db.select().from(schema.sources).orderBy(asc(schema.sources.id)),
+    db.select().from(schema.sources).orderBy(asc(schema.sources.code)),
   ]);
 
   // Index items by id so we can resolve targetItemId -> name for the Data* shape.
@@ -167,6 +167,7 @@ export async function exportAll(): Promise<AdminExport> {
     buckets.set(key, b);
   }
 
+  const sourceCodeById = new Map(sources.map((s) => [s.id, s.code]));
   const dataEvidenceLinks: DataEvidenceLink[] = [];
   for (const b of buckets.values()) {
     // Pick one representative set of evidence entries (they should be
@@ -182,7 +183,7 @@ export async function exportAll(): Promise<AdminExport> {
         seen.add(k);
         const srcs = (evSourcesByEvidence.get(e.id) ?? [])
           .sort((a, z) => a.position - z.position)
-          .map((s) => s.sourceId);
+          .map((s) => sourceCodeById.get(s.sourceId) ?? s.sourceId);
         entries.push({
           type: e.type,
           stance: e.stance,
@@ -211,7 +212,7 @@ export async function exportAll(): Promise<AdminExport> {
     if (s.year != null) d.year = s.year;
     if (s.published) d.published = s.published;
     if (s.url) d.url = s.url;
-    sourceMap[s.id] = d;
+    sourceMap[s.code] = d;
   }
   return { items: dataItems, evidenceLinks: dataEvidenceLinks, sources: sourceMap };
 }

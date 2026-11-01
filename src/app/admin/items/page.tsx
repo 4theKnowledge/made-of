@@ -21,7 +21,13 @@ export default async function AdminItemsList({
 
   const db = getDb();
   const conds = [];
-  if (q) conds.push(or(ilike(schema.items.name, `%${q}%`), ilike(schema.items.id, `%${q}%`)));
+  if (q)
+    conds.push(
+      or(
+        ilike(schema.items.name, `%${q}%`),
+        ilike(schema.items.slug, `%${q}%`),
+      ),
+    );
   if (status) conds.push(eq(schema.items.status, status));
   if (tier) conds.push(eq(schema.items.tier, tier));
 

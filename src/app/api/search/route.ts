@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     // Pass 1: prefix match on name.
     for (const node of live.snapshot.nodes.values()) {
       if (node.name.toLowerCase().startsWith(q)) {
-        const code = live.itemCodes.toCode(node.id);
+        const code = live.itemCodes.toCode(node.slug);
         if (code) results.push({ code, name: node.name });
         if (results.length >= MAX_RESULTS) break;
       }
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       for (const node of live.snapshot.nodes.values()) {
         if (have.has(node.name)) continue;
         if (node.name.toLowerCase().includes(q)) {
-          const code = live.itemCodes.toCode(node.id);
+          const code = live.itemCodes.toCode(node.slug);
           if (code) results.push({ code, name: node.name });
           if (results.length >= MAX_RESULTS) break;
         }

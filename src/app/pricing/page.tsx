@@ -24,12 +24,12 @@ const TRAILS: Array<[string, string]> = [
   ["Trace your breakfast to the stars", "bread"],
   ["How is a phone made?", "smartphone"],
   ["From fish to you", "humans"],
-  ["Where did life begin?", "LUCA"],
+  ["Where did life begin?", "luca"],
   ["Why pencils are hard to make", "pencil"],
 ];
 
 const SPONSOR_TRAIL = [
-  "LUCA",
+  "luca",
   "fish",
   "amphibians",
   "synapsids",
@@ -47,32 +47,51 @@ export default async function PricingPage() {
     .then((rows) => [{ count: rows.length }]);
 
   const nodes = live.snapshot.nodes;
+  const bySlug = live.snapshot.bySlug;
   const itemCount = nodes.size;
   const elementCount = [...nodes.values()].filter(
     (n) => n.kind === "element",
   ).length;
 
+  const nodeBySlug = (slug: string): GraphNode | undefined => bySlug.get(slug);
+  const idForSlug = (slug: string): string | null =>
+    bySlug.get(slug)?.id ?? null;
+  const upstreamSlug = (slug: string, depth: number): Set<string> => {
+    const id = idForSlug(slug);
+    return id ? upstreamWithin(live.snapshot, id, depth) : new Set();
+  };
+  const ancestorsSlug = (slug: string): Set<string> => {
+    const id = idForSlug(slug);
+    return id ? ancestors(live.snapshot, id) : new Set();
+  };
+
   // Difficulty-levels bars: how much of the pencil's upstream each depth
   // reveals. Mirrors prototype line 2532.
   const target = "pencil";
-  const simple = upstreamWithin(live.snapshot, target, 2);
-  const standard = upstreamWithin(live.snapshot, target, 5);
-  const all = ancestors(live.snapshot, target);
+  const simple = upstreamSlug(target, 2);
+  const standard = upstreamSlug(target, 5);
+  const all = ancestorsSlug(target);
   const depthLevels: Array<[string, Set<string>, string]> = [
     ["Simple", simple, "--tN"],
     ["Standard", standard, "--tM"],
     ["Complex", all, "--tP"],
   ];
-  const famNodes = [...upstreamWithin(live.snapshot, target, 1)]
+  const famNodes = [...upstreamSlug(target, 1)]
     .map((id) => nodes.get(id))
     .filter((n): n is GraphNode => Boolean(n));
 
   // Coverage mock: an example learner's seen set, built from pencil + bread
-  // + humans upstreams. Mirrors prototype line 2544.
-  const seen = new Set<string>(["pencil", "bread"]);
-  for (const id of upstreamWithin(live.snapshot, "pencil", 3)) seen.add(id);
-  for (const id of upstreamWithin(live.snapshot, "bread", 2)) seen.add(id);
-  for (const id of upstreamWithin(live.snapshot, "humans", 4)) seen.add(id);
+  // + humans upstreams. Mirrors prototype line 2544. Keyed by node uuid.
+  const seen = new Set<string>();
+  const seedSlug = (slug: string) => {
+    const id = idForSlug(slug);
+    if (id) seen.add(id);
+  };
+  seedSlug("pencil");
+  seedSlug("bread");
+  for (const id of upstreamSlug("pencil", 3)) seen.add(id);
+  for (const id of upstreamSlug("bread", 2)) seen.add(id);
+  for (const id of upstreamSlug("humans", 4)) seen.add(id);
   const sortedItems = [...nodes.values()].sort(
     (a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier),
   );
@@ -91,28 +110,28 @@ export default async function PricingPage() {
   const livingSeen = livingNodes.filter((n) => seen.has(n.id)).length;
   const goalRows = [
     {
-      node: nodes.get("gold"),
+      node: nodeBySlug("gold"),
       title: "Meet every element",
       done: elementSeen,
       total: Math.max(1, elementNodes.length),
       label: null as string | null,
     },
     {
-      node: nodes.get("LUCA"),
+      node: nodeBySlug("luca"),
       title: "Explore the tree of life",
       done: livingSeen,
       total: Math.max(1, livingNodes.length),
       label: null,
     },
     {
-      node: nodes.get("pencil"),
+      node: nodeBySlug("pencil"),
       title: "Make a pencil in under 5 minutes",
       done: 1,
       total: 1,
       label: "Done in 4:12",
     },
     {
-      node: nodes.get("big bang"),
+      node: nodeBySlug("big-bang"),
       title: "Daily link streak",
       done: 3,
       total: 5,
@@ -123,24 +142,24 @@ export default async function PricingPage() {
   );
 
   // Weekly mock items (pure example, but uses real nodes for the icons).
-  const weeklyDone = nodes.get("humans");
-  const weeklyFav = nodes.get("neutron star merger");
-  const weeklyBadge = nodes.get("gold");
+  const weeklyDone = nodeBySlug("humans");
+  const weeklyFav = nodeBySlug("neutron-star-merger");
+  const weeklyBadge = nodeBySlug("gold");
 
   // Sponsor trail chain + icon for humans.
-  const sponsorChain = SPONSOR_TRAIL.map((id) => nodes.get(id)).filter(
+  const sponsorChain = SPONSOR_TRAIL.map((slug) => nodeBySlug(slug)).filter(
     (n): n is GraphNode => Boolean(n),
   );
-  const sponsorHero = nodes.get("humans");
+  const sponsorHero = nodeBySlug("humans");
 
   // Junior example: sheep.
-  const juniorNode = nodes.get("sheep");
+  const juniorNode = nodeBySlug("sheep");
 
   // Guided trails list.
-  const trails = TRAILS.map(([title, id]) => {
-    const n = nodes.get(id);
+  const trails = TRAILS.map(([title, slug]) => {
+    const n = nodeBySlug(slug);
     if (!n) return null;
-    return { title, node: n, count: ancestors(live.snapshot, id).size };
+    return { title, node: n, count: ancestors(live.snapshot, n.id).size };
   }).filter(
     (t): t is NonNullable<typeof t> => Boolean(t),
   );
@@ -507,7 +526,7 @@ export default async function PricingPage() {
                       {famNodes.map((n) => (
                         <Chip
                           key={n.id}
-                          slug={n.id}
+                          slug={n.slug}
                           name={cap(n.name)}
                           tier={n.tier}
                           kind={n.kind}
@@ -743,7 +762,7 @@ export default async function PricingPage() {
                   >
                     {i > 0 && <span>→</span>}
                     <Chip
-                      slug={n.id}
+                      slug={n.slug}
                       name={cap(n.name)}
                       tier={n.tier}
                       kind={n.kind}

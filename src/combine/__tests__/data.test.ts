@@ -6,6 +6,11 @@ import { buildThemeBundle } from "../data";
 import { computeRefine } from "../levels";
 
 const snapshot = buildSnapshot(toRows(loadKnowledgeBase()));
+const id = (slug: string): string => {
+  const n = snapshot.bySlug.get(slug);
+  if (!n) throw new Error(`missing node for slug ${slug}`);
+  return n.id;
+};
 
 describe("buildThemeBundle", () => {
   const everyday = buildThemeBundle(snapshot, "everyday");
@@ -144,19 +149,19 @@ describe("buildThemeBundle", () => {
 describe("computeRefine", () => {
   it("raw stuff is 0", () => {
     const r = computeRefine(snapshot);
-    expect(r.get("hydrogen")).toBe(0);
-    expect(r.get("sheep")).toBe(0);
-    expect(r.get("big-bang")).toBe(0);
+    expect(r.get(id("hydrogen"))).toBe(0);
+    expect(r.get(id("sheep"))).toBe(0);
+    expect(r.get(id("big-bang"))).toBe(0);
   });
 
   it("made things step up from raw", () => {
     const r = computeRefine(snapshot);
     // Tier-N stuff is raw: 0.
-    expect(r.get("water")).toBe(0);
-    expect(r.get("iron-ore")).toBe(0);
+    expect(r.get(id("water"))).toBe(0);
+    expect(r.get(id("iron-ore"))).toBe(0);
     // Processed materials and composed things step up.
-    const flour = r.get("flour") ?? 0;
-    const bread = r.get("bread") ?? 0;
+    const flour = r.get(id("flour")) ?? 0;
+    const bread = r.get(id("bread")) ?? 0;
     expect(flour).toBeGreaterThan(0);
     expect(bread).toBeGreaterThan(flour);
   });

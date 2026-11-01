@@ -43,16 +43,14 @@ export async function POST(req: NextRequest) {
     }
 
     const live = await getLiveSnapshot();
-    const have = new Set<string>(["big-bang"]);
+    const have = new Set<string>();
+    const bigBang = live.snapshot.bySlug.get("big-bang");
+    if (bigBang) have.add(bigBang.id);
     for (const c of body.haveCodes as string[]) {
-      const id = live.itemCodes.toId(c);
-      if (id) have.add(id);
+      const n = live.nodeByCode(c);
+      if (n) have.add(n.id);
     }
-    const makeId = live.itemCodes.toId(body.makeCode as string);
-    if (!makeId) {
-      return NextResponse.json({ error: "not_found" }, { status: 404 });
-    }
-    const node = live.snapshot.nodes.get(makeId);
+    const node = live.nodeByCode(body.makeCode as string);
     if (!node) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
@@ -64,16 +62,13 @@ export async function POST(req: NextRequest) {
       typeof body.targetCode === "string" && isValidCode(body.targetCode)
         ? body.targetCode
         : null;
-    const targetId = targetCode ? live.itemCodes.toId(targetCode) : null;
-
-    const newHave = new Set(have);
-    newHave.add(makeId);
+    const targetNode = targetCode ? live.nodeByCode(targetCode) : null;
 
     return NextResponse.json({
       ok: true,
       item: {
         code: body.makeCode,
-        slug: node.id,
+        slug: node.slug,
         name: node.name,
         tier: node.tier,
         kind: node.kind,
@@ -81,7 +76,7 @@ export async function POST(req: NextRequest) {
         fact: node.fact,
         firstAppeared: node.firstAppeared,
       },
-      won: targetId ? makeId === targetId : false,
+      won: targetNode ? node.id === targetNode.id : false,
     });
   }) as Promise<Response>;
 }

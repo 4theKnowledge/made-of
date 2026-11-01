@@ -14,18 +14,23 @@ import type { SeedRows } from "../data/rows";
 import type { GraphEdge, GraphNode, PathStep } from "./types";
 
 export interface Snapshot {
+  /** Keyed by item uuid. */
   nodes: Map<string, GraphNode>;
   /** Convenience lookup by original artifact name (e.g. "big bang"). */
   byName: Map<string, GraphNode>;
+  /** Convenience lookup by URL slug (e.g. "big-bang"). */
+  bySlug: Map<string, GraphNode>;
 }
 
 export function buildSnapshot(rows: SeedRows): Snapshot {
   const nodes = new Map<string, GraphNode>();
   const byName = new Map<string, GraphNode>();
+  const bySlug = new Map<string, GraphNode>();
 
   for (const it of rows.items) {
     const node: GraphNode = {
-      id: it.id,
+      id: it.id!,
+      slug: it.slug,
       name: it.name,
       tier: it.tier,
       kind: it.kind,
@@ -42,13 +47,14 @@ export function buildSnapshot(rows: SeedRows): Snapshot {
       down: [],
       neighbours: [],
     };
-    nodes.set(it.id, node);
+    nodes.set(node.id, node);
     byName.set(it.name, node);
+    bySlug.set(it.slug, node);
   }
 
   for (const r of rows.recipes) {
     const n = nodes.get(r.itemId);
-    if (!n) continue;
+    if (!n || !r.id) continue;
     n.recipes.push({
       id: r.id,
       label: r.label ?? null,
@@ -61,9 +67,10 @@ export function buildSnapshot(rows: SeedRows): Snapshot {
   // representative when the same (type, source, target) appears in several
   // of the source's recipes.
   for (const l of rows.links) {
+    if (!l.id) continue;
     const srcId = l.recipeId
       ? recipeOwner(rows, l.recipeId)
-      : l.itemId!;
+      : l.itemId ?? null;
     const src = srcId ? nodes.get(srcId) : null;
     const dst = nodes.get(l.targetItemId);
     if (!src || !dst) continue;
@@ -103,7 +110,7 @@ export function buildSnapshot(rows: SeedRows): Snapshot {
     n.neighbours = [...nbSet];
   }
 
-  return { nodes, byName };
+  return { nodes, byName, bySlug };
 }
 
 /**
@@ -144,7 +151,11 @@ const recipeToItem = new WeakMap<SeedRows, Map<string, string>>();
 function recipeOwner(rows: SeedRows, recipeId: string): string | null {
   let map = recipeToItem.get(rows);
   if (!map) {
-    map = new Map(rows.recipes.map((r) => [r.id, r.itemId]));
+    map = new Map(
+      rows.recipes
+        .filter((r): r is typeof r & { id: string } => Boolean(r.id))
+        .map((r) => [r.id, r.itemId]),
+    );
     recipeToItem.set(rows, map);
   }
   return map.get(recipeId) ?? null;

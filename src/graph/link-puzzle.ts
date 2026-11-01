@@ -53,16 +53,21 @@ export async function resolvePuzzle(
     if (!isValidCode(start) || !isValidCode(goal)) {
       return { ok: false, status: 400, error: "bad_request" };
     }
-    const startId = live.itemCodes.toId(start);
-    const goalId = live.itemCodes.toId(goal);
-    if (!startId || !goalId) {
+    const startNode = live.nodeByCode(start);
+    const goalNode = live.nodeByCode(goal);
+    if (!startNode || !goalNode) {
       return { ok: false, status: 404, error: "no_puzzle" };
     }
-    const par = freeplayPar(live.snapshot, startId, goalId, live.closed);
+    const par = freeplayPar(
+      live.snapshot,
+      startNode.id,
+      goalNode.id,
+      live.closed,
+    );
     if (par === null) {
       return { ok: false, status: 422, error: "no_path" };
     }
-    return { ok: true, startId, goalId, par };
+    return { ok: true, startId: startNode.id, goalId: goalNode.id, par };
   }
 
   const date = body?.date ?? todayKeyUtc();

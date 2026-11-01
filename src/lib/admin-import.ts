@@ -112,8 +112,7 @@ export async function runImport(
   // Preserve canaries across the import. If an item that a canary targets
   // isn't in the payload, drop the canary with a warning rather than failing
   // the whole import — admins can re-add later.
-  const itemIds = new Set(rows.items.map((i) => i.id));
-  const canaries = buildCanaryLinks(itemIds);
+  const canaries = buildCanaryLinks(rows.itemIdBySlug);
   if (canaries.missing.length > 0) {
     warnings.push(`Canary links skipped (unknown items): ${canaries.missing.join(", ")}`);
   }

@@ -22,7 +22,12 @@ export async function GET(req: NextRequest) {
   const db = getDb();
   const conds = [];
   if (q) {
-    conds.push(or(ilike(schema.items.name, `%${q}%`), ilike(schema.items.id, `%${q}%`)));
+    conds.push(
+      or(
+        ilike(schema.items.name, `%${q}%`),
+        ilike(schema.items.slug, `%${q}%`),
+      ),
+    );
   }
   if (status) conds.push(eq(schema.items.status, status));
   if (tier) conds.push(eq(schema.items.tier, tier));
@@ -65,26 +70,38 @@ export async function POST(req: NextRequest) {
   if (!tier) return NextResponse.json({ error: "tier_required" }, { status: 400 });
   if (!kind) return NextResponse.json({ error: "kind_required" }, { status: 400 });
 
-  const id = slug(name);
-  if (!id) return NextResponse.json({ error: "bad_slug" }, { status: 400 });
+  const itemSlug = slug(name);
+  if (!itemSlug) return NextResponse.json({ error: "bad_slug" }, { status: 400 });
 
   const db = getDb();
-  const existing = await db.select({ id: schema.items.id }).from(schema.items).where(eq(schema.items.id, id)).limit(1);
-  if (existing.length) return NextResponse.json({ error: "already_exists", id }, { status: 409 });
+  const existing = await db
+    .select({ id: schema.items.id })
+    .from(schema.items)
+    .where(eq(schema.items.slug, itemSlug))
+    .limit(1);
+  if (existing.length) {
+    return NextResponse.json(
+      { error: "already_exists", slug: itemSlug },
+      { status: 409 },
+    );
+  }
 
-  await db.insert(schema.items).values({
-    id,
-    name: name.toLowerCase(),
-    tier,
-    kind,
-    firstAppeared: (body.firstAppeared as string | null) ?? null,
-    firstAppearedYa: null,
-    symbol: (body.symbol as string | null) ?? null,
-    fact: (body.fact as string | undefined) ?? "",
-    status: "draft",
-    isCanary: false,
-    tags: Array.isArray(body.tags) ? (body.tags as string[]) : [],
-  });
+  const [inserted] = await db
+    .insert(schema.items)
+    .values({
+      slug: itemSlug,
+      name: name.toLowerCase(),
+      tier,
+      kind,
+      firstAppeared: (body.firstAppeared as string | null) ?? null,
+      firstAppearedYa: null,
+      symbol: (body.symbol as string | null) ?? null,
+      fact: (body.fact as string | undefined) ?? "",
+      status: "draft",
+      isCanary: false,
+      tags: Array.isArray(body.tags) ? (body.tags as string[]) : [],
+    })
+    .returning({ id: schema.items.id });
 
-  return NextResponse.json({ id }, { status: 201 });
+  return NextResponse.json({ id: inserted.id, slug: itemSlug }, { status: 201 });
 }

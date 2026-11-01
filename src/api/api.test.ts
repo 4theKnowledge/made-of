@@ -7,6 +7,7 @@ import { buildSnapshot } from "../graph/snapshot";
 import { buildCodeMap } from "../graph/codes";
 import { buildClosedSet } from "../graph/link";
 import {
+  makeLiveSnapshot,
   setLiveSnapshotForTesting,
   type LiveSnapshot,
 } from "../graph/live";
@@ -19,19 +20,27 @@ import { GET as getEverything } from "../app/api/items/[code]/everything/route";
 /* Build an in-memory LiveSnapshot from the knowledge base + canaries. No DB needed. */
 function buildFixture(): LiveSnapshot {
   const rows = toRows(loadKnowledgeBase());
-  const canaries = buildCanaryLinks(new Set(rows.items.map((i) => i.id)));
+  const canaries = buildCanaryLinks(rows.itemIdBySlug);
   rows.links.push(...canaries.links);
   const snapshot = buildSnapshot(rows);
   const itemCodes = buildCodeMap(
-    [...snapshot.nodes.keys()],
+    [...snapshot.nodes.values()].map((n) => n.slug),
     "test-seed",
   );
   const linkCodes = buildCodeMap(
-    rows.links.map((l) => l.id),
+    rows.links
+      .map((l) => l.id)
+      .filter((id): id is string => Boolean(id)),
     "test-seed:links",
   );
   const closed = buildClosedSet(snapshot);
-  return { snapshot, itemCodes, linkCodes, closed, version: 1 };
+  return makeLiveSnapshot({
+    snapshot,
+    itemCodes,
+    linkCodes,
+    closed,
+    version: 1,
+  });
 }
 
 let live: LiveSnapshot;

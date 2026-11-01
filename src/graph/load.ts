@@ -61,6 +61,11 @@ export async function loadRowsFromDb(opts?: {
     linkEvidence: [],
     evidenceSources: [],
     sources: [],
+    // Lookup maps are only populated when building rows from the knowledge
+    // base. Reading straight from the DB leaves them empty.
+    itemIdByName: new Map(),
+    itemIdBySlug: new Map(),
+    sourceIdByCode: new Map(),
     stats: {
       items: items.length,
       links: liveLinks.length,

@@ -46,18 +46,20 @@ export async function POST(req: NextRequest) {
     }
 
     const live = await getLiveSnapshot();
-    const have = new Set<string>(["big-bang"]);
+    const have = new Set<string>();
+    const bigBang = live.snapshot.bySlug.get("big-bang");
+    if (bigBang) have.add(bigBang.id);
     for (const c of body.haveCodes as string[]) {
-      const id = live.itemCodes.toId(c);
-      if (id) have.add(id);
+      const n = live.nodeByCode(c);
+      if (n) have.add(n.id);
     }
-    const targetId = live.itemCodes.toId(body.targetCode as string);
-    if (!targetId) {
+    const targetNode = live.nodeByCode(body.targetCode as string);
+    if (!targetNode) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
     const c = costs(live.snapshot, have);
-    const miss = missing(live.snapshot, targetId, have, c);
+    const miss = missing(live.snapshot, targetNode.id, have, c);
 
     // Pick a missing item the player can craft right now; prefer the one
     // closest to ready (fewer sub-requirements remaining).
@@ -78,9 +80,9 @@ export async function POST(req: NextRequest) {
     if (!bestHint) return NextResponse.json({ hint: null });
 
     const node = live.snapshot.nodes.get(bestHint)!;
-    const code = live.itemCodes.toCode(bestHint);
+    const code = live.itemCodes.toCode(node.slug);
     return NextResponse.json({
-      hint: { code, slug: node.id, name: node.name },
+      hint: { code, slug: node.slug, name: node.name },
     });
   }) as Promise<Response>;
 }

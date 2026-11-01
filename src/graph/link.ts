@@ -129,9 +129,10 @@ export function generatePuzzle(
   if (picked) {
     return { date, n, startId: picked.a, goalId: picked.b, par: picked.par };
   }
-  // Fallback to a known pair.
-  const fallbackStart = snap.nodes.has("sheep") ? "sheep" : pool[0];
-  const fallbackGoal = snap.nodes.has("internet") ? "internet" : pool[pool.length - 1];
+  // Fallback to a known pair, resolving slugs through the snapshot.
+  const fallbackStart = snap.bySlug.get("sheep")?.id ?? pool[0];
+  const fallbackGoal =
+    snap.bySlug.get("internet")?.id ?? pool[pool.length - 1];
   const dist = bfsOpen(snap, fallbackStart, closed).get(fallbackGoal) ?? 1;
   return { date, n, startId: fallbackStart, goalId: fallbackGoal, par: dist };
 }

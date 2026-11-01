@@ -13,23 +13,24 @@ import type {
   ExploreView,
 } from "@/components/explore/types";
 
-const ORIGIN = "big-bang";
+const ORIGIN_SLUG = "big-bang";
 
 export async function getExploreView(
   slug: string,
   opts: { includeCanary?: boolean } = {},
 ): Promise<ExploreView | null> {
   const live = await getLiveSnapshot();
-  const node = live.snapshot.nodes.get(slug);
+  const node = live.snapshot.bySlug.get(slug);
   if (!node) return null;
   const includeCanary = opts.includeCanary ?? false;
 
   const toItem = (id: string): ExploreItem | null => {
     const n = live.snapshot.nodes.get(id);
-    const code = live.itemCodes.toCode(id);
-    if (!n || !code) return null;
+    if (!n) return null;
+    const code = live.itemCodes.toCode(n.slug);
+    if (!code) return null;
     return {
-      slug: n.id,
+      slug: n.slug,
       code,
       name: n.name,
       tier: n.tier,
@@ -56,7 +57,7 @@ export async function getExploreView(
     };
   };
 
-  const item = toItem(slug)!;
+  const item = toItem(node.id)!;
   const up = node.up
     .map(toEdge)
     .filter((e): e is ExploreEdge => e !== null);
@@ -67,8 +68,9 @@ export async function getExploreView(
   // Chain from big bang → this item.
   let originChain: ExploreItem[] = [];
   let stepsFromBigBang: number | null = null;
-  if (live.snapshot.nodes.has(ORIGIN)) {
-    const path = shortestPath(live.snapshot, ORIGIN, slug);
+  const origin = live.snapshot.bySlug.get(ORIGIN_SLUG);
+  if (origin) {
+    const path = shortestPath(live.snapshot, origin.id, node.id);
     if (path) {
       originChain = path
         .map((p) => toItem(p.id))
@@ -77,7 +79,7 @@ export async function getExploreView(
     }
   }
 
-  const ancestorCount = ancestors(live.snapshot, slug).size;
+  const ancestorCount = ancestors(live.snapshot, node.id).size;
 
   return {
     item,

@@ -28,11 +28,11 @@ export default async function NotFound() {
   }> = [];
   try {
     const live = await getLiveSnapshot();
-    picks = POPULAR.map((slug) => live.snapshot.nodes.get(slug))
+    picks = POPULAR.map((slug) => live.snapshot.bySlug.get(slug))
       .filter((n): n is NonNullable<typeof n> => Boolean(n))
       .slice(0, 6)
       .map((n) => ({
-        id: n.id,
+        id: n.slug,
         name: n.name,
         tier: n.tier,
         kind: n.kind,

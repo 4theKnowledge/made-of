@@ -58,14 +58,16 @@ function shape(
 ): ApiItem {
   const recipeCodes = new Map<string, string>();
   const recipes = node.recipes.map((r, i) => {
-    const code = `r${i}:${live.itemCodes.toCode(node.id) ?? ""}`;
+    const code = `r${i}:${live.itemCodes.toCode(node.slug) ?? ""}`;
     recipeCodes.set(r.id, code);
     return { code, label: r.label, position: r.position };
   });
 
   const toEdge = (e: GraphEdge): ApiEdge | null => {
     if (!opts.includeCanary && e.isCanary) return null;
-    const item = live.itemCodes.toCode(e.id);
+    const otherSlug = live.snapshot.nodes.get(e.id)?.slug;
+    if (!otherSlug) return null;
+    const item = live.itemCodes.toCode(otherSlug);
     const code = live.linkCodes.toCode(e.linkId);
     if (!item || !code) return null;
     const out: ApiEdge = {
@@ -85,8 +87,8 @@ function shape(
   const down = node.down.map(toEdge).filter((e): e is ApiEdge => e !== null);
 
   return {
-    code: live.itemCodes.toCode(node.id) ?? "",
-    slug: node.id,
+    code: live.itemCodes.toCode(node.slug) ?? "",
+    slug: node.slug,
     name: node.name,
     tier: node.tier,
     recipes,

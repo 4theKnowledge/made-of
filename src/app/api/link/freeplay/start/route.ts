@@ -36,33 +36,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "bad_request" }, { status: 400 });
     }
     const live = await getLiveSnapshot();
-    const startId = live.itemCodes.toId(body.start);
-    const goalId = live.itemCodes.toId(body.goal);
-    if (!startId || !goalId) {
+    const startNode = live.nodeByCode(body.start);
+    const goalNode = live.nodeByCode(body.goal);
+    if (!startNode || !goalNode) {
       return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
     }
-    if (startId === goalId) {
+    if (startNode.id === goalNode.id) {
       return NextResponse.json({ ok: false, error: "same_item" }, { status: 422 });
     }
-    const par = freeplayPar(live.snapshot, startId, goalId, live.closed);
+    const par = freeplayPar(
+      live.snapshot,
+      startNode.id,
+      goalNode.id,
+      live.closed,
+    );
     if (par === null) {
       return NextResponse.json({ ok: false, error: "no_path" }, { status: 422 });
     }
 
-    const startNode = live.snapshot.nodes.get(startId)!;
-    const goalNode = live.snapshot.nodes.get(goalId)!;
     return NextResponse.json({
       ok: true,
       par,
       start: {
-        code: live.itemCodes.toCode(startId),
+        code: live.itemCodes.toCode(startNode.slug),
         name: startNode.name,
         tier: startNode.tier,
         kind: startNode.kind,
         symbol: startNode.symbol,
       },
       goal: {
-        code: live.itemCodes.toCode(goalId),
+        code: live.itemCodes.toCode(goalNode.slug),
         name: goalNode.name,
         tier: goalNode.tier,
         kind: goalNode.kind,

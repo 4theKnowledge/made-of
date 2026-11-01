@@ -22,8 +22,7 @@ async function main() {
 
   // Plant the canary links. If any referenced slug is missing (because the
   // artifact changed), fail loudly — a stale canary set is worse than none.
-  const itemIds = new Set(rows.items.map((i) => i.id));
-  const canaries = buildCanaryLinks(itemIds);
+  const canaries = buildCanaryLinks(rows.itemIdBySlug);
   if (canaries.missing.length > 0) {
     throw new Error(
       `Canary set references unknown items: ${canaries.missing.join(", ")}`,

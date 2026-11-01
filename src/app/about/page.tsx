@@ -102,7 +102,7 @@ export default async function AboutPage() {
   // Build tier example chip lists.
   const tiersExamples = TIER_ORDER.map((t) => {
     const wanted = TIER_EXAMPLES[t]
-      .map((slug) => live.snapshot.nodes.get(slug))
+      .map((slug) => live.snapshot.bySlug.get(slug))
       .filter((n): n is NonNullable<typeof n> => Boolean(n));
     const inTier = [...live.snapshot.nodes.values()].filter(
       (n) => n.tier === t,
@@ -162,7 +162,7 @@ export default async function AboutPage() {
                     {examples.map((n) => (
                       <Chip
                         key={n.id}
-                        slug={n.id}
+                        slug={n.slug}
                         name={cap(n.name)}
                         tier={n.tier}
                         kind={n.kind}

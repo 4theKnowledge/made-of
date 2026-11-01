@@ -44,14 +44,14 @@ export async function GET(req: NextRequest) {
       date: puzzle.date,
       number: puzzle.n,
       start: {
-        code: live.itemCodes.toCode(startNode.id),
+        code: live.itemCodes.toCode(startNode.slug),
         name: startNode.name,
         tier: startNode.tier,
         kind: startNode.kind,
         symbol: startNode.symbol,
       },
       goal: {
-        code: live.itemCodes.toCode(goalNode.id),
+        code: live.itemCodes.toCode(goalNode.slug),
         name: goalNode.name,
         tier: goalNode.tier,
         kind: goalNode.kind,

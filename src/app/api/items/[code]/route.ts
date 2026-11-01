@@ -21,11 +21,11 @@ export async function GET(
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
     const live = await getLiveSnapshot();
-    const id = live.itemCodes.toId(code);
-    if (!id) {
+    const slug = live.itemCodes.toId(code);
+    if (!slug) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
-    const node = live.snapshot.nodes.get(id);
+    const node = live.snapshot.bySlug.get(slug);
     if (!node) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }

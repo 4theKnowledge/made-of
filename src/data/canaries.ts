@@ -17,6 +17,7 @@
  * of the ~500 non-evidenced legit links, so canaries blend in.
  */
 
+import { randomUUID } from "node:crypto";
 import type { NewLink } from "../db/schema";
 
 export interface CanarySpec {
@@ -59,29 +60,31 @@ export const CANARIES: CanarySpec[] = [
 
 /**
  * Build the link rows. Attached as item-level links (recipe_id null) so they
- * do not pollute an existing recipe. The seed script is responsible for
- * ensuring all referenced slugs exist.
+ * do not pollute an existing recipe. The caller supplies a slug → item uuid
+ * map so canaries can reference existing items by their stable id.
  */
 export function buildCanaryLinks(
-  itemIds: Set<string>,
+  itemIdBySlug: Map<string, string>,
 ): { links: NewLink[]; missing: string[] } {
   const links: NewLink[] = [];
   const missing: string[] = [];
   for (const c of CANARIES) {
-    if (!itemIds.has(c.srcSlug)) {
+    const src = itemIdBySlug.get(c.srcSlug);
+    if (!src) {
       missing.push(c.srcSlug);
       continue;
     }
-    if (!itemIds.has(c.targetSlug)) {
+    const target = itemIdBySlug.get(c.targetSlug);
+    if (!target) {
       missing.push(c.targetSlug);
       continue;
     }
     links.push({
-      id: `canary:${c.srcSlug}:${c.type}:${c.targetSlug}`,
+      id: randomUUID(),
       recipeId: null,
-      itemId: c.srcSlug,
+      itemId: src,
       type: c.type,
-      targetItemId: c.targetSlug,
+      targetItemId: target,
       confidence: "strong",
       note: c.note,
       isCanary: true,

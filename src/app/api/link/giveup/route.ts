@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     const steps = path.map((p) => {
       const node = live.snapshot.nodes.get(p.id)!;
       return {
-        code: live.itemCodes.toCode(p.id),
+        code: live.itemCodes.toCode(node.slug),
         name: node.name,
         tier: node.tier,
         kind: node.kind,

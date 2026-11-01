@@ -17,7 +17,10 @@ export interface GraphEdge {
 }
 
 export interface GraphNode {
+  /** Opaque uuid primary key. */
   id: string;
+  /** URL-safe slug (`big-bang`). Unique and stable across renames. */
+  slug: string;
   name: string;
   tier: Tier;
   kind: ItemKind;

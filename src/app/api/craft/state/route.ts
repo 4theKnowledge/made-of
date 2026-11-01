@@ -55,24 +55,21 @@ export async function POST(req: NextRequest) {
 
     const have = new Set<string>();
     for (const c of body.haveCodes as string[]) {
-      const id = live.itemCodes.toId(c);
-      if (id) have.add(id);
+      const n = live.nodeByCode(c);
+      if (n) have.add(n.id);
     }
     // The big bang is always in `have` — enforce server-side.
-    have.add("big-bang");
+    const bigBang = live.snapshot.bySlug.get("big-bang");
+    if (bigBang) have.add(bigBang.id);
 
-    const targetId = live.itemCodes.toId(body.targetCode);
-    if (!targetId) {
-      return NextResponse.json({ error: "not_found" }, { status: 404 });
-    }
-    const targetNode = live.snapshot.nodes.get(targetId);
+    const targetNode = live.nodeByCode(body.targetCode);
     if (!targetNode) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
     const c = costs(live.snapshot, have);
-    const miss = missing(live.snapshot, targetId, have, c);
-    const won = have.has(targetId);
+    const miss = missing(live.snapshot, targetNode.id, have, c);
+    const won = have.has(targetNode.id);
 
     // Target card: recipes list with per-input codes.
     const targetView = viewOf(targetNode, body.targetCode as string);
@@ -81,18 +78,19 @@ export async function POST(req: NextRequest) {
       label: r.label,
       position: r.position,
       requires: r.requires
-        .map((slug) => {
-          const n = live.snapshot.nodes.get(slug);
-          const code = live.itemCodes.toCode(slug);
-          if (!n || !code) return null;
+        .map((id) => {
+          const n = live.snapshot.nodes.get(id);
+          if (!n) return null;
+          const code = live.itemCodes.toCode(n.slug);
+          if (!code) return null;
           return {
-            slug,
+            slug: n.slug,
             code,
             name: n.name,
             tier: n.tier,
             kind: n.kind,
             symbol: n.symbol,
-            have: have.has(slug),
+            have: have.has(id),
           };
         })
         .filter(
@@ -105,7 +103,7 @@ export async function POST(req: NextRequest) {
     const readyItems: ReturnType<typeof viewOf>[] = [];
     for (const n of live.snapshot.nodes.values()) {
       if (canMakeNow(n, have)) {
-        const code = live.itemCodes.toCode(n.id);
+        const code = live.itemCodes.toCode(n.slug);
         if (code) readyItems.push(viewOf(n, code));
       }
     }
@@ -114,7 +112,7 @@ export async function POST(req: NextRequest) {
       target: targetView,
       targetRecipes,
       bestRecipeIndex,
-      par: parFor(live.snapshot, targetId),
+      par: parFor(live.snapshot, targetNode.id),
       ready: readyItems,
       missing: miss.size,
       won,

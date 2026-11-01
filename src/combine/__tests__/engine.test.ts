@@ -34,6 +34,7 @@ function fakeBundle(opts: {
   const ingredients = new Set(opts.recipes.flatMap((r) => r.all));
   const items = new Map<string, {
     id: string;
+    slug: string;
     name: string;
     tier: "F" | "N" | "M" | "C" | "P" | "S";
     symbol: string | null;
@@ -45,6 +46,7 @@ function fakeBundle(opts: {
     const tier = (opts.tiers?.[id] ?? "M") as "M";
     items.set(id, {
       id,
+      slug: id,
       name: id,
       tier,
       symbol: null,

@@ -191,6 +191,7 @@ function makeItemView(node: GraphNode): CombineItem {
   }
   return {
     id: node.id,
+    slug: node.slug,
     name: node.name,
     tier: node.tier,
     symbol: node.symbol,

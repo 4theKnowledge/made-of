@@ -34,6 +34,8 @@ export interface CombineRecipe {
 /** Light view of an item for Combine — just what tiles and cards need. */
 export interface CombineItem {
   id: string;
+  /** URL slug for the Explore link. */
+  slug: string;
   name: string;
   tier: Tier;
   symbol: string | null;

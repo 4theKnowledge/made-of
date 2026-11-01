@@ -37,14 +37,14 @@ export async function GET(
         return NextResponse.json({ error: "not_found" }, { status: 404 });
       }
       const live = await getLiveSnapshot();
-      const id = live.itemCodes.toId(code);
-      if (!id) {
+      const node = live.nodeByCode(code);
+      if (!node) {
         return NextResponse.json({ error: "not_found" }, { status: 404 });
       }
-      const r = everything(live.snapshot, id);
+      const r = everything(live.snapshot, node.id);
       return NextResponse.json({
         items: r.items
-          .map((x) => live.itemCodes.toCode(x))
+          .map((x) => live.codeForId(x))
           .filter((c): c is string => Boolean(c)),
       });
     },

@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "bad_request" }, { status: 400 });
     }
     const live = await getLiveSnapshot();
-    const fromId = live.itemCodes.toId(body.from);
-    if (!fromId) {
+    const fromNode = live.nodeByCode(body.from);
+    if (!fromNode) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
     const puzzle = await resolvePuzzle(live, body);
@@ -35,7 +35,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: puzzle.error }, { status: puzzle.status });
     }
 
-    const hintId = nextHint(live.snapshot, live.closed, fromId, puzzle.goalId);
+    const hintId = nextHint(
+      live.snapshot,
+      live.closed,
+      fromNode.id,
+      puzzle.goalId,
+    );
     if (!hintId) return NextResponse.json({ hint: null });
 
     const node = live.snapshot.nodes.get(hintId)!;
@@ -43,7 +48,6 @@ export async function POST(req: NextRequest) {
     // Recipe-context clause: if the hint target is reached via a *non-primary*
     // recipe of the current item, surface the recipe label so the player can
     // find the chip quickly. Mirrors the prototype (around line 2085).
-    const fromNode = live.snapshot.nodes.get(fromId)!;
     let recipeLabel: string | null = null;
     if (fromNode.recipes.length > 1) {
       const primaryId = fromNode.recipes[0]?.id ?? null;
@@ -63,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       hint: {
-        code: live.itemCodes.toCode(hintId),
+        code: live.itemCodes.toCode(node.slug),
         name: node.name,
         recipeLabel,
       },

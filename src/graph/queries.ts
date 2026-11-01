@@ -51,10 +51,10 @@ export async function getItemPage(
   opts: { includeCanary?: boolean } = {},
 ): Promise<PageItem | null> {
   const live = await getLiveSnapshot();
-  const node = live.snapshot.nodes.get(slug);
+  const node = live.snapshot.bySlug.get(slug);
   if (!node) return null;
 
-  const code = live.itemCodes.toCode(node.id);
+  const code = live.itemCodes.toCode(node.slug);
   if (!code) return null;
 
   const includeCanary = opts.includeCanary ?? false;
@@ -62,9 +62,10 @@ export async function getItemPage(
   const toPageEdge = (e: GraphEdge): PageEdge | null => {
     if (!includeCanary && e.isCanary) return null;
     const target = live.snapshot.nodes.get(e.id);
-    const targetCode = live.itemCodes.toCode(e.id);
+    if (!target) return null;
+    const targetCode = live.itemCodes.toCode(target.slug);
     const linkCode = live.linkCodes.toCode(e.linkId);
-    if (!target || !targetCode || !linkCode) return null;
+    if (!targetCode || !linkCode) return null;
     return {
       type: e.type,
       confidence: e.confidence,
@@ -72,7 +73,7 @@ export async function getItemPage(
       linkId: e.linkId,
       linkCode,
       item: {
-        slug: target.id,
+        slug: target.slug,
         code: targetCode,
         name: target.name,
         tier: target.tier,
@@ -83,7 +84,7 @@ export async function getItemPage(
   };
 
   return {
-    slug: node.id,
+    slug: node.slug,
     code,
     name: node.name,
     tier: node.tier,

@@ -15,12 +15,20 @@ import { buildClosedSet } from "./link";
 
 export interface LiveSnapshot {
   snapshot: Snapshot;
+  /** Code map keyed by slug (not uuid), so the public API can stay slug-ish
+   *  without ever exposing slugs directly. Resolve code -> slug -> node via
+   *  `snapshot.bySlug`, or use the `codeForId` / `nodeByCode` helpers below. */
   itemCodes: CodeMap<string>;
+  /** Code map keyed by link uuid. */
   linkCodes: CodeMap<string>;
-  /** Items closed in daily puzzles (fundamentals + 10 busiest hubs). */
+  /** Item uuids closed in daily puzzles (fundamentals + 10 busiest hubs). */
   closed: Set<string>;
   /** Monotonic version id; bumped on every reload. */
   version: number;
+  /** Code for an item uuid, going through the slug map. */
+  codeForId(id: string): string | undefined;
+  /** Node for a public code. */
+  nodeByCode(code: string): import("./types").GraphNode | undefined;
 }
 
 /**
@@ -72,12 +80,38 @@ export function setLiveSnapshotForTesting(snap: LiveSnapshot | null) {
 async function buildLive(): Promise<LiveSnapshot> {
   const rows = await loadRowsFromDb({ liveOnly: true });
   const snapshot = buildSnapshot(rows);
-  const itemCodes = buildCodeMap([...snapshot.nodes.keys()], slot.codeSeed);
+  const itemCodes = buildCodeMap(
+    [...snapshot.nodes.values()].map((n) => n.slug),
+    slot.codeSeed,
+  );
   const linkCodes = buildCodeMap(
-    rows.links.map((l) => l.id),
+    rows.links.map((l) => l.id!),
     slot.codeSeed + ":links",
   );
   const closed = buildClosedSet(snapshot);
   slot.version += 1;
-  return { snapshot, itemCodes, linkCodes, closed, version: slot.version };
+  return makeLiveSnapshot({
+    snapshot,
+    itemCodes,
+    linkCodes,
+    closed,
+    version: slot.version,
+  });
+}
+
+type LiveSnapshotData = Omit<LiveSnapshot, "codeForId" | "nodeByCode">;
+
+/** Attach the helper methods. Exported so tests can wrap an in-memory fixture. */
+export function makeLiveSnapshot(data: LiveSnapshotData): LiveSnapshot {
+  return {
+    ...data,
+    codeForId(id) {
+      const slug = data.snapshot.nodes.get(id)?.slug;
+      return slug ? data.itemCodes.toCode(slug) : undefined;
+    },
+    nodeByCode(code) {
+      const slug = data.itemCodes.toId(code);
+      return slug ? data.snapshot.bySlug.get(slug) : undefined;
+    },
+  };
 }

@@ -70,14 +70,14 @@ export default async function LinkPage({
     par: puzzleRaw.par,
     ref: { kind: "daily", date: puzzleRaw.date },
     start: {
-      code: live.itemCodes.toCode(start.id)!,
+      code: live.itemCodes.toCode(start.slug)!,
       name: start.name,
       tier: start.tier,
       kind: start.kind,
       symbol: start.symbol,
     },
     goal: {
-      code: live.itemCodes.toCode(goal.id)!,
+      code: live.itemCodes.toCode(goal.slug)!,
       name: goal.name,
       tier: goal.tier,
       kind: goal.kind,
@@ -85,12 +85,12 @@ export default async function LinkPage({
     },
   };
 
-  const initialView = await getExploreView(start.id, { includeCanary: true });
+  const initialView = await getExploreView(start.slug, { includeCanary: true });
   if (!initialView) throw new Error("Daily start item has no view");
 
   return (
     <main className="wrap">
-      <Header current="link" exploreHref={`/explore/${start.id}`} />
+      <Header current="link" exploreHref={`/explore/${start.slug}`} />
       <LinkBoard puzzle={puzzle} initialView={initialView} />
       <Footer />
     </main>

@@ -27,8 +27,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "bad_request" }, { status: 400 });
     }
     const live = await getLiveSnapshot();
-    const atId = live.itemCodes.toId(body.at);
-    if (!atId) {
+    const node = live.nodeByCode(body.at);
+    if (!node) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
     const puzzle = await resolvePuzzle(live, body);
@@ -36,11 +36,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: puzzle.error }, { status: puzzle.status });
     }
 
-    const node = live.snapshot.nodes.get(atId)!;
     const neighbours = node.neighbours.map((nbId) => {
       const nb = live.snapshot.nodes.get(nbId)!;
       return {
-        code: live.itemCodes.toCode(nbId) ?? "",
+        code: live.itemCodes.toCode(nb.slug) ?? "",
         name: nb.name,
         tier: nb.tier,
         kind: nb.kind,
@@ -52,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       arrived: {
-        code: live.itemCodes.toCode(atId),
+        code: live.itemCodes.toCode(node.slug),
         name: node.name,
         tier: node.tier,
         kind: node.kind,

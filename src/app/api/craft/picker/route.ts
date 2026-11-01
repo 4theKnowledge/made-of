@@ -45,11 +45,11 @@ export async function GET(req: NextRequest) {
       const d = difficultyOf(live.snapshot, n.id);
       if (difficulty && difficulty !== d) continue;
       if (q && !n.name.toLowerCase().includes(q)) continue;
-      const code = live.itemCodes.toCode(n.id);
+      const code = live.itemCodes.toCode(n.slug);
       if (!code) continue;
       results.push({
         code,
-        slug: n.id,
+        slug: n.slug,
         name: n.name,
         tier: n.tier,
         kind: n.kind,

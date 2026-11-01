@@ -1,9 +1,16 @@
 /**
  * Convert a `LoadedKnowledgeBase` into the rows that will be inserted into
- * Postgres. Ids are deterministic so re-running the seed gives the same row
- * ids, which makes diffs and migrations easy.
+ * Postgres.
+ *
+ * Row ids are uuids assigned at build time, so the DB foreign keys don't
+ * carry names. Each run of `toRows` generates a fresh set of uuids; the seed
+ * script wipes and re-inserts, so stability across runs is not required.
+ * Within one run, we keep in-memory maps (name → uuid, slug → uuid) so the
+ * evidence resolver can translate `child<type<parent` strings to concrete
+ * link ids.
  */
 
+import { randomUUID } from "node:crypto";
 import type {
   LinkType,
   NewItem,
@@ -12,7 +19,7 @@ import type {
   NewRecipe,
   NewSource,
 } from "../db/schema";
-import { parseLinkId, slug } from "./load";
+import { parseLinkId } from "./load";
 import type { LoadedEvidenceLink, LoadedKnowledgeBase } from "./types";
 
 export interface SeedRows {
@@ -26,6 +33,15 @@ export interface SeedRows {
     position: number;
   }>;
   sources: NewSource[];
+  /** name → item uuid. Only populated when building rows from the knowledge
+   *  base; empty when rows are loaded straight from the DB. */
+  itemIdByName: Map<string, string>;
+  /** slug → item uuid. Only populated when building rows from the knowledge
+   *  base; empty when rows are loaded straight from the DB. */
+  itemIdBySlug: Map<string, string>;
+  /** source code (e.g. "src:martin-2008") → source uuid. Only populated when
+   *  building rows from the knowledge base. */
+  sourceIdByCode: Map<string, string>;
   stats: {
     items: number;
     links: number;
@@ -41,8 +57,14 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
   const recipes: NewRecipe[] = [];
   const links: NewLink[] = [];
 
+  // Resolve item names/slugs to uuids. Both maps are needed because recipes
+  // reference items by name, while canary builders and tests reference them
+  // by slug.
+  const itemIdByName = new Map<string, string>();
+  const itemIdBySlug = new Map<string, string>();
+
   // Fast lookup from an evidence link id ("child<type<parent") to the concrete
-  // link row ids it should attach to.
+  // link row uuids it should attach to.
   const linkIdsByKey = new Map<string, string[]>();
   const pushLinkKey = (key: string, linkId: string) => {
     const arr = linkIdsByKey.get(key);
@@ -50,10 +72,14 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
     else linkIdsByKey.set(key, [linkId]);
   };
 
+  // First pass: assign item uuids so recipes/links can reference them.
   for (const item of kb.items) {
-    const itemId = item.slug;
+    const itemId = randomUUID();
+    itemIdByName.set(item.name, itemId);
+    itemIdBySlug.set(item.slug, itemId);
     items.push({
       id: itemId,
+      slug: item.slug,
       name: item.name,
       tier: item.tier,
       kind: item.kind,
@@ -67,9 +93,16 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
       isCanary: false,
       tags: item.tags,
     });
+  }
+
+  const resolveName = (name: string): string | null =>
+    itemIdByName.get(name) ?? null;
+
+  for (const item of kb.items) {
+    const itemId = itemIdByName.get(item.name)!;
 
     item.recipes.forEach((recipe, idx) => {
-      const recipeId = `${itemId}:r${idx}`;
+      const recipeId = randomUUID();
       recipes.push({
         id: recipeId,
         itemId,
@@ -78,9 +111,10 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
       });
 
       const addRecipeLinks = (type: LinkType, targets: string[]) => {
-        targets.forEach((targetName, j) => {
-          const targetId = slug(targetName);
-          const linkId = `${recipeId}:${type}:${j}:${targetId}`;
+        targets.forEach((targetName) => {
+          const targetId = resolveName(targetName);
+          if (!targetId) return; // orphan check runs separately in tests
+          const linkId = randomUUID();
           links.push({
             id: linkId,
             recipeId,
@@ -101,9 +135,10 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
     });
 
     const addItemLinks = (type: LinkType, targets: string[]) => {
-      targets.forEach((targetName, j) => {
-        const targetId = slug(targetName);
-        const linkId = `${itemId}:item:${type}:${j}:${targetId}`;
+      targets.forEach((targetName) => {
+        const targetId = resolveName(targetName);
+        if (!targetId) return;
+        const linkId = randomUUID();
         links.push({
           id: linkId,
           recipeId: null,
@@ -121,6 +156,23 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
     addItemLinks("s", item.itemLinks.s);
   }
 
+  // Sources: assign uuids and index by their citation code.
+  const sourceIdByCode = new Map<string, string>();
+  const sources: NewSource[] = kb.sources.map((s) => {
+    const id = randomUUID();
+    sourceIdByCode.set(s.id, id);
+    return {
+      id,
+      code: s.id,
+      kind: s.kind,
+      title: s.title,
+      authors: s.authors,
+      year: s.year,
+      published: s.published,
+      url: s.url,
+    };
+  });
+
   // Attach evidence to links.
   const linkEvidence: NewLinkEvidence[] = [];
   const evidenceSources: SeedRows["evidenceSources"] = [];
@@ -128,7 +180,6 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
   const evidencedLinkIds = new Set<string>();
   const linkConfidence = new Map<string, string>();
 
-  let evidenceCounter = 0;
   for (const ev of kb.evidenceLinks) {
     const matchedLinks: string[] = [];
     for (const id of ev.ids) {
@@ -148,7 +199,7 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
 
     ev.evidence.forEach((entry, i) => {
       for (const linkId of matchedLinks) {
-        const evId = `ev:${linkId}:${i}:${++evidenceCounter}`;
+        const evId = randomUUID();
         linkEvidence.push({
           id: evId,
           linkId,
@@ -157,10 +208,12 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
           summary: entry.summary,
           position: i,
         });
-        entry.sources.forEach((srcId, k) => {
+        entry.sources.forEach((srcCode, k) => {
+          const sourceId = sourceIdByCode.get(srcCode);
+          if (!sourceId) return;
           evidenceSources.push({
             evidenceId: evId,
-            sourceId: srcId,
+            sourceId,
             position: k,
           });
         });
@@ -170,10 +223,10 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
 
   // Apply denormalised confidence + hasEvidence flag to link rows.
   for (const link of links) {
-    const c = linkConfidence.get(link.id);
+    const c = linkConfidence.get(link.id!);
     if (c) (link as { confidence: string }).confidence = c;
     (link as { hasEvidence?: boolean }).hasEvidence = evidencedLinkIds.has(
-      link.id,
+      link.id!,
     );
   }
 
@@ -188,19 +241,9 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
     }
   }
   for (const link of links) {
-    const note = linkNotes.get(link.id);
+    const note = linkNotes.get(link.id!);
     if (note) (link as { note: string | null }).note = note;
   }
-
-  const sources: NewSource[] = kb.sources.map((s) => ({
-    id: s.id,
-    kind: s.kind,
-    title: s.title,
-    authors: s.authors,
-    year: s.year,
-    published: s.published,
-    url: s.url,
-  }));
 
   return {
     items,
@@ -209,6 +252,9 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
     linkEvidence,
     evidenceSources,
     sources,
+    itemIdByName,
+    itemIdBySlug,
+    sourceIdByCode,
     stats: {
       items: items.length,
       links: links.length,
