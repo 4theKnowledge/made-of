@@ -822,3 +822,16 @@ a.btn.primary{color:var(--bg)}
 
 /* Modal animation reused by the helpers menu and toasts */
 @keyframes mdin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+/* Points floaters (rises then fades) + nope badge — ported from prototype
+   lines 937–939, 952 */
+.cbc .pts{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:13px;font-weight:700;color:var(--good);background:var(--surface);border:1.5px solid var(--good);border-radius:3px;padding:0 4px;white-space:nowrap;z-index:3;animation:cbrise .9s ease-out forwards;pointer-events:none}
+.cbc .pts.ship{color:var(--ink);border-color:var(--ink);background:var(--fM)}
+.cbc .pts.nope{color:var(--bad);border-color:var(--bad)}
+@keyframes cbrise{from{opacity:0;transform:translate(-50%,6px)}20%{opacity:1}to{opacity:0;transform:translate(-50%,-22px)}}
+
+/* Age-row icon buttons (book, sound) — prototype lines 1042–1044 */
+.cbsnd{flex:none;width:30px;height:26px;display:grid;place-items:center;border:1.5px solid var(--ink);border-radius:99px;background:var(--surface);color:var(--ink);cursor:pointer;padding:0}
+.cbsnd svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.cbsnd.on{background:var(--ink);color:var(--bg)}
+.cbsnd:disabled{opacity:.5;cursor:default}
