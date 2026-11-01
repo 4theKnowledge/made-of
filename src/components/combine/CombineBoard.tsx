@@ -101,6 +101,10 @@ export function CombineBoard({ bundle: serialised }: Props) {
     out: string;
     recipe: string[];
   } | null>(null);
+  const [ageToast, setAgeToast] = useState<{
+    age: number;
+    sample: string[];
+  } | null>(null);
   // The tile pressed and currently being held / dragged. Mirrors the
   // prototype's cbDrag record. Ghost x/y are in viewport coords.
   const [drag, setDrag] = useState<{
@@ -136,6 +140,7 @@ export function CombineBoard({ bundle: serialised }: Props) {
       // Fold events into one fx patch so React batches a single render.
       const patch: Fx = {};
       let latestDiscovery: { out: string; recipe: string[] } | null = null;
+      let latestAgeUp: { age: number; sample: string[] } | null = null;
       for (const e of events) {
         if (e.type === "placed") patch.placed = e.at;
         else if (e.type === "nope") patch.nope = e.at;
@@ -151,11 +156,18 @@ export function CombineBoard({ bundle: serialised }: Props) {
           patch.crumble = new Set(e.cells);
         } else if (e.type === "discovery") {
           latestDiscovery = { out: e.out, recipe: e.recipe };
+        } else if (e.type === "age-up") {
+          latestAgeUp = { age: e.age, sample: e.sample };
         }
       }
       if (latestDiscovery) {
         setDiscovery(latestDiscovery);
         const id = window.setTimeout(() => setDiscovery(null), 4600);
+        timers.current.push(id);
+      }
+      if (latestAgeUp) {
+        setAgeToast(latestAgeUp);
+        const id = window.setTimeout(() => setAgeToast(null), 4200);
         timers.current.push(id);
       }
       if (Object.keys(patch).length === 0) return;
@@ -393,9 +405,18 @@ export function CombineBoard({ bundle: serialised }: Props) {
           onToggleHelpers={() => setHelpersOpen((o) => !o)}
           onHelper={onHelper}
         />
-        <TipLine state={state} selectedSlot={selectedSlot} />
+        <TipLine
+          state={state}
+          selectedSlot={selectedSlot}
+          preview={preview}
+        />
         <AgeBar state={state} bundle={bundle} />
-        <Shelf state={state} bundle={bundle} fx={fx} />
+        <Shelf
+          state={state}
+          bundle={bundle}
+          fx={fx}
+          onInfo={(id) => setInfoTile(id)}
+        />
         <Board
           state={state}
           bundle={bundle}
@@ -426,6 +447,31 @@ export function CombineBoard({ bundle: serialised }: Props) {
             onChoose={onChoose}
           />
         )}
+        {state.over && (
+          <GameOverCard
+            state={state}
+            bundle={bundle}
+            onPlayAgain={() => {
+              // Fresh deterministic game with a different seed each run.
+              const next = newGame("everyday", bundle, {
+                seed: (Math.random() * 4294967296) | 0,
+                size: state.n,
+              }).state;
+              setState(next);
+              setFx({});
+              setDiscovery(null);
+              setAgeToast(null);
+              setInfoTile(null);
+            }}
+          />
+        )}
+        {ageToast && (
+          <AgeToast
+            toast={ageToast}
+            bundle={bundle}
+            onDismiss={() => setAgeToast(null)}
+          />
+        )}
         {discovery && (
           <DiscoveryToast
             discovery={discovery}
@@ -437,6 +483,7 @@ export function CombineBoard({ bundle: serialised }: Props) {
           <DetailCard
             tileId={infoTile}
             bundle={bundle}
+            state={state}
             onDismiss={() => setInfoTile(null)}
           />
         )}
@@ -496,14 +543,24 @@ function DragGhost({
 function DetailCard({
   tileId,
   bundle,
+  state,
   onDismiss,
 }: {
   tileId: string;
   bundle: ThemeBundle;
+  state: GameState;
   onDismiss: () => void;
 }) {
   const item = bundle.items.get(tileId);
   if (!item) return null;
+  // Knowledge-base recipe: find the first recipe whose output is this tile.
+  const madeFrom = bundle.recipes.find((r) => r.out === tileId);
+  // Goes into: recipes that use this tile as an ingredient.
+  const goesInto = (bundle.byIngredient.get(tileId) ?? []).filter(
+    (r) => r.out !== tileId,
+  );
+  const foundGoesInto = goesInto.filter((r) => state.found.includes(r.out));
+  const unfoundCount = goesInto.length - foundGoesInto.length;
   return (
     <>
       <div className="cbscrim" onClick={onDismiss} />
@@ -521,12 +578,186 @@ function DetailCard({
           />
         </div>
         <div className="nm">{cap(item.name)}</div>
+        {madeFrom ? (
+          <div className="cbrcp" aria-label="Made from">
+            {madeFrom.all.map((pid, k) => {
+              const p = bundle.items.get(pid);
+              if (!p) return null;
+              return (
+                <span key={pid}>
+                  <Pictogram
+                    name={p.name}
+                    tier={p.tier}
+                    kind={p.kind}
+                    symbol={p.symbol}
+                  />
+                  {cap(p.name)}
+                  {k < madeFrom.all.length - 1 && <i>+</i>}
+                </span>
+              );
+            })}
+            <i>=</i>
+            <span>{cap(item.name)}</span>
+          </div>
+        ) : (
+          <p className="fact">A raw thing.</p>
+        )}
         {item.fact && <p className="fact">{item.fact}</p>}
-        <button type="button" className="cbh" onClick={onDismiss}>
-          Close
-        </button>
+        {goesInto.length > 0 && (
+          <div
+            className="cbrcp"
+            aria-label="Goes into"
+            style={{ marginTop: 4 }}
+          >
+            <b style={{ marginRight: 6 }}>Goes into:</b>
+            {foundGoesInto.slice(0, 6).map((r) => {
+              const o = bundle.items.get(r.out);
+              if (!o) return null;
+              return (
+                <span key={r.out}>
+                  <Pictogram
+                    name={o.name}
+                    tier={o.tier}
+                    kind={o.kind}
+                    symbol={o.symbol}
+                  />
+                  {cap(o.name)}
+                </span>
+              );
+            })}
+            {unfoundCount > 0 && (
+              <span className="q">+{unfoundCount} to discover</span>
+            )}
+          </div>
+        )}
+        <div className="row2">
+          <a className="cbh" href={`/explore/${item.id}`}>
+            Full story in Explore
+          </a>
+          <button type="button" className="cbh" onClick={onDismiss}>
+            Back to the game
+          </button>
+        </div>
       </section>
     </>
+  );
+}
+
+function GameOverCard({
+  state,
+  bundle,
+  onPlayAgain,
+}: {
+  state: GameState;
+  bundle: ThemeBundle;
+  onPlayAgain: () => void;
+}) {
+  const ages = bundle.theme.ages;
+  const ageName = ages[state.age];
+  return (
+    <>
+      <div className="cbscrim" />
+      <section className="cbover" role="dialog" aria-label="Run over">
+        <span className="k">Board full</span>
+        <b className="big">{state.score.toLocaleString("en")}</b>
+        <span className="sub">
+          You reached the {ageName.toLowerCase()} age.
+        </span>
+        <div className="cb3">
+          <div>
+            <b>{state.shelf.length}</b>
+            <span>finished things</span>
+          </div>
+          <div>
+            <b>{state.age + 1}</b>
+            <span>{ageName.toLowerCase()} age</span>
+          </div>
+          <div>
+            <b>{state.found.length}</b>
+            <span>new discoveries</span>
+          </div>
+        </div>
+        {state.found.length > 0 && (
+          <>
+            <p className="sub" style={{ marginTop: 4 }}>
+              New discoveries
+            </p>
+            <div className="cbfound">
+              {state.found.slice(0, 10).map((id) => {
+                const it = bundle.items.get(id);
+                if (!it) return null;
+                return (
+                  <span key={id}>
+                    <Pictogram
+                      name={it.name}
+                      tier={it.tier}
+                      kind={it.kind}
+                      symbol={it.symbol}
+                    />
+                    <em>{cap(it.name)}</em>
+                  </span>
+                );
+              })}
+              {state.found.length > 10 && (
+                <span className="more">
+                  +{state.found.length - 10} more in your collection
+                </span>
+              )}
+            </div>
+          </>
+        )}
+        <div className="row2">
+          <button type="button" className="cbh" onClick={onPlayAgain}>
+            Play again
+          </button>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function AgeToast({
+  toast,
+  bundle,
+  onDismiss,
+}: {
+  toast: { age: number; sample: string[] };
+  bundle: ThemeBundle;
+  onDismiss: () => void;
+}) {
+  const ageName = bundle.theme.ages[toast.age];
+  return (
+    <div className="cbdisc cbagetoast" role="status" onClick={onDismiss}>
+      <div>
+        <span className="k">New age · tap to close</span>
+        <b>
+          Age {toast.age + 1}: {ageName}
+        </b>
+        <p>
+          New things start arriving. Old ones nobody needs will crumble
+          away.
+        </p>
+        {toast.sample.length > 0 && (
+          <div className="cbrcp">
+            {toast.sample.map((id) => {
+              const it = bundle.items.get(id);
+              if (!it) return null;
+              return (
+                <span key={id}>
+                  <Pictogram
+                    name={it.name}
+                    tier={it.tier}
+                    kind={it.kind}
+                    symbol={it.symbol}
+                  />
+                  {cap(it.name)}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -724,20 +955,26 @@ function TopBar({
 function TipLine({
   state,
   selectedSlot,
+  preview,
 }: {
   state: GameState;
   selectedSlot: number | null;
+  preview: Map<number, Preview>;
 }) {
   let tip: string;
   if (state.over) tip = "Game over.";
-  else if (state.choosing)
-    tip = "These make more than one thing. Pick one.";
+  else if (state.choosing) tip = "These make more than one thing. Pick one.";
   else if (selectedSlot != null) {
-    // Phase 3C adds ghost-preview-based tips (Nothing glows / Glowing squares
-    // make things you've found before / etc.). For now the single-tile tip.
-    tip = state.found.length
-      ? "Glowing squares make things you've found before. New combos don't glow: try things."
-      : "Nothing glows until you've found it. Drop it on, or beside, things that might go with it.";
+    if (preview.size > 0) {
+      tip =
+        "Glowing squares make things you've found before. New combos don't glow: try things.";
+    } else if (state.found.length) {
+      tip =
+        "No combo you know of. Try somewhere new, or place it where it can wait.";
+    } else {
+      tip =
+        "Nothing glows until you've found it. Drop it on, or beside, things that might go with it.";
+    }
   } else {
     tip =
       "Drag a tile onto the board, or tap it and then a square. Things that touch combine.";
@@ -800,10 +1037,12 @@ function Shelf({
   state,
   bundle,
   fx,
+  onInfo,
 }: {
   state: GameState;
   bundle: ThemeBundle;
   fx: Fx;
+  onInfo: (id: string) => void;
 }) {
   // Group by output id with a count badge.
   const counts = new Map<string, number>();
@@ -830,7 +1069,7 @@ function Shelf({
             style={fillVar(item)}
             aria-label={`${cap(item.name)}${n > 1 ? `, ×${n}` : ""}. Show how it's made`}
             title={cap(item.name)}
-            disabled
+            onClick={() => onInfo(id)}
           >
             <Pictogram
               name={item.name}

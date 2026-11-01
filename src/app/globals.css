@@ -848,3 +848,42 @@ a.btn.primary{color:var(--bg)}
 .cbc .pts.ship{color:var(--ink);border-color:var(--ink);background:var(--fM)}
 .cbc .pts.nope{color:var(--bad);border-color:var(--bad)}
 @keyframes cbrise{from{opacity:0;transform:translate(-50%,6px)}20%{opacity:1}to{opacity:0;transform:translate(-50%,-22px)}}
+
+/* Legend row under the tray — prototype lines 1094–1097 */
+.cbkey{margin:0;display:flex;gap:14px;flex-wrap:wrap;justify-content:center;font-size:11.5px;color:var(--muted)}
+.cbkey span{display:inline-flex;align-items:center;gap:5px}
+.cbkey i{width:10px;height:10px;border-radius:2px;border:1.5px solid var(--ink)}
+.cbkey .k1{background:var(--ink)}
+.cbkey .k2{background:var(--fM)}
+.cbkey .k3{background:var(--good);border-radius:50%}
+
+/* DetailCard recipe chips + row2 button pair — prototype lines 1075–1082 */
+.cbinfo .cbrcp{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:5px 6px;font-size:12.5px;font-weight:700}
+.cbinfo .cbrcp span{display:inline-flex;align-items:center;gap:3px;padding:2px 7px 2px 3px;border:1.5px solid var(--ink);border-radius:3px;background:var(--surface)}
+.cbinfo .cbrcp .ic{width:18px;height:18px;border:0;background:transparent}
+.cbinfo .cbrcp .ic svg{width:100%;height:100%}
+.cbinfo .cbrcp i{font-style:normal;font-weight:800}
+.cbinfo .cbrcp .q{border-style:dashed;color:var(--muted);padding:2px 7px}
+.cbover .row2{display:flex;gap:8px;width:100%;margin-top:4px}
+.cbover .row2 .cbh{flex:1;justify-content:center;height:44px;font-size:14px;text-decoration:none}
+
+/* New-age toast — prototype line 1056–1059 */
+.cbdisc.cbagetoast{background:var(--fN)}
+.cbdisc.cbagetoast .cbrcp{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;font-size:12px;font-weight:700}
+.cbdisc.cbagetoast .cbrcp span{display:inline-flex;align-items:center;gap:3px;padding:2px 6px 2px 3px;border:1.5px solid #111417;border-radius:3px;background:rgba(255,255,255,.55)}
+.cbdisc.cbagetoast .cbrcp .ic{width:18px;height:18px;border:0;background:transparent}
+.cbdisc.cbagetoast .cbrcp .ic svg{width:100%;height:100%}
+
+/* End-of-game summary — prototype lines 3870–3879 */
+.cbover .k{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.cbover .big{font-family:var(--mono);font-size:52px;line-height:1}
+.cbover .sub{margin:0;font-size:13.5px;color:var(--muted)}
+.cb3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+.cb3 div{padding:8px 4px;border:1.5px solid var(--ink);border-radius:3px;background:var(--surface)}
+.cb3 b{display:block;font-family:var(--mono);font-size:20px}
+.cb3 span{font-size:11.5px}
+.cbfound{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.cbfound span{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700}
+.cbfound .ic{width:44px;height:44px}
+.cbfound em{font-style:normal}
+.cbfound .more{flex-basis:100%;font-size:12px;color:var(--muted);font-weight:600}
