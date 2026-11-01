@@ -1,7 +1,8 @@
 /**
  * Audio core: a tiny Web Audio graph (master → compressor → speakers) with
- * a reverb convolver and two sends (music bus, effects bus). Two voices —
- * felt piano and handpan — synthesise notes live, no samples.
+ * a reverb convolver and two sends (music bus, effects bus). Three voices —
+ * felt piano, chimes (steel-tongue bell), and a slow pad — synthesise
+ * notes live, no samples.
  *
  * The context is created lazily on first use because browsers block audio
  * until a user gesture. Call `ensureContext()` from the first pointerdown
@@ -13,7 +14,7 @@
 
 /** Snapshot of the sound settings the audio graph reads from. */
 export interface AudioSettings {
-  music: "piano" | "handpan" | "off";
+  music: "piano" | "chimes" | "drift" | "off";
   sfx: boolean;
   /** 0..1. The prototype's localStorage stores 0..100; translate at the
    *  settings boundary. */
@@ -68,7 +69,7 @@ export function ensureContext(settings: AudioSettings): AudioCore | null {
   wet.connect(master);
 
   const musicBus = ctx.createGain();
-  musicBus.gain.value = settings.music === "piano" ? 0.2 : 0.16;
+  musicBus.gain.value = musicBusGain(settings.music);
   musicBus.connect(master);
   musicBus.connect(verb);
 
@@ -97,7 +98,7 @@ export function ensureContext(settings: AudioSettings): AudioCore | null {
     applySettings(next) {
       core.settings = { ...next };
       master.gain.value = 0.9 * clamp01(next.vol);
-      musicBus.gain.value = next.music === "piano" ? 0.2 : 0.16;
+      musicBus.gain.value = musicBusGain(next.music);
     },
   };
   singleton = core;
@@ -226,7 +227,9 @@ export function playPiano(
   }
 }
 
-/** Play one note with the voice that matches the current music track. */
+/** Play one note with the voice that matches the current music track.
+ *  Drift's pad voice is too slow for feedback effects, so sfx under drift
+ *  still use the chimes voice. */
 export function strike(
   core: AudioCore,
   freq: number,
@@ -239,6 +242,50 @@ export function strike(
     playPiano(core, freq, t, vel * 0.8, bus, len);
   } else {
     playHandpan(core, freq, t, vel, bus, len);
+  }
+}
+
+/** Slow pad voice for the drift track: two detuned triangle oscillators
+ *  through a lowpass that opens over ~2 s then closes, producing a long
+ *  breathy swell. Used for sustained chord drones, never for feedback. */
+export function playPad(
+  core: AudioCore,
+  freq: number,
+  t: number,
+  vel: number,
+  bus: AudioNode,
+  len = 8,
+): void {
+  const { ctx } = core;
+  const out = ctx.createGain();
+  out.gain.setValueAtTime(0.0001, t);
+  out.gain.exponentialRampToValueAtTime(vel, t + 1.8);
+  out.gain.setValueAtTime(vel, t + len * 0.55);
+  out.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  const lp = ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.Q.value = 0.6;
+  lp.frequency.setValueAtTime(Math.max(260, freq * 1.4), t);
+  lp.frequency.exponentialRampToValueAtTime(Math.min(2400, freq * 5), t + len * 0.4);
+  lp.frequency.exponentialRampToValueAtTime(Math.max(260, freq * 1.5), t + len);
+  out.connect(lp);
+  lp.connect(bus);
+  // Two detuned triangles an octave apart give the pad its slow beat.
+  const partials: Array<[number, number]> = [
+    [1, 0.6],
+    [1.0046, 0.55],
+    [2, 0.18],
+  ];
+  for (const [m, g] of partials) {
+    const o = ctx.createOscillator();
+    const e = ctx.createGain();
+    o.type = "triangle";
+    o.frequency.value = freq * m;
+    e.gain.value = g;
+    o.connect(e);
+    e.connect(out);
+    o.start(t);
+    o.stop(t + len + 0.1);
   }
 }
 
@@ -276,6 +323,14 @@ export function midiToFreq(m: number): number {
 
 function clamp01(x: number): number {
   return Math.max(0, Math.min(1, x));
+}
+
+/** Per-track music bus gain. Drift's pad voice is already sustained and
+ *  wet, so it needs the least gain to sit at the same perceived level. */
+function musicBusGain(track: AudioSettings["music"]): number {
+  if (track === "piano") return 0.2;
+  if (track === "drift") return 0.13;
+  return 0.16;
 }
 
 function makeReverbIR(ctx: BaseAudioContext, seconds: number): AudioBuffer {

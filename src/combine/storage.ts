@@ -28,7 +28,7 @@ const MUSIC_KEY = "madeof:music";
 const SFX_KEY = "madeof:sfx";
 const VOL_KEY = "madeof:vol";
 
-export type MusicTrack = "piano" | "handpan" | "off";
+export type MusicTrack = "piano" | "chimes" | "drift" | "off";
 export interface SoundSettings {
   music: MusicTrack;
   sfx: boolean;
@@ -261,10 +261,16 @@ export function loadSound(): SoundSettings {
     const music = window.localStorage.getItem(MUSIC_KEY);
     const sfx = window.localStorage.getItem(SFX_KEY);
     const vol = window.localStorage.getItem(VOL_KEY);
+    // "handpan" was the earlier name for "chimes" — migrate silently so
+    // old saves don't silently fall back to "off".
+    const musicNormalised = music === "handpan" ? "chimes" : music;
     return {
       music:
-        music === "piano" || music === "handpan" || music === "off"
-          ? (music as MusicTrack)
+        musicNormalised === "piano" ||
+        musicNormalised === "chimes" ||
+        musicNormalised === "drift" ||
+        musicNormalised === "off"
+          ? (musicNormalised as MusicTrack)
           : SOUND_DEFAULT.music,
       sfx: sfx == null ? SOUND_DEFAULT.sfx : sfx === "1",
       vol: vol == null ? SOUND_DEFAULT.vol : Math.max(0, Math.min(100, Number(vol))),

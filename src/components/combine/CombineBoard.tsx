@@ -1410,8 +1410,9 @@ function SoundMenu({
   onDismiss: () => void;
 }) {
   const tracks: Array<[MusicTrack, string, string]> = [
+    ["drift", "Drift", "Slow pads, low stimulation"],
     ["piano", "Calm piano", "Slow, soft and roomy"],
-    ["handpan", "Handpan", "Gentle and a bit busier"],
+    ["chimes", "Chimes", "Gentle and a bit busier"],
     ["off", "No music", ""],
   ];
   return (

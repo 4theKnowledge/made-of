@@ -1,21 +1,24 @@
 /**
- * Two generative music tracks: handpan (D Kurd) and calm piano (D major
- * chord loop). A single 120 ms scheduler loop checks the music track in
- * use and dispatches to the right tick function.
+ * Three generative music tracks:
+ *   - piano: D major chord loop with a melodic answer figure
+ *   - chimes: D Kurd steel-tongue bell (random walk, phrases + rests)
+ *   - drift: slow pad drones on the piano progression, ~every 6–8 s
  *
- * Ports tickHandpan + tickPiano + startMusic/stopMusic from
- * legacy/made-of.html lines 4046–4091.
+ * A single 120 ms scheduler loop reads the active track and dispatches to
+ * the right tick function. Ports tickHandpan + tickPiano + startMusic/
+ * stopMusic from legacy/made-of.html lines 4046–4091; drift is new.
  */
 
 import {
   getContext,
   midiToFreq,
   playHandpan,
+  playPad,
   playPiano,
   type AudioCore,
 } from "./core";
 
-/** D Kurd handpan: D3 | A3 Bb3 C4 D4 E4 F4 G4 A4 C5. */
+/** D Kurd steel-tongue scale: D3 | A3 Bb3 C4 D4 E4 F4 G4 A4 C5. */
 const KURD = [
   146.83, 220.0, 233.08, 261.63, 293.66, 329.63, 349.23, 392.0, 440.0, 523.25,
 ];
@@ -57,7 +60,7 @@ const state: MusicState = {
   busyGetter: () => 0,
 };
 
-function tickHandpan(core: AudioCore): void {
+function tickChimes(core: AudioCore): void {
   const { ctx, musicBus } = core;
   const busy = state.busyGetter();
   const density = 0.5 + busy * 0.04;
@@ -154,6 +157,33 @@ function tickPiano(core: AudioCore): void {
   }
 }
 
+function tickDrift(core: AudioCore): void {
+  const { ctx, musicBus } = core;
+  // One pad note every ~6 s, lasting ~9 s so they overlap into a wash.
+  const BEAT = 6.2;
+  const LEN = 9.5;
+  while (state.nextT < ctx.currentTime + 1.5) {
+    const t = state.nextT + (Math.random() - 0.5) * 0.4;
+    const C = CHORDS[state.chord];
+    // Low chord root sits underneath.
+    playPad(core, midiToFreq(C[0]), t, 0.6, musicBus, LEN);
+    // One upper chord tone, picked at random; sometimes two for a swell.
+    const upper = C[1 + Math.floor(Math.random() * 4)];
+    playPad(core, midiToFreq(upper), t + 0.4, 0.42, musicBus, LEN - 1);
+    if (Math.random() < 0.3) {
+      const second = C[1 + Math.floor(Math.random() * 4)];
+      playPad(core, midiToFreq(second), t + 1.1, 0.28, musicBus, LEN - 1.6);
+    }
+    state.step++;
+    state.nextT += BEAT;
+    // Chord moves every two pad notes; piano and drift share the loop
+    // feel without ever landing on the exact same beat.
+    if (state.step % 2 === 0) {
+      state.chord = (state.chord + 1) % CHORDS.length;
+    }
+  }
+}
+
 /** Start the current music track. No-op if already running or if `music`
  *  is "off". */
 export function startMusic(opts?: { busyGetter?: () => number }): void {
@@ -173,7 +203,8 @@ export function startMusic(opts?: { busyGetter?: () => number }): void {
   state.timer = setInterval(() => {
     if (!core.ctx) return;
     if (core.settings.music === "piano") tickPiano(core);
-    else if (core.settings.music === "handpan") tickHandpan(core);
+    else if (core.settings.music === "chimes") tickChimes(core);
+    else if (core.settings.music === "drift") tickDrift(core);
   }, 120);
 }
 
