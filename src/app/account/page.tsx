@@ -3,8 +3,11 @@ import { redirect } from "next/navigation";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { getSession } from "@/lib/session";
+import { loadAccountStats } from "@/lib/stats/load";
 import { AccountActions } from "./AccountActions";
+import { EmailVerification } from "./EmailVerification";
 import { HandlePicker } from "./HandlePicker";
+import { StatsPanel } from "./StatsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +26,13 @@ export default async function AccountPage() {
     tier?: string;
     handle?: string | null;
     handleLockedAt?: string | Date | null;
+    emailVerified?: boolean;
   };
   const tier = user.tier ?? "free";
   const handle = user.handle ?? null;
   const handleLocked = Boolean(user.handleLockedAt);
+  const emailVerified = Boolean(user.emailVerified);
+  const stats = await loadAccountStats(session.user.id);
 
   return (
     <main className="wrap">
@@ -40,6 +46,10 @@ export default async function AccountPage() {
           <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "8px 16px", margin: 0 }}>
             <dt style={{ color: "var(--muted)" }}>Email</dt>
             <dd style={{ margin: 0 }}>{user.email}</dd>
+            <dt style={{ color: "var(--muted)" }}>Verification</dt>
+            <dd style={{ margin: 0 }}>
+              <EmailVerification email={user.email} verified={emailVerified} />
+            </dd>
             <dt style={{ color: "var(--muted)" }}>Plan</dt>
             <dd style={{ margin: 0 }}>
               {tier === "paid" ? "Family" : "Free"}
@@ -53,6 +63,10 @@ export default async function AccountPage() {
         <section className="feat">
           <h3 style={{ marginTop: 0 }}>Display name</h3>
           <HandlePicker initialHandle={handle} locked={handleLocked} />
+        </section>
+        <section className="feat">
+          <h3 style={{ marginTop: 0 }}>Your stats</h3>
+          <StatsPanel stats={stats} />
         </section>
         <section className="feat">
           <h3 style={{ marginTop: 0 }}>Manage</h3>

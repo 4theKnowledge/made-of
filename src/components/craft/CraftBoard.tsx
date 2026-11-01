@@ -200,6 +200,24 @@ export function CraftBoard({
       setBusy(true);
       setNotice("");
       try {
+        // Pre-compute the score fields the server will persist if this move
+        // is the winning one. `moves` is the hypothetical post-move step
+        // count; the server ignores these for non-wins and sanity-clamps
+        // them for wins.
+        const now = Date.now();
+        const started = game.startedAt ?? now;
+        const resumeAt = game.startedAt ? game.resumeAt : now;
+        const nextSteps = game.steps + 1;
+        const nextTimeMs = game.acc + (now - (resumeAt ?? started));
+        const nextStars = starsFor(nextSteps, state.par, game.hints);
+        // Mirror the useMemo'd `points` formula so the row we persist
+        // matches what the win screen shows.
+        const extraOverPar = Math.max(0, state.par ? nextSteps - state.par : 0);
+        const nextPoints =
+          1000 -
+          game.hints * PENALTY.hint -
+          game.badHides * PENALTY.hide -
+          extraOverPar * PENALTY.detour;
         const res = await fetch("/api/craft/make", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -207,6 +225,12 @@ export function CraftBoard({
             haveCodes: game.haveCodes,
             makeCode: item.code,
             targetCode: game.targetCode,
+            moves: nextSteps,
+            hints: game.hints,
+            timeMs: nextTimeMs,
+            stars: nextStars,
+            points: nextPoints,
+            badHides: game.badHides,
           }),
         });
         const body = (await res.json()) as ScratchMakeResponse;
@@ -215,10 +239,6 @@ export function CraftBoard({
           return;
         }
 
-        const now = Date.now();
-        const started = game.startedAt ?? now;
-        const resumeAt = game.startedAt ? game.resumeAt : now;
-
         setGame((g) => ({
           ...g,
           haveCodes: [...g.haveCodes, body.item!.code],
@@ -226,12 +246,8 @@ export function CraftBoard({
           startedAt: started,
           resumeAt,
           won: Boolean(body.won),
-          stars: body.won
-            ? starsFor(g.steps + 1, state.par, g.hints)
-            : g.stars,
-          acc: body.won
-            ? g.acc + (now - (resumeAt ?? started))
-            : g.acc,
+          stars: body.won ? nextStars : g.stars,
+          acc: body.won ? nextTimeMs : g.acc,
         }));
 
         setPop({
@@ -242,7 +258,7 @@ export function CraftBoard({
         setBusy(false);
       }
     },
-    [busy, game.haveCodes, game.startedAt, game.resumeAt, game.targetCode, game.won, state.par],
+    [busy, game.acc, game.badHides, game.haveCodes, game.hints, game.startedAt, game.resumeAt, game.steps, game.targetCode, game.won, state.par],
   );
 
   const onHint = useCallback(async () => {

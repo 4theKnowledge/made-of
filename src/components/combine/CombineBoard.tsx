@@ -463,6 +463,18 @@ export function CombineBoard({ bundles: serialised }: Props) {
           setBest((b) => ({ ...b, [r.state.theme]: r.state.score }));
           r.state.newBest = true;
         }
+        // Fire-and-forget: record the finished run in the user's account
+        // stats. Signed-out users just skip this with a 401; we don't care.
+        fetch("/api/combine/result", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            theme: r.state.theme,
+            score: r.state.score,
+            made: r.state.made,
+            age: r.state.age,
+          }),
+        }).catch(() => {});
         if (r.state.daily) {
           const bestShelfId =
             [...r.state.shelf].sort((a, b) => {
