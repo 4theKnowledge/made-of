@@ -507,7 +507,14 @@ export function CombineBoard({ bundles: serialised }: Props) {
         setMoveMode(null);
         return;
       }
-      if (selectedSlot == null) return;
+      // No tray tile selected: tapping a full board tile opens its info
+      // card (per spec: tap a board tile with nothing selected). Empty
+      // cells with no selection do nothing.
+      if (selectedSlot == null) {
+        const target = state.board[cell];
+        if (target != null) setInfoTile(target);
+        return;
+      }
       const target = state.board[cell];
       if (target == null) {
         act({ type: "place", slot: selectedSlot, cell });
