@@ -14,6 +14,10 @@
 import type { CrumbleCounter, GameState } from "./engine";
 import type { ThemeBundle, ThemeKey } from "./types";
 
+/** Bump when the StoredGame shape changes so older saves fall through to
+ *  a fresh game instead of hydrating into a broken state. */
+const SAVE_VERSION = 1;
+
 const ENDLESS_KEY = "madeof:cbsave";
 const DAILY_KEY = "madeof:cbsave:daily";
 const BEST_KEY = "madeof:cbbest";
@@ -34,6 +38,7 @@ export interface SoundSettings {
 const SOUND_DEFAULT: SoundSettings = { music: "off", sfx: false, vol: 80 };
 
 export interface StoredGame {
+  v: number;
   theme: ThemeKey;
   daily: string | null;
   n: number;
@@ -75,6 +80,7 @@ export interface DailyResult {
 
 function toStored(state: GameState): StoredGame {
   return {
+    v: SAVE_VERSION,
     theme: state.theme,
     daily: state.daily,
     n: state.n,
@@ -125,8 +131,34 @@ function readStored(key: string): StoredGame | null {
     const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as StoredGame;
-    if (!parsed || !Array.isArray(parsed.board) || !Array.isArray(parsed.tray))
+    if (!parsed) return null;
+    // Schema version mismatch → drop so the user starts fresh.
+    if (parsed.v !== SAVE_VERSION) {
+      window.localStorage.removeItem(key);
       return null;
+    }
+    // Required fields: a well-formed board/tray with the right length.
+    if (
+      typeof parsed.n !== "number" ||
+      !Number.isFinite(parsed.n) ||
+      parsed.n < 3 ||
+      parsed.n > 12
+    ) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
+    if (!Array.isArray(parsed.board) || parsed.board.length !== parsed.n * parsed.n) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
+    if (!Array.isArray(parsed.tray) || parsed.tray.length !== 3) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
+    if (parsed.theme !== "everyday" && parsed.theme !== "everything") {
+      window.localStorage.removeItem(key);
+      return null;
+    }
     return parsed;
   } catch {
     return null;
@@ -154,6 +186,12 @@ export function loadGame(
   for (const v of s.board) if (v && !bundle.items.has(v)) return null;
   for (const v of s.tray) if (v && !bundle.items.has(v)) return null;
   return s;
+}
+
+/** True if the stored state has no tray tiles — a sign the save predates
+ *  the dealTray in-place fix. The caller should re-deal before showing it. */
+export function needsRedeal(s: StoredGame): boolean {
+  return s.tray.every((t) => t == null) && !s.over;
 }
 
 /** Rebuild a full GameState from the stored projection. */

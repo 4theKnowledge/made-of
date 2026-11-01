@@ -7,6 +7,7 @@ import { ageSets, catalogue } from "@/combine/data";
 import { newGame, reduce } from "@/combine/engine";
 import type { Action, Event, GameState } from "@/combine/engine";
 import { matchAt, matchOn } from "@/combine/match";
+import { dealTray } from "@/combine/deal";
 import { todayKey, dailySeed, freshEndlessSeed } from "@/combine/rng";
 import { hydrateBundle, type SerialisedBundle } from "@/combine/serialise";
 import {
@@ -16,12 +17,14 @@ import {
   loadGame,
   loadSound,
   markFound,
+  needsRedeal,
   saveBest,
   saveDailyDone,
   saveGame,
   saveSound,
   type DailyResult,
   type MusicTrack,
+  type StoredGame,
 } from "@/combine/storage";
 import { dailyShareText, endlessShareText, shareText } from "@/combine/share";
 import type {
@@ -136,6 +139,26 @@ export function CombineBoard({ bundles: serialised }: Props) {
   });
   const [dailyDone, setDailyDone] = useState<DailyResult | null>(null);
 
+  /** Resume a saved game. If the save predates the dealer in-place fix
+   *  (tray entirely null while mid-game), re-deal before showing it. */
+  const resumeSaved = useCallback(
+    (saved: StoredGame, bundle: ThemeBundle) => {
+      const hydrated = hydrateGame(saved);
+      if (needsRedeal(saved)) {
+        dealTray({
+          bundle,
+          board: hydrated.board,
+          tray: hydrated.tray,
+          size: hydrated.n,
+          age: hydrated.age,
+          rng: hydrated.rng,
+        });
+      }
+      setState(hydrated);
+    },
+    [],
+  );
+
   // On mount: load best scores + today's daily result, and resume the
   // endless save if any (daily resume lives on the user's explicit tap
   // of the Daily button in ThemeMenu).
@@ -148,11 +171,18 @@ export function CombineBoard({ bundles: serialised }: Props) {
       everything: loadBest("everything"),
     });
     setDailyDone(loadDailyDone(todayKey()));
-    const saved = loadGame(bundles.everyday, { daily: null });
-    if (saved) {
-      setState(hydrateGame(saved));
+    // Try to resume either theme's endless save (we only have the single
+    // ENDLESS slot, so whichever theme's save is there takes precedence).
+    const everydaySave = loadGame(bundles.everyday, { daily: null });
+    if (everydaySave) {
+      resumeSaved(everydaySave, bundles.everyday);
+      return;
     }
-  }, [bundles.everyday]);
+    const everythingSave = loadGame(bundles.everything, { daily: null });
+    if (everythingSave) {
+      resumeSaved(everythingSave, bundles.everything);
+    }
+  }, [bundles.everyday, bundles.everything, resumeSaved]);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [helpersOpen, setHelpersOpen] = useState(false);
   // Clear-mode: next tap on a full cell removes that tile.
@@ -340,7 +370,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
       const nextBundle = bundles[which];
       const saved = loadGame(nextBundle, { daily: null });
       if (saved && saved.theme === which) {
-        setState(hydrateGame(saved));
+        resumeSaved(saved, nextBundle);
       } else {
         const size =
           typeof window !== "undefined" && window.innerWidth <= 600 ? 5 : 6;
@@ -353,7 +383,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
       }
       resetTransient();
     },
-    [state, bundles, resetTransient],
+    [state, bundles, resetTransient, resumeSaved],
   );
 
   const startDaily = useCallback(() => {
@@ -362,7 +392,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
     const saved = loadGame(bundles.everyday, { daily: day });
     if (saved) {
       saveGame(state);
-      setState(hydrateGame(saved));
+      resumeSaved(saved, bundles.everyday);
     } else {
       saveGame(state);
       setState(
@@ -374,7 +404,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
       );
     }
     resetTransient();
-  }, [bundles, state, resetTransient]);
+  }, [bundles, state, resetTransient, resumeSaved]);
 
   const shareDaily = useCallback(async () => {
     const dr = dailyDone;
