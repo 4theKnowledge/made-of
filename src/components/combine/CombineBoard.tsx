@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
+import Link from "next/link";
 import { Pictogram } from "@/pictograms/Pictogram";
 import { ageSets, catalogue } from "@/combine/data";
 import { newGame, reduce } from "@/combine/engine";
@@ -1085,7 +1086,6 @@ export function CombineBoard({ bundles: serialised }: Props) {
           <DetailCard
             tileId={infoTile}
             bundle={bundle}
-            state={state}
             known={knownIds}
             onDismiss={() => setInfoTile(null)}
           />
@@ -1224,13 +1224,11 @@ function DragGhost({
 function DetailCard({
   tileId,
   bundle,
-  state,
   known,
   onDismiss,
 }: {
   tileId: string;
   bundle: ThemeBundle;
-  state: GameState;
   /** Everything the player knows (this game + lifetime collection). */
   known: Set<string>;
   onDismiss: () => void;
@@ -1791,9 +1789,9 @@ function SignInCTA({ count }: { count: number }) {
         Discoveries reset when you start a new game. Sign in to keep them
         across every game, forever.
       </span>
-      <a className="cbh" href="/sign-in">
+      <Link className="cbh" href="/sign-in">
         Sign in
-      </a>
+      </Link>
     </div>
   );
 }
