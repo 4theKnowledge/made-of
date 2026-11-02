@@ -361,6 +361,9 @@ function afterMove(
     const A = ageSets(bundle, state.age);
     const sample = [...new Set(A.recipes.filter((r) => r.band === state.age + 1).map((r) => r.out))].slice(0, 4);
     events.push({ type: "age-up", age: state.age, sample });
+    // Clear the tray so step 3 re-deals from the new age's pool. Keeps I→II
+    // feeling like a transition instead of just a label swap.
+    state.tray.fill(null);
   } else if (
     state.age === totalAges - 1 &&
     state.ageMade >= ageNeed(state.age)
