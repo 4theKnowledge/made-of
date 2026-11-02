@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminGraphPage() {
   const db = getDb();
-  const [items, allLinks, recipes] = await Promise.all([
+  const [items, allLinks, recipes, kinds] = await Promise.all([
     db
       .select({
         id: schema.items.id,
@@ -42,6 +42,9 @@ export default async function AdminGraphPage() {
         position: schema.recipes.position,
       })
       .from(schema.recipes),
+    db
+      .select({ code: schema.kinds.code, label: schema.kinds.label, position: schema.kinds.position })
+      .from(schema.kinds),
   ]);
 
   const data: TreeData = {
@@ -55,6 +58,10 @@ export default async function AdminGraphPage() {
       type: l.type,
       confidence: l.confidence,
     })),
+    kinds: kinds
+      .slice()
+      .sort((a, b) => a.position - b.position || a.code.localeCompare(b.code))
+      .map((k) => ({ code: k.code, label: k.label })),
   };
 
   return (

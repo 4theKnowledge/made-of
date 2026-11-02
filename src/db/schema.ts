@@ -25,21 +25,6 @@ import {
 
 export const tierEnum = pgEnum("tier", ["F", "N", "M", "C", "P", "S"]);
 
-export const itemKindEnum = pgEnum("item_kind", [
-  "cosmic",
-  "element",
-  "mineral",
-  "living",
-  "substance",
-  "food",
-  "energy",
-  "part",
-  "object",
-  "tool",
-  "place",
-  "information",
-]);
-
 export const itemStatusEnum = pgEnum("item_status", ["draft", "review", "live"]);
 
 export const linkTypeEnum = pgEnum("link_type", ["f", "w", "n", "s", "e"]);
@@ -81,6 +66,31 @@ export const combineScopeEnum = pgEnum("combine_scope", ["endless", "daily"]);
 export const codeKindEnum = pgEnum("code_kind", ["invite", "promo"]);
 
 /* ========================================================================
+ * Kinds.
+ *
+ * Was a Postgres enum; now a table so admins can add/rename kinds without
+ * a migration. `code` is the stable identifier (lowercase, hyphen-safe) and
+ * acts as the FK target on items.kind. `label` is the display string.
+ * ====================================================================== */
+
+export const kinds = pgTable(
+  "kinds",
+  {
+    code: text("code").primaryKey(),
+    label: text("label").notNull(),
+    description: text("description"),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("kinds_position_idx").on(t.position)],
+);
+
+/* ========================================================================
  * Items.
  *
  * id is a uuid so renames don't break foreign keys. `slug` (lowercase,
@@ -96,7 +106,13 @@ export const items = pgTable(
     slug: text("slug").notNull().unique(),
     name: text("name").notNull().unique(),
     tier: tierEnum("tier").notNull(),
-    kind: itemKindEnum("kind").notNull(),
+    // Previously a pgEnum "item_kind". Now a text FK to kinds.code so admins
+    // can add/rename kinds without a migration. ON DELETE RESTRICT because
+    // deleting a kind that's still in use is a destructive mistake we want
+    // to catch at the API layer with a clear error.
+    kind: text("kind")
+      .notNull()
+      .references(() => kinds.code, { onDelete: "restrict", onUpdate: "cascade" }),
     firstAppeared: text("first_appeared"),
     // Years before 2026. Big bang is ~13.8e9, which overflows int32.
     firstAppearedYa: bigint("first_appeared_ya", { mode: "number" }),
@@ -560,7 +576,12 @@ export const evidenceSourcesRelations = relations(
  * ====================================================================== */
 
 export type Tier = (typeof tierEnum.enumValues)[number];
-export type ItemKind = (typeof itemKindEnum.enumValues)[number];
+// Kind codes are user-managed now (see the `kinds` table), so the TS type
+// is a plain string. API handlers validate against the live set of codes
+// at write time.
+export type ItemKind = string;
+export type Kind = typeof kinds.$inferSelect;
+export type NewKind = typeof kinds.$inferInsert;
 export type ItemStatus = (typeof itemStatusEnum.enumValues)[number];
 export type LinkType = (typeof linkTypeEnum.enumValues)[number];
 export type Confidence = (typeof confidenceEnum.enumValues)[number];

@@ -5,13 +5,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Confidence, ItemKind, ItemStatus, LinkType, Tier } from "@/db/schema";
 import { REL } from "@/lib/rel";
-import { TIER, TIER_ORDER, KIND } from "@/lib/taxonomy";
+import { TIER, TIER_ORDER } from "@/lib/taxonomy";
 import { api, type ItemRow, type LinkRow, type RecipeRow } from "./treeApi";
 
 export interface TreeData {
   items: ItemRow[];
   recipes: RecipeRow[];
   links: LinkRow[];
+  kinds: { code: string; label: string }[];
 }
 
 const STORAGE_KEY = "admin:tree:expanded:v2";
@@ -44,7 +45,6 @@ const CONFIDENCE_DESC: Record<Confidence, string> = {
 const LINK_TYPES: LinkType[] = ["f", "w", "n", "s", "e"];
 const CONFIDENCES: Confidence[] = ["established", "strong", "debated", "hypothesis"];
 const STATUSES: ItemStatus[] = ["draft", "review", "live"];
-const KINDS: ItemKind[] = Object.keys(KIND) as ItemKind[];
 
 function statusColour(s: ItemStatus) {
   return s === "live" ? "var(--good, #2a7a2a)" : s === "review" ? "var(--warn, #a66400)" : "var(--muted)";
@@ -363,6 +363,7 @@ function Toasts({ list, dismiss }: { list: Toast[]; dismiss: (id: number) => voi
 export function TreeList({ initialData }: { initialData: TreeData }) {
   const [data, setData] = useState<TreeData>(initialData);
   const views = useMemo(() => deriveViews(data), [data]);
+
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
@@ -796,6 +797,7 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
           </button>
         ) : (
           <AddItemForm
+            kinds={data.kinds}
             onCancel={() => setShowAddItem(false)}
             onSubmit={async (input) => {
               await createItem(input);
@@ -838,6 +840,7 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
       {editingItem && (
         <EditItemModal
           item={editingItem}
+          kinds={data.kinds}
           onClose={() => setEditingItemId(null)}
           onSave={(patch) => patchItem(editingItem.id, patch)}
           onPublish={() => publishItem(editingItem.id)}
@@ -1364,7 +1367,7 @@ function Row(props: RowProps) {
         </Tooltip>
 
         <span style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</span>
-        <Tooltip title={KIND[item.kind]}>
+        <Tooltip title={data.kinds.find((k) => k.code === item.kind)?.label ?? item.kind}>
           <span style={{ fontSize: 11, color: "var(--muted)" }}>{item.kind}</span>
         </Tooltip>
 
@@ -1978,13 +1981,16 @@ function RecipeGroup(props: RecipeGroupProps) {
 function AddItemForm({
   onSubmit,
   onCancel,
+  kinds,
 }: {
   onSubmit: (input: { name: string; tier: Tier; kind: ItemKind }) => Promise<void>;
   onCancel: () => void;
+  kinds: { code: string; label: string }[];
 }) {
   const [name, setName] = useState("");
   const [tier, setTier] = useState<Tier>("M");
-  const [kind, setKind] = useState<ItemKind>("substance");
+  const defaultKind = kinds.find((k) => k.code === "substance")?.code ?? kinds[0]?.code ?? "";
+  const [kind, setKind] = useState<ItemKind>(defaultKind);
   const [busy, setBusy] = useState(false);
 
   return (
@@ -2018,9 +2024,9 @@ function AddItemForm({
         ))}
       </select>
       <select value={kind} onChange={(e) => setKind(e.target.value as ItemKind)} style={formInput}>
-        {Object.entries(KIND).map(([k, label]) => (
-          <option key={k} value={k}>
-            {label}
+        {kinds.map((k) => (
+          <option key={k.code} value={k.code}>
+            {k.label}
           </option>
         ))}
       </select>
@@ -2462,6 +2468,7 @@ const tagChip: React.CSSProperties = {
 
 function EditItemModal({
   item,
+  kinds,
   onClose,
   onSave,
   onPublish,
@@ -2469,6 +2476,7 @@ function EditItemModal({
   onDelete,
 }: {
   item: ItemRow;
+  kinds: { code: string; label: string }[];
   onClose: () => void;
   onSave: (patch: Partial<Pick<ItemRow, "name" | "tier" | "kind" | "firstAppeared" | "symbol" | "fact" | "tags" | "status" | "isCanary">>) => Promise<void>;
   onPublish: () => Promise<void>;
@@ -2585,9 +2593,9 @@ function EditItemModal({
 
             <label style={modalLabel}>Kind</label>
             <select value={kind} onChange={(e) => setKind(e.target.value as ItemKind)} style={modalInput}>
-              {KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {KIND[k]}
+              {kinds.map((k) => (
+                <option key={k.code} value={k.code}>
+                  {k.label}
                 </option>
               ))}
             </select>

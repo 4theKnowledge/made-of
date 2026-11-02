@@ -51,6 +51,27 @@ async function main() {
     await tx.delete(schema.sources);
     await tx.delete(schema.items);
 
+    // Kinds table is populated by the migration, but a fresh DB that runs
+    // this seeder may still need them. onConflictDoNothing keeps this
+    // idempotent in both cases.
+    await tx
+      .insert(schema.kinds)
+      .values([
+        { code: "cosmic", label: "Cosmic", position: 0 },
+        { code: "element", label: "Element", position: 1 },
+        { code: "mineral", label: "Mineral", position: 2 },
+        { code: "living", label: "Living", position: 3 },
+        { code: "substance", label: "Substance", position: 4 },
+        { code: "food", label: "Food", position: 5 },
+        { code: "energy", label: "Energy", position: 6 },
+        { code: "part", label: "Part", position: 7 },
+        { code: "object", label: "Object", position: 8 },
+        { code: "tool", label: "Tool", position: 9 },
+        { code: "place", label: "Place", position: 10 },
+        { code: "information", label: "Information", position: 11 },
+      ])
+      .onConflictDoNothing();
+
     await bulkInsert(tx, schema.items, rows.items);
     await bulkInsert(tx, schema.sources, rows.sources);
     await bulkInsert(tx, schema.recipes, rows.recipes);
