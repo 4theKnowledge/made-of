@@ -154,7 +154,12 @@ export async function shareText(
     canShare?: (data: { title?: string; text?: string; url?: string }) => boolean;
   };
   if (nav.share) {
-    const data = { title: p.title, text: p.text, url: p.url || undefined };
+    // When a URL is present, share URL-only so iMessage (and most OS share
+    // sheets) render a Rich Link preview from our OG card. Including `text`
+    // alongside `url` drops iMessage into the compact bubble with no image.
+    const data = p.url
+      ? { title: p.title, url: p.url }
+      : { title: p.title, text: p.text };
     if (!nav.canShare || nav.canShare(data)) {
       try {
         await nav.share(data);

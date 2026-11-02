@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   const title = day ? `Daily Combine · ${day}` : "Combine";
 
-  return new ImageResponse(
+  const response = new ImageResponse(
     (
       <div
         style={{
@@ -157,4 +157,12 @@ export async function GET(req: NextRequest) {
     ),
     SIZE,
   );
+  // The query string makes each daily result unique, so a long immutable
+  // cache is safe. This keeps iMessage's link-preview fetch inside its
+  // short budget — a cold @vercel/og render otherwise drops the preview.
+  response.headers.set(
+    "Cache-Control",
+    "public, max-age=31536000, s-maxage=31536000, immutable",
+  );
+  return response;
 }
