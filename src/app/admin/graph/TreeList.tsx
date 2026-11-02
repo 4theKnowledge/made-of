@@ -124,17 +124,35 @@ function deriveViews(data: TreeData) {
     ensureBucket(l.targetItemId).incoming.push(l);
   }
 
-  // Roots: items with no incoming forward links. (We treat *all* incoming as
-  // disqualifying — same as before.)
+  // Parent sets per item (via resolved link source) and parent count.
+  const parentsByItem = new Map<string, Set<string>>();
   const parentCountByItem = new Map<string, number>();
   for (const l of data.links) {
+    const src = linkSource.get(l.linkId);
+    if (src) {
+      const set = parentsByItem.get(l.targetItemId) ?? new Set<string>();
+      set.add(src);
+      parentsByItem.set(l.targetItemId, set);
+    }
     parentCountByItem.set(l.targetItemId, (parentCountByItem.get(l.targetItemId) ?? 0) + 1);
   }
+
+  // Roots: items with no incoming forward links. (We treat *all* incoming as
+  // disqualifying — same as before.)
   const roots = data.items
     .filter((it) => !parentCountByItem.has(it.id))
     .map((it) => it.id);
 
-  return { itemById, recipeById, recipesByItem, linksByItem, parentCountByItem, roots, linkSource };
+  return {
+    itemById,
+    recipeById,
+    recipesByItem,
+    linksByItem,
+    parentCountByItem,
+    parentsByItem,
+    roots,
+    linkSource,
+  };
 }
 
 type Views = ReturnType<typeof deriveViews>;
@@ -664,21 +682,59 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
 
   const [statusFilter, setStatusFilter] = useState<ItemStatus | "all">("all");
   const [tierFilter, setTierFilter] = useState<Tier | "all">("all");
+  const [tagFilter, setTagFilter] = useState<string>("all");
   const [view, setView] = useState<"tree" | "flat">("tree");
+
+  const availableTags = useMemo(() => {
+    const s = new Set<string>();
+    for (const it of data.items) for (const t of it.tags) if (t) s.add(t);
+    return Array.from(s).sort();
+  }, [data.items]);
+
+  // If the selected tag disappears (last item carrying it was deleted or
+  // retagged), fall back to "all" so the filter doesn't silently hide
+  // everything.
+  useEffect(() => {
+    if (tagFilter !== "all" && !availableTags.includes(tagFilter)) {
+      setTagFilter("all");
+    }
+  }, [availableTags, tagFilter]);
 
   const q = query.trim().toLowerCase();
   const matches = useMemo(() => {
-    const isFiltered = q !== "" || statusFilter !== "all" || tierFilter !== "all";
+    const isFiltered =
+      q !== "" || statusFilter !== "all" || tierFilter !== "all" || tagFilter !== "all";
     if (!isFiltered) return null;
     const s = new Set<string>();
     for (const it of data.items) {
       if (q && !it.name.toLowerCase().includes(q)) continue;
       if (statusFilter !== "all" && it.status !== statusFilter) continue;
       if (tierFilter !== "all" && it.tier !== tierFilter) continue;
+      if (tagFilter !== "all" && !it.tags.includes(tagFilter)) continue;
       s.add(it.id);
     }
     return s;
-  }, [q, statusFilter, tierFilter, data.items]);
+  }, [q, statusFilter, tierFilter, tagFilter, data.items]);
+
+  // Tree visibility: matches + all ancestors leading to them (so lineage
+  // context is preserved). Null when no filter is active.
+  const visibleIds = useMemo(() => {
+    if (!matches) return null;
+    const visible = new Set<string>(matches);
+    const stack = Array.from(matches);
+    while (stack.length) {
+      const cur = stack.pop()!;
+      const parents = views.parentsByItem.get(cur);
+      if (!parents) continue;
+      for (const p of parents) {
+        if (!visible.has(p)) {
+          visible.add(p);
+          stack.push(p);
+        }
+      }
+    }
+    return visible;
+  }, [matches, views]);
 
   const expandAll = useCallback(() => {
     const MAX_DEPTH = 8;
@@ -719,6 +775,9 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
         setStatusFilter={setStatusFilter}
         tierFilter={tierFilter}
         setTierFilter={setTierFilter}
+        tagFilter={tagFilter}
+        setTagFilter={setTagFilter}
+        availableTags={availableTags}
         view={view}
         setView={setView}
         expandAll={expandAll}
@@ -762,6 +821,7 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
               forceExpand={forceExpand}
               ancestors={new Set()}
               matches={matches}
+              visibleIds={visibleIds}
               onCreateLink={createLink}
               onPatchLink={patchLink}
               onDeleteLink={deleteLink}
@@ -805,6 +865,9 @@ function Toolbar({
   setStatusFilter,
   tierFilter,
   setTierFilter,
+  tagFilter,
+  setTagFilter,
+  availableTags,
   view,
   setView,
   expandAll,
@@ -819,6 +882,9 @@ function Toolbar({
   setStatusFilter: (s: ItemStatus | "all") => void;
   tierFilter: Tier | "all";
   setTierFilter: (t: Tier | "all") => void;
+  tagFilter: string;
+  setTagFilter: (t: string) => void;
+  availableTags: string[];
   view: "tree" | "flat";
   setView: (v: "tree" | "flat") => void;
   expandAll: () => void;
@@ -861,6 +927,21 @@ function Toolbar({
         {TIER_ORDER.map((t) => (
           <option key={t} value={t}>
             {t} — {TIER[t].name}
+          </option>
+        ))}
+      </select>
+      <select
+        value={tagFilter}
+        onChange={(e) => setTagFilter(e.target.value)}
+        style={selectStyle}
+        disabled={availableTags.length === 0}
+      >
+        <option value="all">
+          {availableTags.length === 0 ? "No tags" : "All tags"}
+        </option>
+        {availableTags.map((t) => (
+          <option key={t} value={t}>
+            {t}
           </option>
         ))}
       </select>
@@ -1165,6 +1246,7 @@ interface RowProps {
   forceExpand: (path: string) => void;
   ancestors: Set<string>;
   matches: Set<string> | null;
+  visibleIds: Set<string> | null;
   onCreateLink: (input: {
     type: LinkType;
     targetItemId: string;
@@ -1192,6 +1274,7 @@ function Row(props: RowProps) {
     forceExpand,
     ancestors,
     matches,
+    visibleIds,
     onCreateLink,
     onPatchLink,
     onDeleteLink,
@@ -1207,6 +1290,9 @@ function Row(props: RowProps) {
   const item = views.itemById.get(itemId);
   if (!item) return null;
 
+  // Under a filter, hide any item not in the match-or-ancestor set.
+  if (visibleIds && !visibleIds.has(itemId)) return null;
+
   const bucket = views.linksByItem.get(itemId);
   const recipes = views.recipesByItem.get(itemId) ?? [];
   const itemLevel = bucket?.itemLevel ?? [];
@@ -1214,12 +1300,15 @@ function Row(props: RowProps) {
 
   const totalChildren =
     itemLevel.length + Array.from(recipeLinks.values()).reduce((n, arr) => n + arr.length, 0);
-  const isExpanded = expanded.has(path);
+  // When filtering, auto-expand so matches are visible without manual clicks.
+  const isExpanded = visibleIds ? true : expanded.has(path);
   const isCycle = ancestors.has(itemId);
   const canExpand = (totalChildren > 0 || recipes.length > 0) && !isCycle;
   const parentCount = views.parentCountByItem.get(itemId) ?? 0;
 
-  const dimmed = matches && !matches.has(itemId);
+  // Subtly highlight actual matches (vs ancestors shown for context).
+  const isActualMatch = matches ? matches.has(itemId) : false;
+  const isAncestorContext = !!visibleIds && !isActualMatch;
 
   return (
     <li>
@@ -1233,7 +1322,7 @@ function Row(props: RowProps) {
           padding: "4px 14px",
           paddingLeft: 14 + depth * INDENT,
           cursor: canExpand ? "pointer" : "default",
-          opacity: dimmed ? 0.4 : 1,
+          opacity: isAncestorContext ? 0.65 : 1,
           borderBottom: "1px solid transparent",
           ["--depth" as string]: depth,
         }}
@@ -1473,6 +1562,7 @@ function Row(props: RowProps) {
               ancestors={ancestors}
               itemId={itemId}
               matches={matches}
+              visibleIds={visibleIds}
               onCreateLink={onCreateLink}
               onPatchLink={onPatchLink}
               onDeleteLink={onDeleteLink}
@@ -1521,6 +1611,7 @@ function Row(props: RowProps) {
                     forceExpand={forceExpand}
                     ancestors={new Set([...ancestors, itemId])}
                     matches={matches}
+                    visibleIds={visibleIds}
                     onCreateLink={onCreateLink}
                     onPatchLink={onPatchLink}
                     onDeleteLink={onDeleteLink}
@@ -1715,6 +1806,7 @@ interface RecipeGroupProps {
   ancestors: Set<string>;
   itemId: string;
   matches: Set<string> | null;
+  visibleIds: Set<string> | null;
   onCreateLink: RowProps["onCreateLink"];
   onPatchLink: RowProps["onPatchLink"];
   onDeleteLink: RowProps["onDeleteLink"];
@@ -1723,11 +1815,33 @@ interface RecipeGroupProps {
 }
 
 function RecipeGroup(props: RecipeGroupProps) {
-  const { recipe, parentItem, path, depth, links, views, expanded, toggle, forceExpand, ancestors, itemId, matches, data } =
-    props;
-  const isExpanded = expanded.has(path);
-  const canExpand = links.length > 0;
   const [showAddChild, setShowAddChild] = useState(false);
+  const {
+    recipe,
+    parentItem,
+    path,
+    depth,
+    links,
+    views,
+    expanded,
+    toggle,
+    forceExpand,
+    ancestors,
+    itemId,
+    matches,
+    visibleIds,
+    data,
+  } = props;
+
+  // Under a filter, hide this recipe group entirely if none of its link
+  // targets are in the visible set — nothing of interest to show.
+  if (visibleIds) {
+    const anyVisible = links.some((l) => visibleIds.has(l.targetItemId));
+    if (!anyVisible) return null;
+  }
+
+  const isExpanded = visibleIds ? true : expanded.has(path);
+  const canExpand = links.length > 0;
 
   return (
     <li>
@@ -1840,6 +1954,7 @@ function RecipeGroup(props: RecipeGroupProps) {
                 forceExpand={forceExpand}
                 ancestors={new Set([...ancestors, itemId])}
                 matches={matches}
+                visibleIds={props.visibleIds}
                 onCreateLink={props.onCreateLink}
                 onPatchLink={props.onPatchLink}
                 onDeleteLink={props.onDeleteLink}
@@ -2241,6 +2356,7 @@ function FlatView({
             <th style={flatTh}>Tier</th>
             <th style={flatTh}>Kind</th>
             <th style={flatTh}>Status</th>
+            <th style={flatTh}>Tags</th>
             <th style={flatTh}>Updated</th>
             <th style={flatTh}></th>
           </tr>
@@ -2274,6 +2390,9 @@ function FlatView({
               <td style={flatTd}>
                 <StatusPill status={it.status} />
               </td>
+              <td style={flatTd}>
+                <TagsCell tags={it.tags} />
+              </td>
               <td style={{ ...flatTd, color: "var(--muted)" }}>
                 {new Date(it.updatedAt).toLocaleDateString()}
               </td>
@@ -2292,6 +2411,50 @@ function FlatView({
 
 const flatTh: React.CSSProperties = { padding: "6px 10px", fontSize: 12, color: "var(--muted)" };
 const flatTd: React.CSSProperties = { padding: "6px 10px" };
+
+/**
+ * Smart tag truncation: show tags up to a character budget, then a
+ * "+N more" chip whose tooltip reveals the full list.
+ */
+function TagsCell({ tags }: { tags: string[] }) {
+  if (tags.length === 0) {
+    return <span style={{ color: "var(--muted)", fontSize: 12 }}>—</span>;
+  }
+  const BUDGET = 24;
+  const shown: string[] = [];
+  let used = 0;
+  for (const t of tags) {
+    const next = used + t.length + (shown.length > 0 ? 2 : 0);
+    if (next > BUDGET && shown.length > 0) break;
+    shown.push(t);
+    used = next;
+  }
+  const hidden = tags.length - shown.length;
+  return (
+    <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap", maxWidth: 220 }}>
+      {shown.map((t) => (
+        <span key={t} style={tagChip}>
+          {t}
+        </span>
+      ))}
+      {hidden > 0 && (
+        <Tooltip title={`${tags.length} tags`} body={tags.join(", ")}>
+          <span style={{ ...tagChip, cursor: "help" }}>+{hidden}</span>
+        </Tooltip>
+      )}
+    </span>
+  );
+}
+
+const tagChip: React.CSSProperties = {
+  fontSize: 11,
+  padding: "1px 6px",
+  borderRadius: 10,
+  border: "1px solid var(--line)",
+  color: "var(--muted)",
+  fontFamily: "var(--mono, monospace)",
+  whiteSpace: "nowrap",
+};
 
 /* ========================================================================
  * EditItemModal — portal dialog with full parity to /admin/items/[id].
