@@ -1090,6 +1090,16 @@ a.btn.primary{color:var(--bg)}
 /* GameOverCard mini-shelf — prototype line 965 */
 .cbshelf.sum{border:0;justify-content:center;gap:8px;flex-wrap:wrap!important;overflow:visible!important;min-height:0}
 
+/* GameOverCard close ("view board") — dismisses the summary so the player
+   can inspect the final board; works for both endless and reviewed daily. */
+.cbx{position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:0;background:transparent;color:var(--ink);cursor:pointer;border-radius:99px}
+.cbx:hover{background:color-mix(in srgb, var(--ink) 10%, transparent)}
+.cbx svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
+/* "Results" chip shown when the GameOverCard has been dismissed, so the
+   player can re-open their summary from the board view. */
+.cbh.cbresults{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:70;box-shadow:0 2px 8px rgba(17,20,23,.18)}
+
 /* Theme menu / Sound menu / Collection book — prototype lines
    1064–1068, 1023–1051 */
 .cbtopt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:10px 12px;border:2px solid var(--ink);border-radius:4px;background:var(--surface);color:var(--ink);font:inherit;cursor:pointer}

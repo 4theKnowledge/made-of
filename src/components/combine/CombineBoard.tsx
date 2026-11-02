@@ -377,6 +377,15 @@ export function CombineBoard({ bundles: serialised }: Props) {
   const [soundOpen, setSoundOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [agesOpen, setAgesOpen] = useState(false);
+  // Game-over summary card. Opens automatically when the run ends; the
+  // player can dismiss it to review the final board (especially useful for
+  // a finished daily they re-entered from the theme menu).
+  const [overCardOpen, setOverCardOpen] = useState(false);
+  const prevOverRef = useRef(false);
+  useEffect(() => {
+    if (state.over && !prevOverRef.current) setOverCardOpen(true);
+    prevOverRef.current = state.over;
+  }, [state.over]);
   // Pending clears so overlapping actions don't orphan timers.
   const timers = useRef<number[]>([]);
   useEffect(() => () => {
@@ -840,6 +849,13 @@ export function CombineBoard({ bundles: serialised }: Props) {
 
   const onCellTap = useCallback(
     (cell: number) => {
+      // In a finished run (e.g. reviewing today's completed daily), the
+      // board is inert except for tapping a tile to open its info card.
+      if (state.over) {
+        const target = state.board[cell];
+        if (target != null) setInfoTile(target);
+        return;
+      }
       // Clear mode: tap a full cell to remove it.
       if (clearMode) {
         if (state.board[cell] == null) return;
@@ -887,7 +903,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
         act({ type: "drop-on", slot: selectedSlot, cell });
       }
     },
-    [act, selectedSlot, state.board, state.crumb, clearMode, moveMode, shoreMode],
+    [act, selectedSlot, state.board, state.crumb, state.over, clearMode, moveMode, shoreMode],
   );
 
   // When a drag completed via drop or a long-press fired, we don't want
@@ -1388,11 +1404,12 @@ export function CombineBoard({ bundles: serialised }: Props) {
             onChoose={onChoose}
           />
         )}
-        {state.over && (
+        {state.over && overCardOpen && (
           <GameOverCard
             state={state}
             bundle={bundle}
             best={best[state.theme] ?? 0}
+            onClose={() => setOverCardOpen(false)}
             onPlayAgain={() => {
               // From a finished daily, "Play endless" starts a fresh
               // endless game. From endless, start another endless.
@@ -1414,6 +1431,15 @@ export function CombineBoard({ bundles: serialised }: Props) {
               await shareText(text);
             }}
           />
+        )}
+        {state.over && !overCardOpen && (
+          <button
+            type="button"
+            className="cbh cbresults"
+            onClick={() => setOverCardOpen(true)}
+          >
+            Results
+          </button>
         )}
         {ageToast && (
           <AgeToast
@@ -1706,12 +1732,14 @@ function GameOverCard({
   state,
   bundle,
   best,
+  onClose,
   onPlayAgain,
   onShare,
 }: {
   state: GameState;
   bundle: ThemeBundle;
   best: number;
+  onClose: () => void;
   onPlayAgain: () => void;
   onShare: () => void;
 }) {
@@ -1729,8 +1757,18 @@ function GameOverCard({
   const totalOutputs = bundle.outputs.size;
   return (
     <>
-      <div className="cbscrim" />
+      <div className="cbscrim" onClick={onClose} />
       <section className="cbover" role="dialog" aria-label="Run over">
+        <button
+          type="button"
+          className="cbx"
+          aria-label="View board"
+          onClick={onClose}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
         <span className="k">{state.daily ? `Daily game · ${state.daily}` : "Board full"}</span>
         <b className="big">{state.score.toLocaleString("en")}</b>
         <span className="sub">
@@ -1858,8 +1896,19 @@ function ThemeMenu({
       >
         <span className="k">Today</span>
         {dailyDone ? (
-          <div className="cbtopt cbdaily done">
-            <b>Daily game · done</b>
+          <div
+            className="cbtopt cbdaily done"
+            role="button"
+            tabIndex={0}
+            onClick={onPickDaily}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onPickDaily();
+              }
+            }}
+          >
+            <b>Daily game · done · review</b>
             <span>
               {dailyDone.score.toLocaleString("en")} points · reached Age{" "}
               {dailyDone.ageName}. A new one tomorrow.
@@ -1867,7 +1916,10 @@ function ThemeMenu({
             <button
               type="button"
               className="cbh"
-              onClick={onShareDaily}
+              onClick={(e) => {
+                e.stopPropagation();
+                onShareDaily();
+              }}
             >
               Share result
             </button>
@@ -1880,7 +1932,7 @@ function ThemeMenu({
           >
             <b>Daily game{daily ? " · playing" : ""}</b>
             <span>
-              Same start and same tiles for everyone today. One go. 5×5.
+              Same start and same tiles for everyone today. One go. 6×6.
             </span>
           </button>
         )}
