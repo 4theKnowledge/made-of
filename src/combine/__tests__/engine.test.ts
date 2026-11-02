@@ -411,6 +411,129 @@ describe("helpers (swap, clear, move)", () => {
   });
 });
 
+describe("hold zone", () => {
+  // Age-0 recipe (band 1) plus a band-3 recipe so some tiles stop being
+  // useful once the player ages up past band 1.
+  const bundle = fakeBundle({
+    recipes: [
+      R("dough", ["flour", "water"]),
+      // "future" sits in band 3; its ingredients aren't in `USE` for ages
+      // 0 or 1 (which see bands [0,1,2] and [1,2,3] respectively), so a
+      // held "future-tool" tile should crumble when ageing from 0 → 1.
+      { out: "warp", from: ["spice"], with: [], all: ["spice"], lvl: 1, band: 3 },
+    ],
+  });
+
+  function state0() {
+    const s = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s.board = Array(9).fill(null);
+    return s;
+  }
+
+  it("hold stashes a tray tile and clears the tray slot", () => {
+    const s0 = state0();
+    s0.tray = ["flour", "water", null];
+    const { state } = reduce(s0, bundle, { type: "hold", slot: 0 });
+    expect(state.hold[0]).toBe("flour");
+    // Dealer refills the tray at the end of the move; just assert the
+    // specific slot that was consumed is no longer "flour".
+    expect(state.tray[0]).not.toBe("flour");
+  });
+
+  it("hold counts as a move (increments moves and triggers afterMove)", () => {
+    const s0 = state0();
+    s0.tray = ["flour", null, null];
+    const before = s0.moves;
+    const { state } = reduce(s0, bundle, { type: "hold", slot: 0 });
+    expect(state.moves).toBe(before + 1);
+  });
+
+  it("hold is a no-op when all hold slots are full", () => {
+    const s0 = state0();
+    s0.tray = ["flour", null, null];
+    s0.hold = ["water"]; // age-0 capacity is 1 and it's full
+    const { state, events } = reduce(s0, bundle, { type: "hold", slot: 0 });
+    expect(state).toBe(s0);
+    expect(events).toEqual([]);
+  });
+
+  it("hold is a no-op when the tray slot is empty", () => {
+    const s0 = state0();
+    s0.tray = [null, null, null];
+    const { state, events } = reduce(s0, bundle, { type: "hold", slot: 0 });
+    expect(state).toBe(s0);
+    expect(events).toEqual([]);
+  });
+
+  it("placing from hold combines like placing from the tray", () => {
+    const s0 = state0();
+    s0.board[0] = "water";
+    s0.hold = ["flour"];
+    s0.tray = [null, null, null];
+    const { state, events } = reduce(s0, bundle, {
+      type: "place",
+      slot: 0,
+      cell: 1,
+      source: "hold",
+    });
+    expect(state.board[1]).toBe("dough");
+    expect(state.hold[0]).toBeNull();
+    expect(events.some((e) => e.type === "combine")).toBe(true);
+  });
+
+  it("drop-on from hold combines like drop-on from the tray", () => {
+    const s0 = state0();
+    s0.board[4] = "water";
+    s0.hold = ["flour"];
+    s0.tray = [null, null, null];
+    const { state } = reduce(s0, bundle, {
+      type: "drop-on",
+      slot: 0,
+      cell: 4,
+      source: "hold",
+    });
+    expect(state.board[4]).toBe("dough");
+    expect(state.hold[0]).toBeNull();
+  });
+
+  it("age-up grows the hold capacity (1 → 2)", () => {
+    const s0 = state0();
+    s0.ageMade = 7; // meets ageNeed(0)
+    s0.tray = ["water", null, null];
+    s0.hold = ["flour"]; // dough is in USE at ages 0, 1 (band 1 recipe)
+    const { state, events } = reduce(s0, bundle, { type: "hold", slot: 0 });
+    // Hold slot full → the hold itself was a no-op path, but we need an
+    // action that triggers afterMove. Use place of a non-combining tile on
+    // an empty cell instead.
+    expect(state).toBe(s0);
+    expect(events).toEqual([]);
+
+    const s1 = state0();
+    s1.ageMade = 7;
+    s1.hold = ["flour"];
+    s1.tray = ["water", null, null];
+    const res = reduce(s1, bundle, { type: "place", slot: 0, cell: 4 });
+    expect(res.state.age).toBe(1);
+    expect(res.state.hold.length).toBe(2);
+    // "flour" is still useful at age 1 (band 1 is in [1,2,3]), so it stays.
+    expect(res.state.hold[0]).toBe("flour");
+    expect(res.state.hold[1]).toBeNull();
+  });
+
+  it("age-up crumbles held tiles that are no longer in USE", () => {
+    const s0 = state0();
+    s0.ageMade = 7 + 2; // meets ageNeed(1); start at age 1 to force → age 2
+    s0.age = 1;
+    s0.hold = ["flour", null]; // band 1; USE at age 2 is bands [2,3,4]
+    s0.tray = ["spice", null, null]; // "spice" is in band 3 so it's valid
+    const { state, events } = reduce(s0, bundle, { type: "place", slot: 0, cell: 4 });
+    expect(state.age).toBe(2);
+    expect(state.hold.length).toBe(3);
+    expect(state.hold[0]).toBeNull();
+    expect(events.some((e) => e.type === "hold-crumble")).toBe(true);
+  });
+});
+
 describe("purity (no shared references with input)", () => {
   it("reduce does not mutate the previous state", () => {
     const bundle = fakeBundle({ recipes: [R("dough", ["flour", "water"])] });

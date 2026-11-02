@@ -254,11 +254,15 @@ export function CombineBoard({ bundles: serialised }: Props) {
   // prototype's cbDrag record. Ghost x/y are in viewport coords.
   const [drag, setDrag] = useState<{
     slot: number;
+    source: "tray" | "hold";
     x: number;
     y: number;
     tileWidth: number;
     overCell: number | null;
     overOk: boolean;
+    /** True while the pointer is over the hold zone. When set, `overCell`
+     *  will be null — only one of the two is active at a time. */
+    overHold: boolean;
   } | null>(null);
   const [infoTile, setInfoTile] = useState<string | null>(null);
   const [themeOpen, setThemeOpen] = useState(false);
@@ -575,6 +579,8 @@ export function CombineBoard({ bundles: serialised }: Props) {
           cursor = shipAt + 380;
         } else if (e.type === "crumble") {
           immediate.crumble = new Set(e.cells);
+          playFx("crumble");
+        } else if (e.type === "hold-crumble") {
           playFx("crumble");
         } else if (e.type === "discovery") {
           const firstLifetime = !collection.has(e.out);
@@ -961,12 +967,14 @@ export function CombineBoard({ bundles: serialised }: Props) {
   // to React state only when the over-cell changes so cells can light up.
   const dragRef = useRef<{
     slot: number;
+    source: "tray" | "hold";
     x0: number;
     y0: number;
     moved: boolean;
     tileWidth: number;
     holdTimer: number | null;
     overCell: number | null;
+    overHold: boolean;
   } | null>(null);
 
   const endDrag = useCallback(() => {
@@ -978,40 +986,54 @@ export function CombineBoard({ bundles: serialised }: Props) {
     setDrag(null);
     if (!d.moved) return; // tap: handled on click
     suppressClick.current = true;
+    // Drop onto the hold zone: tray → hold stashes; hold → hold is a no-op.
+    if (snapshot?.overHold) {
+      if (d.source === "tray") {
+        act({ type: "hold", slot: d.slot });
+      }
+      return;
+    }
     if (snapshot?.overCell != null && snapshot.overOk) {
       const cell = snapshot.overCell;
       const target = state.board[cell];
       if (target == null) {
-        act({ type: "place", slot: d.slot, cell });
+        act({ type: "place", slot: d.slot, cell, source: d.source });
       } else {
-        act({ type: "drop-on", slot: d.slot, cell });
+        act({ type: "drop-on", slot: d.slot, cell, source: d.source });
       }
     } else {
       setSelectedSlot(null);
     }
   }, [act, drag, state.board]);
 
-  // Capture the tile under the pointer and whether a drop there would combine.
+  // Capture the drop target under the pointer and whether a drop there is
+  // valid. Returns the board cell (and whether a combine would form) OR a
+  // hold-zone hit — never both.
   const captureOver = useCallback(
-    (x: number, y: number): { cell: number | null; ok: boolean } => {
+    (x: number, y: number): { cell: number | null; ok: boolean; hold: boolean } => {
       const el = document.elementFromPoint(x, y);
-      const cellEl = el?.closest("[data-cb]") as HTMLElement | null;
-      if (!cellEl) return { cell: null, ok: false };
-      const cell = Number(cellEl.dataset.cb);
       const d = dragRef.current;
-      if (d == null) return { cell: null, ok: false };
-      const tile = state.tray[d.slot];
-      if (tile == null) return { cell, ok: false };
+      if (d == null) return { cell: null, ok: false, hold: false };
+      // Hold-zone hit: only accept from the tray and only if there's room.
+      if (el?.closest("[data-cbholdzone]")) {
+        if (d.source !== "tray") return { cell: null, ok: false, hold: false };
+        const roomy = state.hold.some((v) => v == null);
+        return { cell: null, ok: roomy, hold: true };
+      }
+      const cellEl = el?.closest("[data-cb]") as HTMLElement | null;
+      if (!cellEl) return { cell: null, ok: false, hold: false };
+      const cell = Number(cellEl.dataset.cb);
+      const src = d.source === "hold" ? state.hold : state.tray;
+      const tile = src[d.slot];
+      if (tile == null) return { cell, ok: false, hold: false };
       const target = state.board[cell];
-      // Any empty cell is a valid drop target; occupied cells need a
-      // recipe to form on drop-on-top. Mirrors cbOnOK in the prototype.
       const ok =
         target == null
           ? true
           : Boolean(matchOn(bundle, state.board, cell, tile, state.n));
-      return { cell, ok };
+      return { cell, ok, hold: false };
     },
-    [bundle, state.board, state.n, state.tray],
+    [bundle, state.board, state.hold, state.n, state.tray],
   );
 
   // Global pointermove / pointerup once a drag is in flight.
@@ -1030,10 +1052,11 @@ export function CombineBoard({ bundles: serialised }: Props) {
           window.clearTimeout(d.holdTimer);
           d.holdTimer = null;
         }
-        setSelectedSlot(d.slot);
+        if (d.source === "tray") setSelectedSlot(d.slot);
       }
       const over = captureOver(e.clientX, e.clientY);
       d.overCell = over.cell;
+      d.overHold = over.hold;
       setDrag((cur) =>
         cur
           ? {
@@ -1042,6 +1065,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
               y: e.clientY,
               overCell: over.cell,
               overOk: over.ok,
+              overHold: over.hold,
             }
           : cur,
       );
@@ -1064,29 +1088,36 @@ export function CombineBoard({ bundles: serialised }: Props) {
   }, [drag, endDrag, captureOver]);
 
   const onSlotPointerDown = useCallback(
-    (slot: number, e: React.PointerEvent<HTMLButtonElement>) => {
+    (
+      slot: number,
+      source: "tray" | "hold",
+      e: React.PointerEvent<HTMLButtonElement>,
+    ) => {
       const target = e.currentTarget;
       const rect = target.getBoundingClientRect();
-      const tile = state.tray[slot];
+      const tile = (source === "hold" ? state.hold : state.tray)[slot];
       if (tile == null) return;
       suppressClick.current = false;
-      // Start a drag record.
       dragRef.current = {
         slot,
+        source,
         x0: e.clientX,
         y0: e.clientY,
         moved: false,
         tileWidth: rect.width,
         holdTimer: null,
         overCell: null,
+        overHold: false,
       };
       setDrag({
         slot,
+        source,
         x: e.clientX,
         y: e.clientY,
         tileWidth: rect.width,
         overCell: null,
         overOk: false,
+        overHold: false,
       });
       // 450ms long-press opens the detail card unless movement starts.
       const holdId = window.setTimeout(() => {
@@ -1100,7 +1131,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
       }, 450);
       dragRef.current.holdTimer = holdId;
     },
-    [state.tray],
+    [state.hold, state.tray],
   );
 
   const onChoose = useCallback(
@@ -1290,6 +1321,13 @@ export function CombineBoard({ bundles: serialised }: Props) {
           shoreMode={shoreMode}
           onCellTap={onCellTap}
         />
+        <Hold
+          state={state}
+          bundle={bundle}
+          active={Boolean(drag?.overHold)}
+          activeOk={Boolean(drag?.overHold && drag.overOk)}
+          onSlotPointerDown={onSlotPointerDown}
+        />
         <Tray
           state={state}
           bundle={bundle}
@@ -1457,15 +1495,17 @@ export function CombineBoard({ bundles: serialised }: Props) {
           footnote="Need a nudge mid-run? Use the Helpers button for a hint, a swap, a clear, a move or a shore."
         />
       </div>
-      {drag && drag.slot != null && state.tray[drag.slot] != null && (
-        <DragGhost
-          tileId={state.tray[drag.slot]!}
-          bundle={bundle}
-          x={drag.x}
-          y={drag.y}
-          size={64}
-        />
-      )}
+      {drag &&
+        drag.slot != null &&
+        (drag.source === "hold" ? state.hold : state.tray)[drag.slot] != null && (
+          <DragGhost
+            tileId={(drag.source === "hold" ? state.hold : state.tray)[drag.slot]!}
+            bundle={bundle}
+            x={drag.x}
+            y={drag.y}
+            size={64}
+          />
+        )}
     </div>
   );
 }
@@ -2871,9 +2911,11 @@ function Shelf({
       {empty && (
         <span className="cbshelf-empty">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 4v12M7 11l5 5 5-5M4 20h16" />
+            <path d="M3 12a9 9 0 1 0 3-6.7" />
+            <path d="M3 4v5h5" />
+            <path d="M12 7v5l3 2" />
           </svg>
-          <em>Finished things land here</em>
+          <em>History</em>
         </span>
       )}
     </div>
@@ -3107,6 +3149,7 @@ function Tray({
   onSlotTap: (slot: number) => void;
   onSlotPointerDown: (
     slot: number,
+    source: "tray" | "hold",
     e: React.PointerEvent<HTMLButtonElement>,
   ) => void;
 }) {
@@ -3130,7 +3173,7 @@ function Tray({
             className={classes.join(" ")}
             data-cbp={slot}
             style={fillVar(item)}
-            onPointerDown={(e) => onSlotPointerDown(slot, e)}
+            onPointerDown={(e) => onSlotPointerDown(slot, "tray", e)}
             onClick={() => onSlotTap(slot)}
             onContextMenu={(e) => e.preventDefault()}
             aria-label={`Tray slot ${slot + 1}: ${cap(item.name)}${selected === slot ? ", selected" : ""}`}
@@ -3144,6 +3187,72 @@ function Tray({
               symbol={item.symbol}
             />
             <span className="cbn">{cap(item.name)}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Hold({
+  state,
+  bundle,
+  active,
+  activeOk,
+  onSlotPointerDown,
+}: {
+  state: GameState;
+  bundle: ThemeBundle;
+  /** True while a tray tile is being dragged and the pointer is over the
+   *  zone — tells CSS to highlight the drop target. */
+  active: boolean;
+  /** True iff `active` and the drop would succeed (zone has room). When
+   *  active but not ok, the zone paints a reject state. */
+  activeOk: boolean;
+  onSlotPointerDown: (
+    slot: number,
+    source: "tray" | "hold",
+    e: React.PointerEvent<HTMLButtonElement>,
+  ) => void;
+}) {
+  const empty = state.hold.every((v) => v == null);
+  const classes = ["cbshelf", "cbhold"];
+  if (empty) classes.push("none");
+  if (active) classes.push(activeOk ? "over" : "over-bad");
+  return (
+    <div
+      className={classes.join(" ")}
+      data-cbholdzone="1"
+      aria-label="Hold — drag a tile here to save for later. Held tiles crumble when the age moves past them."
+    >
+      {empty && (
+        <span className="cbshelf-empty" aria-hidden="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 3h12v18l-6-4-6 4z" />
+          </svg>
+          <em>Hold zone</em>
+        </span>
+      )}
+      {state.hold.map((id, slot) => {
+        if (id == null) return null;
+        const item = bundle.items.get(id);
+        if (!item) return null;
+        return (
+          <button
+            key={slot}
+            type="button"
+            className="cbslot cbheld"
+            style={fillVar(item)}
+            onPointerDown={(e) => onSlotPointerDown(slot, "hold", e)}
+            onContextMenu={(e) => e.preventDefault()}
+            aria-label={`Held: ${cap(item.name)}`}
+          >
+            <Pictogram
+              name={item.name}
+              tier={item.tier}
+              kind={item.kind}
+              symbol={item.symbol}
+            />
           </button>
         );
       })}

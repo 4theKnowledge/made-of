@@ -46,6 +46,16 @@ export const TIER_VALUE: Record<string, number> = {
  *  removes). */
 export const CRUMBLE_TTL = 3;
 
+/** Hold-zone capacity per age. Index is the 0-based age; capacity grows
+ *  one slot per age. Flatten to all-1s to turn the growth off during
+ *  playtesting. The array extends to cover more ages than any theme
+ *  actually ships. */
+export const HOLD_CAPACITY_BY_AGE: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8];
+
+export function holdCapacity(age: number): number {
+  return HOLD_CAPACITY_BY_AGE[Math.min(age, HOLD_CAPACITY_BY_AGE.length - 1)] ?? 1;
+}
+
 /** A crumble counter for cell `i`: counts ticks since the tile stopped
  *  being "useful" in the current age. */
 export interface CrumbleCounter {
@@ -87,6 +97,10 @@ export interface GameState {
   newBest: boolean;
   moves: number;
   shelf: string[];
+  /** Held tiles. Length is the current age's capacity (see
+   *  `HOLD_CAPACITY_BY_AGE`). Commit-until-used: a stored tile only leaves
+   *  by being placed on the board or crumbling. */
+  hold: Array<string | null>;
   /** 0-based age index. */
   age: number;
   /** Count of makes in the current age (used for the age bar). */
@@ -123,20 +137,25 @@ export type Event =
   | { type: "shipped"; at: number; out: string; bonus: number }
   | { type: "age-up"; age: number; sample: string[] }
   | { type: "crumble"; cells: number[] }
+  | { type: "hold-crumble"; slots: number[]; tiles: string[] }
   | { type: "discovery"; out: string; recipe: string[] }
   | { type: "dealt" }
   | { type: "over" };
 
+/** Tile source for placement actions. */
+export type TileSource = "tray" | "hold";
+
 export type Action =
   | { type: "new-game"; theme: ThemeKey; daily: string | null; size: number; seed?: number }
-  | { type: "place"; slot: number; cell: number }
-  | { type: "drop-on"; slot: number; cell: number }
+  | { type: "place"; slot: number; cell: number; source?: TileSource }
+  | { type: "drop-on"; slot: number; cell: number; source?: TileSource }
   | { type: "choose"; outputIndex: number }
   | { type: "swap" }
   | { type: "clear"; cell: number }
   | { type: "hint" }
   | { type: "move"; from: number; to: number }
-  | { type: "shore"; cell: number };
+  | { type: "shore"; cell: number }
+  | { type: "hold"; slot: number };
 
 export interface ReduceResult {
   state: GameState;
@@ -164,6 +183,7 @@ function cloneState(s: GameState): GameState {
     tray: cloneTray(s.tray),
     found: [...s.found],
     shelf: [...s.shelf],
+    hold: s.hold.slice(),
     crumb: cloneCrumb(s.crumb),
     recentTrays: s.recentTrays.map((t) => t.slice()),
     choosing: s.choosing
@@ -376,6 +396,40 @@ function afterMove(
     }
   }
 
+  // 2b. Hold-zone crumble + resize.
+  // Capacity grows one slot per age. Any held tile that's no longer useful
+  // in the new age (i.e. not in `A.USE`) crumbles — this is what keeps the
+  // hold slot from becoming a free long-term stash.
+  const cap = holdCapacity(state.age);
+  const holdGone: number[] = [];
+  const holdGoneTiles: string[] = [];
+  for (let i = 0; i < state.hold.length; i++) {
+    const v = state.hold[i];
+    if (v && !A.USE.has(v)) {
+      holdGone.push(i);
+      holdGoneTiles.push(v);
+      state.hold[i] = null;
+    }
+  }
+  if (state.hold.length < cap) {
+    while (state.hold.length < cap) state.hold.push(null);
+  } else if (state.hold.length > cap) {
+    // Only shrinks if the config is reduced during a run — we keep the
+    // first `cap` slots and drop the rest (crumble any tiles in them so
+    // nothing is silently lost).
+    for (let i = cap; i < state.hold.length; i++) {
+      const v = state.hold[i];
+      if (v) {
+        holdGone.push(i);
+        holdGoneTiles.push(v);
+      }
+    }
+    state.hold.length = cap;
+  }
+  if (holdGone.length) {
+    events.push({ type: "hold-crumble", slots: holdGone, tiles: holdGoneTiles });
+  }
+
   // 3. Deal if the tray is empty.
   if (state.tray.every((t) => t == null)) {
     dealTray({
@@ -430,6 +484,7 @@ export function newGame(
     newBest: false,
     moves: 0,
     shelf: [],
+    hold: Array(holdCapacity(0)).fill(null),
     age: 0,
     ageMade: 0,
     crumb: Array(size * size).fill(null),
@@ -509,10 +564,12 @@ export function reduce(
     }
 
     case "place": {
-      const t = state.tray[action.slot];
+      const src = action.source ?? "tray";
+      const srcArr = src === "hold" ? state.hold : state.tray;
+      const t = srcArr[action.slot];
       if (t == null) return { state: prev, events: [] };
       if (state.board[action.cell] != null) return { state: prev, events: [] };
-      state.tray[action.slot] = null;
+      srcArr[action.slot] = null;
       state.moves++;
       state.score += 1;
       state.board[action.cell] = t;
@@ -541,7 +598,9 @@ export function reduce(
     }
 
     case "drop-on": {
-      const t = state.tray[action.slot];
+      const src = action.source ?? "tray";
+      const srcArr = src === "hold" ? state.hold : state.tray;
+      const t = srcArr[action.slot];
       if (t == null) return { state: prev, events: [] };
       const y = state.board[action.cell];
       if (y == null) return { state: prev, events: [] };
@@ -550,7 +609,7 @@ export function reduce(
         events.push({ type: "nope", at: action.cell });
         return { state, events };
       }
-      state.tray[action.slot] = null;
+      srcArr[action.slot] = null;
       state.moves++;
       state.score += 1;
       const cells = m.cells.slice(); // includes the target cell
@@ -568,6 +627,21 @@ export function reduce(
         };
         return { state, events };
       }
+      afterMove(state, bundle, events);
+      return { state, events };
+    }
+
+    case "hold": {
+      // Move a tray tile into the first empty hold slot. Commit-until-used:
+      // once stored, the tile only leaves by being placed or by crumbling
+      // on age-up. Counts as a move (afterMove runs below).
+      const t = state.tray[action.slot];
+      if (t == null) return { state: prev, events: [] };
+      const target = state.hold.findIndex((v) => v == null);
+      if (target === -1) return { state: prev, events: [] };
+      state.tray[action.slot] = null;
+      state.hold[target] = t;
+      state.moves++;
       afterMove(state, bundle, events);
       return { state, events };
     }
