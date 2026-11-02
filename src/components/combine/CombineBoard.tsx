@@ -2883,41 +2883,45 @@ function Shelf({
       className={`cbshelf${empty ? " none" : ""}`}
       aria-label={`Made and shipped: ${state.shelf.length}`}
     >
-      {[...counts.entries()].map(([id, n]) => {
-        const item = bundle.items.get(id);
-        if (!item) return null;
-        const isNew = id === freshlyShipped;
-        return (
-          <button
-            key={id}
-            type="button"
-            className={`cbslot${isNew ? " new" : ""}`}
-            style={fillVar(item)}
-            aria-label={`${cap(item.name)}${n > 1 ? `, ×${n}` : ""}. Show how it's made`}
-            title={cap(item.name)}
-            onClick={() => onInfo(id)}
-          >
-            <Pictogram
-              name={item.name}
-              tier={item.tier}
-              kind={item.kind}
-              symbol={item.symbol}
-            />
-            {n > 1 && <b>{n}</b>}
-          </button>
-        );
-      })}
-      {!empty && <span className="cbslot cbslot-next" aria-hidden="true" />}
-      {empty && (
-        <span className="cbshelf-empty">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M3 12a9 9 0 1 0 3-6.7" />
-            <path d="M3 4v5h5" />
-            <path d="M12 7v5l3 2" />
-          </svg>
-          <em>History</em>
-        </span>
-      )}
+      <span className="cbshelf-slots">
+        {[...counts.entries()].map(([id, n]) => {
+          const item = bundle.items.get(id);
+          if (!item) return null;
+          const isNew = id === freshlyShipped;
+          return (
+            <button
+              key={id}
+              type="button"
+              className={`cbslot${isNew ? " new" : ""}`}
+              style={fillVar(item)}
+              aria-label={`${cap(item.name)}${n > 1 ? `, ×${n}` : ""}. Show how it's made`}
+              title={cap(item.name)}
+              onClick={() => onInfo(id)}
+            >
+              <Pictogram
+                name={item.name}
+                tier={item.tier}
+                kind={item.kind}
+                symbol={item.symbol}
+              />
+              {n > 1 && <b>{n}</b>}
+            </button>
+          );
+        })}
+        {!empty && <span className="cbslot cbslot-next" aria-hidden="true" />}
+        {empty &&
+          Array.from({ length: 4 }).map((_, i) => (
+            <span key={i} className="cbslot cbslot-ph" aria-hidden="true" />
+          ))}
+      </span>
+      <span className="cbshelf-empty">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 12a9 9 0 1 0 3-6.7" />
+          <path d="M3 4v5h5" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+        <em>History</em>
+      </span>
     </div>
   );
 }
@@ -3225,37 +3229,45 @@ function Hold({
       data-cbholdzone="1"
       aria-label="Hold — drag a tile here to save for later. Held tiles crumble when the age moves past them."
     >
-      {empty && (
-        <span className="cbshelf-empty" aria-hidden="true">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M6 3h12v18l-6-4-6 4z" />
-          </svg>
-          <em>Hold zone</em>
-        </span>
-      )}
-      {state.hold.map((id, slot) => {
-        if (id == null) return null;
-        const item = bundle.items.get(id);
-        if (!item) return null;
-        return (
-          <button
-            key={slot}
-            type="button"
-            className="cbslot cbheld"
-            style={fillVar(item)}
-            onPointerDown={(e) => onSlotPointerDown(slot, "hold", e)}
-            onContextMenu={(e) => e.preventDefault()}
-            aria-label={`Held: ${cap(item.name)}`}
-          >
-            <Pictogram
-              name={item.name}
-              tier={item.tier}
-              kind={item.kind}
-              symbol={item.symbol}
-            />
-          </button>
-        );
-      })}
+      <span className="cbshelf-slots">
+        {state.hold.map((id, slot) => {
+          if (id == null) {
+            return (
+              <span
+                key={`ph-${slot}`}
+                className="cbslot cbslot-ph"
+                aria-hidden="true"
+              />
+            );
+          }
+          const item = bundle.items.get(id);
+          if (!item) return null;
+          return (
+            <button
+              key={slot}
+              type="button"
+              className="cbslot cbheld"
+              style={fillVar(item)}
+              onPointerDown={(e) => onSlotPointerDown(slot, "hold", e)}
+              onContextMenu={(e) => e.preventDefault()}
+              aria-label={`Held: ${cap(item.name)}`}
+            >
+              <Pictogram
+                name={item.name}
+                tier={item.tier}
+                kind={item.kind}
+                symbol={item.symbol}
+              />
+            </button>
+          );
+        })}
+      </span>
+      <span className="cbshelf-empty" aria-hidden="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 3h12v18l-6-4-6 4z" />
+        </svg>
+        <em>Hold zone</em>
+      </span>
     </div>
   );
 }
