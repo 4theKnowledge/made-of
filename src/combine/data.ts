@@ -377,12 +377,15 @@ export function catalogue(bundle: ThemeBundle): {
   return { byAge, no };
 }
 
-/** Catalogue every output in the theme, grouped by `kind`. Buckets are
- *  stable across KB edits so the collection view doesn't shift when ages
- *  shift; players' own time-of-find story comes from `firstFoundAt`.
+/** Catalogue every item playable in the theme — outputs *and* base
+ *  ingredients — grouped by `kind`. Base ingredients count because the
+ *  player encounters them in the tray; collecting them tracks "used in a
+ *  combo" rather than "crafted from a recipe". Buckets are stable across KB
+ *  edits so the collection view doesn't shift when ages shift; players' own
+ *  time-of-find story comes from `firstFoundAt`.
  *
- *  Kinds are sorted by their canonical "first appearance" ordering (the
- *  earliest age-band in which any item of that kind can be built), so the
+ *  Kinds are sorted by their canonical "first appearance" ordering (base
+ *  ingredients get band 0 since they're available immediately), so the
  *  layout still reads roughly earliest-first. Items within a kind are
  *  alpha-sorted for predictability. */
 export function catalogueByKind(bundle: ThemeBundle): {
@@ -390,9 +393,9 @@ export function catalogueByKind(bundle: ThemeBundle): {
 } {
   const byKind = new Map<string, string[]>();
   const kindBand = new Map<string, number>();
-  for (const id of bundle.outputs) {
+  const addId = (id: string, band: number) => {
     const it = bundle.items.get(id);
-    if (!it) continue;
+    if (!it) return;
     const k = it.kind || "other";
     let list = byKind.get(k);
     if (!list) {
@@ -400,9 +403,16 @@ export function catalogueByKind(bundle: ThemeBundle): {
       byKind.set(k, list);
     }
     list.push(id);
-    const band = bundle.outBand.get(id) ?? 99;
     const cur = kindBand.get(k);
     if (cur == null || band < cur) kindBand.set(k, band);
+  };
+  for (const id of bundle.outputs) {
+    addId(id, bundle.outBand.get(id) ?? 99);
+  }
+  for (const id of bundle.base) {
+    // Base ingredients land at band 0 so pure-ingredient kinds (e.g.
+    // Element) sort to the top of the collection.
+    addId(id, 0);
   }
   const kinds = [...byKind.entries()]
     .map(([kind, items]) => ({

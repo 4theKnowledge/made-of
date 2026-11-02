@@ -763,9 +763,21 @@ export function CombineBoard({ bundles: serialised }: Props) {
       // users this persists to Postgres; for signed-out users it accumulates
       // in memory only (lost on next game / reload — this is the gated
       // behaviour that makes signing in valuable).
-      const found = r.events
-        .filter((e): e is Extract<Event, { type: "discovery" }> => e.type === "discovery")
-        .map((e) => e.out);
+      //
+      // "Discovered" = outputs you've made (discovery events) ∪ base
+      // ingredients you've used in a combo (combine event inputs that aren't
+      // outputs anywhere in the theme). Base tiles that only ever sit in the
+      // tray — never consumed — stay uncollected on purpose.
+      const found: string[] = [];
+      for (const e of r.events) {
+        if (e.type === "discovery") {
+          found.push(e.out);
+        } else if (e.type === "combine") {
+          for (const id of e.inputs) {
+            if (!bundle.outputs.has(id)) found.push(id);
+          }
+        }
+      }
       if (found.length) recordDiscoveries(found);
     },
     [state, bundle, applyEvents, best, recordDiscoveries],
@@ -2268,7 +2280,15 @@ function CollectionBook({
 }) {
   const cat = useMemo(() => catalogue(bundle), [bundle]);
   const catKinds = useMemo(() => catalogueByKind(bundle), [bundle]);
-  const total = bundle.outputs.size;
+  // Collectables = things the player can meet in play: outputs + base
+  // ingredients. (Tools / "with" items that are never standalone tiles are
+  // excluded via `bundle.base`, which already filters to real raw inputs.)
+  const collectables = useMemo(() => {
+    const s = new Set<string>(bundle.outputs);
+    for (const id of bundle.base) s.add(id);
+    return s;
+  }, [bundle.outputs, bundle.base]);
+  const total = collectables.size;
   // Merge the current game's new discoveries with the lifetime collection
   // so a signed-out player's in-game progress still shows in the book even
   // if the collection map hasn't caught up yet (both are driven by the same
@@ -2277,13 +2297,13 @@ function CollectionBook({
     const now = Date.now();
     const merged = new Map<string, number>();
     for (const [id, t] of collection) {
-      if (bundle.outputs.has(id)) merged.set(id, t);
+      if (collectables.has(id)) merged.set(id, t);
     }
     for (const id of state.found) {
-      if (!merged.has(id) && bundle.outputs.has(id)) merged.set(id, now);
+      if (!merged.has(id) && collectables.has(id)) merged.set(id, now);
     }
     return merged;
-  }, [collection, state.found, bundle.outputs]);
+  }, [collection, state.found, collectables]);
   const got = findsForTheme.size;
   const pct = Math.round((100 * got) / Math.max(1, total));
   const [view, setView] = useState<"grid" | "list">("grid");
