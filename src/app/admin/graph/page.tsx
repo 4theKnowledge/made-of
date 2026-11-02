@@ -15,6 +15,13 @@ export default async function AdminGraphPage() {
         name: schema.items.name,
         tier: schema.items.tier,
         kind: schema.items.kind,
+        status: schema.items.status,
+        firstAppeared: schema.items.firstAppeared,
+        symbol: schema.items.symbol,
+        fact: schema.items.fact,
+        tags: schema.items.tags,
+        isCanary: schema.items.isCanary,
+        updatedAt: schema.items.updatedAt,
       })
       .from(schema.items),
     db
@@ -38,7 +45,7 @@ export default async function AdminGraphPage() {
   ]);
 
   const data: TreeData = {
-    items,
+    items: items.map((it) => ({ ...it, updatedAt: it.updatedAt.toISOString() })),
     recipes,
     links: allLinks.map((l) => ({
       linkId: l.id,
@@ -54,7 +61,7 @@ export default async function AdminGraphPage() {
     <main className="wrap">
       <Header />
       <section className="phero">
-        <Breadcrumb trail={[{ label: "Admin", href: "/admin" }, { label: "Graph" }]} />
+        <Breadcrumb trail={[{ label: "Admin", href: "/admin" }, { label: "Tree" }]} />
         <h2>Knowledge tree</h2>
         <p>
           {items.length} items, {allLinks.length} links. Click a row to expand. Items with multiple parents appear in each lineage.

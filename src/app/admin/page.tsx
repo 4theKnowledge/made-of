@@ -42,8 +42,7 @@ export default async function AdminHome() {
       <section className="feat">
         <h3 style={{ marginTop: 0 }}>Actions</h3>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-          <Link href="/admin/items" className="btn">Browse items</Link>
-          <Link href="/admin/graph" className="btn">Graph view</Link>
+          <Link href="/admin/graph" className="btn">Tree view</Link>
           <Link href="/admin/pictograms" className="btn">Pictogram audit</Link>
           <Link href="/admin/import" className="btn">Import JSON</Link>
           <Link href="/admin/codes" className="btn">Invite codes</Link>

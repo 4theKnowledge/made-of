@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Confidence, ItemKind, LinkType, Tier } from "@/db/schema";
+import { createPortal } from "react-dom";
+import type { Confidence, ItemKind, ItemStatus, LinkType, Tier } from "@/db/schema";
 import { REL } from "@/lib/rel";
 import { TIER, TIER_ORDER, KIND } from "@/lib/taxonomy";
 import { api, type ItemRow, type LinkRow, type RecipeRow } from "./treeApi";
@@ -42,6 +43,33 @@ const CONFIDENCE_DESC: Record<Confidence, string> = {
 
 const LINK_TYPES: LinkType[] = ["f", "w", "n", "s", "e"];
 const CONFIDENCES: Confidence[] = ["established", "strong", "debated", "hypothesis"];
+const STATUSES: ItemStatus[] = ["draft", "review", "live"];
+const KINDS: ItemKind[] = Object.keys(KIND) as ItemKind[];
+
+function statusColour(s: ItemStatus) {
+  return s === "live" ? "var(--good, #2a7a2a)" : s === "review" ? "var(--warn, #a66400)" : "var(--muted)";
+}
+
+function StatusPill({ status }: { status: ItemStatus }) {
+  const colour = statusColour(status);
+  return (
+    <span
+      style={{
+        fontFamily: "var(--mono, monospace)",
+        fontSize: 10,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color: colour,
+        border: `1px solid ${colour}`,
+        padding: "0 5px",
+        borderRadius: 3,
+        lineHeight: "14px",
+      }}
+    >
+      {status}
+    </span>
+  );
+}
 
 /* ========================================================================
  * Derived views over TreeData — recomputed on every state change. Cheap at
@@ -379,15 +407,25 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
   const createItem = useCallback(
     async (input: { name: string; tier: Tier; kind: ItemKind }) => {
       const tempId = `tmp:${Math.random().toString(36).slice(2)}`;
+      const optimisticRow: ItemRow = {
+        id: tempId,
+        ...input,
+        status: "draft",
+        firstAppeared: null,
+        symbol: null,
+        fact: "",
+        tags: [],
+        isCanary: false,
+        updatedAt: new Date().toISOString(),
+      };
       await mutate(
-        (d) => ({
-          ...d,
-          items: [...d.items, { id: tempId, ...input }],
-        }),
+        (d) => ({ ...d, items: [...d.items, optimisticRow] }),
         () => api.createItem(input),
         (result, applied) => ({
           ...applied,
-          items: applied.items.map((it) => (it.id === tempId ? { id: result.id, ...input } : it)),
+          items: applied.items.map((it) =>
+            it.id === tempId ? { ...optimisticRow, id: result.id } : it,
+          ),
         }),
         "Create item failed",
       );
@@ -395,15 +433,100 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
     [mutate],
   );
 
-  /* -- Filter ---------------------------------------------------------- */
+  const patchItem = useCallback(
+    async (
+      id: string,
+      input: Partial<Pick<ItemRow, "name" | "tier" | "kind" | "firstAppeared" | "symbol" | "fact" | "tags" | "status" | "isCanary">>,
+    ) => {
+      await mutate(
+        (d) => ({
+          ...d,
+          items: d.items.map((it) =>
+            it.id === id ? { ...it, ...input, updatedAt: new Date().toISOString() } : it,
+          ),
+        }),
+        () => api.patchItem(id, input),
+        (result, applied) => ({
+          ...applied,
+          items: applied.items.map((it) =>
+            it.id === id ? { ...it, ...result.item } : it,
+          ),
+        }),
+        "Update item failed",
+      );
+    },
+    [mutate],
+  );
+
+  const deleteItem = useCallback(
+    async (id: string) => {
+      await mutate(
+        (d) => ({
+          ...d,
+          items: d.items.filter((it) => it.id !== id),
+          // Also drop any orphaned links referencing this item locally; the
+          // server rejects with has_incoming_links when there are inbound
+          // links, so this only runs when the server actually succeeds.
+          links: d.links.filter((l) => l.itemId !== id && l.targetItemId !== id),
+          recipes: d.recipes.filter((r) => r.itemId !== id),
+        }),
+        () => api.deleteItem(id),
+        undefined,
+        "Delete item failed",
+      );
+    },
+    [mutate],
+  );
+
+  const publishItem = useCallback(
+    async (id: string) => {
+      await mutate(
+        (d) => ({
+          ...d,
+          items: d.items.map((it) => (it.id === id ? { ...it, status: "live" } : it)),
+        }),
+        () => api.publishItem(id),
+        undefined,
+        "Publish failed",
+      );
+    },
+    [mutate],
+  );
+
+  const unpublishItem = useCallback(
+    async (id: string) => {
+      await mutate(
+        (d) => ({
+          ...d,
+          items: d.items.map((it) => (it.id === id ? { ...it, status: "draft" } : it)),
+        }),
+        () => api.unpublishItem(id),
+        undefined,
+        "Unpublish failed",
+      );
+    },
+    [mutate],
+  );
+
+  /* -- Filter + view --------------------------------------------------- */
+
+  const [statusFilter, setStatusFilter] = useState<ItemStatus | "all">("all");
+  const [tierFilter, setTierFilter] = useState<Tier | "all">("all");
+  const [view, setView] = useState<"tree" | "flat">("tree");
 
   const q = query.trim().toLowerCase();
   const matches = useMemo(() => {
-    if (!q) return null;
+    const isFiltered = q !== "" || statusFilter !== "all" || tierFilter !== "all";
+    if (!isFiltered) return null;
     const s = new Set<string>();
-    for (const it of data.items) if (it.name.toLowerCase().includes(q)) s.add(it.id);
+    for (const it of data.items) {
+      if (q && !it.name.toLowerCase().includes(q)) continue;
+      if (statusFilter !== "all" && it.status !== statusFilter) continue;
+      if (tierFilter !== "all" && it.tier !== tierFilter) continue;
+      s.add(it.id);
+    }
     return s;
-  }, [q, data.items]);
+  }, [q, statusFilter, tierFilter, data.items]);
 
   const expandAll = useCallback(() => {
     const MAX_DEPTH = 8;
@@ -428,15 +551,23 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
     persistExpanded(new Set());
   }, [persistExpanded]);
 
-  /* -- Add-item form ---------------------------------------------------- */
+  /* -- Add-item form / edit modal -------------------------------------- */
 
   const [showAddItem, setShowAddItem] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const editingItem = editingItemId ? data.items.find((it) => it.id === editingItemId) ?? null : null;
 
   return (
     <div>
       <Toolbar
         query={query}
         setQuery={setQuery}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        tierFilter={tierFilter}
+        setTierFilter={setTierFilter}
+        view={view}
+        setView={setView}
         expandAll={expandAll}
         collapseAll={collapseAll}
         expandedCount={expanded.size}
@@ -462,29 +593,48 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
         )}
       </div>
 
-      <ul style={{ listStyle: "none", margin: 0, padding: "6px 0" }}>
-        {views.roots.map((rootId) => (
-          <Row
-            key={rootId}
-            itemId={rootId}
-            path={rootId}
-            depth={0}
-            edge={null}
-            data={data}
-            views={views}
-            expanded={expanded}
-            toggle={toggle}
-            forceExpand={forceExpand}
-            ancestors={new Set()}
-            matches={matches}
-            onCreateLink={createLink}
-            onPatchLink={patchLink}
-            onDeleteLink={deleteLink}
-            onCreateRecipe={createRecipe}
-            onDeleteRecipe={deleteRecipe}
-          />
-        ))}
-      </ul>
+      {view === "tree" ? (
+        <ul style={{ listStyle: "none", margin: 0, padding: "6px 0" }}>
+          {views.roots.map((rootId) => (
+            <Row
+              key={rootId}
+              itemId={rootId}
+              path={rootId}
+              depth={0}
+              edge={null}
+              data={data}
+              views={views}
+              expanded={expanded}
+              toggle={toggle}
+              forceExpand={forceExpand}
+              ancestors={new Set()}
+              matches={matches}
+              onCreateLink={createLink}
+              onPatchLink={patchLink}
+              onDeleteLink={deleteLink}
+              onCreateRecipe={createRecipe}
+              onDeleteRecipe={deleteRecipe}
+              onEditItem={setEditingItemId}
+            />
+          ))}
+        </ul>
+      ) : (
+        <FlatView items={data.items} matches={matches} onEditItem={setEditingItemId} />
+      )}
+
+      {editingItem && (
+        <EditItemModal
+          item={editingItem}
+          onClose={() => setEditingItemId(null)}
+          onSave={(patch) => patchItem(editingItem.id, patch)}
+          onPublish={() => publishItem(editingItem.id)}
+          onUnpublish={() => unpublishItem(editingItem.id)}
+          onDelete={async () => {
+            await deleteItem(editingItem.id);
+            setEditingItemId(null);
+          }}
+        />
+      )}
 
       <Toasts list={toasts} dismiss={dismissToast} />
     </div>
@@ -498,6 +648,12 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
 function Toolbar({
   query,
   setQuery,
+  statusFilter,
+  setStatusFilter,
+  tierFilter,
+  setTierFilter,
+  view,
+  setView,
   expandAll,
   collapseAll,
   expandedCount,
@@ -506,6 +662,12 @@ function Toolbar({
 }: {
   query: string;
   setQuery: (q: string) => void;
+  statusFilter: ItemStatus | "all";
+  setStatusFilter: (s: ItemStatus | "all") => void;
+  tierFilter: Tier | "all";
+  setTierFilter: (t: Tier | "all") => void;
+  view: "tree" | "flat";
+  setView: (v: "tree" | "flat") => void;
   expandAll: () => void;
   collapseAll: () => void;
   expandedCount: number;
@@ -514,6 +676,14 @@ function Toolbar({
 }) {
   const smallBtn: React.CSSProperties = { fontSize: 12, padding: "4px 10px" };
   const isFiltered = matchCount !== totalCount;
+  const selectStyle: React.CSSProperties = {
+    padding: "6px 8px",
+    fontSize: 12,
+    border: "1px solid var(--line)",
+    borderRadius: 6,
+    background: "var(--card)",
+    color: "var(--ink)",
+  };
   return (
     <div
       style={{
@@ -532,7 +702,7 @@ function Toolbar({
         onChange={(e) => setQuery(e.target.value)}
         style={{
           flex: "1 1 240px",
-          maxWidth: 360,
+          maxWidth: 300,
           padding: "6px 10px",
           fontSize: 13,
           border: "1px solid var(--line)",
@@ -541,14 +711,74 @@ function Toolbar({
           color: "var(--ink)",
         }}
       />
-      <button className="btn" style={smallBtn} onClick={expandAll}>
-        Expand all
-      </button>
-      <button className="btn" style={smallBtn} onClick={collapseAll}>
-        Collapse all
-      </button>
+      <select
+        value={statusFilter}
+        onChange={(e) => setStatusFilter(e.target.value as ItemStatus | "all")}
+        style={selectStyle}
+      >
+        <option value="all">All statuses</option>
+        {STATUSES.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+      <select
+        value={tierFilter}
+        onChange={(e) => setTierFilter(e.target.value as Tier | "all")}
+        style={selectStyle}
+      >
+        <option value="all">All tiers</option>
+        {TIER_ORDER.map((t) => (
+          <option key={t} value={t}>
+            {t} — {TIER[t].name}
+          </option>
+        ))}
+      </select>
+      <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: 6, overflow: "hidden" }}>
+        <button
+          type="button"
+          onClick={() => setView("tree")}
+          style={{
+            padding: "6px 10px",
+            fontSize: 12,
+            border: 0,
+            background: view === "tree" ? "var(--ink)" : "var(--card)",
+            color: view === "tree" ? "var(--bg)" : "var(--ink)",
+            cursor: "pointer",
+          }}
+        >
+          Tree
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("flat")}
+          style={{
+            padding: "6px 10px",
+            fontSize: 12,
+            border: 0,
+            borderLeft: "1px solid var(--line)",
+            background: view === "flat" ? "var(--ink)" : "var(--card)",
+            color: view === "flat" ? "var(--bg)" : "var(--ink)",
+            cursor: "pointer",
+          }}
+        >
+          Flat
+        </button>
+      </div>
+      {view === "tree" && (
+        <>
+          <button className="btn" style={smallBtn} onClick={expandAll}>
+            Expand all
+          </button>
+          <button className="btn" style={smallBtn} onClick={collapseAll}>
+            Collapse all
+          </button>
+        </>
+      )}
       <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)" }}>
-        {expandedCount} expanded · {isFiltered ? `${matchCount} match` : `${totalCount} items`}
+        {view === "tree" && `${expandedCount} expanded · `}
+        {isFiltered ? `${matchCount} match` : `${totalCount} items`}
       </span>
     </div>
   );
@@ -696,6 +926,7 @@ interface RowProps {
   onDeleteLink: (id: string) => Promise<void>;
   onCreateRecipe: (itemId: string, label: string | null) => Promise<void>;
   onDeleteRecipe: (id: string) => Promise<void>;
+  onEditItem: (id: string) => void;
 }
 
 function Row(props: RowProps) {
@@ -716,7 +947,12 @@ function Row(props: RowProps) {
     onDeleteLink,
     onCreateRecipe,
     onDeleteRecipe,
+    onEditItem,
   } = props;
+
+  const [showAddChild, setShowAddChild] = useState(false);
+  const [editingLink, setEditingLink] = useState<string | null>(null);
+  const [showRecipeForm, setShowRecipeForm] = useState(false);
 
   const item = views.itemById.get(itemId);
   if (!item) return null;
@@ -732,10 +968,6 @@ function Row(props: RowProps) {
   const isCycle = ancestors.has(itemId);
   const canExpand = (totalChildren > 0 || recipes.length > 0) && !isCycle;
   const parentCount = views.parentCountByItem.get(itemId) ?? 0;
-
-  const [showAddChild, setShowAddChild] = useState(false);
-  const [editingLink, setEditingLink] = useState<string | null>(null);
-  const [showRecipeForm, setShowRecipeForm] = useState(false);
 
   const dimmed = matches && !matches.has(itemId);
 
@@ -837,6 +1069,8 @@ function Row(props: RowProps) {
           </span>
         )}
 
+        {item.status !== "live" && <StatusPill status={item.status} />}
+
         {parentCount > 1 && (
           <Tooltip
             title={`${parentCount} lineages`}
@@ -896,13 +1130,14 @@ function Row(props: RowProps) {
               </button>
             </>
           )}
-          <Link
-            href={`/admin/items/${encodeURIComponent(item.id)}`}
+          <button
+            type="button"
             className="btn"
             style={rowBtn}
+            onClick={() => onEditItem(item.id)}
           >
             Edit item
-          </Link>
+          </button>
         </span>
       </div>
 
@@ -964,6 +1199,7 @@ function Row(props: RowProps) {
               onPatchLink={onPatchLink}
               onDeleteLink={onDeleteLink}
               onDeleteRecipe={onDeleteRecipe}
+              onEditItem={onEditItem}
             />
           ))}
 
@@ -1012,6 +1248,7 @@ function Row(props: RowProps) {
                     onDeleteLink={onDeleteLink}
                     onCreateRecipe={onCreateRecipe}
                     onDeleteRecipe={onDeleteRecipe}
+                    onEditItem={onEditItem}
                   />
                 ))}
             </>
@@ -1073,6 +1310,7 @@ interface RecipeGroupProps {
   onPatchLink: RowProps["onPatchLink"];
   onDeleteLink: RowProps["onDeleteLink"];
   onDeleteRecipe: (id: string) => Promise<void>;
+  onEditItem: RowProps["onEditItem"];
 }
 
 function RecipeGroup(props: RecipeGroupProps) {
@@ -1200,6 +1438,7 @@ function RecipeGroup(props: RecipeGroupProps) {
                   /* can't add a recipe to a child from here */
                 }}
                 onDeleteRecipe={props.onDeleteRecipe}
+                onEditItem={props.onEditItem}
               />
             ))}
         </ul>
@@ -1552,6 +1791,343 @@ const formInput: React.CSSProperties = {
   fontSize: 12,
   border: "1px solid var(--line)",
   borderRadius: 3,
+  background: "var(--card)",
+  color: "var(--ink)",
+};
+
+/* ========================================================================
+ * FlatView — table of items that match the current filter.
+ * ====================================================================== */
+
+function FlatView({
+  items,
+  matches,
+  onEditItem,
+}: {
+  items: ItemRow[];
+  matches: Set<string> | null;
+  onEditItem: (id: string) => void;
+}) {
+  const visible = useMemo(() => {
+    const list = matches ? items.filter((it) => matches.has(it.id)) : items;
+    return list.slice().sort((a, b) => a.name.localeCompare(b.name));
+  }, [items, matches]);
+
+  if (visible.length === 0) {
+    return (
+      <p style={{ padding: 24, color: "var(--muted)", textAlign: "center" }}>No items match.</p>
+    );
+  }
+
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead>
+          <tr style={{ textAlign: "left", borderBottom: "1px solid var(--line)" }}>
+            <th style={flatTh}>Name</th>
+            <th style={flatTh}>Tier</th>
+            <th style={flatTh}>Kind</th>
+            <th style={flatTh}>Status</th>
+            <th style={flatTh}>Updated</th>
+            <th style={flatTh}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {visible.map((it) => (
+            <tr key={it.id} style={{ borderBottom: "1px solid var(--line)" }}>
+              <td style={flatTd}>
+                <span style={{ fontWeight: 500 }}>{it.name}</span>
+              </td>
+              <td style={flatTd}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 20,
+                    height: 20,
+                    borderRadius: 4,
+                    background: tierBg(it.tier),
+                    color: "var(--card)",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    fontFamily: "var(--mono, monospace)",
+                  }}
+                >
+                  {it.tier}
+                </span>
+              </td>
+              <td style={flatTd}>{it.kind}</td>
+              <td style={flatTd}>
+                <StatusPill status={it.status} />
+              </td>
+              <td style={{ ...flatTd, color: "var(--muted)" }}>
+                {new Date(it.updatedAt).toLocaleDateString()}
+              </td>
+              <td style={flatTd}>
+                <button type="button" className="btn" style={rowBtn} onClick={() => onEditItem(it.id)}>
+                  Edit
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const flatTh: React.CSSProperties = { padding: "6px 10px", fontSize: 12, color: "var(--muted)" };
+const flatTd: React.CSSProperties = { padding: "6px 10px" };
+
+/* ========================================================================
+ * EditItemModal — portal dialog with full parity to /admin/items/[id].
+ * ====================================================================== */
+
+function EditItemModal({
+  item,
+  onClose,
+  onSave,
+  onPublish,
+  onUnpublish,
+  onDelete,
+}: {
+  item: ItemRow;
+  onClose: () => void;
+  onSave: (patch: Partial<Pick<ItemRow, "name" | "tier" | "kind" | "firstAppeared" | "symbol" | "fact" | "tags" | "status" | "isCanary">>) => Promise<void>;
+  onPublish: () => Promise<void>;
+  onUnpublish: () => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  const [name, setName] = useState(item.name);
+  const [tier, setTier] = useState<Tier>(item.tier);
+  const [kind, setKind] = useState<ItemKind>(item.kind);
+  const [firstAppeared, setFirstAppeared] = useState(item.firstAppeared ?? "");
+  const [symbol, setSymbol] = useState(item.symbol ?? "");
+  const [fact, setFact] = useState(item.fact);
+  const [tagsText, setTagsText] = useState(item.tags.join(", "));
+  const [status, setStatus] = useState<ItemStatus>(item.status);
+  const [isCanary, setIsCanary] = useState(item.isCanary);
+  const [busy, setBusy] = useState<null | "save" | "publish" | "delete">(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Escape to close.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  if (typeof document === "undefined") return null;
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy("save");
+    try {
+      await onSave({
+        name,
+        tier,
+        kind,
+        firstAppeared: firstAppeared.trim() || null,
+        symbol: symbol.trim() || null,
+        fact,
+        tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean),
+        status,
+        isCanary,
+      });
+      onClose();
+    } catch {
+      // toast already shown
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handlePublish = async () => {
+    setBusy("publish");
+    try {
+      if (status === "live") {
+        await onUnpublish();
+        setStatus("draft");
+      } else {
+        await onPublish();
+        setStatus("live");
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    setConfirmDelete(false);
+    setBusy("delete");
+    try {
+      await onDelete();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return createPortal(
+    <>
+      <div className="cbscrim" onClick={onClose} aria-hidden="true" />
+      <section
+        className="cbover"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Edit ${item.name}`}
+        style={{ maxWidth: 640, width: "min(92vw, 640px)" }}
+      >
+        <form onSubmit={handleSave}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+            <h3 style={{ margin: 0, fontSize: 18 }}>Edit item</h3>
+            <StatusPill status={status} />
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "110px 1fr",
+              gap: "10px 12px",
+              alignItems: "center",
+            }}
+          >
+            <label style={modalLabel}>Name</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} style={modalInput} required />
+
+            <label style={modalLabel}>Tier</label>
+            <select value={tier} onChange={(e) => setTier(e.target.value as Tier)} style={modalInput}>
+              {TIER_ORDER.map((t) => (
+                <option key={t} value={t}>
+                  {t} — {TIER[t].name}
+                </option>
+              ))}
+            </select>
+
+            <label style={modalLabel}>Kind</label>
+            <select value={kind} onChange={(e) => setKind(e.target.value as ItemKind)} style={modalInput}>
+              {KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {KIND[k]}
+                </option>
+              ))}
+            </select>
+
+            <label style={modalLabel}>First appeared</label>
+            <input
+              value={firstAppeared}
+              onChange={(e) => setFirstAppeared(e.target.value)}
+              placeholder="13.8bya · 385mya · 10ka · 1994 · -3500"
+              style={modalInput}
+            />
+
+            <label style={modalLabel}>Symbol</label>
+            <input value={symbol} onChange={(e) => setSymbol(e.target.value)} style={modalInput} />
+
+            <label style={modalLabel}>Fact</label>
+            <textarea value={fact} onChange={(e) => setFact(e.target.value)} rows={3} style={{ ...modalInput, fontFamily: "inherit" }} />
+
+            <label style={modalLabel}>Tags</label>
+            <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="comma, separated" style={modalInput} />
+
+            <label style={modalLabel}>Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value as ItemStatus)} style={modalInput}>
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+
+            <label style={modalLabel}>Canary</label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+              <input type="checkbox" checked={isCanary} onChange={(e) => setIsCanary(e.target.checked)} />
+              <span style={{ color: "var(--muted)" }}>Flag this item as a canary (not public).</span>
+            </label>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginTop: 20,
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            <button type="submit" className="btn primary" disabled={!!busy}>
+              {busy === "save" ? "Saving…" : "Save"}
+            </button>
+            <button type="button" className="btn" disabled={!!busy} onClick={handlePublish}>
+              {busy === "publish" ? "…" : status === "live" ? "Unpublish" : "Publish"}
+            </button>
+            <Link
+              href={`/admin/items/${encodeURIComponent(item.id)}`}
+              className="btn"
+              style={{ fontSize: 13 }}
+            >
+              Open full editor
+            </Link>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setConfirmDelete(true)}
+              disabled={!!busy}
+              style={{ marginLeft: "auto", borderColor: "var(--bad, #a62828)", color: "var(--bad, #a62828)" }}
+            >
+              {busy === "delete" ? "…" : "Delete"}
+            </button>
+            <button type="button" className="btn" onClick={onClose} disabled={!!busy}>
+              Cancel
+            </button>
+          </div>
+        </form>
+
+        {confirmDelete && (
+          <div
+            style={{
+              marginTop: 16,
+              padding: 12,
+              border: "1.5px solid var(--bad, #a62828)",
+              borderRadius: 3,
+              background: "color-mix(in srgb, var(--bad, #a62828) 10%, var(--surface))",
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Delete &ldquo;{item.name}&rdquo;?</div>
+            <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 10 }}>
+              This is irreversible. The server will refuse if anything still links to this item.
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={handleDelete}
+                style={{ background: "var(--bad, #a62828)", color: "var(--bg)", borderColor: "var(--bad, #a62828)" }}
+              >
+                Delete
+              </button>
+              <button type="button" className="btn" onClick={() => setConfirmDelete(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+    </>,
+    document.body,
+  );
+}
+
+const modalLabel: React.CSSProperties = { fontSize: 13, color: "var(--muted)" };
+const modalInput: React.CSSProperties = {
+  padding: "6px 10px",
+  border: "1px solid var(--line)",
+  borderRadius: 4,
+  fontFamily: "inherit",
+  fontSize: 14,
+  width: "100%",
   background: "var(--card)",
   color: "var(--ink)",
 };

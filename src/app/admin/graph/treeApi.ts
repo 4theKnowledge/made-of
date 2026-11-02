@@ -1,4 +1,4 @@
-import type { Confidence, ItemKind, LinkType, Tier } from "@/db/schema";
+import type { Confidence, ItemKind, ItemStatus, LinkType, Tier } from "@/db/schema";
 
 export interface LinkRow {
   linkId: string;
@@ -21,6 +21,13 @@ export interface ItemRow {
   name: string;
   tier: Tier;
   kind: ItemKind;
+  status: ItemStatus;
+  firstAppeared: string | null;
+  symbol: string | null;
+  fact: string;
+  tags: string[];
+  isCanary: boolean;
+  updatedAt: string;
 }
 
 async function send<T>(url: string, init: RequestInit): Promise<T> {
@@ -88,6 +95,34 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  patchItem: (
+    id: string,
+    body: Partial<{
+      name: string;
+      tier: Tier;
+      kind: ItemKind;
+      firstAppeared: string | null;
+      symbol: string | null;
+      fact: string;
+      tags: string[];
+      status: ItemStatus;
+      isCanary: boolean;
+    }>,
+  ) =>
+    send<{ item: ItemRow }>(
+      `/api/admin/items/${encodeURIComponent(id)}`,
+      { method: "PATCH", body: JSON.stringify(body) },
+    ),
+
+  deleteItem: (id: string) =>
+    send<{ ok: true }>(`/api/admin/items/${encodeURIComponent(id)}`, { method: "DELETE" }),
+
+  publishItem: (id: string) =>
+    send<{ item: ItemRow }>(`/api/admin/items/${encodeURIComponent(id)}/publish`, { method: "POST" }),
+
+  unpublishItem: (id: string) =>
+    send<{ item: ItemRow }>(`/api/admin/items/${encodeURIComponent(id)}/unpublish`, { method: "POST" }),
 
   searchItems: (q: string) =>
     send<{ items: { id: string; name: string; tier: Tier; kind: ItemKind }[] }>(
