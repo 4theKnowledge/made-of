@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Pictogram } from "@/pictograms/Pictogram";
 import { Bowtie } from "@/components/bowtie/Bowtie";
 import { flyPictogram } from "@/components/bowtie/fly";
+import { ItemSearch } from "@/components/common/ItemSearch";
 import { formatFirstAppeared } from "@/lib/year";
 import type { ExploreView } from "./types";
 
@@ -67,6 +68,13 @@ export function ExploreShell({ view: initial }: { view: ExploreView }) {
 
   return (
     <>
+      <section
+        className="panel"
+        style={{ padding: "10px 14px", marginBottom: 10 }}
+      >
+        <ItemSearch placeholder="Explore anything — type a name…" />
+      </section>
+
       <div ref={focusHeadRef} style={{ display: "contents" }}>
         <Bowtie view={view} mode="explore" onChipClick={onChipClick} />
       </div>

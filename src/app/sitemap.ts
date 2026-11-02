@@ -60,6 +60,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   const itemRoutes: MetadataRoute.Sitemap = [...live.snapshot.nodes.values()]
+    .filter((n) => !n.isCanary)
     .map((n) => ({
       url: `${BASE_URL}/i/${n.id}`,
       lastModified: now,

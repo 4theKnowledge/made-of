@@ -53,6 +53,7 @@ export function buildSnapshot(rows: SeedRows): Snapshot {
         : (it.tags ?? []).includes("combine-exclude")
           ? []
           : ["everything"],
+      isCanary: it.isCanary ?? false,
       up: [],
       down: [],
       neighbours: [],

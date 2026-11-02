@@ -33,6 +33,10 @@ export interface GraphNode {
   tags: Tag[];
   /** Combine theme codes this item belongs to. Empty array if none. */
   combineThemes: string[];
+  /** True when the item is a canary (seeded fake, visible only in API
+   *  responses — never on item pages, the sitemap, llms.txt, or the
+   *  Index). */
+  isCanary: boolean;
   /** All edges leading *up* (into the parents, i.e. what this item is made from). */
   up: GraphEdge[];
   /** All edges leading *down* (consumers of this item). */
