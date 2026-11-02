@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
+import { invitesRequired } from "@/lib/auth";
 import { getSession } from "@/lib/session";
 import { SignInForm } from "./SignInForm";
 
@@ -33,7 +34,7 @@ export default async function SignInPage() {
           </p>
         </section>
         <section className="feat">
-          <SignInForm />
+          <SignInForm inviteRequired={invitesRequired()} />
           <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 16 }}>
             By continuing you confirm you are 13 or older and agree to our{" "}
             <Link href="/terms">Terms</Link> and{" "}

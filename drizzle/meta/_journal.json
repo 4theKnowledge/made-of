@@ -57,6 +57,13 @@
       "when": 1793533842448,
       "tag": "0007_late_magneto",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793622062160,
+      "tag": "0008_closed_fabian_cortez",
+      "breakpoints": true
     }
   ]
 }

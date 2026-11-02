@@ -5,6 +5,7 @@ import { Resend } from "resend";
 import { getDb, schema } from "@/db/client";
 import { suggestAvailableHandle } from "./handle";
 import { randomHandleCandidate } from "./handle-words";
+import { redeemInvite } from "./invites";
 
 // Construct the Better Auth instance lazily so that `next build` (which
 // evaluates route modules without DATABASE_URL / RESEND_API_KEY) doesn't
@@ -20,6 +21,37 @@ export function getAuth() {
 // follow the real verify flow without an email round-trip. Never populated
 // in production (sendMagicLink only writes when NODE_ENV !== "production").
 export const devMagicLinks = new Map<string, string>();
+
+// Pending invite codes: email → code to redeem when the user actually
+// signs up. Written by /api/sign-in/request after a successful invite
+// check; drained by the user-create hook below. In-memory because the
+// deployment is single-instance (see CLAUDE.md). If we scale out, back
+// this with a short-lived DB table or Postgres LISTEN/NOTIFY. Entries
+// expire after 30 minutes — longer than the 15-minute magic link, with
+// slack for clock drift.
+const pendingInvites = new Map<string, { code: string; expiresAt: number }>();
+const INVITE_TTL_MS = 30 * 60 * 1000;
+
+export function stashPendingInvite(email: string, code: string): void {
+  const key = email.trim().toLowerCase();
+  pendingInvites.set(key, { code, expiresAt: Date.now() + INVITE_TTL_MS });
+}
+
+function takePendingInvite(email: string): string | null {
+  const key = email.trim().toLowerCase();
+  const entry = pendingInvites.get(key);
+  if (!entry) return null;
+  pendingInvites.delete(key);
+  if (entry.expiresAt < Date.now()) return null;
+  return entry.code;
+}
+
+// Invite gate: when true, new users must present a valid invite code at
+// sign-in. Returning users (already in `authUser`) are never gated. Flip
+// off by unsetting the env var.
+export function invitesRequired(): boolean {
+  return process.env.INVITES_REQUIRED === "1";
+}
 
 // Dev-only admin allowlist. Comma-separated emails in DEV_ADMIN_EMAILS get
 // `role = "admin"` on sign-in. In production this always returns false.
@@ -92,6 +124,24 @@ function buildAuth() {
                 ...(role ? { role } : {}),
               },
             };
+          },
+          // On first sign-in, redeem the pending invite code stashed by
+          // /api/sign-in/request. The request endpoint already validated
+          // the code, so a missing entry here just means the user wasn't
+          // gated (invitesRequired() was false) or the TTL lapsed — both
+          // benign. Any DB error is logged but not thrown; we'd rather
+          // under-count a redemption than block a legitimate sign-up.
+          after: async (user) => {
+            const code = takePendingInvite(user.email);
+            if (!code) return;
+            try {
+              await redeemInvite(code, user.id);
+            } catch (err) {
+              console.error(
+                `[auth] redeemInvite failed for ${user.email}:`,
+                err,
+              );
+            }
           },
         },
       },

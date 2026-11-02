@@ -46,6 +46,7 @@ export default async function AdminHome() {
           <Link href="/admin/graph" className="btn">Graph view</Link>
           <Link href="/admin/pictograms" className="btn">Pictogram audit</Link>
           <Link href="/admin/import" className="btn">Import JSON</Link>
+          <Link href="/admin/codes" className="btn">Invite codes</Link>
           <a href="/api/admin/export" className="btn" download>Download export</a>
         </div>
       </section>

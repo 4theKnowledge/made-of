@@ -75,6 +75,11 @@ export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 
 export const combineScopeEnum = pgEnum("combine_scope", ["endless", "daily"]);
 
+// Access codes. `invite` gates sign-up during soft-launch; `promo` is left
+// open for future use (e.g. upgrade coupons, event drops). Both share the
+// same table so admin tooling and redemption bookkeeping stay in one place.
+export const codeKindEnum = pgEnum("code_kind", ["invite", "promo"]);
+
 /* ========================================================================
  * Items.
  *
@@ -417,6 +422,52 @@ export const combineDiscoveries = pgTable(
     primaryKey({ columns: [t.userId, t.itemId, t.scope] }),
     index("combine_discoveries_user_idx").on(t.userId),
     index("combine_discoveries_user_scope_idx").on(t.userId, t.scope),
+  ],
+);
+
+/* ========================================================================
+ * Access codes.
+ *
+ * Soft-launch invite gate plus a header for future promo codes. `code` is
+ * the primary key — admins mint the string and hand it out directly. For
+ * invites, `maxUses` is usually 1 (single-use) but can be null for an
+ * unlimited "team" code. Expired or spent codes are rejected server-side;
+ * the UI never sees the full list.
+ * ====================================================================== */
+
+export const codes = pgTable(
+  "codes",
+  {
+    code: text("code").primaryKey(),
+    kind: codeKindEnum("kind").notNull().default("invite"),
+    // null = unlimited uses. Enforced server-side against `uses`.
+    maxUses: integer("max_uses"),
+    uses: integer("uses").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("codes_kind_idx").on(t.kind)],
+);
+
+export const codeRedemptions = pgTable(
+  "code_redemptions",
+  {
+    code: text("code")
+      .notNull()
+      .references(() => codes.code, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => authUser.id, { onDelete: "cascade" }),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.code, t.userId] }),
+    index("code_redemptions_user_idx").on(t.userId),
   ],
 );
 

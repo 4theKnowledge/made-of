@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "@/lib/auth-client";
 
 const isDev = process.env.NODE_ENV !== "production";
 const DEV_EMAIL = process.env.NEXT_PUBLIC_DEV_ADMIN_EMAIL ?? "";
 
-export function SignInForm() {
+export function SignInForm({ inviteRequired }: { inviteRequired: boolean }) {
   const [email, setEmail] = useState("");
+  const [invite, setInvite] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(
     "idle",
@@ -44,13 +44,19 @@ export function SignInForm() {
     }
     setStatus("sending");
     setError(null);
-    const { error: err } = await signIn.magicLink({
-      email,
-      callbackURL: "/account",
+    const res = await fetch("/api/sign-in/request", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email,
+        invite: invite || undefined,
+        callbackURL: "/account",
+      }),
     });
-    if (err) {
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
       setStatus("error");
-      setError(err.message ?? "Something went wrong. Try again.");
+      setError(body.error ?? "Something went wrong. Try again.");
       return;
     }
     setStatus("sent");
@@ -115,6 +121,39 @@ export function SignInForm() {
           font: "inherit",
         }}
       />
+      {inviteRequired && (
+        <>
+          <label
+            htmlFor="invite"
+            style={{ fontSize: 13, color: "var(--muted)" }}
+          >
+            Invite code{" "}
+            <span style={{ fontSize: 12 }}>
+              (new accounts only — leave blank if you already have one)
+            </span>
+          </label>
+          <input
+            id="invite"
+            type="text"
+            value={invite}
+            onChange={(e) => setInvite(e.target.value)}
+            autoComplete="off"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="your-code"
+            style={{
+              padding: "10px 12px",
+              borderRadius: 6,
+              border: "1px solid var(--line)",
+              background: "var(--bg)",
+              color: "var(--ink)",
+              font: "inherit",
+              fontFamily: "var(--mono, ui-monospace, monospace)",
+            }}
+          />
+        </>
+      )}
       <label style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
         <input
           type="checkbox"
