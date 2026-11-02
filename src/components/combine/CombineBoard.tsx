@@ -675,7 +675,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
         timers.current.push(clearId);
       }
     },
-    [scheduleClear, collection],
+    [scheduleClear, collection, bundle.items],
   );
 
   // Apply an action: run reduce once, update state, and route events.
