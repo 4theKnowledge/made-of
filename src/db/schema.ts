@@ -408,6 +408,54 @@ export const progress = pgTable(
 );
 
 /* ========================================================================
+ * Combine themes.
+ *
+ * A theme is a curated subset of items that are playable together (e.g.
+ * "everything", "everyday"). Admin-managed vocabulary with a reachability
+ * validator so themes can't ship with items that have no buildable recipe.
+ * `code` is the stable identifier used in game code; `label` is the display
+ * string. Daily puzzle is a scope (combine_discoveries.scope), not a theme —
+ * the daily draws from whichever theme the puzzle references.
+ * ====================================================================== */
+
+export const combineThemes = pgTable(
+  "combine_themes",
+  {
+    code: text("code").primaryKey(),
+    label: text("label").notNull(),
+    description: text("description"),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("combine_themes_position_idx").on(t.position)],
+);
+
+/* Many-to-many membership: an item can belong to several themes. */
+export const itemCombineThemes = pgTable(
+  "item_combine_themes",
+  {
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => items.id, { onDelete: "cascade" }),
+    themeCode: text("theme_code")
+      .notNull()
+      .references(() => combineThemes.code, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.itemId, t.themeCode] }),
+    index("item_combine_themes_theme_idx").on(t.themeCode),
+  ],
+);
+
+/* ========================================================================
  * Combine discoveries.
  *
  * Signed-in users accumulate a lifetime collection of items first discovered
@@ -582,6 +630,9 @@ export type Tier = (typeof tierEnum.enumValues)[number];
 export type ItemKind = string;
 export type Kind = typeof kinds.$inferSelect;
 export type NewKind = typeof kinds.$inferInsert;
+export type CombineTheme = typeof combineThemes.$inferSelect;
+export type NewCombineTheme = typeof combineThemes.$inferInsert;
+export type ItemCombineTheme = typeof itemCombineThemes.$inferSelect;
 export type ItemStatus = (typeof itemStatusEnum.enumValues)[number];
 export type LinkType = (typeof linkTypeEnum.enumValues)[number];
 export type Confidence = (typeof confidenceEnum.enumValues)[number];

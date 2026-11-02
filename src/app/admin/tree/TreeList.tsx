@@ -13,6 +13,8 @@ export interface TreeData {
   recipes: RecipeRow[];
   links: LinkRow[];
   kinds: { code: string; label: string }[];
+  combineThemes: { code: string; label: string }[];
+  itemThemes: { itemId: string; themeCode: string }[];
 }
 
 const STORAGE_KEY = "admin:tree:expanded:v2";
@@ -679,6 +681,24 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
     [mutate],
   );
 
+  const setItemThemes = useCallback(
+    async (itemId: string, themes: string[]) => {
+      await mutate(
+        (d) => ({
+          ...d,
+          itemThemes: [
+            ...d.itemThemes.filter((r) => r.itemId !== itemId),
+            ...themes.map((themeCode) => ({ itemId, themeCode })),
+          ],
+        }),
+        () => api.setItemThemes(itemId, themes),
+        undefined,
+        "Update themes failed",
+      );
+    },
+    [mutate],
+  );
+
   /* -- Filter + view --------------------------------------------------- */
 
   const [statusFilter, setStatusFilter] = useState<ItemStatus | "all">("all");
@@ -841,10 +861,15 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
         <EditItemModal
           item={editingItem}
           kinds={data.kinds}
+          combineThemes={data.combineThemes}
+          initialItemThemes={data.itemThemes
+            .filter((r) => r.itemId === editingItem.id)
+            .map((r) => r.themeCode)}
           onClose={() => setEditingItemId(null)}
           onSave={(patch) => patchItem(editingItem.id, patch)}
           onPublish={() => publishItem(editingItem.id)}
           onUnpublish={() => unpublishItem(editingItem.id)}
+          onSetThemes={(themes) => setItemThemes(editingItem.id, themes)}
           onDelete={async () => {
             await deleteItem(editingItem.id);
             setEditingItemId(null);
@@ -2469,18 +2494,24 @@ const tagChip: React.CSSProperties = {
 function EditItemModal({
   item,
   kinds,
+  combineThemes,
+  initialItemThemes,
   onClose,
   onSave,
   onPublish,
   onUnpublish,
+  onSetThemes,
   onDelete,
 }: {
   item: ItemRow;
   kinds: { code: string; label: string }[];
+  combineThemes: { code: string; label: string }[];
+  initialItemThemes: string[];
   onClose: () => void;
   onSave: (patch: Partial<Pick<ItemRow, "name" | "tier" | "kind" | "firstAppeared" | "symbol" | "fact" | "tags" | "status" | "isCanary">>) => Promise<void>;
   onPublish: () => Promise<void>;
   onUnpublish: () => Promise<void>;
+  onSetThemes: (themes: string[]) => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
   const [name, setName] = useState(item.name);
@@ -2491,6 +2522,8 @@ function EditItemModal({
   const [fact, setFact] = useState(item.fact);
   const [tagsText, setTagsText] = useState(item.tags.join(", "));
   const [status, setStatus] = useState<ItemStatus>(item.status);
+  const [itemThemes, setItemThemesState] = useState<Set<string>>(new Set(initialItemThemes));
+  const [themesDirty, setThemesDirty] = useState(false);
   const [isCanary, setIsCanary] = useState(item.isCanary);
   const [busy, setBusy] = useState<null | "save" | "publish" | "delete">(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -2521,6 +2554,9 @@ function EditItemModal({
         status,
         isCanary,
       });
+      if (themesDirty) {
+        await onSetThemes(Array.from(itemThemes));
+      }
       onClose();
     } catch {
       // toast already shown
@@ -2631,6 +2667,49 @@ function EditItemModal({
               <input type="checkbox" checked={isCanary} onChange={(e) => setIsCanary(e.target.checked)} />
               <span style={{ color: "var(--muted)" }}>Flag this item as a canary (not public).</span>
             </label>
+
+            <label style={modalLabel}>Combine themes</label>
+            {combineThemes.length === 0 ? (
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                No themes defined. Create one in Combine themes admin.
+              </span>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                {combineThemes.map((t) => {
+                  const checked = itemThemes.has(t.code);
+                  return (
+                    <label
+                      key={t.code}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        fontSize: 13,
+                        padding: "2px 8px 2px 4px",
+                        border: "1px solid var(--line)",
+                        borderRadius: 12,
+                        background: checked ? "var(--soft)" : "transparent",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setItemThemesState((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(t.code);
+                            else next.delete(t.code);
+                            return next;
+                          });
+                          setThemesDirty(true);
+                        }}
+                      />
+                      {t.label}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div

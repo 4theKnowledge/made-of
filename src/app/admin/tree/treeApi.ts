@@ -124,6 +124,12 @@ export const api = {
   unpublishItem: (id: string) =>
     send<{ item: ItemRow }>(`/api/admin/items/${encodeURIComponent(id)}/unpublish`, { method: "POST" }),
 
+  setItemThemes: (id: string, themes: string[]) =>
+    send<{ themes: string[] }>(`/api/admin/items/${encodeURIComponent(id)}/themes`, {
+      method: "PUT",
+      body: JSON.stringify({ themes }),
+    }),
+
   searchItems: (q: string) =>
     send<{ items: { id: string; name: string; tier: Tier; kind: ItemKind }[] }>(
       `/api/admin/items?q=${encodeURIComponent(q)}&limit=20`,

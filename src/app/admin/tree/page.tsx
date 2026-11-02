@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminGraphPage() {
   const db = getDb();
-  const [items, allLinks, recipes, kinds] = await Promise.all([
+  const [items, allLinks, recipes, kinds, combineThemes, itemThemes] = await Promise.all([
     db
       .select({
         id: schema.items.id,
@@ -45,6 +45,19 @@ export default async function AdminGraphPage() {
     db
       .select({ code: schema.kinds.code, label: schema.kinds.label, position: schema.kinds.position })
       .from(schema.kinds),
+    db
+      .select({
+        code: schema.combineThemes.code,
+        label: schema.combineThemes.label,
+        position: schema.combineThemes.position,
+      })
+      .from(schema.combineThemes),
+    db
+      .select({
+        itemId: schema.itemCombineThemes.itemId,
+        themeCode: schema.itemCombineThemes.themeCode,
+      })
+      .from(schema.itemCombineThemes),
   ]);
 
   const data: TreeData = {
@@ -62,6 +75,11 @@ export default async function AdminGraphPage() {
       .slice()
       .sort((a, b) => a.position - b.position || a.code.localeCompare(b.code))
       .map((k) => ({ code: k.code, label: k.label })),
+    combineThemes: combineThemes
+      .slice()
+      .sort((a, b) => a.position - b.position || a.code.localeCompare(b.code))
+      .map((t) => ({ code: t.code, label: t.label })),
+    itemThemes: itemThemes.map((r) => ({ itemId: r.itemId, themeCode: r.themeCode })),
   };
 
   return (
