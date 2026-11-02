@@ -699,12 +699,148 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
     [mutate],
   );
 
+  const bulkPatch = useCallback(
+    async (ids: string[], patch: Parameters<typeof api.bulkPatchItems>[0]["patch"]) => {
+      const now = new Date().toISOString();
+      await mutate(
+        (d) => {
+          let next = d;
+          const setIds = new Set(ids);
+          // Core fields (status, isCanary).
+          if (patch.status || typeof patch.isCanary === "boolean") {
+            next = {
+              ...next,
+              items: next.items.map((it) =>
+                setIds.has(it.id)
+                  ? {
+                      ...it,
+                      ...(patch.status ? { status: patch.status } : {}),
+                      ...(typeof patch.isCanary === "boolean" ? { isCanary: patch.isCanary } : {}),
+                      updatedAt: now,
+                    }
+                  : it,
+              ),
+            };
+          }
+          // Tags.
+          if (patch.addTags?.length || patch.removeTags?.length) {
+            next = {
+              ...next,
+              items: next.items.map((it) => {
+                if (!setIds.has(it.id)) return it;
+                const tagSet = new Set(it.tags);
+                for (const t of patch.addTags ?? []) tagSet.add(t);
+                for (const t of patch.removeTags ?? []) tagSet.delete(t);
+                return { ...it, tags: Array.from(tagSet), updatedAt: now };
+              }),
+            };
+          }
+          // Themes.
+          if (patch.setThemes?.add?.length || patch.setThemes?.remove?.length) {
+            const addThemes = patch.setThemes.add ?? [];
+            const removeThemes = new Set(patch.setThemes.remove ?? []);
+            // Drop any (itemId, themeCode) we're about to re-insert or remove.
+            const filtered = next.itemThemes.filter((r) => {
+              if (!setIds.has(r.itemId)) return true;
+              if (removeThemes.has(r.themeCode)) return false;
+              if (addThemes.includes(r.themeCode)) return false;
+              return true;
+            });
+            const toAdd = ids.flatMap((itemId) =>
+              addThemes.map((themeCode) => ({ itemId, themeCode })),
+            );
+            next = { ...next, itemThemes: [...filtered, ...toAdd] };
+          }
+          return next;
+        },
+        () => api.bulkPatchItems({ itemIds: ids, patch }),
+        undefined,
+        "Bulk update failed",
+      );
+    },
+    [mutate],
+  );
+
+  const bulkDelete = useCallback(
+    async (ids: string[]) => {
+      const setIds = new Set(ids);
+      await mutate(
+        (d) => ({
+          ...d,
+          items: d.items.filter((it) => !setIds.has(it.id)),
+          links: d.links.filter((l) => !setIds.has(l.targetItemId) && !(l.itemId && setIds.has(l.itemId))),
+          recipes: d.recipes.filter((r) => !setIds.has(r.itemId)),
+          itemThemes: d.itemThemes.filter((r) => !setIds.has(r.itemId)),
+        }),
+        async () => {
+          const result = await api.bulkDeleteItems(ids);
+          if (result.blocked.length) {
+            // Server refused some; surface via throw so toast fires AND the
+            // optimistic update rolls back.
+            throw new Error(
+              `${result.deleted} deleted · ${result.blocked.length} blocked by incoming links`,
+            );
+          }
+          return result;
+        },
+        undefined,
+        "Bulk delete failed",
+      );
+    },
+    [mutate],
+  );
+
   /* -- Filter + view --------------------------------------------------- */
 
   const [statusFilter, setStatusFilter] = useState<ItemStatus | "all">("all");
   const [tierFilter, setTierFilter] = useState<Tier | "all">("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
   const [view, setView] = useState<"tree" | "flat">("tree");
+
+  // Bulk selection. Keyed by item id, not path — a single item can appear in
+  // multiple lineages in the tree, but selecting it is "pick this item" so
+  // we track by id. Lineage duplicates reflect the selection together.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const lastSelectedId = useRef<string | null>(null);
+
+  const clearSelection = useCallback(() => {
+    setSelected(new Set());
+    lastSelectedId.current = null;
+  }, []);
+
+  /**
+   * Called when a row's checkbox is toggled. Supports shift-click for a
+   * range select over the current alpha-sorted visible item list — gives
+   * a predictable range even for tangled-tree views.
+   */
+  const onRowSelectionToggle = useCallback(
+    (itemId: string, shiftKey: boolean, visibleOrderedIds: string[]) => {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (shiftKey && lastSelectedId.current) {
+          const from = visibleOrderedIds.indexOf(lastSelectedId.current);
+          const to = visibleOrderedIds.indexOf(itemId);
+          if (from >= 0 && to >= 0) {
+            const [lo, hi] = from < to ? [from, to] : [to, from];
+            // Range-select copies the current state of the anchor onto
+            // every item in [lo, hi]. If the anchor was in the set, we
+            // add them all; otherwise we remove them all.
+            const shouldAdd = prev.has(lastSelectedId.current);
+            for (let i = lo; i <= hi; i++) {
+              if (shouldAdd) next.add(visibleOrderedIds[i]);
+              else next.delete(visibleOrderedIds[i]);
+            }
+            return next;
+          }
+        }
+        if (next.has(itemId)) next.delete(itemId);
+        else next.add(itemId);
+        lastSelectedId.current = itemId;
+        return next;
+      });
+    },
+    [],
+  );
 
   const availableTags = useMemo(() => {
     const s = new Set<string>();
@@ -757,6 +893,22 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
     return visible;
   }, [matches, views]);
 
+  /**
+   * Alpha-sorted list of item ids currently targetable by bulk actions.
+   * Under a filter: matches only (not ancestors shown for context). Without
+   * a filter: all items. Shift-click range selection operates over this
+   * ordering so it stays predictable across tree/flat views.
+   */
+  const visibleOrderedIds = useMemo(() => {
+    const pool = matches
+      ? data.items.filter((it) => matches.has(it.id))
+      : data.items;
+    return pool
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((it) => it.id);
+  }, [matches, data.items]);
+
   const expandAll = useCallback(() => {
     const MAX_DEPTH = 8;
     const all = new Set<string>();
@@ -806,6 +958,9 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
         expandedCount={expanded.size}
         matchCount={matches ? matches.size : data.items.length}
         totalCount={data.items.length}
+        selectedCount={selected.size}
+        onSelectAllVisible={() => setSelected(new Set(visibleOrderedIds))}
+        onClearSelection={clearSelection}
       />
 
       <Legend />
@@ -850,11 +1005,19 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
               onCreateRecipe={createRecipe}
               onDeleteRecipe={deleteRecipe}
               onEditItem={setEditingItemId}
+              selectedSet={selected}
+              onToggleSelected={(id, shift) => onRowSelectionToggle(id, shift, visibleOrderedIds)}
             />
           ))}
         </ul>
       ) : (
-        <FlatView items={data.items} matches={matches} onEditItem={setEditingItemId} />
+        <FlatView
+          items={data.items}
+          matches={matches}
+          onEditItem={setEditingItemId}
+          selectedSet={selected}
+          onToggleSelected={(id, shift) => onRowSelectionToggle(id, shift, visibleOrderedIds)}
+        />
       )}
 
       {editingItem && (
@@ -874,6 +1037,18 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
             await deleteItem(editingItem.id);
             setEditingItemId(null);
           }}
+        />
+      )}
+
+      {selected.size > 0 && (
+        <BulkActionsBar
+          selectedIds={Array.from(selected)}
+          combineThemes={data.combineThemes}
+          itemThemes={data.itemThemes}
+          availableTags={availableTags}
+          onBulkPatch={bulkPatch}
+          onBulkDelete={bulkDelete}
+          onClear={clearSelection}
         />
       )}
 
@@ -903,6 +1078,9 @@ function Toolbar({
   expandedCount,
   matchCount,
   totalCount,
+  selectedCount,
+  onSelectAllVisible,
+  onClearSelection,
 }: {
   query: string;
   setQuery: (q: string) => void;
@@ -920,6 +1098,9 @@ function Toolbar({
   expandedCount: number;
   matchCount: number;
   totalCount: number;
+  selectedCount: number;
+  onSelectAllVisible: () => void;
+  onClearSelection: () => void;
 }) {
   const smallBtn: React.CSSProperties = { fontSize: 12, padding: "4px 10px" };
   const isFiltered = matchCount !== totalCount;
@@ -1067,10 +1248,20 @@ function Toolbar({
         {filters}
       </div>
 
-      <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)" }}>
-        {view === "tree" && `${expandedCount} expanded · `}
-        {isFiltered ? `${matchCount} match` : `${totalCount} items`}
-      </span>
+      <div style={{ marginLeft: "auto", display: "inline-flex", gap: 8, alignItems: "center" }}>
+        <button type="button" className="btn" style={smallBtn} onClick={onSelectAllVisible}>
+          Select {isFiltered ? "matches" : "all"}
+        </button>
+        {selectedCount > 0 && (
+          <button type="button" className="btn" style={smallBtn} onClick={onClearSelection}>
+            Clear ({selectedCount})
+          </button>
+        )}
+        <span style={{ fontSize: 12, color: "var(--muted)" }}>
+          {view === "tree" && `${expandedCount} expanded · `}
+          {isFiltered ? `${matchCount} match` : `${totalCount} items`}
+        </span>
+      </div>
       <style jsx>{`
         @media (max-width: 600px) {
           :global(.tree-toolbar-filters-desktop) {
@@ -1287,6 +1478,8 @@ interface RowProps {
   onCreateRecipe: (itemId: string, label: string | null) => Promise<void>;
   onDeleteRecipe: (id: string) => Promise<void>;
   onEditItem: (id: string) => void;
+  selectedSet: Set<string>;
+  onToggleSelected: (itemId: string, shiftKey: boolean) => void;
 }
 
 function Row(props: RowProps) {
@@ -1309,7 +1502,10 @@ function Row(props: RowProps) {
     onCreateRecipe,
     onDeleteRecipe,
     onEditItem,
+    selectedSet,
+    onToggleSelected,
   } = props;
+  const isSelected = selectedSet.has(itemId);
 
   const [showAddChild, setShowAddChild] = useState(false);
   const [editingLink, setEditingLink] = useState<string | null>(null);
@@ -1356,6 +1552,17 @@ function Row(props: RowProps) {
         }}
         onClick={() => canExpand && toggle(path)}
       >
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => {}}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelected(itemId, e.shiftKey);
+          }}
+          aria-label={`Select ${item.name}`}
+          style={{ cursor: "pointer" }}
+        />
         <span
           className="tree-row-chevron"
           style={{
@@ -1596,6 +1803,8 @@ function Row(props: RowProps) {
               onDeleteLink={onDeleteLink}
               onDeleteRecipe={onDeleteRecipe}
               onEditItem={onEditItem}
+              selectedSet={selectedSet}
+              onToggleSelected={onToggleSelected}
             />
           ))}
 
@@ -1646,6 +1855,8 @@ function Row(props: RowProps) {
                     onCreateRecipe={onCreateRecipe}
                     onDeleteRecipe={onDeleteRecipe}
                     onEditItem={onEditItem}
+                    selectedSet={selectedSet}
+                    onToggleSelected={onToggleSelected}
                   />
                 ))}
             </>
@@ -1840,6 +2051,8 @@ interface RecipeGroupProps {
   onDeleteLink: RowProps["onDeleteLink"];
   onDeleteRecipe: (id: string) => Promise<void>;
   onEditItem: RowProps["onEditItem"];
+  selectedSet: RowProps["selectedSet"];
+  onToggleSelected: RowProps["onToggleSelected"];
 }
 
 function RecipeGroup(props: RecipeGroupProps) {
@@ -1991,6 +2204,8 @@ function RecipeGroup(props: RecipeGroupProps) {
                 }}
                 onDeleteRecipe={props.onDeleteRecipe}
                 onEditItem={props.onEditItem}
+                selectedSet={props.selectedSet}
+                onToggleSelected={props.onToggleSelected}
               />
             ))}
         </ul>
@@ -2355,6 +2570,399 @@ const formInput: React.CSSProperties = {
 };
 
 /* ========================================================================
+ * BulkActionsBar — floating bottom bar for applying actions to the
+ * current selection. Collapsed by default (just a count + a "Clear"
+ * button); each action expands into an inline form.
+ * ====================================================================== */
+
+type BulkMode =
+  | { kind: "none" }
+  | { kind: "themes" }
+  | { kind: "status" }
+  | { kind: "add-tag" }
+  | { kind: "remove-tag" }
+  | { kind: "delete" };
+
+function BulkActionsBar({
+  selectedIds,
+  combineThemes,
+  itemThemes,
+  availableTags,
+  onBulkPatch,
+  onBulkDelete,
+  onClear,
+}: {
+  selectedIds: string[];
+  combineThemes: { code: string; label: string }[];
+  itemThemes: { itemId: string; themeCode: string }[];
+  availableTags: string[];
+  onBulkPatch: (ids: string[], patch: Parameters<typeof api.bulkPatchItems>[0]["patch"]) => Promise<void>;
+  onBulkDelete: (ids: string[]) => Promise<void>;
+  onClear: () => void;
+}) {
+  const [mode, setMode] = useState<BulkMode>({ kind: "none" });
+  const [busy, setBusy] = useState(false);
+
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+  // For tri-state theme UI: compute per-theme how many of the selected
+  // items currently have it.
+  const themeCountInSelection = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of itemThemes) {
+      if (!selectedSet.has(r.itemId)) continue;
+      m.set(r.themeCode, (m.get(r.themeCode) ?? 0) + 1);
+    }
+    return m;
+  }, [itemThemes, selectedSet]);
+
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await fn();
+      setMode({ kind: "none" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      role="toolbar"
+      aria-label="Bulk actions"
+      style={{
+        position: "fixed",
+        left: 16,
+        right: 16,
+        bottom: 16,
+        margin: "0 auto",
+        maxWidth: 980,
+        background: "var(--surface)",
+        border: "1.5px solid var(--ink)",
+        boxShadow: "2px 2px 0 var(--ink)",
+        borderRadius: 6,
+        padding: 10,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        zIndex: 90,
+      }}
+    >
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <strong style={{ fontSize: 13 }}>{selectedIds.length} selected</strong>
+        <span style={{ flex: 1 }} />
+        <button type="button" className="btn" style={bulkBtn} onClick={() => setMode({ kind: "themes" })} disabled={busy}>
+          Edit themes
+        </button>
+        <button type="button" className="btn" style={bulkBtn} onClick={() => setMode({ kind: "status" })} disabled={busy}>
+          Set status
+        </button>
+        <button type="button" className="btn" style={bulkBtn} onClick={() => setMode({ kind: "add-tag" })} disabled={busy}>
+          Add tag
+        </button>
+        <button type="button" className="btn" style={bulkBtn} onClick={() => setMode({ kind: "remove-tag" })} disabled={busy}>
+          Remove tag
+        </button>
+        <button
+          type="button"
+          className="btn"
+          style={{ ...bulkBtn, borderColor: "#f85149", color: "#f85149" }}
+          onClick={() => setMode({ kind: "delete" })}
+          disabled={busy}
+        >
+          Delete
+        </button>
+        <button type="button" className="btn" style={bulkBtn} onClick={onClear} disabled={busy}>
+          Clear
+        </button>
+      </div>
+
+      {mode.kind === "themes" && (
+        <BulkThemesEditor
+          combineThemes={combineThemes}
+          selectedCount={selectedIds.length}
+          themeCountInSelection={themeCountInSelection}
+          busy={busy}
+          onCancel={() => setMode({ kind: "none" })}
+          onApply={(add, remove) =>
+            run(async () => {
+              await onBulkPatch(selectedIds, { setThemes: { add, remove } });
+            })
+          }
+        />
+      )}
+
+      {mode.kind === "status" && (
+        <BulkStatusEditor
+          busy={busy}
+          onCancel={() => setMode({ kind: "none" })}
+          onApply={(status) => run(() => onBulkPatch(selectedIds, { status }))}
+        />
+      )}
+
+      {mode.kind === "add-tag" && (
+        <BulkTagEditor
+          busy={busy}
+          placeholder="tag to add (e.g. combine-exclude)"
+          onCancel={() => setMode({ kind: "none" })}
+          onApply={(tag) => run(() => onBulkPatch(selectedIds, { addTags: [tag] }))}
+        />
+      )}
+
+      {mode.kind === "remove-tag" && (
+        <BulkTagEditor
+          busy={busy}
+          placeholder="tag to remove"
+          suggestions={availableTags}
+          onCancel={() => setMode({ kind: "none" })}
+          onApply={(tag) => run(() => onBulkPatch(selectedIds, { removeTags: [tag] }))}
+        />
+      )}
+
+      {mode.kind === "delete" && (
+        <div
+          style={{
+            padding: 10,
+            border: "1.5px solid #f85149",
+            borderRadius: 4,
+            background: "color-mix(in srgb, #f85149 10%, var(--surface))",
+            fontSize: 13,
+          }}
+        >
+          Delete {selectedIds.length} item{selectedIds.length === 1 ? "" : "s"}? Items with incoming links will be
+          blocked and reported.
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn"
+              style={{ ...bulkBtn, background: "#f85149", borderColor: "#f85149", color: "#fff" }}
+              onClick={() => run(() => onBulkDelete(selectedIds))}
+              disabled={busy}
+            >
+              {busy ? "…" : "Delete"}
+            </button>
+            <button type="button" className="btn" style={bulkBtn} onClick={() => setMode({ kind: "none" })}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const bulkBtn: React.CSSProperties = { fontSize: 12, padding: "6px 12px" };
+
+function BulkThemesEditor({
+  combineThemes,
+  selectedCount,
+  themeCountInSelection,
+  busy,
+  onCancel,
+  onApply,
+}: {
+  combineThemes: { code: string; label: string }[];
+  selectedCount: number;
+  themeCountInSelection: Map<string, number>;
+  busy: boolean;
+  onCancel: () => void;
+  onApply: (add: string[], remove: string[]) => Promise<void>;
+}) {
+  // For each theme, three initial states derived from the selection:
+  //  "all": every selected item has it → checked.
+  //  "none": no selected item has it → unchecked.
+  //  "mixed": some have, some don't → indeterminate.
+  // User toggles to "all" (add to everyone) or "none" (remove from everyone).
+  // Leaving "mixed" alone means no change for that theme.
+  type ThemeState = "all" | "none" | "mixed";
+  const initialState: Record<string, ThemeState> = {};
+  for (const t of combineThemes) {
+    const n = themeCountInSelection.get(t.code) ?? 0;
+    initialState[t.code] = n === 0 ? "none" : n === selectedCount ? "all" : "mixed";
+  }
+  const [state, setState] = useState<Record<string, ThemeState>>(initialState);
+
+  const cycle = (code: string) => {
+    setState((prev) => {
+      const cur = prev[code];
+      const next: ThemeState = cur === "all" ? "none" : "all";
+      return { ...prev, [code]: next };
+    });
+  };
+
+  const add = combineThemes
+    .filter((t) => state[t.code] === "all" && initialState[t.code] !== "all")
+    .map((t) => t.code);
+  const remove = combineThemes
+    .filter((t) => state[t.code] === "none" && initialState[t.code] !== "none")
+    .map((t) => t.code);
+
+  return (
+    <div
+      style={{
+        padding: 10,
+        border: "1px solid var(--line)",
+        borderRadius: 4,
+        background: "var(--soft)",
+      }}
+    >
+      <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
+        Toggle themes to add to or remove from all {selectedCount} selected items. Mixed states (some have, some
+        don&rsquo;t) stay mixed if you don&rsquo;t touch them.
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
+        {combineThemes.map((t) => {
+          const s = state[t.code];
+          return (
+            <label
+              key={t.code}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 13,
+                padding: "4px 10px 4px 4px",
+                border: "1px solid var(--line)",
+                borderRadius: 12,
+                background: s === "all" ? "var(--card)" : "transparent",
+                cursor: "pointer",
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                cycle(t.code);
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={s === "all"}
+                ref={(el) => {
+                  if (el) el.indeterminate = s === "mixed";
+                }}
+                onChange={() => cycle(t.code)}
+              />
+              {t.label}
+              <span style={{ fontSize: 10, color: "var(--muted)", fontFamily: "var(--mono, monospace)" }}>
+                {themeCountInSelection.get(t.code) ?? 0}/{selectedCount}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          type="button"
+          className="btn"
+          style={bulkBtn}
+          disabled={busy || (add.length === 0 && remove.length === 0)}
+          onClick={() => onApply(add, remove)}
+        >
+          {busy ? "…" : `Apply (${add.length} add, ${remove.length} remove)`}
+        </button>
+        <button type="button" className="btn" style={bulkBtn} onClick={onCancel} disabled={busy}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function BulkStatusEditor({
+  busy,
+  onCancel,
+  onApply,
+}: {
+  busy: boolean;
+  onCancel: () => void;
+  onApply: (status: "draft" | "review" | "live") => Promise<void>;
+}) {
+  const [status, setStatus] = useState<"draft" | "review" | "live">("draft");
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <span style={{ fontSize: 12, color: "var(--muted)" }}>Set all selected items to:</span>
+      <select
+        value={status}
+        onChange={(e) => setStatus(e.target.value as "draft" | "review" | "live")}
+        style={{
+          padding: "6px 8px",
+          fontSize: 12,
+          border: "1px solid var(--line)",
+          borderRadius: 6,
+          background: "var(--card)",
+          color: "var(--ink)",
+        }}
+      >
+        <option value="draft">draft</option>
+        <option value="review">review</option>
+        <option value="live">live</option>
+      </select>
+      <button type="button" className="btn" style={bulkBtn} disabled={busy} onClick={() => onApply(status)}>
+        {busy ? "…" : "Apply"}
+      </button>
+      <button type="button" className="btn" style={bulkBtn} onClick={onCancel} disabled={busy}>
+        Cancel
+      </button>
+    </div>
+  );
+}
+
+function BulkTagEditor({
+  busy,
+  placeholder,
+  suggestions,
+  onCancel,
+  onApply,
+}: {
+  busy: boolean;
+  placeholder: string;
+  suggestions?: string[];
+  onCancel: () => void;
+  onApply: (tag: string) => Promise<void>;
+}) {
+  const [tag, setTag] = useState("");
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!tag.trim()) return;
+        onApply(tag.trim());
+      }}
+      style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}
+    >
+      <input
+        value={tag}
+        onChange={(e) => setTag(e.target.value)}
+        placeholder={placeholder}
+        list={suggestions ? "bulk-tag-suggestions" : undefined}
+        autoFocus
+        required
+        style={{
+          padding: "6px 10px",
+          fontSize: 12,
+          border: "1px solid var(--line)",
+          borderRadius: 6,
+          background: "var(--card)",
+          color: "var(--ink)",
+          minWidth: 220,
+        }}
+      />
+      {suggestions && (
+        <datalist id="bulk-tag-suggestions">
+          {suggestions.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+      )}
+      <button type="submit" className="btn" style={bulkBtn} disabled={busy || !tag.trim()}>
+        {busy ? "…" : "Apply"}
+      </button>
+      <button type="button" className="btn" style={bulkBtn} onClick={onCancel} disabled={busy}>
+        Cancel
+      </button>
+    </form>
+  );
+}
+
+/* ========================================================================
  * FlatView — table of items that match the current filter.
  * ====================================================================== */
 
@@ -2362,10 +2970,14 @@ function FlatView({
   items,
   matches,
   onEditItem,
+  selectedSet,
+  onToggleSelected,
 }: {
   items: ItemRow[];
   matches: Set<string> | null;
   onEditItem: (id: string) => void;
+  selectedSet: Set<string>;
+  onToggleSelected: (itemId: string, shiftKey: boolean) => void;
 }) {
   const visible = useMemo(() => {
     const list = matches ? items.filter((it) => matches.has(it.id)) : items;
@@ -2383,6 +2995,7 @@ function FlatView({
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
           <tr style={{ textAlign: "left", borderBottom: "1px solid var(--line)" }}>
+            <th style={{ ...flatTh, width: 24 }}></th>
             <th style={flatTh}>Name</th>
             <th style={flatTh}>Tier</th>
             <th style={flatTh}>Kind</th>
@@ -2394,7 +3007,20 @@ function FlatView({
         </thead>
         <tbody>
           {visible.map((it) => (
-            <tr key={it.id} style={{ borderBottom: "1px solid var(--line)" }}>
+            <tr key={it.id} style={{ borderBottom: "1px solid var(--line)", background: selectedSet.has(it.id) ? "var(--soft)" : undefined }}>
+              <td style={flatTd}>
+                <input
+                  type="checkbox"
+                  checked={selectedSet.has(it.id)}
+                  onChange={() => {}}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleSelected(it.id, e.shiftKey);
+                  }}
+                  aria-label={`Select ${it.name}`}
+                  style={{ cursor: "pointer" }}
+                />
+              </td>
               <td style={flatTd}>
                 <span style={{ fontWeight: 500 }}>{it.name}</span>
               </td>

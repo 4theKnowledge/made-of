@@ -135,4 +135,27 @@ export const api = {
       `/api/admin/items?q=${encodeURIComponent(q)}&limit=20`,
       { method: "GET" },
     ),
+
+  bulkPatchItems: (body: {
+    itemIds: string[];
+    patch: {
+      status?: ItemStatus;
+      isCanary?: boolean;
+      addTags?: string[];
+      removeTags?: string[];
+      setThemes?: { add?: string[]; remove?: string[] };
+    };
+  }) =>
+    send<{
+      requested: number;
+      matched: number;
+      missing: string[];
+      updatedFields: Record<string, number>;
+    }>("/api/admin/items/bulk", { method: "POST", body: JSON.stringify(body) }),
+
+  bulkDeleteItems: (itemIds: string[]) =>
+    send<{ requested: number; deleted: number; blocked: string[] }>(
+      "/api/admin/items/bulk-delete",
+      { method: "POST", body: JSON.stringify({ itemIds }) },
+    ),
 };
