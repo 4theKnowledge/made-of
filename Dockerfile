@@ -39,11 +39,10 @@ COPY --from=build --chown=nextjs:nodejs /app/public ./public
 
 # Predeploy bundle: compiled JS for migrate + seed-if-empty, plus the data
 # they need. Standalone doesn't trace scripts; we build a small single-file
-# bundle in the build stage and only ship that + the migration SQL + the
-# artifact HTML. Everything is plain Node — no tsx at runtime.
+# bundle in the build stage and only ship that + the migration SQL.
+# Everything is plain Node — no tsx at runtime.
 COPY --from=build --chown=nextjs:nodejs /app/dist-scripts ./dist-scripts
 COPY --from=build --chown=nextjs:nodejs /app/drizzle ./drizzle
-COPY --from=build --chown=nextjs:nodejs /app/legacy ./legacy
 COPY --from=build --chown=nextjs:nodejs /app/scripts/predeploy.sh ./scripts/predeploy.sh
 # The predeploy bundle marks `postgres` as external, so it must be present
 # in node_modules at runtime. Next's standalone output traces imports from
