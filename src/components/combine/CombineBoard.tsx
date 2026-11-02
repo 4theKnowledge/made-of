@@ -1508,13 +1508,27 @@ export function CombineBoard({ bundles: serialised }: Props) {
           />
         )}
         {state.over && !overCardOpen && (
-          <button
-            type="button"
-            className="cbh cbresults"
-            onClick={() => setOverCardOpen(true)}
-          >
-            Results
-          </button>
+          <div className="cbresultsrow">
+            <button
+              type="button"
+              className="cbh cbresults"
+              onClick={() => setOverCardOpen(true)}
+            >
+              Results
+            </button>
+            <button
+              type="button"
+              className="cbh"
+              onClick={async () => {
+                const payload = state.daily
+                  ? dailyShareText(state.daily, state, bundle)
+                  : endlessShareText(state, bundle);
+                await shareText(payload);
+              }}
+            >
+              Share
+            </button>
+          </div>
         )}
         {ageToast && (
           <AgeToast
