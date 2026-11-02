@@ -3232,11 +3232,8 @@ function AgesSheet({
           <div>
             <b>Crumbling</b>
             <p>
-              When nothing in the current age needs a tile, a red counter
-              appears and ticks down from 3 each turn. On the 4th turn the
-              tile falls off the board. Combine it, move it, or clear a
-              space before then — stale tiles don&apos;t score and they take
-              up room.
+              Tiles not useful in this age tick down from 3. On turn 4 they
+              fall off — combine, move, or shore first.
             </p>
           </div>
         </div>
