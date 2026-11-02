@@ -3802,7 +3802,7 @@ function ChainOverlay({ trace }: { trace: ChainTrace }) {
     return (
       <svg
         ref={svgRef}
-        className="cbchain"
+        className="cbchainfx"
         aria-hidden="true"
       />
     );
@@ -3812,7 +3812,7 @@ function ChainOverlay({ trace }: { trace: ChainTrace }) {
   return (
     <svg
       ref={svgRef}
-      className="cbchain"
+      className="cbchainfx"
       viewBox={`0 0 ${geo.w} ${geo.h}`}
       width={geo.w}
       height={geo.h}
