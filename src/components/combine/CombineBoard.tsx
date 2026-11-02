@@ -1562,6 +1562,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
             tileId={infoTile}
             bundle={bundle}
             known={knownIds}
+            howMade={state.howMade}
             onDismiss={() => setInfoTile(null)}
           />
         )}
@@ -1719,22 +1720,29 @@ function DetailCard({
   tileId,
   bundle,
   known,
+  howMade,
   onDismiss,
 }: {
   tileId: string;
   bundle: ThemeBundle;
   /** Everything the player knows (this game + lifetime collection). */
   known: Set<string>;
+  /** Ingredients the player actually used to make each output this run.
+   *  When present for `tileId`, it wins over the bundle's canonical recipe
+   *  so items with multiple valid recipes show the one the player made. */
+  howMade: Record<string, string[]>;
   onDismiss: () => void;
 }) {
   const item = bundle.items.get(tileId);
   if (!item) return null;
-  // Prefer the gameplay recipe. If the theme filtered it out, fall back to
-  // the item's knowledge-base lore so the card still reads
-  // "hydrogen + oxygen = water".
+  // Prefer the recipe the player actually used this run. Otherwise fall back
+  // to the first bundle recipe, then to the item's knowledge-base lore so the
+  // card still reads "hydrogen + oxygen = water" for items not yet made.
+  const playerRecipe = howMade[tileId];
   const bundleRecipe = bundle.recipes.find((r) => r.out === tileId);
-  const madeFrom: { all: string[] } | null =
-    bundleRecipe ?? (item.lore ? { all: item.lore } : null);
+  const madeFrom: { all: string[] } | null = playerRecipe
+    ? { all: playerRecipe }
+    : (bundleRecipe ?? (item.lore ? { all: item.lore } : null));
   // Goes into: recipes that use this tile as an ingredient.
   const goesInto = (bundle.byIngredient.get(tileId) ?? []).filter(
     (r) => r.out !== tileId,

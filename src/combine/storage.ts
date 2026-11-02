@@ -56,6 +56,7 @@ export interface StoredGame {
   made: number;
   longest: number;
   found: string[];
+  howMade?: Record<string, string[]>;
   swaps: number;
   clears: number;
   hints: number;
@@ -113,6 +114,7 @@ function toStored(state: GameState): StoredGame {
     made: state.made,
     longest: state.longest,
     found: state.found.slice(),
+    howMade: { ...state.howMade },
     swaps: state.swaps,
     clears: state.clears,
     hints: state.hints,
@@ -218,6 +220,7 @@ export function hydrateGame(s: StoredGame): GameState {
     made: s.made,
     longest: s.longest,
     found: s.found.slice(),
+    howMade: s.howMade ? { ...s.howMade } : {},
     swaps: s.swaps,
     clears: s.clears,
     hints: s.hints,

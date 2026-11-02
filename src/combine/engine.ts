@@ -88,6 +88,11 @@ export interface GameState {
   longest: number;
   /** Items first-found during this game. */
   found: string[];
+  /** The ingredient list the player actually used the first time they
+   *  made each output this run. Lets the info card show "How you made it"
+   *  with the right recipe when an item has multiple valid recipes
+   *  (e.g. window = glass+wood OR glass+aluminium). */
+  howMade: Record<string, string[]>;
   swaps: number;
   clears: number;
   hints: number;
@@ -197,6 +202,7 @@ function cloneState(s: GameState): GameState {
     board: cloneBoard(s.board),
     tray: cloneTray(s.tray),
     found: [...s.found],
+    howMade: { ...s.howMade },
     shelf: [...s.shelf],
     hold: s.hold.slice(),
     crumb: cloneCrumb(s.crumb),
@@ -349,6 +355,7 @@ function finishResolve(
   const first = !state.found.includes(recipe.out);
   if (first) {
     state.found.push(recipe.out);
+    state.howMade[recipe.out] = recipe.all.slice();
     // Age bar tracks unique discoveries whose min band is the current age's
     // band, so the "N/need" counter matches the tiles shown in the Ages
     // dialog for this age. Later-band discoveries belong to a future age.
@@ -534,6 +541,7 @@ export function newGame(
     made: 0,
     longest: 0,
     found: [],
+    howMade: {},
     swaps: 2,
     clears: 1,
     hints: 2,
