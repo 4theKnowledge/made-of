@@ -27,7 +27,12 @@ import {
   type MusicTrack,
 } from "@/combine/storage";
 import { useCollection } from "@/combine/useCollection";
-import { dailyShareText, endlessShareText, shareText } from "@/combine/share";
+import {
+  dailyShareText,
+  endlessShareText,
+  resolveItemName,
+  shareText,
+} from "@/combine/share";
 import type {
   CombineItem,
   CombineRecipe,
@@ -218,6 +223,26 @@ export function CombineBoard({ bundles: serialised }: Props) {
       everything: loadBest("everything"),
     });
     setDailyDone(loadDailyDone(todayKey()));
+    // Deep link: ?d=<dayKey> on /combine starts today's daily. Yesterday's
+    // keys fall through to the regular endless resume (today's daily will
+    // still be a tap away from the theme menu).
+    const sp =
+      typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const deepLinkDay = sp?.get("d");
+    if (deepLinkDay && deepLinkDay === todayKey()) {
+      const day = deepLinkDay;
+      const saved = loadGame(bundles.everything, { daily: day });
+      setState(
+        saved
+          ? hydrateGame(saved)
+          : newGame("everything", bundles.everything, {
+              daily: day,
+              size: 6,
+              seed: dailySeed(day),
+            }).state,
+      );
+      return;
+    }
     const everythingSave = loadGame(bundles.everything, { daily: null });
     if (everythingSave) {
       setState(hydrateGame(everythingSave));
@@ -684,7 +709,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
             age: r.state.age,
             ageName: bundle.theme.ages[r.state.age] ?? "",
             made: r.state.made,
-            top: bestShelfId,
+            top: bestShelfId ? bundle.items.get(bestShelfId)?.name ?? null : null,
           };
           saveDailyDone(dr);
           setDailyDone(dr);
@@ -778,19 +803,30 @@ export function CombineBoard({ bundles: serialised }: Props) {
   const shareDaily = useCallback(async () => {
     const dr = dailyDone;
     if (!dr) return;
-    // Rebuild a share text from the stored result.
+    // Legacy stored results may hold a raw uuid in `top`; resolve to a name
+    // if we can, otherwise drop the field so we never leak a uuid.
+    const topDisplay = (() => {
+      if (!dr.top) return null;
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dr.top);
+      if (!isUuid) return dr.top.charAt(0).toUpperCase() + dr.top.slice(1);
+      const resolved = resolveItemName(dr.top, bundles.everything);
+      return resolved && resolved !== dr.top ? resolved : null;
+    })();
     const text =
       `Made Of · Daily Combine ${dr.key}\n` +
-      // One square per age, green up to the age reached.
       Array.from({ length: bundles.everything.theme.ages.length }, (_, k) =>
         k <= dr.age ? "🟩" : "⬜",
       ).join("") +
       ` reached Age ${dr.ageName}\n` +
       `${dr.score.toLocaleString("en")} points · ${dr.made} made${
-        dr.top ? ` · best: ${dr.top}` : ""
-      }\n` +
-      "https://madeof.app/combine";
-    await shareText(text);
+        topDisplay ? ` · best: ${topDisplay}` : ""
+      }`;
+    await shareText({
+      title: "Made Of · Daily Combine",
+      text,
+      url: `https://madeof.app/combine?d=${encodeURIComponent(dr.key)}`,
+    });
   }, [dailyDone, bundles.everything]);
 
   const onCellTap = useCallback(
