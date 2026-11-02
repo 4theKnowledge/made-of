@@ -131,6 +131,9 @@ interface Fx {
   chain?: number;
   /** Close-call bonus for the "Close call!" badge. */
   close?: number;
+  /** Cell where a new discovery just formed — triggers a tier-colored
+   *  sparkle pulse after the pop phase. */
+  discover?: number;
 }
 
 interface Props {
@@ -194,6 +197,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
   }, [bundles.everything]);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [helpersOpen, setHelpersOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   // Clear-mode: next tap on a full cell removes that tile.
   const [clearMode, setClearMode] = useState(false);
   // Move-mode: null = inactive. {from:null} = pick a tile. {from:cell} = pick
@@ -212,6 +216,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
   const [discovery, setDiscovery] = useState<{
     out: string;
     recipe: string[];
+    firstLifetime: boolean;
   } | null>(null);
   const [ageToast, setAgeToast] = useState<{
     age: number;
@@ -340,8 +345,15 @@ export function CombineBoard({ bundles: serialised }: Props) {
       // ingredient cells (300ms), then a pop/burst on the output cell
       // (420ms). Chain steps queue after each other, so we build a timeline
       // of fx patches and schedule them with setTimeout.
-      let latestDiscovery: { out: string; recipe: string[] } | null = null;
+      let latestDiscovery:
+        | { out: string; recipe: string[]; firstLifetime: boolean }
+        | null = null;
       let latestAgeUp: { age: number; sample: string[] } | null = null;
+
+      // Outputs discovered in this batch — used to flash the forming cell
+      // when the matching combine pops. (Discovery event precedes its combine
+      // in the engine's event order.)
+      const discoveredOuts = new Set<string>();
 
       // Immediate (non-combine) patch — placed/nope/crumble/discovery/age-up.
       const immediate: Fx = {};
@@ -350,6 +362,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
       let cursor = 0;
       const FUSE_MS = 300;
       const POP_MS = 420;
+      const DISCOVER_MS = 720;
 
       for (const e of events) {
         if (e.type === "placed") {
@@ -420,6 +433,17 @@ export function CombineBoard({ bundles: serialised }: Props) {
             clearAt: popAt + POP_MS + 180,
             clearKeys: ["pop", "burst", "popGhost", "chain", "close"],
           });
+          // If this combine's output is a new discovery, fire a sparkle
+          // pulse on the forming cell right after the pop lands.
+          if (discoveredOuts.has(e.out)) {
+            const discoverAt = popAt + POP_MS;
+            schedule.push({
+              at: discoverAt,
+              patch: { discover: e.at },
+              clearAt: discoverAt + DISCOVER_MS,
+              clearKeys: ["discover"],
+            });
+          }
           cursor = popAt + POP_MS;
         } else if (e.type === "shipped") {
           // The ship animation starts right after the pop finishes.
@@ -437,7 +461,13 @@ export function CombineBoard({ bundles: serialised }: Props) {
           immediate.crumble = new Set(e.cells);
           playFx("crumble");
         } else if (e.type === "discovery") {
-          latestDiscovery = { out: e.out, recipe: e.recipe };
+          const firstLifetime = !collection.has(e.out);
+          latestDiscovery = {
+            out: e.out,
+            recipe: e.recipe,
+            firstLifetime,
+          };
+          discoveredOuts.add(e.out);
           window.setTimeout(() => playFx("discover"), 250);
         } else if (e.type === "age-up") {
           latestAgeUp = { age: e.age, sample: e.sample };
@@ -479,7 +509,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
         timers.current.push(clearId);
       }
     },
-    [scheduleClear],
+    [scheduleClear, collection],
   );
 
   // Apply an action: run reduce once, update state, and route events.
@@ -721,6 +751,19 @@ export function CombineBoard({ bundles: serialised }: Props) {
     return () => window.removeEventListener("click", onDocClick);
   }, [helpersOpen]);
 
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest(".cbmoremenu")) return;
+      if (target.closest("#cbMore")) return;
+      setMoreOpen(false);
+    };
+    window.addEventListener("click", onDocClick);
+    return () => window.removeEventListener("click", onDocClick);
+  }, [moreOpen]);
+
   // Escape closes the top overlay in prototype order: info card, discovery
   // toast, age toast, hint toast, helpers menu, helper mode, selected tray
   // tile. Doesn't dismiss the choice picker (the engine is paused and
@@ -760,6 +803,10 @@ export function CombineBoard({ bundles: serialised }: Props) {
         setHelpersOpen(false);
         return;
       }
+      if (moreOpen) {
+        setMoreOpen(false);
+        return;
+      }
       if (clearMode) {
         setClearMode(false);
         return;
@@ -787,6 +834,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
     bookOpen,
     soundOpen,
     helpersOpen,
+    moreOpen,
     clearMode,
     moveMode,
     shoreMode,
@@ -1071,9 +1119,20 @@ export function CombineBoard({ bundles: serialised }: Props) {
           }}
           onHelper={onHelper}
           onTheme={() => setThemeOpen(true)}
-          onBook={() => setBookOpen(true)}
-          onSound={() => setSoundOpen(true)}
-          onHelp={() => setHelpOpen(true)}
+          moreOpen={moreOpen}
+          onToggleMore={() => setMoreOpen((o) => !o)}
+          onBook={() => {
+            setMoreOpen(false);
+            setBookOpen(true);
+          }}
+          onSound={() => {
+            setMoreOpen(false);
+            setSoundOpen(true);
+          }}
+          onHelp={() => {
+            setMoreOpen(false);
+            setHelpOpen(true);
+          }}
         />
         <TipLine
           state={state}
@@ -1960,8 +2019,13 @@ function AgeToast({
 }) {
   const ageName = bundle.theme.ages[toast.age];
   return (
-    <div className="cbdisc cbagetoast" role="status" onClick={onDismiss}>
-      <div>
+    <div
+      className="cbdisc cbagetoast cbagebig"
+      role="status"
+      onClick={onDismiss}
+    >
+      <span className="cbagesweep" aria-hidden="true" />
+      <div className="cbagebody">
         <span className="k">New age · tap to close</span>
         <b>Age {ageName}</b>
         <p>
@@ -1969,12 +2033,15 @@ function AgeToast({
           away.
         </p>
         {toast.sample.length > 0 && (
-          <div className="cbrcp">
-            {toast.sample.map((id) => {
+          <div className="cbrcp cbagesample">
+            {toast.sample.map((id, i) => {
               const it = bundle.items.get(id);
               if (!it) return null;
               return (
-                <span key={id}>
+                <span
+                  key={id}
+                  style={{ "--i": i } as React.CSSProperties}
+                >
                   <Pictogram
                     name={it.name}
                     tier={it.tier}
@@ -2045,7 +2112,7 @@ function DiscoveryToast({
   bundle,
   onDismiss,
 }: {
-  discovery: { out: string; recipe: string[] };
+  discovery: { out: string; recipe: string[]; firstLifetime: boolean };
   bundle: ThemeBundle;
   onDismiss: () => void;
 }) {
@@ -2053,19 +2120,25 @@ function DiscoveryToast({
   if (!item) return null;
   return (
     <div
-      className="cbdisc"
+      className={`cbdisc${discovery.firstLifetime ? " cbfirst" : ""}`}
       role="status"
       onClick={onDismiss}
       style={fillVar(item)}
     >
-      <Pictogram
-        name={item.name}
-        tier={item.tier}
-        kind={item.kind}
-        symbol={item.symbol}
-      />
+      <span className="cbdisc-pic">
+        <Pictogram
+          name={item.name}
+          tier={item.tier}
+          kind={item.kind}
+          symbol={item.symbol}
+        />
+      </span>
       <div>
-        <span className="k">New discovery · tap to close</span>
+        <span className="k">
+          {discovery.firstLifetime
+            ? "First time! · tap to close"
+            : "New discovery · tap to close"}
+        </span>
         <b>{cap(item.name)}</b>
         <div className="cbrcp">
           {discovery.recipe.map((pid, k) => {
@@ -2100,11 +2173,13 @@ function TopBar({
   fx,
   best,
   helpersOpen,
+  moreOpen,
   clearMode,
   moveMode,
   shoreMode,
   soundOn,
   onToggleHelpers,
+  onToggleMore,
   onHelper,
   onTheme,
   onBook,
@@ -2115,11 +2190,13 @@ function TopBar({
   fx: Fx;
   best: number;
   helpersOpen: boolean;
+  moreOpen: boolean;
   clearMode: boolean;
   moveMode: boolean;
   shoreMode: boolean;
   soundOn: boolean;
   onToggleHelpers: () => void;
+  onToggleMore: () => void;
   onHelper: (which: "hint" | "swap" | "clear" | "move" | "shore") => void;
   onTheme: () => void;
   onBook: () => void;
@@ -2128,7 +2205,7 @@ function TopBar({
 }) {
   const helpersLeft =
     state.swaps + state.clears + state.hints + state.mv + state.shore;
-  const themeName = state.daily ? "Daily" : "Everything";
+  const themeName = state.daily ? "Daily" : "Endless";
   const bestDisplay = Math.max(best, state.over ? state.score : 0);
   const modeActive = clearMode || moveMode || shoreMode;
   return (
@@ -2281,46 +2358,81 @@ function TopBar({
           </>
         )}
       </div>
-      <button
-        type="button"
-        className="cbsnd"
-        aria-label="Collection"
-        title="Collection"
-        onClick={onBook}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 5c3-1 6-1 8 1v14c-2-2-5-2-8-1zM20 5c-3-1-6-1-8 1v14c2-2 5-2 8-1z" />
-        </svg>
-      </button>
-      <button
-        type="button"
-        className={`cbsnd${soundOn ? " on" : ""}`}
-        aria-label="Music and sound settings"
-        title="Music and sound"
-        onClick={onSound}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 9h4l5-4v14l-5-4H4z" />
-          {soundOn ? (
-            <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
-          ) : (
-            <path d="M17 9l5 6M22 9l-5 6" />
-          )}
-        </svg>
-      </button>
-      <button
-        type="button"
-        className="cbsnd"
-        aria-label="How to play"
-        title="How to play"
-        onClick={onHelp}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M9.3 9.2a2.7 2.7 0 1 1 4.2 2.4c-1 .6-1.5 1.2-1.5 2.4" />
-          <circle cx="12" cy="17.2" r="0.9" fill="currentColor" stroke="none" />
-        </svg>
-      </button>
+      <div className="cbmorewrap">
+        <button
+          type="button"
+          id="cbMore"
+          className={`cbsnd${moreOpen ? " on" : ""}`}
+          aria-haspopup="menu"
+          aria-expanded={moreOpen}
+          aria-label="More"
+          title="More"
+          onClick={onToggleMore}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" />
+            <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+            <circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
+        {moreOpen && (
+          <>
+            <div className="cbscrim cbhelpscrim" aria-hidden="true" />
+            <div className="cbmoremenu cbhelpmenu" role="menu" aria-label="More">
+              <span className="k cbhelptitle">More</span>
+              <button
+                type="button"
+                className="cbhm"
+                onClick={onBook}
+                aria-label="Open collection"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 5c3-1 6-1 8 1v14c-2-2-5-2-8-1zM20 5c-3-1-6-1-8 1v14c2-2 5-2 8-1z" />
+                </svg>
+                <span className="nm">
+                  <b className="t">Collection</b>
+                  <em>Everything you&apos;ve ever found</em>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="cbhm"
+                onClick={onSound}
+                aria-label="Music and sound settings"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 9h4l5-4v14l-5-4H4z" />
+                  {soundOn ? (
+                    <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
+                  ) : (
+                    <path d="M17 9l5 6M22 9l-5 6" />
+                  )}
+                </svg>
+                <span className="nm">
+                  <b className="t">Music &amp; sound</b>
+                  <em>{soundOn ? "On" : "Off"}</em>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="cbhm"
+                onClick={onHelp}
+                aria-label="How to play"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M9.3 9.2a2.7 2.7 0 1 1 4.2 2.4c-1 .6-1.5 1.2-1.5 2.4" />
+                  <circle cx="12" cy="17.2" r="0.9" fill="currentColor" stroke="none" />
+                </svg>
+                <span className="nm">
+                  <b className="t">How to play</b>
+                  <em>Rules and tips</em>
+                </span>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -2767,12 +2879,14 @@ function Cell({
   const isPlaced = fx.placed === cell;
   const isNope = fx.nope === cell;
   const burst = fx.burst?.at === cell ? fx.burst : null;
+  const isDiscover = fx.discover === cell;
 
   const classes = ["cbc"];
   if (!empty) classes.push("full");
   if (isPlaced) classes.push("placed");
   if (inFuse) classes.push("fuse");
   if (isPop) classes.push("cbpopc");
+  if (isDiscover) classes.push("cbdiscovered");
   if (isNope) classes.push("nope");
   if (isShipped) classes.push("ship");
   if (crumbleTick > 0 && !inCrumble) classes.push("crumbling");
@@ -2842,6 +2956,7 @@ function Cell({
         </>
       )}
       {burst && <span className="pts">+{burst.pts}</span>}
+      {isDiscover && <span className="cbspark" aria-hidden="true" />}
       {isNope && <span className="pts nope">no recipe</span>}
       {isShipped && (
         <span className="pts ship">shipped +{fx.shipped!.bonus}</span>
