@@ -19,6 +19,9 @@ export async function GET(req: NextRequest) {
     age + 1,
     Math.min(10, Number(sp.get("ac") ?? AGE_COUNT_DEFAULT) || AGE_COUNT_DEFAULT),
   );
+  const found = Math.max(0, Number(sp.get("f") ?? "0") || 0);
+  const longest = Math.max(0, Number(sp.get("lc") ?? "0") || 0);
+  const shelf = Math.max(0, Number(sp.get("sh") ?? "0") || 0);
 
   const title = day ? `Daily Combine · ${day}` : "Combine";
 
@@ -113,21 +116,31 @@ export async function GET(req: NextRequest) {
           </div>
         </div>
 
-        {/* Best line */}
-        {best ? (
-          <div
-            style={{
-              marginTop: "auto",
-              fontSize: 32,
-              fontWeight: 600,
-              color: "#111417",
-            }}
-          >
-            best: {best}
-          </div>
-        ) : (
-          <div style={{ marginTop: "auto" }} />
-        )}
+        {/* Stats row */}
+        <div
+          style={{
+            marginTop: "auto",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "12px 32px",
+            fontSize: 28,
+            fontWeight: 600,
+            color: "#111417",
+          }}
+        >
+          {best ? <span>best: {best}</span> : null}
+          {found > 0 ? (
+            <span>
+              {found} new discover{found > 1 ? "ies" : "y"}
+            </span>
+          ) : null}
+          {longest > 1 ? <span>longest chain ×{longest}</span> : null}
+          {shelf > 0 ? (
+            <span>
+              {shelf} finished thing{shelf > 1 ? "s" : ""}
+            </span>
+          ) : null}
+        </div>
 
         {/* Footer */}
         <div

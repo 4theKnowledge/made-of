@@ -724,6 +724,9 @@ export function CombineBoard({ bundles: serialised }: Props) {
             ageName: bundle.theme.ages[r.state.age] ?? "",
             made: r.state.made,
             top: bestShelfId ? bundle.items.get(bestShelfId)?.name ?? null : null,
+            found: r.state.found.length,
+            longest: r.state.longest,
+            shelf: r.state.shelf.length,
           };
           saveDailyDone(dr);
           setDailyDone(dr);
@@ -835,6 +838,15 @@ export function CombineBoard({ bundles: serialised }: Props) {
       const resolved = resolveItemName(dr.top, bundles.everything);
       return resolved && resolved !== dr.top ? resolved : null;
     })();
+    const foundLine =
+      dr.found && dr.found > 0
+        ? ` · ${dr.found} new discover${dr.found > 1 ? "ies" : "y"}`
+        : "";
+    const chainLine = dr.longest && dr.longest > 1 ? ` · longest chain ×${dr.longest}` : "";
+    const shelfLine =
+      dr.shelf && dr.shelf > 0
+        ? ` · ${dr.shelf} finished thing${dr.shelf > 1 ? "s" : ""}`
+        : "";
     const text =
       `Made Of · Daily Combine ${dr.key}\n` +
       Array.from({ length: bundles.everything.theme.ages.length }, (_, k) =>
@@ -843,7 +855,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
       ` reached Age ${dr.ageName}\n` +
       `${dr.score.toLocaleString("en")} points · ${dr.made} made${
         topDisplay ? ` · best: ${topDisplay}` : ""
-      }`;
+      }${foundLine}${chainLine}${shelfLine}`;
     const query = dailyShareQuery(dr.key, {
       score: dr.score,
       age: dr.age,
@@ -851,6 +863,9 @@ export function CombineBoard({ bundles: serialised }: Props) {
       ageName: dr.ageName,
       ageCount: bundles.everything.theme.ages.length,
       best: topDisplay,
+      found: dr.found,
+      longest: dr.longest,
+      shelf: dr.shelf,
     });
     await shareText({
       title: "Made Of · Daily Combine",

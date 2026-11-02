@@ -75,6 +75,13 @@ export interface DailyResult {
   made: number;
   /** Top-tier output on the shelf, or null. */
   top: string | null;
+  /** New discoveries made in this run. Optional for forward-compat with
+   *  older saves. */
+  found?: number;
+  /** Longest chain this run (×). */
+  longest?: number;
+  /** Finished things shipped to the shelf. */
+  shelf?: number;
 }
 
 /* ========================================================================

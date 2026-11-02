@@ -30,7 +30,7 @@ export async function generateMetadata({
     ? "?" +
       new URLSearchParams(
         Object.fromEntries(
-          (["d", "s", "a", "m", "b", "an", "ac"] as const)
+          (["d", "s", "a", "m", "b", "an", "ac", "f", "lc", "sh"] as const)
             .map((k) => [k, pick(sp, k)] as const)
             .filter(([, v]) => v != null) as [string, string][],
         ),

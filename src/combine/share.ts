@@ -30,12 +30,19 @@ export function dailyShareText(
     .join("");
   const ageName = ages[state.age] ?? "";
   const top = bestShelfItem(state, bundle);
+  const foundLine = state.found.length
+    ? ` · ${state.found.length} new discover${state.found.length > 1 ? "ies" : "y"}`
+    : "";
+  const chainLine = state.longest > 1 ? ` · longest chain ×${state.longest}` : "";
+  const shelfLine = state.shelf.length
+    ? ` · ${state.shelf.length} finished thing${state.shelf.length > 1 ? "s" : ""}`
+    : "";
   const text =
     `Made Of · Daily Combine ${dayKey}\n` +
     `${squares} reached ${ageName}\n` +
     `${state.score.toLocaleString("en")} points · ${state.made} made${
       top ? ` · best: ${top}` : ""
-    }`;
+    }${foundLine}${chainLine}${shelfLine}`;
   return {
     title: "Made Of · Daily Combine",
     text,
@@ -46,6 +53,9 @@ export function dailyShareText(
       ageName,
       ageCount: ages.length,
       best: top,
+      found: state.found.length,
+      longest: state.longest,
+      shelf: state.shelf.length,
     })}`,
   };
 }
@@ -62,6 +72,9 @@ export function dailyShareQuery(
     ageName: string;
     ageCount: number;
     best: string | null;
+    found?: number;
+    longest?: number;
+    shelf?: number;
   },
 ): string {
   const q = new URLSearchParams({
@@ -73,6 +86,9 @@ export function dailyShareQuery(
     ac: String(r.ageCount),
   });
   if (r.best) q.set("b", r.best);
+  if (r.found && r.found > 0) q.set("f", String(r.found));
+  if (r.longest && r.longest > 1) q.set("lc", String(r.longest));
+  if (r.shelf && r.shelf > 0) q.set("sh", String(r.shelf));
   return q.toString();
 }
 
