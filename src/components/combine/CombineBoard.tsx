@@ -134,6 +134,34 @@ interface Fx {
   /** Cell where a new discovery just formed — triggers a tier-colored
    *  sparkle pulse after the pop phase. */
   discover?: number;
+  /** Chain visualisation. One trace per in-flight chain. The overlay
+   *  reads this to draw arcs between each step's ingredients and output,
+   *  and cells listed in `members` get a persistent tint for the chain's
+   *  lifetime. `tier` keys the accent colour of the final output.
+   *  Cleared ~900ms after the chain's last pop. */
+  trace?: ChainTrace;
+}
+
+interface ChainStep {
+  /** Ingredient cells for this step. */
+  from: number[];
+  /** Output cell. */
+  to: number;
+  /** Tier of the output tile — drives arc colour via --f<tier>. */
+  tier: string;
+  /** When (in trace-local ms) the arc should start drawing. */
+  drawAt: number;
+}
+
+interface ChainTrace {
+  steps: ChainStep[];
+  /** All cells touched by the chain (ingredients + outputs). */
+  members: Set<number>;
+  /** Tier of the final output — used as the chain's dominant accent. */
+  tier: string;
+  /** Local time (ms) when the trace first mounts; the overlay uses
+   *  `performance.now() - startedAt` to pick which steps have "drawn". */
+  startedAt: number;
 }
 
 interface Props {
@@ -363,8 +391,49 @@ export function CombineBoard({ bundles: serialised }: Props) {
       const FUSE_MS = 300;
       const POP_MS = 420;
       const DISCOVER_MS = 720;
+      const CHAIN_FADE_MS = 900;
 
-      for (const e of events) {
+      // Group consecutive combine events into chains. Each `combine`
+      // carries `mult` — a run starts at mult=1 and increments; a reset
+      // (next mult<=current) ends the chain. We build one ChainTrace per
+      // group so the overlay can draw the whole path across steps.
+      type Group = { startIdx: number; endIdx: number; startAt: number };
+      const groups: Group[] = [];
+      {
+        let current: Group | null = null;
+        let localCursor = 0;
+        for (let i = 0; i < events.length; i++) {
+          const e = events[i];
+          if (e.type === "combine") {
+            if (current && e.mult > 1) {
+              current.endIdx = i;
+            } else {
+              if (current) groups.push(current);
+              current = { startIdx: i, endIdx: i, startAt: localCursor };
+            }
+            localCursor += FUSE_MS + POP_MS;
+          } else if (e.type === "placed" || e.type === "nope") {
+            // non-combine, non-blocking
+          } else if (e.type === "shipped") {
+            localCursor += 380;
+          }
+        }
+        if (current) groups.push(current);
+      }
+      // Index of combine event → its group (or null if standalone single-step).
+      const eventGroup = new Map<number, Group>();
+      for (const g of groups) {
+        if (g.endIdx > g.startIdx) {
+          for (let i = g.startIdx; i <= g.endIdx; i++) eventGroup.set(i, g);
+        }
+      }
+
+      // Per-group accumulator — the trace mounted at the group's start
+      // grows as later steps in the same chain fire.
+      const groupTrace = new Map<Group, { trace: ChainTrace; mountAt: number }>();
+
+      for (let eIdx = 0; eIdx < events.length; eIdx++) {
+        const e = events[eIdx];
         if (e.type === "placed") {
           immediate.placed = e.at;
           playFx("place");
@@ -444,6 +513,53 @@ export function CombineBoard({ bundles: serialised }: Props) {
               clearKeys: ["discover"],
             });
           }
+
+          // Chain overlay: when this combine is part of a multi-step
+          // chain, accumulate a trace that the <ChainOverlay> renders as
+          // arcs between ingredients and output across all steps.
+          const group = eventGroup.get(eIdx);
+          if (group) {
+            const outTier = bundle.items.get(e.out)?.tier ?? "M";
+            let entry = groupTrace.get(group);
+            if (!entry) {
+              const trace: ChainTrace = {
+                steps: [],
+                members: new Set<number>(),
+                tier: outTier,
+                startedAt: 0,
+              };
+              entry = { trace, mountAt: fuseAt };
+              groupTrace.set(group, entry);
+            }
+            entry.trace.steps.push({
+              from: [...e.cells],
+              to: e.at,
+              tier: outTier,
+              drawAt: fuseAt - entry.mountAt,
+            });
+            for (const c of e.cells) entry.trace.members.add(c);
+            entry.trace.members.add(e.at);
+            // The final output tier wins visual priority.
+            entry.trace.tier = outTier;
+            // If this is the last step of the group, schedule the mount
+            // + clear now that the trace is complete.
+            if (eIdx === group.endIdx) {
+              const finalPopEnd = popAt + POP_MS;
+              const traceSnapshot: ChainTrace = {
+                steps: entry.trace.steps,
+                members: entry.trace.members,
+                tier: entry.trace.tier,
+                startedAt: entry.mountAt,
+              };
+              schedule.push({
+                at: entry.mountAt,
+                patch: { trace: traceSnapshot },
+                clearAt: finalPopEnd + CHAIN_FADE_MS,
+                clearKeys: ["trace"],
+              });
+            }
+          }
+
           cursor = popAt + POP_MS;
         } else if (e.type === "shipped") {
           // The ship animation starts right after the pop finishes.
@@ -2825,6 +2941,7 @@ function Board({
           />
         );
       })}
+      {fx.trace && <ChainOverlay trace={fx.trace} />}
     </div>
   );
 }
@@ -2880,6 +2997,7 @@ function Cell({
   const isNope = fx.nope === cell;
   const burst = fx.burst?.at === cell ? fx.burst : null;
   const isDiscover = fx.discover === cell;
+  const inChain = fx.trace?.members.has(cell) ?? false;
 
   const classes = ["cbc"];
   if (!empty) classes.push("full");
@@ -2887,6 +3005,7 @@ function Cell({
   if (inFuse) classes.push("fuse");
   if (isPop) classes.push("cbpopc");
   if (isDiscover) classes.push("cbdiscovered");
+  if (inChain) classes.push("cbchainm");
   if (isNope) classes.push("nope");
   if (isShipped) classes.push("ship");
   if (crumbleTick > 0 && !inCrumble) classes.push("crumbling");
@@ -2923,7 +3042,12 @@ function Cell({
       type="button"
       className={classes.join(" ")}
       data-cb={cell}
-      style={item ? fillVar(item) : undefined}
+      style={{
+        ...(item ? fillVar(item) : {}),
+        ...(inChain && fx.trace
+          ? ({ "--chain-tier": `var(--f${fx.trace.tier})` } as React.CSSProperties)
+          : {}),
+      }}
       onClick={onTap}
       aria-label={ariaLabel}
     >
@@ -3097,6 +3221,99 @@ function vibrate(pattern: number | number[]): void {
   } catch {
     // ignore
   }
+}
+
+function ChainOverlay({ trace }: { trace: ChainTrace }) {
+  // Measure cell geometry relative to the board. We re-measure once on
+  // mount — the board doesn't resize mid-chain, so a single pass is
+  // enough. Everything after that is pure CSS keyframes.
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [geo, setGeo] = useState<{ w: number; h: number; centers: Map<number, { x: number; y: number }> } | null>(null);
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const board = svg.parentElement;
+    if (!board) return;
+    const br = board.getBoundingClientRect();
+    const centers = new Map<number, { x: number; y: number }>();
+    const cells = board.querySelectorAll<HTMLElement>("[data-cb]");
+    cells.forEach((el) => {
+      const idx = Number(el.getAttribute("data-cb"));
+      if (!Number.isFinite(idx)) return;
+      const r = el.getBoundingClientRect();
+      centers.set(idx, {
+        x: r.left - br.left + r.width / 2,
+        y: r.top - br.top + r.height / 2,
+      });
+    });
+    setGeo({ w: br.width, h: br.height, centers });
+  }, [trace]);
+
+  if (!geo) {
+    return (
+      <svg
+        ref={svgRef}
+        className="cbchain"
+        aria-hidden="true"
+      />
+    );
+  }
+
+  const stroke = `var(--f${trace.tier})`;
+  return (
+    <svg
+      ref={svgRef}
+      className="cbchain"
+      viewBox={`0 0 ${geo.w} ${geo.h}`}
+      width={geo.w}
+      height={geo.h}
+      aria-hidden="true"
+    >
+      {trace.steps.map((step, si) => {
+        const to = geo.centers.get(step.to);
+        if (!to) return null;
+        return (
+          <g key={si}>
+            {step.from.map((fromCell, fi) => {
+              const from = geo.centers.get(fromCell);
+              if (!from) return null;
+              // Curved path — midpoint pulled toward the output and
+              // offset perpendicular so parallel arcs don't overlap.
+              const mx = (from.x + to.x) / 2;
+              const my = (from.y + to.y) / 2;
+              const dx = to.x - from.x;
+              const dy = to.y - from.y;
+              const len = Math.hypot(dx, dy) || 1;
+              const nx = -dy / len;
+              const ny = dx / len;
+              const bend = 14 + fi * 6;
+              const cx = mx + nx * bend;
+              const cy = my + ny * bend;
+              const d = `M ${from.x} ${from.y} Q ${cx} ${cy} ${to.x} ${to.y}`;
+              return (
+                <path
+                  key={fi}
+                  className="cbchain-arc"
+                  d={d}
+                  stroke={stroke}
+                  style={{ animationDelay: `${step.drawAt}ms` } as React.CSSProperties}
+                />
+              );
+            })}
+            <circle
+              className="cbchain-node"
+              cx={to.x}
+              cy={to.y}
+              r={5}
+              fill={stroke}
+              style={{ animationDelay: `${step.drawAt + 150}ms` } as React.CSSProperties}
+            />
+          </g>
+        );
+      })}
+    </svg>
+  );
 }
 
 function fillVar(item: CombineItem): React.CSSProperties {
