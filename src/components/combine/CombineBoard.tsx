@@ -1387,7 +1387,14 @@ export function CombineBoard({ bundles: serialised }: Props) {
           bundle={bundle}
           active={Boolean(drag?.overHold)}
           activeOk={Boolean(drag?.overHold && drag.overOk)}
+          selectedSlot={selectedSlot}
           onSlotPointerDown={onSlotPointerDown}
+          onHoldTap={() => {
+            if (selectedSlot == null) return;
+            if (!state.hold.some((v) => v == null)) return;
+            act({ type: "hold", slot: selectedSlot });
+            setSelectedSlot(null);
+          }}
         />
         <Tray
           state={state}
@@ -3300,7 +3307,9 @@ function Hold({
   bundle,
   active,
   activeOk,
+  selectedSlot,
   onSlotPointerDown,
+  onHoldTap,
 }: {
   state: GameState;
   bundle: ThemeBundle;
@@ -3310,21 +3319,35 @@ function Hold({
   /** True iff `active` and the drop would succeed (zone has room). When
    *  active but not ok, the zone paints a reject state. */
   activeOk: boolean;
+  /** Currently selected tray slot (tap-to-select), if any. Tapping the
+   *  hold zone with a selection stashes that tile. */
+  selectedSlot: number | null;
   onSlotPointerDown: (
     slot: number,
     source: "tray" | "hold",
     e: React.PointerEvent<HTMLButtonElement>,
   ) => void;
+  onHoldTap: () => void;
 }) {
   const empty = state.hold.every((v) => v == null);
+  const hasRoom = state.hold.some((v) => v == null);
+  const tapReady = selectedSlot != null && hasRoom;
   const classes = ["cbshelf", "cbhold"];
   if (empty) classes.push("none");
   if (active) classes.push(activeOk ? "over" : "over-bad");
+  if (tapReady) classes.push("tap-ready");
   return (
     <div
       className={classes.join(" ")}
       data-cbholdzone="1"
-      aria-label="Hold — drag a tile here to save for later. Held tiles crumble when the age moves past them."
+      aria-label="Hold — drag or tap a tile here to save for later. Held tiles crumble when the age moves past them."
+      onClick={(e) => {
+        if (selectedSlot == null) return;
+        // Ignore clicks that originated on a held-tile button; those have
+        // their own tap behaviour (select/drag).
+        if ((e.target as HTMLElement).closest(".cbheld")) return;
+        onHoldTap();
+      }}
     >
       <span className="cbshelf-slots">
         {state.hold.map((id, slot) => {
