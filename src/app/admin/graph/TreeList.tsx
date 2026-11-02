@@ -140,6 +140,158 @@ function deriveViews(data: TreeData) {
 type Views = ReturnType<typeof deriveViews>;
 
 /* ========================================================================
+ * Mobile styles. One global style block instead of scattering media queries.
+ * Everything targets the .tree-root container so these styles only apply
+ * inside this admin tree view, never bleeding to the rest of the site.
+ * ====================================================================== */
+
+function TreeMobileStyles() {
+  return (
+    <style jsx global>{`
+      /* Larger tap targets on touch devices without blowing up the layout. */
+      @media (hover: none), (max-width: 600px) {
+        .tree-root .tree-row-btn {
+          min-height: 36px;
+          padding: 6px 10px !important;
+          font-size: 12px !important;
+        }
+        .tree-root .tree-row-chevron {
+          min-width: 32px !important;
+          min-height: 32px !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+      }
+
+      @media (max-width: 600px) {
+        /* Toolbar reorganises: search gets full width, filters go behind a
+           button that reveals a drawer. */
+        .tree-root .tree-toolbar {
+          flex-direction: column;
+          align-items: stretch !important;
+          gap: 8px !important;
+        }
+        .tree-root .tree-toolbar input[type="search"] {
+          max-width: none !important;
+          flex: 1 1 auto !important;
+        }
+        .tree-root .tree-toolbar-row {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          align-items: center;
+        }
+        .tree-root .tree-toolbar-drawer-filters {
+          display: none !important;
+        }
+        .tree-root .tree-toolbar-drawer-filters.is-open {
+          display: flex !important;
+          flex-direction: column;
+          gap: 8px;
+          padding: 10px 0 0;
+        }
+        .tree-root .tree-toolbar-drawer-filters.is-open select,
+        .tree-root .tree-toolbar-drawer-filters.is-open .tree-view-toggle {
+          width: 100%;
+          font-size: 14px !important;
+        }
+        .tree-root .tree-toolbar-drawer-filters.is-open .tree-view-toggle button {
+          flex: 1;
+          min-height: 36px;
+        }
+
+        /* Hide inline row actions behind the overflow menu. */
+        .tree-root .tree-row-actions-inline {
+          display: none !important;
+        }
+        .tree-root .tree-row-actions-overflow {
+          display: inline-flex !important;
+        }
+
+        /* Reduce indent, add lineage guide lines so ancestry stays readable. */
+        .tree-root .tree-row {
+          position: relative;
+        }
+        .tree-root .tree-row[data-depth="1"] { padding-left: 24px !important; }
+        .tree-root .tree-row[data-depth="2"] { padding-left: 36px !important; }
+        .tree-root .tree-row[data-depth="3"] { padding-left: 48px !important; }
+        .tree-root .tree-row[data-depth="4"] { padding-left: 60px !important; }
+        .tree-root .tree-row[data-depth="5"] { padding-left: 72px !important; }
+        .tree-root .tree-row[data-depth="6"] { padding-left: 84px !important; }
+        .tree-root .tree-row[data-depth="7"] { padding-left: 96px !important; }
+        .tree-root .tree-row[data-depth="8"] { padding-left: 108px !important; }
+
+        .tree-root .tree-row::before {
+          content: "";
+          position: absolute;
+          left: calc(14px + (var(--depth, 0) - 1) * 12px);
+          top: 0;
+          bottom: 0;
+          width: 1px;
+          background: var(--line);
+          display: var(--guide-display, block);
+        }
+        .tree-root .tree-row[data-depth="0"]::before { display: none; }
+
+        /* Forms stack vertically on mobile. */
+        .tree-root .tree-form {
+          flex-direction: column !important;
+          align-items: stretch !important;
+        }
+        .tree-root .tree-form > * {
+          width: 100%;
+        }
+        .tree-root .tree-form select,
+        .tree-root .tree-form input {
+          font-size: 14px !important;
+          padding: 8px 10px !important;
+        }
+        .tree-root .tree-form button {
+          min-height: 36px;
+          font-size: 13px !important;
+        }
+      }
+
+      /* Modal: full-width centered dialog by default; bottom sheet on mobile. */
+      @media (max-width: 600px) {
+        .tree-root-modal.cbover {
+          position: fixed !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          top: auto !important;
+          transform: none !important;
+          max-height: 92vh;
+          max-width: none !important;
+          width: 100% !important;
+          overflow-y: auto;
+          border-radius: 12px 12px 0 0 !important;
+          border-left: 0 !important;
+          border-right: 0 !important;
+          border-bottom: 0 !important;
+          padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+          box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15) !important;
+          animation: tree-sheet-up 180ms ease-out;
+        }
+        .tree-root-modal .modal-grid {
+          grid-template-columns: 1fr !important;
+          gap: 6px 0 !important;
+        }
+        .tree-root-modal .modal-grid > label {
+          margin-top: 6px;
+        }
+      }
+
+      @keyframes tree-sheet-up {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+      }
+    `}</style>
+  );
+}
+
+/* ========================================================================
  * Toast — minimal error surface for failed mutations.
  * ====================================================================== */
 
@@ -558,7 +710,8 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
   const editingItem = editingItemId ? data.items.find((it) => it.id === editingItemId) ?? null : null;
 
   return (
-    <div>
+    <div className="tree-root">
+      <TreeMobileStyles />
       <Toolbar
         query={query}
         setQuery={setQuery}
@@ -684,33 +837,9 @@ function Toolbar({
     background: "var(--card)",
     color: "var(--ink)",
   };
-  return (
-    <div
-      style={{
-        display: "flex",
-        gap: 10,
-        padding: "10px 14px",
-        borderBottom: "1px solid var(--line)",
-        alignItems: "center",
-        flexWrap: "wrap",
-      }}
-    >
-      <input
-        type="search"
-        placeholder="Filter items by name…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        style={{
-          flex: "1 1 240px",
-          maxWidth: 300,
-          padding: "6px 10px",
-          fontSize: 13,
-          border: "1px solid var(--line)",
-          borderRadius: 6,
-          background: "var(--card)",
-          color: "var(--ink)",
-        }}
-      />
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const filters = (
+    <>
       <select
         value={statusFilter}
         onChange={(e) => setStatusFilter(e.target.value as ItemStatus | "all")}
@@ -735,7 +864,10 @@ function Toolbar({
           </option>
         ))}
       </select>
-      <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: 6, overflow: "hidden" }}>
+      <div
+        className="tree-view-toggle"
+        style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: 6, overflow: "hidden" }}
+      >
         <button
           type="button"
           onClick={() => setView("tree")}
@@ -776,12 +908,82 @@ function Toolbar({
           </button>
         </>
       )}
+    </>
+  );
+
+  return (
+    <div
+      className="tree-toolbar"
+      style={{
+        display: "flex",
+        gap: 10,
+        padding: "10px 14px",
+        borderBottom: "1px solid var(--line)",
+        alignItems: "center",
+        flexWrap: "wrap",
+      }}
+    >
+      <div className="tree-toolbar-row" style={{ display: "contents" }}>
+        <input
+          type="search"
+          placeholder="Filter items by name…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          style={{
+            flex: "1 1 240px",
+            maxWidth: 300,
+            padding: "6px 10px",
+            fontSize: 13,
+            border: "1px solid var(--line)",
+            borderRadius: 6,
+            background: "var(--card)",
+            color: "var(--ink)",
+          }}
+        />
+        <button
+          type="button"
+          className="btn tree-toolbar-mobile-trigger"
+          style={{ ...smallBtn, display: "none" }}
+          onClick={() => setDrawerOpen((v) => !v)}
+        >
+          {drawerOpen ? "Hide filters" : "Filters"}
+        </button>
+      </div>
+
+      {/* Desktop: filters inline. Mobile: hidden until Filters tapped. */}
+      <div className="tree-toolbar-filters-desktop" style={{ display: "contents" }}>
+        {filters}
+      </div>
+      <div className={`tree-toolbar-drawer-filters${drawerOpen ? " is-open" : ""}`} style={{ display: "none", width: "100%" }}>
+        {filters}
+      </div>
+
       <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)" }}>
         {view === "tree" && `${expandedCount} expanded · `}
         {isFiltered ? `${matchCount} match` : `${totalCount} items`}
       </span>
+      <style jsx>{`
+        @media (max-width: 600px) {
+          :global(.tree-toolbar-filters-desktop) {
+            display: none !important;
+          }
+          :global(.tree-toolbar-mobile-trigger) {
+            display: inline-flex !important;
+          }
+        }
+      `}</style>
     </div>
   );
+}
+
+// Shared tooltip state: only one open at a time. Hover still works via CSS
+// for desktop; tap toggles explicit visibility for touch.
+let tooltipOpenSeq = 0;
+const tooltipListeners = new Set<(id: number | null) => void>();
+let currentOpenTooltip: number | null = null;
+function setOpenTooltip(id: number | null) {
+  currentOpenTooltip = id;
+  for (const fn of tooltipListeners) fn(id);
 }
 
 function Tooltip({
@@ -793,8 +995,46 @@ function Tooltip({
   title: string;
   body?: string;
 }) {
+  const [id] = useState(() => ++tooltipOpenSeq);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const listener = (openId: number | null) => setOpen(openId === id);
+    tooltipListeners.add(listener);
+    return () => {
+      tooltipListeners.delete(listener);
+    };
+  }, [id]);
+
+  // Dismiss on outside tap / Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(`[data-tooltip-id="${id}"]`)) setOpenTooltip(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenTooltip(null);
+    };
+    document.addEventListener("click", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, id]);
+
   return (
-    <span className="t-tip" style={{ position: "relative", display: "inline-flex" }}>
+    <span
+      className="t-tip"
+      data-tooltip-id={id}
+      data-tip-open={open ? "1" : "0"}
+      style={{ position: "relative", display: "inline-flex" }}
+      onClick={(e) => {
+        e.stopPropagation();
+        setOpenTooltip(currentOpenTooltip === id ? null : id);
+      }}
+    >
       {children}
       <span className="t-tip-pop" role="tooltip">
         <strong style={{ fontWeight: 600 }}>{title}</strong>
@@ -806,6 +1046,9 @@ function Tooltip({
         )}
       </span>
       <style jsx>{`
+        .t-tip {
+          cursor: help;
+        }
         .t-tip-pop {
           position: absolute;
           bottom: calc(100% + 8px);
@@ -830,8 +1073,15 @@ function Tooltip({
           transition: opacity 0.08s ease-in;
           z-index: 20;
         }
-        .t-tip:hover .t-tip-pop,
-        .t-tip:focus-within .t-tip-pop {
+        /* Hover still works on devices with pointers. */
+        @media (hover: hover) {
+          .t-tip:hover .t-tip-pop,
+          .t-tip:focus-within .t-tip-pop {
+            opacity: 1;
+          }
+        }
+        /* Explicit tap-open overrides. */
+        .t-tip[data-tip-open="1"] .t-tip-pop {
           opacity: 1;
         }
       `}</style>
@@ -975,6 +1225,7 @@ function Row(props: RowProps) {
     <li>
       <div
         className="tree-row"
+        data-depth={depth}
         style={{
           display: "flex",
           alignItems: "center",
@@ -984,10 +1235,12 @@ function Row(props: RowProps) {
           cursor: canExpand ? "pointer" : "default",
           opacity: dimmed ? 0.4 : 1,
           borderBottom: "1px solid transparent",
+          ["--depth" as string]: depth,
         }}
         onClick={() => canExpand && toggle(path)}
       >
         <span
+          className="tree-row-chevron"
           style={{
             width: 14,
             display: "inline-block",
@@ -1095,9 +1348,13 @@ function Row(props: RowProps) {
           <span style={{ fontSize: 10, color: "var(--muted)", fontStyle: "italic" }}>(cycle)</span>
         )}
 
-        <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }} onClick={(e) => e.stopPropagation()}>
+        <span
+          className="tree-row-actions-inline"
+          style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <button
-            className="btn"
+            className="btn tree-row-btn"
             style={rowBtn}
             onClick={() => {
               forceExpand(path);
@@ -1110,7 +1367,7 @@ function Row(props: RowProps) {
           {edge && (
             <>
               <button
-                className="btn"
+                className="btn tree-row-btn"
                 style={rowBtn}
                 onClick={() => setEditingLink(editingLink === edge.linkId ? null : edge.linkId)}
                 title="Edit this link"
@@ -1118,7 +1375,7 @@ function Row(props: RowProps) {
                 Edit link
               </button>
               <button
-                className="btn"
+                className="btn tree-row-btn"
                 style={{ ...rowBtn, color: "#f85149" }}
                 onClick={async () => {
                   if (!confirm("Delete this link?")) return;
@@ -1132,12 +1389,33 @@ function Row(props: RowProps) {
           )}
           <button
             type="button"
-            className="btn"
+            className="btn tree-row-btn"
             style={rowBtn}
             onClick={() => onEditItem(item.id)}
           >
             Edit item
           </button>
+        </span>
+        <span
+          className="tree-row-actions-overflow"
+          style={{ marginLeft: "auto", display: "none" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <RowActionSheet
+            itemName={item.name}
+            hasEdge={!!edge}
+            onAddChild={() => {
+              forceExpand(path);
+              setShowAddChild(true);
+            }}
+            onEditLink={() => edge && setEditingLink(edge.linkId)}
+            onDeleteLink={async () => {
+              if (!edge) return;
+              if (!confirm("Delete this link?")) return;
+              await onDeleteLink(edge.linkId);
+            }}
+            onEditItem={() => onEditItem(item.id)}
+          />
         </span>
       </div>
 
@@ -1287,6 +1565,137 @@ function Row(props: RowProps) {
 }
 
 const rowBtn: React.CSSProperties = { fontSize: 11, padding: "2px 8px" };
+
+/* ========================================================================
+ * RowActionSheet — mobile overflow menu. Renders a ⋯ button that opens a
+ * bottom sheet with full action labels. Portal-rendered so it isn't
+ * trapped inside the tree-row cell's overflow.
+ * ====================================================================== */
+
+function RowActionSheet({
+  itemName,
+  hasEdge,
+  onAddChild,
+  onEditLink,
+  onDeleteLink,
+  onEditItem,
+}: {
+  itemName: string;
+  hasEdge: boolean;
+  onAddChild: () => void;
+  onEditLink: () => void;
+  onDeleteLink: () => void | Promise<void>;
+  onEditItem: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const close = () => setOpen(false);
+  const runAnd = (fn: () => void | Promise<void>) => async () => {
+    close();
+    await fn();
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="btn tree-row-btn"
+        style={{ ...rowBtn, minWidth: 32 }}
+        aria-label={`Actions for ${itemName}`}
+        onClick={() => setOpen(true)}
+      >
+        ⋯
+      </button>
+      {typeof document !== "undefined" &&
+        open &&
+        createPortal(
+          <>
+            <div
+              onClick={close}
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0,0,0,0.3)",
+                zIndex: 90,
+              }}
+              aria-hidden
+            />
+            <div
+              role="dialog"
+              aria-label={`Actions for ${itemName}`}
+              style={{
+                position: "fixed",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: "var(--surface)",
+                borderTop: "1.5px solid var(--ink)",
+                borderRadius: "12px 12px 0 0",
+                boxShadow: "0 -4px 16px rgba(0,0,0,0.15)",
+                padding: "12px 16px",
+                paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
+                zIndex: 100,
+                animation: "tree-sheet-up 180ms ease-out",
+              }}
+            >
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, fontFamily: "var(--mono, monospace)" }}>
+                {itemName}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button type="button" className="btn" style={sheetBtn} onClick={runAnd(onAddChild)}>
+                  + Add child link
+                </button>
+                {hasEdge && (
+                  <>
+                    <button type="button" className="btn" style={sheetBtn} onClick={runAnd(onEditLink)}>
+                      Edit this link
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ ...sheetBtn, borderColor: "#f85149", color: "#f85149" }}
+                      onClick={runAnd(onDeleteLink)}
+                    >
+                      Delete this link
+                    </button>
+                  </>
+                )}
+                <button type="button" className="btn" style={sheetBtn} onClick={runAnd(onEditItem)}>
+                  Edit item
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ ...sheetBtn, marginTop: 4, background: "var(--soft)" }}
+                  onClick={close}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </>,
+          document.body,
+        )}
+    </>
+  );
+}
+
+const sheetBtn: React.CSSProperties = {
+  width: "100%",
+  justifyContent: "center",
+  padding: "12px 14px",
+  fontSize: 14,
+  minHeight: 44,
+};
 
 /* ========================================================================
  * RecipeGroup — header row for a recipe inside an item's expansion.
@@ -1475,6 +1884,7 @@ function AddItemForm({
           setBusy(false);
         }
       }}
+      className="tree-form"
       style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}
     >
       <input
@@ -1529,6 +1939,7 @@ function AddRecipeForm({
           setBusy(false);
         }
       }}
+      className="tree-form"
       style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
     >
       <input
@@ -1574,6 +1985,7 @@ function EditLinkForm({
           setBusy(false);
         }
       }}
+      className="tree-form"
       style={{
         display: "inline-flex",
         gap: 6,
@@ -1674,6 +2086,7 @@ function AddChildForm({
           setBusy(false);
         }
       }}
+      className="tree-form"
       style={{
         display: "flex",
         gap: 8,
@@ -1974,7 +2387,7 @@ function EditItemModal({
     <>
       <div className="cbscrim" onClick={onClose} aria-hidden="true" />
       <section
-        className="cbover"
+        className="cbover tree-root-modal"
         role="dialog"
         aria-modal="true"
         aria-label={`Edit ${item.name}`}
@@ -1987,6 +2400,7 @@ function EditItemModal({
           </div>
 
           <div
+            className="modal-grid"
             style={{
               display: "grid",
               gridTemplateColumns: "110px 1fr",
