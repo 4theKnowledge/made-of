@@ -546,3 +546,224 @@ describe("purity (no shared references with input)", () => {
     expect(s0).toEqual(snapshot);
   });
 });
+
+describe("recipe picker ordering", () => {
+  // Four outputs sharing one ingredient set — enough recipes that a
+  // random shuffle will almost always visibly reorder them.
+  const bundle = fakeBundle({
+    recipes: [
+      R("saw", ["steel", "wood"]),
+      R("wheel", ["steel", "wood"]),
+      R("axle", ["steel", "wood"]),
+      R("gear", ["steel", "wood"]),
+    ],
+  });
+
+  function paused(found: string[] = [], seed = 1) {
+    const s = newGame("everything", bundle, { seed, size: 3 }).state;
+    s.board = Array(9).fill(null);
+    s.board[0] = "wood";
+    s.tray = ["steel", null, null];
+    s.found = [...found];
+    const { state } = reduce(s, bundle, { type: "place", slot: 0, cell: 1 });
+    return state;
+  }
+
+  it("found outputs appear before never-seen ones", () => {
+    const state = paused(["wheel", "axle"]);
+    const opts = state.choosing!.options.map((r) => r.out);
+    const firstTwo = new Set(opts.slice(0, 2));
+    const lastTwo = new Set(opts.slice(2));
+    expect(firstTwo).toEqual(new Set(["wheel", "axle"]));
+    expect(lastTwo).toEqual(new Set(["saw", "gear"]));
+  });
+
+  it("found outputs preserve the natural (stable) order from alternatives", () => {
+    // Found both wheel and axle — their relative order should match the
+    // recipe list ordering, so a player who memorised "wheel is above
+    // axle" doesn't get punished.
+    const a = paused(["wheel", "axle"], 1);
+    const b = paused(["wheel", "axle"], 999);
+    const foundA = a.choosing!.options.slice(0, 2).map((r) => r.out);
+    const foundB = b.choosing!.options.slice(0, 2).map((r) => r.out);
+    expect(foundA).toEqual(foundB);
+  });
+
+  it("unknown outputs are shuffled by state.rng (deterministic for a given seed)", () => {
+    // Same seed → same order.
+    const a = paused([], 1);
+    const b = paused([], 1);
+    expect(a.choosing!.options.map((r) => r.out)).toEqual(
+      b.choosing!.options.map((r) => r.out),
+    );
+  });
+
+  it("unknown shuffle produces different orders for different seeds", () => {
+    // At least one of a few seeds should diverge from seed=1 — otherwise
+    // the "shuffle" is not actually randomising. We test the invariant
+    // rather than a specific permutation (keeps the test robust to RNG
+    // tweaks).
+    const base = paused([], 1).choosing!.options.map((r) => r.out).join(",");
+    const alt = [2, 3, 4, 5, 6, 7, 8]
+      .map((s) => paused([], s).choosing!.options.map((r) => r.out).join(","))
+      .some((o) => o !== base);
+    expect(alt).toBe(true);
+  });
+
+  it("all alternatives still appear in the picker (nothing dropped)", () => {
+    const state = paused(["wheel"], 1);
+    const outs = new Set(state.choosing!.options.map((r) => r.out));
+    expect(outs).toEqual(new Set(["saw", "wheel", "axle", "gear"]));
+  });
+});
+
+describe("undo", () => {
+  const bundle = fakeBundle({ recipes: [R("dough", ["flour", "water"])] });
+
+  function base() {
+    const s = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s.board = Array(9).fill(null);
+    return s;
+  }
+
+  it("starts with one undo charge and no snapshot on a fresh game", () => {
+    const s0 = base();
+    expect(s0.undos).toBe(1);
+    expect(s0.lastSnapshot).toBeNull();
+  });
+
+  it("a plain place captures a snapshot of the pre-move state", () => {
+    const s0 = base();
+    s0.tray = ["flour", null, null];
+    const { state } = reduce(s0, bundle, { type: "place", slot: 0, cell: 4 });
+    expect(state.lastSnapshot).not.toBeNull();
+    // The snapshot is of the pre-move state — board was empty.
+    expect(state.lastSnapshot!.board.every((v) => v == null)).toBe(true);
+  });
+
+  it("undo rewinds the last placement and consumes a charge", () => {
+    const s0 = base();
+    s0.tray = ["flour", null, null];
+    const { state: afterPlace } = reduce(s0, bundle, {
+      type: "place",
+      slot: 0,
+      cell: 4,
+    });
+    expect(afterPlace.board[4]).toBe("flour");
+    const { state: undone } = reduce(afterPlace, bundle, { type: "undo" });
+    expect(undone.board[4]).toBeNull();
+    expect(undone.tray[0]).toBe("flour");
+    expect(undone.score).toBe(0);
+    expect(undone.moves).toBe(0);
+    expect(undone.undos).toBe(0);
+    expect(undone.lastSnapshot).toBeNull();
+  });
+
+  it("undo is blocked when the previous turn produced a discovery", () => {
+    const s0 = base();
+    s0.board[0] = "water";
+    s0.tray = ["flour", null, null];
+    const { state } = reduce(s0, bundle, { type: "place", slot: 0, cell: 1 });
+    expect(state.found).toContain("dough"); // discovery fired
+    expect(state.lastSnapshot).toBeNull();
+    // Attempting undo is a no-op.
+    const { state: tried, events } = reduce(state, bundle, { type: "undo" });
+    expect(tried).toBe(state);
+    expect(events).toEqual([]);
+    // Charge not consumed.
+    expect(tried.undos).toBe(1);
+  });
+
+  it("undo is a no-op when there is no snapshot", () => {
+    const s0 = base();
+    expect(s0.lastSnapshot).toBeNull();
+    const { state, events } = reduce(s0, bundle, { type: "undo" });
+    expect(state).toBe(s0);
+    expect(events).toEqual([]);
+  });
+
+  it("undo is a no-op when charges are exhausted", () => {
+    const s0 = base();
+    s0.undos = 0;
+    s0.tray = ["flour", null, null];
+    const { state: afterPlace } = reduce(s0, bundle, {
+      type: "place",
+      slot: 0,
+      cell: 4,
+    });
+    // A snapshot was captured, but undos is 0 so undo refuses.
+    expect(afterPlace.lastSnapshot).not.toBeNull();
+    const { state: tried } = reduce(afterPlace, bundle, { type: "undo" });
+    expect(tried).toBe(afterPlace);
+  });
+
+  it("only one undo is allowed per run (can't undo twice from one charge)", () => {
+    const s0 = base();
+    s0.tray = ["flour", null, null];
+    const { state: a } = reduce(s0, bundle, { type: "place", slot: 0, cell: 4 });
+    const { state: b } = reduce(a, bundle, { type: "undo" });
+    expect(b.undos).toBe(0);
+    // Now place again and try to undo — no charges left.
+    b.tray = ["flour", null, null];
+    const { state: c } = reduce(b, bundle, { type: "place", slot: 0, cell: 4 });
+    const { state: d } = reduce(c, bundle, { type: "undo" });
+    expect(d).toBe(c);
+  });
+
+  it("undo also rewinds a drop-on that did not discover anything", () => {
+    const s0 = base();
+    s0.board[4] = "water";
+    s0.tray = ["flour", null, null];
+    // Pre-seed so the resulting dough is NOT a new discovery.
+    s0.found = ["dough"];
+    const { state: afterDrop } = reduce(s0, bundle, {
+      type: "drop-on",
+      slot: 0,
+      cell: 4,
+    });
+    expect(afterDrop.board[4]).toBe("dough");
+    const { state: undone } = reduce(afterDrop, bundle, { type: "undo" });
+    expect(undone.board[4]).toBe("water");
+    expect(undone.tray[0]).toBe("flour");
+    expect(undone.undos).toBe(0);
+  });
+
+  it("undo rewinds a non-matching move (just a relocation)", () => {
+    const s0 = base();
+    s0.board[0] = "flour";
+    s0.mv = 1;
+    const { state: afterMove } = reduce(s0, bundle, {
+      type: "move",
+      from: 0,
+      to: 4,
+    });
+    expect(afterMove.board[0]).toBeNull();
+    expect(afterMove.board[4]).toBe("flour");
+    const { state: undone } = reduce(afterMove, bundle, { type: "undo" });
+    expect(undone.board[0]).toBe("flour");
+    expect(undone.board[4]).toBeNull();
+    expect(undone.undos).toBe(0);
+  });
+
+  it("undo after a non-matching 'nope' drop is a no-op (snapshot not taken)", () => {
+    const s0 = base();
+    s0.board[4] = "stone"; // doesn't combine with flour
+    s0.tray = ["flour", null, null];
+    const { state } = reduce(s0, bundle, { type: "drop-on", slot: 0, cell: 4 });
+    expect(state.lastSnapshot).toBeNull();
+    const { state: tried } = reduce(state, bundle, { type: "undo" });
+    expect(tried).toBe(state);
+  });
+
+  it("undo does not resurrect a snapshot (the restored state has no further snapshot)", () => {
+    const s0 = base();
+    s0.tray = ["flour", null, null];
+    const { state: afterPlace } = reduce(s0, bundle, {
+      type: "place",
+      slot: 0,
+      cell: 4,
+    });
+    const { state: undone } = reduce(afterPlace, bundle, { type: "undo" });
+    expect(undone.lastSnapshot).toBeNull();
+  });
+});

@@ -6,6 +6,7 @@ import {
   pick,
   rand,
   randInt,
+  shuffle,
 } from "../rng";
 
 describe("rand", () => {
@@ -82,6 +83,42 @@ describe("pick", () => {
   it("returns undefined for an empty array", () => {
     const r = makeRng(5);
     expect(pick(r, [])).toBeUndefined();
+  });
+});
+
+describe("shuffle", () => {
+  it("returns an array of the same length and multiset", () => {
+    const r = makeRng(7);
+    const out = shuffle(r, ["a", "b", "c", "d", "e"]);
+    expect(out.length).toBe(5);
+    expect([...out].sort()).toEqual(["a", "b", "c", "d", "e"]);
+  });
+
+  it("does not mutate the input", () => {
+    const r = makeRng(7);
+    const input = ["a", "b", "c", "d"];
+    const copy = input.slice();
+    shuffle(r, input);
+    expect(input).toEqual(copy);
+  });
+
+  it("is deterministic for a given state", () => {
+    const a = shuffle(makeRng(42), ["a", "b", "c", "d", "e"]);
+    const b = shuffle(makeRng(42), ["a", "b", "c", "d", "e"]);
+    expect(a).toEqual(b);
+  });
+
+  it("different seeds generally produce different orders", () => {
+    const base = shuffle(makeRng(1), ["a", "b", "c", "d", "e"]).join(",");
+    const diverged = [2, 3, 4, 5, 6, 7, 8]
+      .map((s) => shuffle(makeRng(s), ["a", "b", "c", "d", "e"]).join(","))
+      .some((o) => o !== base);
+    expect(diverged).toBe(true);
+  });
+
+  it("handles empty and single-element arrays", () => {
+    expect(shuffle(makeRng(1), [])).toEqual([]);
+    expect(shuffle(makeRng(1), ["x"])).toEqual(["x"]);
   });
 });
 

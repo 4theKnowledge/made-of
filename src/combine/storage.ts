@@ -213,6 +213,10 @@ export function hydrateGame(s: StoredGame): GameState {
     closeCalls: s.closeCalls,
     recentTrays: (s.recentTrays ?? []).map((t) => t.slice()),
     choosing: null,
+    // Undo is session-only (not persisted). Resuming a save gets a
+    // fresh charge; there's no snapshot to undo back to on reload.
+    undos: 1,
+    lastSnapshot: null,
   };
 }
 

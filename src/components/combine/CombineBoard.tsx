@@ -1245,8 +1245,20 @@ export function CombineBoard({ bundles: serialised }: Props) {
   }, [bundle, state.age, state.tray, state.found, collection]);
 
   const onHelper = useCallback(
-    (which: "hint" | "swap" | "clear" | "move" | "shore") => {
+    (which: "hint" | "swap" | "clear" | "move" | "shore" | "undo") => {
       setHelpersOpen(false);
+      // Undo rewinds the last placement/drop/move. Blocked by the
+      // engine when the last turn produced a discovery (so daily
+      // scope stays safe from unlock-then-undo gaming).
+      if (which === "undo") {
+        if (state.undos <= 0 || !state.lastSnapshot || state.over) return;
+        setClearMode(false);
+        setMoveMode(null);
+        setShoreMode(false);
+        setSelectedSlot(null);
+        act({ type: "undo" });
+        return;
+      }
       // Entering move/clear/shore cancels selection and any opposing mode.
       if (which === "clear") {
         if (state.clears <= 0 || state.over) return;
@@ -1297,6 +1309,8 @@ export function CombineBoard({ bundles: serialised }: Props) {
       state.swaps,
       state.hints,
       state.shore,
+      state.undos,
+      state.lastSnapshot,
       state.over,
       findHint,
     ],
@@ -2483,14 +2497,20 @@ function TopBar({
   soundOn: boolean;
   onToggleHelpers: () => void;
   onToggleMore: () => void;
-  onHelper: (which: "hint" | "swap" | "clear" | "move" | "shore") => void;
+  onHelper: (which: "hint" | "swap" | "clear" | "move" | "shore" | "undo") => void;
   onTheme: () => void;
   onBook: () => void;
   onSound: () => void;
   onHelp: () => void;
 }) {
+  const canUndo = state.undos > 0 && state.lastSnapshot != null;
   const helpersLeft =
-    state.swaps + state.clears + state.hints + state.mv + state.shore;
+    state.swaps +
+    state.clears +
+    state.hints +
+    state.mv +
+    state.shore +
+    (canUndo ? 1 : 0);
   const themeName = state.daily ? "Daily" : "Endless";
   const bestDisplay = Math.max(best, state.over ? state.score : 0);
   const modeActive = clearMode || moveMode || shoreMode;
@@ -2639,6 +2659,30 @@ function TopBar({
                 </em>
               </span>
               <b className="c">{state.shore}</b>
+            </button>
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("undo")}
+              disabled={!canUndo}
+              aria-label={
+                canUndo
+                  ? `Undo last move, ${state.undos} left`
+                  : state.undos > 0
+                    ? "Undo unavailable — no move to undo or last turn unlocked something"
+                    : "Undo used"
+              }
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 14l-5-5 5-5M4 9h10a6 6 0 0 1 0 12h-4" />
+              </svg>
+              <span className="nm">
+                <b className="t">Undo</b>
+                <em>
+                  Take back your last tile. Can&apos;t undo past a new discovery.
+                </em>
+              </span>
+              <b className="c">{state.undos}</b>
             </button>
             </div>
           </>
@@ -3442,18 +3486,16 @@ function ChoicePicker({
 }) {
   if (!state.choosing) return null;
   const found = (id: string) => known.has(id);
-  // Found options first, then unknown ("?") options.
+  // Engine orders options: this-run finds first in natural order,
+  // never-seen outputs shuffled deterministically by state.rng (so
+  // daily puzzles stay identical across players). The shuffle stops
+  // players muscle-memorising "?-slot 2 is always wood".
   const indexed = state.choosing.options.map((r, i) => ({ r, i }));
-  const sorted = indexed
-    .slice()
-    .sort(
-      (a, b) => Number(found(b.r.out)) - Number(found(a.r.out)),
-    );
   return (
     <div className="cbchoose" role="dialog" aria-label="Pick what to make">
       <div className="k">These make more than one thing. Pick one.</div>
       <div className="opts">
-        {sorted.map(({ r, i }) => {
+        {indexed.map(({ r, i }) => {
           const item = bundle.items.get(r.out);
           const isFound = found(r.out);
           const classes = ["cbopt"];

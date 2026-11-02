@@ -26,7 +26,7 @@ import {
   type Board,
 } from "./match";
 import { dealTray } from "./deal";
-import { dailySeed, freshEndlessSeed, makeRng, pick, type RngState } from "./rng";
+import { dailySeed, freshEndlessSeed, makeRng, pick, shuffle, type RngState } from "./rng";
 import type { CombineRecipe, ThemeBundle, ThemeKey } from "./types";
 
 /* ========================================================================
@@ -114,6 +114,16 @@ export interface GameState {
   /** Non-null while the engine is waiting for the player to pick an
    *  output. */
   choosing: ChoosingState | null;
+  /** Undo charges remaining this run. Rewinds the last board-modifying
+   *  action (`place` / `drop-on` / `move`), but only if that action did
+   *  not unlock a new discovery — that keeps the daily collection
+   *  scope safe from unlock-then-undo gaming (see CLAUDE.md on daily
+   *  isolation). Not serialised: undo is session-only. */
+  undos: number;
+  /** Snapshot taken right before the last board-modifying action, or
+   *  null when there's nothing to undo (fresh game, after a discovery,
+   *  after undo has already fired). Not serialised. */
+  lastSnapshot: GameState | null;
 }
 
 /* Events — fire-and-forget notifications for the UI/audio layer. */
@@ -155,7 +165,8 @@ export type Action =
   | { type: "hint" }
   | { type: "move"; from: number; to: number }
   | { type: "shore"; cell: number }
-  | { type: "hold"; slot: number };
+  | { type: "hold"; slot: number }
+  | { type: "undo" };
 
 export interface ReduceResult {
   state: GameState;
@@ -189,7 +200,19 @@ function cloneState(s: GameState): GameState {
     choosing: s.choosing
       ? { options: [...s.choosing.options], cells: [...s.choosing.cells], mult: s.choosing.mult }
       : null,
+    // Snapshots are frozen captures — pass the reference through. We
+    // explicitly null their own `lastSnapshot` at capture time so this
+    // never nests more than one level deep.
+    lastSnapshot: s.lastSnapshot,
   };
+}
+
+/** Deep copy a state for the undo buffer. Flattens `lastSnapshot` to
+ *  null so a captured snapshot can't itself be undone recursively. */
+function snapshotState(s: GameState): GameState {
+  const c = cloneState(s);
+  c.lastSnapshot = null;
+  return c;
 }
 
 /** How full is the board, in [0, 1]? */
@@ -214,6 +237,24 @@ function tierOf(bundle: ThemeBundle, id: string): number {
 function alternatives(bundle: ThemeBundle, r: CombineRecipe): CombineRecipe[] {
   const key = [...r.all].sort().join("+");
   return bundle.sameIngredients.get(key) ?? [r];
+}
+
+/** Order recipe-picker options so already-found outputs come first (in
+ *  their natural `alternatives` order — stable, so a player who knows
+ *  the right answer isn't punished) and unknown outputs are shuffled by
+ *  the game RNG. Shuffling unknowns prevents muscle-memorising "the
+ *  second ? is always wood", which would let the player game the
+ *  picker. Using `state.rng` keeps daily puzzles identical across
+ *  players. */
+function orderChoosingOptions(
+  state: GameState,
+  options: readonly CombineRecipe[],
+): CombineRecipe[] {
+  const foundSet = new Set(state.found);
+  const found: CombineRecipe[] = [];
+  const unknown: CombineRecipe[] = [];
+  for (const r of options) (foundSet.has(r.out) ? found : unknown).push(r);
+  return [...found, ...shuffle(state.rng, unknown)];
 }
 
 /* ========================================================================
@@ -494,6 +535,8 @@ export function newGame(
     closeCalls: 0,
     recentTrays: [],
     choosing: null,
+    undos: 1,
+    lastSnapshot: null,
   };
 
   // Seed a few starting tiles that don't already combine. The prototype
@@ -563,6 +606,7 @@ export function reduce(
       state.choosing = null;
       finishResolve(state, bundle, choice, seedCells, mult, events);
       afterMove(state, bundle, events);
+      sealIfDiscovered(state, events);
       return { state, events };
     }
 
@@ -572,6 +616,7 @@ export function reduce(
       const t = srcArr[action.slot];
       if (t == null) return { state: prev, events: [] };
       if (state.board[action.cell] != null) return { state: prev, events: [] };
+      state.lastSnapshot = snapshotState(prev);
       srcArr[action.slot] = null;
       state.moves++;
       state.score += 1;
@@ -589,7 +634,7 @@ export function reduce(
         );
         if (r.needsChoice) {
           state.choosing = {
-            options: alternatives(bundle, m.recipe).slice(),
+            options: orderChoosingOptions(state, alternatives(bundle, m.recipe)),
             cells,
             mult: 1,
           };
@@ -597,6 +642,7 @@ export function reduce(
         }
       }
       afterMove(state, bundle, events);
+      sealIfDiscovered(state, events);
       return { state, events };
     }
 
@@ -612,6 +658,7 @@ export function reduce(
         events.push({ type: "nope", at: action.cell });
         return { state, events };
       }
+      state.lastSnapshot = snapshotState(prev);
       srcArr[action.slot] = null;
       state.moves++;
       state.score += 1;
@@ -624,13 +671,14 @@ export function reduce(
       );
       if (r.needsChoice) {
         state.choosing = {
-          options: alternatives(bundle, m.recipe).slice(),
+          options: orderChoosingOptions(state, alternatives(bundle, m.recipe)),
           cells,
           mult: 1,
         };
         return { state, events };
       }
       afterMove(state, bundle, events);
+      sealIfDiscovered(state, events);
       return { state, events };
     }
 
@@ -681,6 +729,7 @@ export function reduce(
       // Moving onto an empty cell: relocate, then check for a combine at
       // the new cell (symmetric with `place`).
       if (state.board[action.to] == null) {
+        state.lastSnapshot = snapshotState(prev);
         state.board[action.from] = null;
         state.crumb[action.from] = null;
         state.board[action.to] = tile;
@@ -695,13 +744,14 @@ export function reduce(
           );
           if (r.needsChoice) {
             state.choosing = {
-              options: alternatives(bundle, m.recipe).slice(),
+              options: orderChoosingOptions(state, alternatives(bundle, m.recipe)),
               cells,
               mult: 1,
             };
             return { state, events };
           }
         }
+        sealIfDiscovered(state, events);
         return { state, events };
       }
       // Moving onto a tile: try drop-on-top.
@@ -710,6 +760,7 @@ export function reduce(
         events.push({ type: "nope", at: action.to });
         return { state, events };
       }
+      state.lastSnapshot = snapshotState(prev);
       state.board[action.from] = null;
       state.crumb[action.from] = null;
       // The cells involved come from matchOn and already include the target.
@@ -722,13 +773,14 @@ export function reduce(
       );
       if (r.needsChoice) {
         state.choosing = {
-          options: alternatives(bundle, m.recipe).slice(),
+          options: orderChoosingOptions(state, alternatives(bundle, m.recipe)),
           cells,
           mult: 1,
         };
         return { state, events };
       }
       // Move helpers skip the after-turn step (no crumble, no deal).
+      sealIfDiscovered(state, events);
       return { state, events };
     }
 
@@ -754,6 +806,28 @@ export function reduce(
       state.crumb[action.cell] = null;
       return { state, events };
     }
+
+    case "undo": {
+      // One-charge rewind of the last board-modifying action. Snapshot
+      // captured in `place` / `drop-on` / `move`; blocked when the
+      // previous turn produced a discovery (keeps daily collection
+      // scope safe from unlock-then-undo). The restored state keeps
+      // the charge counter minus one — undoing itself is not undoable.
+      if (state.undos <= 0) return { state: prev, events: [] };
+      if (!prev.lastSnapshot) return { state: prev, events: [] };
+      const restored = cloneState(prev.lastSnapshot);
+      restored.undos = prev.undos - 1;
+      restored.lastSnapshot = null;
+      return { state: restored, events: [] };
+    }
+  }
+}
+
+/** Clear `lastSnapshot` when a reduce path produced a discovery event,
+ *  so a `discovery` fired by this turn can't be undone away later. */
+function sealIfDiscovered(state: GameState, events: readonly Event[]): void {
+  if (events.some((e) => e.type === "discovery")) {
+    state.lastSnapshot = null;
   }
 }
 

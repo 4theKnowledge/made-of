@@ -39,6 +39,18 @@ export function pick<T>(state: RngState, arr: readonly T[]): T | undefined {
   return arr[randInt(state, arr.length)];
 }
 
+/** Fisher-Yates shuffle using the game RNG. Returns a new array. */
+export function shuffle<T>(state: RngState, arr: readonly T[]): T[] {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = randInt(state, i + 1);
+    const tmp = out[i]!;
+    out[i] = out[j]!;
+    out[j] = tmp;
+  }
+  return out;
+}
+
 /**
  * FNV-1a 32-bit hash of a string. Used to seed the daily game from the
  * local YYYY-MM-DD date, so every player plays the same board on the same
