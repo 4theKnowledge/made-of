@@ -15,14 +15,43 @@
 import type { GraphNode } from "../graph/types";
 import type { ThemeKey, ThemeMeta } from "./types";
 
+/** Age-label pool per theme. The active bundle slices this down to the
+ *  derived `numAges`; extra entries are headroom for future KB growth so a
+ *  new age doesn't need a code change. */
+const AGE_POOL: Record<ThemeKey, string[]> = {
+  everything: [
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "VI",
+    "VII",
+    "VIII",
+    "IX",
+    "X",
+    "XI",
+    "XII",
+    "XIII",
+    "XIV",
+    "XV",
+  ],
+};
+
 export const THEMES: Record<ThemeKey, ThemeMeta> = {
   everything: {
     k: "everything",
     name: "Everything",
     desc: "The whole map: atoms, stars, life, food, factories, machines.",
-    ages: ["I", "II", "III", "IV", "V", "VI"],
+    ages: AGE_POOL.everything,
   },
 };
+
+/** Open-ended age-label pool for a theme. `buildThemeBundle` slices this to
+ *  the derived `numAges` and puts the slice on the active `ThemeMeta.ages`. */
+export function themeAgePool(theme: ThemeKey): string[] {
+  return AGE_POOL[theme];
+}
 
 /** Never dealt or made in Combine (fab chain, big bang). Kept as a safety
  *  net; the join table is the source of truth for Everything membership. */

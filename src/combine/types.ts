@@ -11,6 +11,9 @@ export interface ThemeMeta {
   k: ThemeKey;
   name: string;
   desc: string;
+  /** Active per-run age labels. Length == the derived `numAges` for this
+   *  bundle. On the authored config this is a *pool* that may be longer than
+   *  today's numAges; `buildThemeBundle` slices it down. */
   ages: string[];
 }
 

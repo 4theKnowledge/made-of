@@ -16,6 +16,12 @@ export type CombineRunResult = {
   score: number;
   made: number;
   age: number;
+  /** The theme's `numAges` at the moment this run finished. Older rows (pre
+   *  derived-ages) are missing this field — treat absence as season 0 for
+   *  comparison. Leaderboards segment by (ref, season). */
+  season?: number;
+  /** Day key for daily runs. */
+  daily?: string;
 };
 
 export type CombineRun = {

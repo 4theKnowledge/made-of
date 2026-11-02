@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import Link from "next/link";
 import { Pictogram } from "@/pictograms/Pictogram";
-import { ageSets, catalogue } from "@/combine/data";
+import { ageSets, catalogue, catalogueByKind } from "@/combine/data";
 import { newGame, reduce } from "@/combine/engine";
 import type { Action, Event, GameState } from "@/combine/engine";
 import { matchAt, matchOn } from "@/combine/match";
@@ -21,6 +21,8 @@ import { hydrateBundle, type SerialisedBundle } from "@/combine/serialise";
 import {
   hydrateGame,
   loadBest,
+  loadSeenAges,
+  saveSeenAges,
   loadDailyDone,
   loadGame,
   loadSound,
@@ -218,6 +220,9 @@ export function CombineBoard({ bundles: serialised }: Props) {
     everything: 0,
   });
   const [dailyDone, setDailyDone] = useState<DailyResult | null>(null);
+  // When a theme's numAges has grown since the player last saw it, surface
+  // a one-time banner with the new age's label. Keyed by theme → label.
+  const [newAgeBanner, setNewAgeBanner] = useState<Partial<Record<ThemeKey, string>>>({});
 
   // On mount: load best scores + today's daily result, and resume the
   // endless save if any (daily resume lives on the user's explicit tap
@@ -230,6 +235,22 @@ export function CombineBoard({ bundles: serialised }: Props) {
       everything: loadBest("everything"),
     });
     setDailyDone(loadDailyDone(todayKey()));
+    // Age-promotion banner: compare each theme's live numAges to what we
+    // last showed on this device. On first ever visit (seen=0), skip —
+    // the banner is for the moment *after* the player has already played
+    // through N ages, not an unsolicited onboarding popup.
+    const banners: Partial<Record<ThemeKey, string>> = {};
+    for (const theme of Object.keys(bundles) as ThemeKey[]) {
+      const b = bundles[theme];
+      const curr = b.theme.ages.length;
+      const seen = loadSeenAges(theme);
+      if (seen > 0 && curr > seen) {
+        banners[theme] = b.theme.ages[curr - 1] ?? String(curr);
+      }
+      // Prime seen on first visit so we don't banner later.
+      if (seen === 0) saveSeenAges(theme, curr);
+    }
+    if (Object.keys(banners).length) setNewAgeBanner(banners);
     // Deep link: ?d=<dayKey> on /combine starts today's daily. Yesterday's
     // keys fall through to the regular endless resume (today's daily will
     // still be a tap away from the theme menu).
@@ -705,6 +726,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
             made: r.state.made,
             age: r.state.age,
             daily: r.state.daily,
+            season: bundles[r.state.theme].theme.ages.length,
           }),
         }).catch(() => {});
         if (r.state.daily) {
@@ -1364,8 +1386,34 @@ export function CombineBoard({ bundles: serialised }: Props) {
     return s;
   }, [state.found, collection]);
 
+  const activeAgeBanner = newAgeBanner[state.theme];
+  const dismissAgeBanner = () => {
+    const curr = bundles[state.theme].theme.ages.length;
+    saveSeenAges(state.theme, curr);
+    setNewAgeBanner((prev) => {
+      const next = { ...prev };
+      delete next[state.theme];
+      return next;
+    });
+  };
+
   return (
     <div className="cbwrap">
+      {activeAgeBanner && (
+        <div className="cbagebanner" role="status">
+          <span>
+            A new age has emerged — <b>{activeAgeBanner}</b>
+          </span>
+          <button
+            type="button"
+            className="cbagebanner-x"
+            onClick={dismissAgeBanner}
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
       <div id="cb">
         <TopBar
           state={state}
@@ -2219,6 +2267,7 @@ function CollectionBook({
   onDismiss: () => void;
 }) {
   const cat = useMemo(() => catalogue(bundle), [bundle]);
+  const catKinds = useMemo(() => catalogueByKind(bundle), [bundle]);
   const total = bundle.outputs.size;
   // Merge the current game's new discoveries with the lifetime collection
   // so a signed-out player's in-game progress still shows in the book even
@@ -2429,30 +2478,28 @@ function CollectionBook({
           </div>
         ) : (
         <div className="cbbookages">
-          {cat.byAge.map((list, k) => {
-            const ageGot = list.filter((x) => findsForTheme.has(x)).length;
+          {catKinds.kinds.map(({ kind, items }) => {
+            const kindGot = items.filter((x) => findsForTheme.has(x)).length;
             return (
-              <div key={k} className="cbbage">
+              <div key={kind} className="cbbage">
                 <div className="bh">
-                  <b>{bundle.theme.ages[k]}</b>
+                  <b>{cap(kind)}</b>
                   <span>
-                    {ageGot}/{list.length}
+                    {kindGot}/{items.length}
                   </span>
                 </div>
                 <div className="bg">
-                  {list.map((id) => {
+                  {items.map((id) => {
                     const it = bundle.items.get(id);
                     if (!it) return null;
                     const foundAt = findsForTheme.get(id);
-                    const no = String(cat.no.get(id)).padStart(3, "0");
                     if (foundAt === undefined) {
                       return (
                         <span
                           key={id}
                           className="bk unk"
-                          aria-label={`No. ${no}, not found yet`}
+                          aria-label={`${cap(it.name)}, not found yet`}
                         >
-                          <i className="no">{no}</i>
                           <Pictogram
                             name={it.name}
                             tier={it.tier}
@@ -2476,7 +2523,6 @@ function CollectionBook({
                         }}
                         title={cap(it.name)}
                       >
-                        <i className="no">{no}</i>
                         <Pictogram
                           name={it.name}
                           tier={it.tier}

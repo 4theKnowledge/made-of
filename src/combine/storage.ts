@@ -30,6 +30,7 @@ const DAILY_KEY = "madeof:cbsave:daily";
 const BEST_PREFIX = "madeof:cbbest:";
 const DAILY_DONE_KEY = "madeof:cbdaily";
 const FOUND_KEY = "madeof:cbfound";
+const SEEN_AGES_PREFIX = "madeof:cbseenages:";
 const MUSIC_KEY = "madeof:music";
 const SFX_KEY = "madeof:sfx";
 const VOL_KEY = "madeof:vol";
@@ -303,6 +304,30 @@ export function saveBest(theme: ThemeKey, score: number): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(BEST_PREFIX + theme, String(score));
+  } catch {
+    // ignore
+  }
+}
+
+/** Highest numAges the player has already been shown for a theme. Used to
+ *  decide whether the "a new age has emerged" banner should fire. Device-
+ *  local — a cross-device replay of a promotion shows the banner twice,
+ *  which is a mild annoyance and not worth a server round-trip. */
+export function loadSeenAges(theme: ThemeKey): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    return (
+      Number(window.localStorage.getItem(SEEN_AGES_PREFIX + theme) ?? 0) || 0
+    );
+  } catch {
+    return 0;
+  }
+}
+
+export function saveSeenAges(theme: ThemeKey, numAges: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SEEN_AGES_PREFIX + theme, String(numAges));
   } catch {
     // ignore
   }

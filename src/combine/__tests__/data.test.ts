@@ -71,6 +71,41 @@ describe("buildThemeBundle", () => {
     }
   });
 
+  it("band invariant holds across a range of numAges (via prevNumAges)", () => {
+    // Simulate a KB that was promoted to higher age counts in the past. The
+    // dependency invariant must hold for every valid numAges, not just the
+    // one derived today.
+    for (const prev of [3, 4, 5, 6, 7, 8]) {
+      const bundle = buildThemeBundle(snapshot, "everything", prev);
+      const outBand = new Map<string, number>();
+      for (const r of bundle.recipes) {
+        const cur = outBand.get(r.out);
+        if (cur == null || r.band < cur) outBand.set(r.out, r.band);
+      }
+      for (const r of bundle.recipes) {
+        for (const partId of r.all) {
+          const ob = outBand.get(partId);
+          if (ob != null) {
+            expect(ob, `prev=${prev} recipe=${r.out} part=${partId}`).toBeLessThanOrEqual(
+              r.band,
+            );
+          }
+        }
+      }
+    }
+  });
+
+  it("numAges is monotonic in prevNumAges", () => {
+    let last = 0;
+    for (const prev of [0, 3, 5, 8, 12]) {
+      const bundle = buildThemeBundle(snapshot, "everything", prev);
+      const n = bundle.theme.ages.length;
+      expect(n).toBeGreaterThanOrEqual(prev);
+      expect(n).toBeGreaterThanOrEqual(last);
+      last = n;
+    }
+  });
+
   it("derived sets are consistent", () => {
     // base ∩ outputs = ∅
     for (const id of everything.base) {

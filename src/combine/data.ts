@@ -8,7 +8,7 @@
 
 import type { Snapshot } from "../graph/snapshot";
 import type { GraphNode } from "../graph/types";
-import { THEMES, inCombineTheme } from "./filters";
+import { THEMES, inCombineTheme, themeAgePool } from "./filters";
 import { computeRefine } from "./levels";
 import type {
   AgeSets,
@@ -64,6 +64,36 @@ function recipesForTheme(
     }
   }
   return out;
+}
+
+/**
+ * Pick how many age bands a theme should expose, given its recipe count and
+ * the previously-promoted count. Monotonic: never shrinks, so a KB edit can
+ * never retroactively collapse a leaderboard season.
+ *
+ * Rules:
+ * - Volume drives growth: ~`RECIPES_PER_AGE` recipes per age.
+ * - Floor at `MIN_AGES` so a tiny KB is still playable.
+ * - Sparse-frontier guard: don't promote an age that would hold fewer than
+ *   `MIN_RECIPES_PER_AGE` recipes. Those recipes still exist and are still
+ *   dealt — they ride along in the current top band until the frontier
+ *   thickens.
+ * - Monotonic: result >= `prevNumAges` always.
+ */
+export function deriveNumAges(
+  recipeCount: number,
+  prevNumAges: number,
+): number {
+  const RECIPES_PER_AGE = 25;
+  const MIN_AGES = 3;
+  const MIN_RECIPES_PER_AGE = 3;
+
+  const byVolume = Math.floor(recipeCount / RECIPES_PER_AGE);
+  const sparsityCap = Math.floor(recipeCount / MIN_RECIPES_PER_AGE);
+  // Floor at MIN_AGES, but never fabricate ages that can't hold the guard —
+  // sparsityCap wins over MIN_AGES only when the KB is genuinely too small.
+  const target = Math.min(sparsityCap, Math.max(MIN_AGES, byVolume));
+  return Math.max(prevNumAges, target);
 }
 
 /** Assign refinement levels inside the theme, cut into ages, then push
@@ -211,20 +241,30 @@ function makeItemView(node: GraphNode): CombineItem {
 export function buildThemeBundle(
   snapshot: Snapshot,
   theme: ThemeKey,
+  prevNumAges: number = 0,
 ): ThemeBundle {
-  const meta = THEMES[theme];
+  const base_meta = THEMES[theme];
   const recipes = recipesForTheme(snapshot, theme);
 
   const outputs = new Set<string>(recipes.map((r) => r.out));
   const ingredients = new Set<string>(recipes.flatMap((r) => r.all));
   const tools = new Set<string>(recipes.flatMap((r) => r.with));
-  const base = [...ingredients].filter((x) => !outputs.has(x));
+  const baseIng = [...ingredients].filter((x) => !outputs.has(x));
   const mid = [...ingredients].filter((x) => outputs.has(x));
   const terminal = new Set<string>(
     [...outputs].filter((x) => !ingredients.has(x)),
   );
 
-  assignAges(snapshot, recipes, outputs, meta.ages.length);
+  const pool = themeAgePool(theme);
+  const rawNumAges = deriveNumAges(recipes.length, prevNumAges);
+  // Never exceed the authored name pool; a KB that outgrows it needs new
+  // authored names before promotion can take effect.
+  const numAges = Math.min(rawNumAges, pool.length);
+  const meta: typeof base_meta = {
+    ...base_meta,
+    ages: pool.slice(0, numAges),
+  };
+  assignAges(snapshot, recipes, outputs, numAges);
 
   // Index recipes by every ingredient, biggest first.
   const byIngredient = new Map<string, CombineRecipe[]>();
@@ -283,7 +323,7 @@ export function buildThemeBundle(
     byIngredient,
     outputs,
     ingredients,
-    base,
+    base: baseIng,
     mid,
     tools,
     terminal,
@@ -299,7 +339,7 @@ export function buildThemeBundle(
  * The dealer picks only from tiles whose recipes live in bands [age, age+1]
  * (1-based). Crumbling clears tiles that aren't useful across bands
  * [age, age+1, age+2].
-  */
+ */
 export function ageSets(bundle: ThemeBundle, age: number): AgeSets {
   const k = age + 1; // 1-based band to match the prototype
   const dealBands = new Set<number>([k - 1, k]);
@@ -337,10 +377,60 @@ export function catalogue(bundle: ThemeBundle): {
   return { byAge, no };
 }
 
+/** Catalogue every output in the theme, grouped by `kind`. Buckets are
+ *  stable across KB edits so the collection view doesn't shift when ages
+ *  shift; players' own time-of-find story comes from `firstFoundAt`.
+ *
+ *  Kinds are sorted by their canonical "first appearance" ordering (the
+ *  earliest age-band in which any item of that kind can be built), so the
+ *  layout still reads roughly earliest-first. Items within a kind are
+ *  alpha-sorted for predictability. */
+export function catalogueByKind(bundle: ThemeBundle): {
+  kinds: { kind: string; items: string[] }[];
+} {
+  const byKind = new Map<string, string[]>();
+  const kindBand = new Map<string, number>();
+  for (const id of bundle.outputs) {
+    const it = bundle.items.get(id);
+    if (!it) continue;
+    const k = it.kind || "other";
+    let list = byKind.get(k);
+    if (!list) {
+      list = [];
+      byKind.set(k, list);
+    }
+    list.push(id);
+    const band = bundle.outBand.get(id) ?? 99;
+    const cur = kindBand.get(k);
+    if (cur == null || band < cur) kindBand.set(k, band);
+  }
+  const kinds = [...byKind.entries()]
+    .map(([kind, items]) => ({
+      kind,
+      items: items.sort((a, b) => {
+        const na = bundle.items.get(a)?.name ?? a;
+        const nb = bundle.items.get(b)?.name ?? b;
+        return na.localeCompare(nb);
+      }),
+    }))
+    .sort((a, b) => {
+      const ba = kindBand.get(a.kind) ?? 99;
+      const bb = kindBand.get(b.kind) ?? 99;
+      if (ba !== bb) return ba - bb;
+      return a.kind.localeCompare(b.kind);
+    });
+  return { kinds };
+}
+
 export function buildAllBundles(
   snapshot: Snapshot,
+  prevNumAges: Partial<Record<ThemeKey, number>> = {},
 ): Record<ThemeKey, ThemeBundle> {
   return {
-    everything: buildThemeBundle(snapshot, "everything"),
+    everything: buildThemeBundle(
+      snapshot,
+      "everything",
+      prevNumAges.everything ?? 0,
+    ),
   };
 }

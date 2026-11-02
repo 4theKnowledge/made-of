@@ -454,6 +454,27 @@ export const itemCombineThemes = pgTable(
 );
 
 /* ========================================================================
+ * Combine season.
+ *
+ * One row per theme tracking the highest `numAges` value ever promoted. The
+ * active bundle derives numAges from recipe count, but monotonicity is
+ * enforced against this stored value so a KB edit can never retroactively
+ * shrink the number of ages on a theme. Updated when a build sees a derived
+ * value greater than the stored one. `promotedAt` records the last bump —
+ * used to drive the "a new age has emerged" announcement.
+ * ====================================================================== */
+
+export const combineSeason = pgTable("combine_season", {
+  theme: text("theme").primaryKey(),
+  numAges: integer("num_ages").notNull().default(0),
+  promotedAt: timestamp("promoted_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type CombineSeason = typeof combineSeason.$inferSelect;
+
+/* ========================================================================
  * Combine discoveries.
  *
  * Signed-in users accumulate a lifetime collection of items first discovered
