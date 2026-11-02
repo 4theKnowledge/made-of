@@ -74,12 +74,13 @@ interface Preview {
 function computePreview(
   bundle: ThemeBundle,
   state: GameState,
-  slot: number | null,
+  selected: { source: "tray" | "hold"; slot: number } | null,
   extraKnown: Iterable<string>,
 ): Map<number, Preview> {
   const out = new Map<number, Preview>();
-  if (slot == null) return out;
-  const x = state.tray[slot];
+  if (selected == null) return out;
+  const src = selected.source === "hold" ? state.hold : state.tray;
+  const x = src[selected.slot];
   if (x == null) return out;
   // "Known" = anything found this game or anywhere in the player's lifetime
   // collection. Signed-out players will see the latter as empty.
@@ -249,7 +250,10 @@ export function CombineBoard({ bundles: serialised }: Props) {
       setState(hydrateGame(everythingSave));
     }
   }, [bundles.everything]);
-  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<{
+    source: "tray" | "hold";
+    slot: number;
+  } | null>(null);
   const [helpersOpen, setHelpersOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   // Clear-mode: next tap on a full cell removes that tile.
@@ -898,9 +902,19 @@ export function CombineBoard({ bundles: serialised }: Props) {
       }
       const target = state.board[cell];
       if (target == null) {
-        act({ type: "place", slot: selectedSlot, cell });
+        act({
+          type: "place",
+          slot: selectedSlot.slot,
+          cell,
+          source: selectedSlot.source,
+        });
       } else {
-        act({ type: "drop-on", slot: selectedSlot, cell });
+        act({
+          type: "drop-on",
+          slot: selectedSlot.slot,
+          cell,
+          source: selectedSlot.source,
+        });
       }
     },
     [act, selectedSlot, state.board, state.crumb, state.over, clearMode, moveMode, shoreMode],
@@ -911,13 +925,18 @@ export function CombineBoard({ bundles: serialised }: Props) {
   // the pointerup, cleared on the next pointerdown.
   const suppressClick = useRef(false);
 
-  const onSlotTap = useCallback((slot: number) => {
-    if (suppressClick.current) {
-      suppressClick.current = false;
-      return;
-    }
-    setSelectedSlot((s) => (s === slot ? null : slot));
-  }, []);
+  const onSlotTap = useCallback(
+    (source: "tray" | "hold", slot: number) => {
+      if (suppressClick.current) {
+        suppressClick.current = false;
+        return;
+      }
+      setSelectedSlot((s) =>
+        s && s.source === source && s.slot === slot ? null : { source, slot },
+      );
+    },
+    [],
+  );
 
   // Close the helpers menu on any click outside it (except on the Helpers
   // button itself, which toggles it).
@@ -1113,7 +1132,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
           window.clearTimeout(d.holdTimer);
           d.holdTimer = null;
         }
-        if (d.source === "tray") setSelectedSlot(d.slot);
+        setSelectedSlot({ source: d.source, slot: d.slot });
       }
       const over = captureOver(e.clientX, e.clientY);
       d.overCell = over.cell;
@@ -1344,7 +1363,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
         />
         <TipLine
           state={state}
-          selectedSlot={selectedSlot}
+          hasSelection={selectedSlot != null}
           preview={preview}
           clearMode={clearMode}
           moveMode={moveMode}
@@ -1387,12 +1406,19 @@ export function CombineBoard({ bundles: serialised }: Props) {
           bundle={bundle}
           active={Boolean(drag?.overHold)}
           activeOk={Boolean(drag?.overHold && drag.overOk)}
-          selectedSlot={selectedSlot}
+          selected={selectedSlot}
+          onSlotTap={onSlotTap}
           onSlotPointerDown={onSlotPointerDown}
           onHoldTap={() => {
-            if (selectedSlot == null) return;
+            // A trailing click from a completed drag (drop onto hold)
+            // must not re-fire the hold action.
+            if (suppressClick.current) {
+              suppressClick.current = false;
+              return;
+            }
+            if (selectedSlot?.source !== "tray") return;
             if (!state.hold.some((v) => v == null)) return;
-            act({ type: "hold", slot: selectedSlot });
+            act({ type: "hold", slot: selectedSlot.slot });
             setSelectedSlot(null);
           }}
         />
@@ -2699,14 +2725,14 @@ function TopBar({
 
 function TipLine({
   state,
-  selectedSlot,
+  hasSelection,
   preview,
   clearMode,
   moveMode,
   shoreMode,
 }: {
   state: GameState;
-  selectedSlot: number | null;
+  hasSelection: boolean;
   preview: Map<number, Preview>;
   clearMode: boolean;
   moveMode: { from: number | null } | null;
@@ -2723,7 +2749,7 @@ function TipLine({
       const name = state.board[moveMode.from];
       tip = `Now tap where the ${name ? cap(name).toLowerCase() : "tile"} should go. Moving isn't a turn.`;
     }
-  } else if (selectedSlot != null) {
+  } else if (hasSelection) {
     if (preview.size > 0) {
       tip =
         "Glowing squares make things you've found before. New combos don't glow: try things.";
@@ -3253,14 +3279,16 @@ function Tray({
 }: {
   state: GameState;
   bundle: ThemeBundle;
-  selected: number | null;
-  onSlotTap: (slot: number) => void;
+  selected: { source: "tray" | "hold"; slot: number } | null;
+  onSlotTap: (source: "tray" | "hold", slot: number) => void;
   onSlotPointerDown: (
     slot: number,
     source: "tray" | "hold",
     e: React.PointerEvent<HTMLButtonElement>,
   ) => void;
 }) {
+  const isSel = (slot: number) =>
+    selected?.source === "tray" && selected.slot === slot;
   return (
     <div className="cbtray" aria-label="Tray">
       {state.tray.map((id, slot) => {
@@ -3272,7 +3300,7 @@ function Tray({
         const item = bundle.items.get(id);
         if (!item) return <div key={slot} className="cbp empty" />;
         const classes = ["cbp"];
-        if (selected === slot) classes.push("sel");
+        if (isSel(slot)) classes.push("sel");
         const isTool = bundle.tools.has(id);
         return (
           <button
@@ -3282,10 +3310,10 @@ function Tray({
             data-cbp={slot}
             style={fillVar(item)}
             onPointerDown={(e) => onSlotPointerDown(slot, "tray", e)}
-            onClick={() => onSlotTap(slot)}
+            onClick={() => onSlotTap("tray", slot)}
             onContextMenu={(e) => e.preventDefault()}
-            aria-label={`Tray slot ${slot + 1}: ${cap(item.name)}${selected === slot ? ", selected" : ""}`}
-            aria-pressed={selected === slot}
+            aria-label={`Tray slot ${slot + 1}: ${cap(item.name)}${isSel(slot) ? ", selected" : ""}`}
+            aria-pressed={isSel(slot)}
           >
             {isTool && <span className="tool">tool</span>}
             <Pictogram
@@ -3307,7 +3335,8 @@ function Hold({
   bundle,
   active,
   activeOk,
-  selectedSlot,
+  selected,
+  onSlotTap,
   onSlotPointerDown,
   onHoldTap,
 }: {
@@ -3319,9 +3348,11 @@ function Hold({
   /** True iff `active` and the drop would succeed (zone has room). When
    *  active but not ok, the zone paints a reject state. */
   activeOk: boolean;
-  /** Currently selected tray slot (tap-to-select), if any. Tapping the
-   *  hold zone with a selection stashes that tile. */
-  selectedSlot: number | null;
+  /** Currently selected slot (tap-to-select), if any. A tray selection
+   *  tapped on the zone stashes the tile; a hold selection shows the
+   *  held tile as active so it can be placed on a board cell. */
+  selected: { source: "tray" | "hold"; slot: number } | null;
+  onSlotTap: (source: "tray" | "hold", slot: number) => void;
   onSlotPointerDown: (
     slot: number,
     source: "tray" | "hold",
@@ -3331,7 +3362,9 @@ function Hold({
 }) {
   const empty = state.hold.every((v) => v == null);
   const hasRoom = state.hold.some((v) => v == null);
-  const tapReady = selectedSlot != null && hasRoom;
+  const tapReady = selected?.source === "tray" && hasRoom;
+  const isSel = (slot: number) =>
+    selected?.source === "hold" && selected.slot === slot;
   const classes = ["cbshelf", "cbhold"];
   if (empty) classes.push("none");
   if (active) classes.push(activeOk ? "over" : "over-bad");
@@ -3342,7 +3375,7 @@ function Hold({
       data-cbholdzone="1"
       aria-label="Hold — drag or tap a tile here to save for later. Held tiles crumble when the age moves past them."
       onClick={(e) => {
-        if (selectedSlot == null) return;
+        if (selected?.source !== "tray") return;
         // Ignore clicks that originated on a held-tile button; those have
         // their own tap behaviour (select/drag).
         if ((e.target as HTMLElement).closest(".cbheld")) return;
@@ -3362,15 +3395,19 @@ function Hold({
           }
           const item = bundle.items.get(id);
           if (!item) return null;
+          const slotClasses = ["cbslot", "cbheld"];
+          if (isSel(slot)) slotClasses.push("sel");
           return (
             <button
               key={slot}
               type="button"
-              className="cbslot cbheld"
+              className={slotClasses.join(" ")}
               style={fillVar(item)}
               onPointerDown={(e) => onSlotPointerDown(slot, "hold", e)}
+              onClick={() => onSlotTap("hold", slot)}
               onContextMenu={(e) => e.preventDefault()}
-              aria-label={`Held: ${cap(item.name)}`}
+              aria-label={`Held: ${cap(item.name)}${isSel(slot) ? ", selected" : ""}`}
+              aria-pressed={isSel(slot)}
             >
               <Pictogram
                 name={item.name}
