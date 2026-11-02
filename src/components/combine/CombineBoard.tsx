@@ -808,11 +808,17 @@ export function CombineBoard({ bundles: serialised }: Props) {
     // for review). Only start a fresh daily when there's no save at all AND
     // today's puzzle hasn't been completed yet — otherwise we'd silently
     // let a player replay today's run.
+    //
+    // Order matters: loadDailyDone has to run first because, on a
+    // DAILY_EPOCH mismatch, it side-effect-clears the review save slot.
+    // If we read loadGame first we'd hydrate the stale finished state
+    // instead of starting the fresh run the reset is meant to allow.
+    const done = loadDailyDone(day);
     const saved = loadGame(bundles.everything, { daily: day });
     if (saved) {
       saveGame(state);
       setState(hydrateGame(saved));
-    } else if (loadDailyDone(day)) {
+    } else if (done) {
       // Done, but the final state is no longer in storage (older save or
       // storage got cleared). Nothing to resume into; keep the current
       // game as-is so the player doesn't accidentally start a replay.

@@ -18,6 +18,13 @@ import type { ThemeBundle, ThemeKey } from "./types";
  *  a fresh game instead of hydrating into a broken state. */
 const SAVE_VERSION = 4;
 
+/** Bump to force every player who has already finished today's daily to
+ *  be able to play it again. Stamped into DailyResult + the review save
+ *  slot on write and checked on read — a mismatch drops both, so the UI
+ *  shows the daily as unplayed. Does NOT touch in-progress saves (mid-run
+ *  players are unaffected). */
+const DAILY_EPOCH = 1;
+
 const ENDLESS_KEY = "madeof:cbsave";
 const DAILY_KEY = "madeof:cbsave:daily";
 const BEST_PREFIX = "madeof:cbbest:";
@@ -82,6 +89,11 @@ export interface DailyResult {
   longest?: number;
   /** Finished things shipped to the shelf. */
   shelf?: number;
+  /** DAILY_EPOCH stamp at save time. A mismatch at read time means a
+   *  global reset was shipped — the result is dropped and the player can
+   *  play today again. Older saves without this field also fail the
+   *  check and are treated as pre-reset. */
+  epoch?: number;
 }
 
 /* ========================================================================
@@ -245,6 +257,15 @@ export function loadDailyDone(dayKey: string): DailyResult | null {
     if (!raw) return null;
     const r = JSON.parse(raw) as DailyResult;
     if (r?.key !== dayKey) return null;
+    // Global reset: bump DAILY_EPOCH to invalidate every finished daily
+    // and let players replay today. Also clears the paired review save so
+    // startDaily can create a fresh run instead of hydrating the old
+    // finished state.
+    if ((r.epoch ?? 0) !== DAILY_EPOCH) {
+      window.localStorage.removeItem(DAILY_DONE_KEY);
+      window.localStorage.removeItem(DAILY_KEY);
+      return null;
+    }
     return r;
   } catch {
     return null;
@@ -254,7 +275,8 @@ export function loadDailyDone(dayKey: string): DailyResult | null {
 export function saveDailyDone(r: DailyResult): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(DAILY_DONE_KEY, JSON.stringify(r));
+    const stamped: DailyResult = { ...r, epoch: DAILY_EPOCH };
+    window.localStorage.setItem(DAILY_DONE_KEY, JSON.stringify(stamped));
     // Keep the final daily save around so "review" can reload the finished
     // board state. Starting a fresh daily on the same day is blocked at the
     // caller (CombineBoard.startDaily) — the save stays until the day rolls
