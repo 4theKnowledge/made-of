@@ -796,11 +796,19 @@ export function CombineBoard({ bundles: serialised }: Props) {
 
   const startDaily = useCallback(() => {
     const day = todayKey();
-    // Resume today's daily save if any, otherwise start a fresh daily.
+    // Resume today's daily save if any (including the finished state kept
+    // for review). Only start a fresh daily when there's no save at all AND
+    // today's puzzle hasn't been completed yet — otherwise we'd silently
+    // let a player replay today's run.
     const saved = loadGame(bundles.everything, { daily: day });
     if (saved) {
       saveGame(state);
       setState(hydrateGame(saved));
+    } else if (loadDailyDone(day)) {
+      // Done, but the final state is no longer in storage (older save or
+      // storage got cleared). Nothing to resume into; keep the current
+      // game as-is so the player doesn't accidentally start a replay.
+      return;
     } else {
       saveGame(state);
       setState(

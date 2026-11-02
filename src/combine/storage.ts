@@ -248,8 +248,10 @@ export function saveDailyDone(r: DailyResult): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(DAILY_DONE_KEY, JSON.stringify(r));
-    // The daily save slot is only interesting while the game is in progress.
-    window.localStorage.removeItem(DAILY_KEY);
+    // Keep the final daily save around so "review" can reload the finished
+    // board state. Starting a fresh daily on the same day is blocked at the
+    // caller (CombineBoard.startDaily) — the save stays until the day rolls
+    // over, at which point loadGame drops it as stale.
   } catch {
     // ignore
   }
