@@ -3291,18 +3291,6 @@ function AgesSheet({
             );
           })}
         </ol>
-        <div className="cbagecrumble">
-          <span className="howto-glyph" aria-hidden="true">
-            <GlyphCrumble />
-          </span>
-          <div>
-            <b>Crumbling</b>
-            <p>
-              Tiles not useful in this age tick down from 3. On turn 4 they
-              fall off — combine, move, or shore first.
-            </p>
-          </div>
-        </div>
         <button
           type="button"
           className="cbh"
