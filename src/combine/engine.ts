@@ -564,8 +564,19 @@ export function newGame(
   };
 
   // Seed a few starting tiles that don't already combine. The prototype
-  // uses fixed cells per board size (lines 3364).
-  const spots = size === 6 ? [7, 10, 19, 25, 28] : [6, 8, 16, 18];
+  // used fixed cells per board size (lines 3364); we sample positions from
+  // the game RNG instead so endless runs don't always start with the same
+  // tray layout. Daily stays deterministic because the RNG is seeded from
+  // the day key — same shuffle every time for the same day.
+  const seedCount = size === 6 ? 5 : 4;
+  // Candidate cells: interior-ish positions, avoiding edges that touch each
+  // other too tightly. These are a superset of the prototype's hardcoded
+  // picks for each board size, so starts stay visually "spread out".
+  const candidateCells =
+    size === 6
+      ? [7, 8, 10, 13, 15, 16, 19, 20, 22, 25, 27, 28]
+      : [6, 7, 8, 11, 13, 16, 17, 18];
+  const spots = shuffle(state.rng, candidateCells).slice(0, seedCount);
   const A0 = ageSets(bundle, 0);
   const seedTiles: string[] = [];
   const events: Event[] = [];

@@ -1489,6 +1489,7 @@ export function CombineBoard({ bundles: serialised }: Props) {
           <GameOverCard
             state={state}
             bundle={bundle}
+            collection={collection}
             best={best[state.theme] ?? 0}
             onClose={() => setOverCardOpen(false)}
             onPlayAgain={() => {
@@ -1834,6 +1835,7 @@ function DetailCard({
 function GameOverCard({
   state,
   bundle,
+  collection,
   best,
   onClose,
   onPlayAgain,
@@ -1841,6 +1843,7 @@ function GameOverCard({
 }: {
   state: GameState;
   bundle: ThemeBundle;
+  collection: Map<string, number>;
   best: number;
   onClose: () => void;
   onPlayAgain: () => void;
@@ -1854,9 +1857,16 @@ function GameOverCard({
   for (const id of state.shelf) {
     shelfCounts.set(id, (shelfCounts.get(id) ?? 0) + 1);
   }
-  const themeDiscovered = state.found.filter((x) =>
-    bundle.outputs.has(x),
-  ).length;
+  // "N of Y discovered so far" is a lifetime figure, so merge this run's
+  // new finds with the lifetime collection (mirrors CollectionBook).
+  const themeDiscoveredSet = new Set<string>();
+  for (const id of collection.keys()) {
+    if (bundle.outputs.has(id)) themeDiscoveredSet.add(id);
+  }
+  for (const id of state.found) {
+    if (bundle.outputs.has(id)) themeDiscoveredSet.add(id);
+  }
+  const themeDiscovered = themeDiscoveredSet.size;
   const totalOutputs = bundle.outputs.size;
   return (
     <>
@@ -2285,7 +2295,9 @@ function CollectionBook({
         role="dialog"
         aria-label="Collection"
       >
-        <span className="k">Collection · {bundle.theme.name}</span>
+        <span className="k">
+          Collection · {state.daily ? "Daily" : bundle.theme.name}
+        </span>
         <b className="big2">
           {got} <small>of {total}</small>
         </b>
