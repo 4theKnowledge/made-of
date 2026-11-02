@@ -107,6 +107,10 @@ export interface GameState {
   ageMade: number;
   /** Per-cell crumble counters. Null means useful / no counter. */
   crumb: Array<CrumbleCounter | null>;
+  /** Per-cell shore flag. A shored tile is exempt from crumble for as long
+   *  as it stays in that cell (combine, move, clear, or a new placement
+   *  on top of it all clear the flag). */
+  shored: boolean[];
   closeCalls: number;
   /** Short memory of recently-dealt trays as sorted multisets, newest first.
    *  Lets the dealer detect "the user keeps getting the same tray". */
@@ -196,6 +200,7 @@ function cloneState(s: GameState): GameState {
     shelf: [...s.shelf],
     hold: s.hold.slice(),
     crumb: cloneCrumb(s.crumb),
+    shored: s.shored.slice(),
     recentTrays: s.recentTrays.map((t) => t.slice()),
     choosing: s.choosing
       ? { options: [...s.choosing.options], cells: [...s.choosing.cells], mult: s.choosing.mult }
@@ -306,8 +311,11 @@ function finishResolve(
   // nulled by the time the UI applies this state).
   const inputs = cells.map((j) => state.board[j] ?? "");
   // Every cell in the group is consumed (tools too — Combine does not keep
-  // "made with" items).
-  for (const j of cells) state.board[j] = null;
+  // "made with" items). Clear any shore flags on the consumed cells.
+  for (const j of cells) {
+    state.board[j] = null;
+    state.shored[j] = false;
+  }
 
   // The new tile lands where it can keep combining if possible, else first.
   const spots = cells.slice();
@@ -427,6 +435,12 @@ function afterMove(
       state.crumb[i] = null;
       continue;
     }
+    // Shored tiles are permanently exempt from crumble until the tile at
+    // this cell changes (which clears the flag at the mutation site).
+    if (state.shored[i]) {
+      state.crumb[i] = null;
+      continue;
+    }
     const cur = state.crumb[i];
     const c = cur && cur.id === v ? cur : (state.crumb[i] = { id: v, n: 0 });
     c.n++;
@@ -437,6 +451,7 @@ function afterMove(
     for (const i of gone) {
       state.board[i] = null;
       state.crumb[i] = null;
+      state.shored[i] = false;
     }
   }
 
@@ -532,6 +547,7 @@ export function newGame(
     age: 0,
     ageMade: 0,
     crumb: Array(size * size).fill(null),
+    shored: Array(size * size).fill(false),
     closeCalls: 0,
     recentTrays: [],
     choosing: null,
@@ -621,6 +637,7 @@ export function reduce(
       state.moves++;
       state.score += 1;
       state.board[action.cell] = t;
+      state.shored[action.cell] = false;
       events.push({ type: "placed", at: action.cell, tile: t });
 
       const m = matchAt(bundle, state.board, action.cell, t, state.n);
@@ -720,6 +737,7 @@ export function reduce(
       state.clears--;
       state.board[action.cell] = null;
       state.crumb[action.cell] = null;
+      state.shored[action.cell] = false;
       return { state, events };
     }
 
@@ -727,12 +745,16 @@ export function reduce(
       const tile = state.board[action.from];
       if (!tile) return { state: prev, events: [] };
       // Moving onto an empty cell: relocate, then check for a combine at
-      // the new cell (symmetric with `place`).
+      // the new cell (symmetric with `place`). The shore flag follows the
+      // tile — a shored tile stays shored when the player relocates it.
       if (state.board[action.to] == null) {
         state.lastSnapshot = snapshotState(prev);
+        const wasShored = state.shored[action.from];
         state.board[action.from] = null;
         state.crumb[action.from] = null;
+        state.shored[action.from] = false;
         state.board[action.to] = tile;
+        state.shored[action.to] = wasShored;
         const m = matchAt(bundle, state.board, action.to, tile, state.n);
         if (m) {
           const cells = [action.to, ...m.cells];
@@ -763,6 +785,7 @@ export function reduce(
       state.lastSnapshot = snapshotState(prev);
       state.board[action.from] = null;
       state.crumb[action.from] = null;
+      state.shored[action.from] = false;
       // The cells involved come from matchOn and already include the target.
       const cells = m.cells.slice();
       const r = resolveMatch(
@@ -794,9 +817,11 @@ export function reduce(
     }
 
     case "shore": {
-      // Reset the crumble counter on one tile, giving it another full TTL
-      // before it crumbles. Only works on a tile that's actually counting
-      // down — on-age tiles have a null counter and gain nothing.
+      // Permanently exempt one crumbling tile from the crumble pass. The
+      // flag clears automatically when the tile at this cell changes
+      // (combine, move, clear, or a new placement on top). Only applies
+      // to a tile that's actually counting down — on-age tiles have a
+      // null counter and gain nothing.
       if (state.shore <= 0) return { state: prev, events: [] };
       const tile = state.board[action.cell];
       if (!tile) return { state: prev, events: [] };
@@ -804,6 +829,7 @@ export function reduce(
       if (!c || c.id !== tile) return { state: prev, events: [] };
       state.shore--;
       state.crumb[action.cell] = null;
+      state.shored[action.cell] = true;
       return { state, events };
     }
 

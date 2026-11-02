@@ -2655,7 +2655,7 @@ function TopBar({
               <span className="nm">
                 <b className="t">Shore</b>
                 <em>
-                  Steady a crumbling tile so it holds for another few turns.
+                  Anchor a crumbling tile — it won&apos;t crumble again.
                 </em>
               </span>
               <b className="c">{state.shore}</b>
@@ -3144,7 +3144,8 @@ function Board({
         const isMovable =
           moveMode != null && moveMode.from == null && v != null;
         const isMoving = moveMode != null && moveMode.from === i;
-        const isShoreable = shoreMode && crumbleTick > 0;
+        const isShored = state.shored[i] === true;
+        const isShoreable = shoreMode && crumbleTick > 0 && !isShored;
         return (
           <Cell
             key={i}
@@ -3159,6 +3160,7 @@ function Board({
             movable={isMovable}
             moving={isMoving}
             shoreable={isShoreable}
+            shored={isShored}
             onTap={() => onCellTap(i)}
           />
         );
@@ -3182,6 +3184,7 @@ function Cell({
   movable,
   moving,
   shoreable,
+  shored,
   onTap,
 }: {
   cell: number;
@@ -3195,6 +3198,7 @@ function Cell({
   movable: boolean;
   moving: boolean;
   shoreable: boolean;
+  shored: boolean;
   onTap: () => void;
 }) {
   // Visual-only overlays: the engine has already mutated state (consumed
@@ -3244,6 +3248,7 @@ function Cell({
   if (movable) classes.push("movable");
   if (moving) classes.push("moving");
   if (shoreable) classes.push("shoreable");
+  if (shored) classes.push("shored");
 
   const words = displayId ? displayId.split("-") : [];
   const longest = Math.max(0, ...words.map((w) => w.length));
@@ -3251,7 +3256,9 @@ function Cell({
 
   const ariaLabel = item
     ? `${cap(item.name)}${
-        crumbleTick > 0
+        shored
+          ? ", shored: won't crumble"
+          : crumbleTick > 0
           ? `, crumbling: nothing in this age uses it, gone in ${CRUMBLE_TTL + 1 - crumbleTick} turns`
           : ""
       }`

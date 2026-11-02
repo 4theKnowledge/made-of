@@ -366,7 +366,7 @@ describe("helpers (swap, clear, move)", () => {
     expect(state.board[0]).toBeNull();
   });
 
-  it("shore resets a crumble counter without consuming a turn", () => {
+  it("shore marks the tile permanently exempt from crumble", () => {
     const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
     s0.board = Array(9).fill(null);
     s0.board[4] = "flour";
@@ -375,6 +375,7 @@ describe("helpers (swap, clear, move)", () => {
     const beforeMoves = s0.moves;
     const { state } = reduce(s0, bundle, { type: "shore", cell: 4 });
     expect(state.crumb[4]).toBeNull();
+    expect(state.shored[4]).toBe(true);
     expect(state.board[4]).toBe("flour");
     expect(state.shore).toBe(beforeShore - 1);
     expect(state.moves).toBe(beforeMoves);
@@ -408,6 +409,62 @@ describe("helpers (swap, clear, move)", () => {
     const { state } = reduce(s0, bundle, { type: "shore", cell: 4 });
     expect(state.crumb[4]).not.toBeNull();
     expect(state.shore).toBe(0);
+  });
+
+  it("a shored tile survives repeated age-advancement crumble ticks", () => {
+    // Place a stale tile (not useful in the current age), shore it, then
+    // make a bunch of unrelated moves. The counter never re-arms and the
+    // tile never falls off the board.
+    const b = fakeBundle({
+      recipes: [R("dough", ["flour", "water"])],
+    });
+    const s0 = newGame("everything", b, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    // "stone" isn't used by any recipe → it's crumble-eligible immediately.
+    s0.board[4] = "stone";
+    s0.crumb[4] = { id: "stone", n: 1 };
+    const afterShore = reduce(s0, b, { type: "shore", cell: 4 }).state;
+    expect(afterShore.shored[4]).toBe(true);
+
+    // Do many placements (any no-op action that triggers afterMove's crumble
+    // pass is enough; we simulate turns by placing + removing).
+    let s = afterShore;
+    for (let i = 0; i < 10; i++) {
+      s.tray = ["flour", null, null];
+      s = reduce(s, b, { type: "place", slot: 0, cell: 0 }).state;
+      s.board[0] = null;
+    }
+    expect(s.board[4]).toBe("stone");
+    expect(s.shored[4]).toBe(true);
+  });
+
+  it("clearing a shored tile drops the shore flag", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    s0.board[4] = "flour";
+    s0.crumb[4] = { id: "flour", n: 2 };
+    s0.clears = 1;
+    const afterShore = reduce(s0, bundle, { type: "shore", cell: 4 }).state;
+    expect(afterShore.shored[4]).toBe(true);
+    const afterClear = reduce(afterShore, bundle, { type: "clear", cell: 4 }).state;
+    expect(afterClear.board[4]).toBeNull();
+    expect(afterClear.shored[4]).toBe(false);
+  });
+
+  it("moving a shored tile carries the shore flag to the new cell", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    s0.board[4] = "flour";
+    s0.crumb[4] = { id: "flour", n: 2 };
+    const afterShore = reduce(s0, bundle, { type: "shore", cell: 4 }).state;
+    const afterMove = reduce(afterShore, bundle, {
+      type: "move",
+      from: 4,
+      to: 0,
+    }).state;
+    expect(afterMove.board[0]).toBe("flour");
+    expect(afterMove.shored[0]).toBe(true);
+    expect(afterMove.shored[4]).toBe(false);
   });
 });
 

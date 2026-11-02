@@ -62,6 +62,7 @@ export interface StoredGame {
   age: number;
   ageMade: number;
   crumb: Array<CrumbleCounter | null>;
+  shored?: boolean[];
   closeCalls: number;
   recentTrays: string[][];
 }
@@ -106,6 +107,7 @@ function toStored(state: GameState): StoredGame {
     age: state.age,
     ageMade: state.ageMade,
     crumb: state.crumb.map((c) => (c ? { ...c } : null)),
+    shored: state.shored.slice(),
     closeCalls: state.closeCalls,
     recentTrays: state.recentTrays.map((t) => t.slice()),
   };
@@ -210,6 +212,10 @@ export function hydrateGame(s: StoredGame): GameState {
     age: s.age,
     ageMade: s.ageMade,
     crumb: s.crumb.map((c) => (c ? { ...c } : null)),
+    shored:
+      Array.isArray(s.shored) && s.shored.length === s.n * s.n
+        ? s.shored.slice()
+        : Array(s.n * s.n).fill(false),
     closeCalls: s.closeCalls,
     recentTrays: (s.recentTrays ?? []).map((t) => t.slice()),
     choosing: null,
