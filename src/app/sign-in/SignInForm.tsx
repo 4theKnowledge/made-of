@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { signIn } from "@/lib/auth-client";
 
+const isDev = process.env.NODE_ENV !== "production";
+const DEV_EMAIL = process.env.NEXT_PUBLIC_DEV_ADMIN_EMAIL ?? "";
+
 export function SignInForm() {
   const [email, setEmail] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -10,6 +13,28 @@ export function SignInForm() {
     "idle",
   );
   const [error, setError] = useState<string | null>(null);
+
+  async function devSignIn() {
+    setStatus("sending");
+    setError(null);
+    try {
+      const res = await fetch("/api/dev/sign-in", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: email || DEV_EMAIL }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      window.location.href = "/account";
+    } catch (e) {
+      setStatus("error");
+      setError(e instanceof Error ? e.message : "Dev sign-in failed.");
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -112,6 +137,22 @@ export function SignInForm() {
       >
         {status === "sending" ? "Sending…" : "Send sign-in link"}
       </button>
+      {isDev && (
+        <button
+          type="button"
+          className="btn"
+          onClick={devSignIn}
+          disabled={status === "sending" || !(email || DEV_EMAIL)}
+          style={{
+            alignSelf: "flex-start",
+            borderStyle: "dashed",
+            opacity: 0.85,
+          }}
+          title="Dev-only. Skips the email round-trip. Set NEXT_PUBLIC_DEV_ADMIN_EMAIL to pre-fill."
+        >
+          Dev sign in{email || DEV_EMAIL ? ` (${email || DEV_EMAIL})` : ""}
+        </button>
+      )}
     </form>
   );
 }

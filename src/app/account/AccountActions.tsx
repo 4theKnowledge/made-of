@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 export function AccountActions() {
   const router = useRouter();
   const [busy, setBusy] = useState<"out" | "del" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function doSignOut() {
     setBusy("out");
@@ -17,12 +19,7 @@ export function AccountActions() {
   }
 
   async function doDelete() {
-    if (
-      !window.confirm(
-        "Delete your account? This removes your email and sign-in records. This can't be undone.",
-      )
-    )
-      return;
+    setConfirmOpen(false);
     setBusy("del");
     setError(null);
     const res = await fetch("/api/account", { method: "DELETE" });
@@ -31,6 +28,9 @@ export function AccountActions() {
       setError("Could not delete account. Try again later.");
       return;
     }
+    // Clear the now-stale session cookie before leaving the page, otherwise
+    // the next request still looks signed in via the cookie cache.
+    await signOut().catch(() => {});
     router.push("/");
     router.refresh();
   }
@@ -47,7 +47,7 @@ export function AccountActions() {
       </button>
       <button
         type="button"
-        onClick={doDelete}
+        onClick={() => setConfirmOpen(true)}
         disabled={busy !== null}
         style={{
           background: "none",
@@ -64,6 +64,15 @@ export function AccountActions() {
       {error && (
         <p style={{ color: "var(--bad)", fontSize: 13, margin: 0 }}>{error}</p>
       )}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete your account?"
+        body="This removes your email and sign-in records. This can't be undone."
+        confirmLabel="Delete account"
+        destructive
+        onConfirm={doDelete}
+        onDismiss={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

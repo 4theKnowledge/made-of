@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
 import type { Confidence, Link as LinkRow } from "@/db/schema";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 const CONFIDENCES: Confidence[] = ["established", "strong", "debated", "hypothesis"];
 
@@ -22,6 +23,7 @@ export function LinkRow({
   const [isCanary, setIsCanary] = useState(link.isCanary);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function save() {
     setBusy(true);
@@ -39,7 +41,7 @@ export function LinkRow({
   }
 
   async function del() {
-    if (!window.confirm(`Delete link to ${targetName}?`)) return;
+    setConfirmOpen(false);
     setBusy(true);
     try {
       await fetch(`/api/admin/links/${encodeURIComponent(link.id)}`, { method: "DELETE" });
@@ -87,12 +89,20 @@ export function LinkRow({
             <button type="button" className="btn primary" disabled={busy} onClick={save} style={{ padding: "2px 10px", fontSize: 12 }}>
               Save
             </button>
-            <button type="button" className="btn" disabled={busy} onClick={del} style={{ padding: "2px 10px", fontSize: 12, borderColor: "var(--bad, #a62828)", color: "var(--bad, #a62828)" }}>
+            <button type="button" className="btn" disabled={busy} onClick={() => setConfirmOpen(true)} style={{ padding: "2px 10px", fontSize: 12, borderColor: "var(--bad, #a62828)", color: "var(--bad, #a62828)" }}>
               Delete link
             </button>
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmOpen}
+        title={`Delete link to ${targetName}?`}
+        confirmLabel="Delete link"
+        destructive
+        onConfirm={del}
+        onDismiss={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

@@ -16,6 +16,25 @@ export function getAuth() {
   return _auth;
 }
 
+// Dev-only: /api/dev/sign-in captures the magic-link URL here so it can
+// follow the real verify flow without an email round-trip. Never populated
+// in production (sendMagicLink only writes when NODE_ENV !== "production").
+export const devMagicLinks = new Map<string, string>();
+
+// Dev-only admin allowlist. Comma-separated emails in DEV_ADMIN_EMAILS get
+// `role = "admin"` on sign-in. In production this always returns false.
+export function isDevAdminEmail(email: string): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  const raw = process.env.DEV_ADMIN_EMAILS;
+  if (!raw) return false;
+  const needle = email.trim().toLowerCase();
+  return raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(needle);
+}
+
 function buildAuth() {
   const from = process.env.RESEND_FROM ?? "Made Of <login@madeof.app>";
   // Resend's constructor throws on an empty key, so defer creation until
@@ -64,11 +83,13 @@ function buildAuth() {
           before: async (user) => {
             const suggested =
               (await suggestAvailableHandle()) ?? randomHandleCandidate();
+            const role = isDevAdminEmail(user.email) ? "admin" : undefined;
             return {
               data: {
                 ...user,
                 ageConfirmedAt: new Date(),
                 handle: suggested,
+                ...(role ? { role } : {}),
               },
             };
           },
@@ -93,6 +114,9 @@ function buildAuth() {
       magicLink({
         expiresIn: 60 * 15,
         sendMagicLink: async ({ email, url }) => {
+          if (process.env.NODE_ENV !== "production") {
+            devMagicLinks.set(email, url);
+          }
           if (!process.env.RESEND_API_KEY) {
             console.log(`[auth] magic link for ${email}: ${url}`);
             return;

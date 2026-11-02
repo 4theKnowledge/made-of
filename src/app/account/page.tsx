@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
@@ -24,11 +25,13 @@ export default async function AccountPage() {
 
   const user = session.user as typeof session.user & {
     tier?: string;
+    role?: string;
     handle?: string | null;
     handleLockedAt?: string | Date | null;
     emailVerified?: boolean;
   };
   const tier = user.tier ?? "free";
+  const isAdmin = user.role === "admin";
   const handle = user.handle ?? null;
   const handleLocked = Boolean(user.handleLockedAt);
   const emailVerified = Boolean(user.emailVerified);
@@ -54,6 +57,14 @@ export default async function AccountPage() {
             <dd style={{ margin: 0 }}>
               {tier === "paid" ? "Family" : "Free"}
             </dd>
+            {isAdmin && (
+              <>
+                <dt style={{ color: "var(--muted)" }}>Role</dt>
+                <dd style={{ margin: 0 }}>
+                  Admin · <Link href="/admin">Open admin</Link>
+                </dd>
+              </>
+            )}
             <dt style={{ color: "var(--muted)" }}>Member since</dt>
             <dd style={{ margin: 0 }}>
               {new Date(user.createdAt).toLocaleDateString()}

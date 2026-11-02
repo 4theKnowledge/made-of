@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import type { Item, ItemKind, ItemStatus, Tier } from "@/db/schema";
 import { TIER } from "@/lib/taxonomy";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 const KINDS: ItemKind[] = [
   "cosmic", "element", "mineral", "living", "substance", "food",
@@ -16,6 +17,7 @@ export function ItemEditForm({ item }: { item: Item }) {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -98,7 +100,7 @@ export function ItemEditForm({ item }: { item: Item }) {
   }
 
   async function onDelete() {
-    if (!window.confirm(`Delete "${item.name}"? This is irreversible.`)) return;
+    setConfirmOpen(false);
     setDeleting(true);
     setMsg(null);
     setErr(null);
@@ -181,7 +183,7 @@ export function ItemEditForm({ item }: { item: Item }) {
         )}
         <button
           type="button"
-          onClick={onDelete}
+          onClick={() => setConfirmOpen(true)}
           disabled={deleting}
           className="btn"
           style={{ marginLeft: "auto", borderColor: "var(--bad, #a62828)", color: "var(--bad, #a62828)" }}
@@ -191,6 +193,15 @@ export function ItemEditForm({ item }: { item: Item }) {
       </div>
       {msg && <p style={{ color: "var(--good, #2a7a2a)", marginTop: 10 }}>{msg}</p>}
       {err && <p style={{ color: "var(--bad, #a62828)", marginTop: 10 }}>{err}</p>}
+      <ConfirmDialog
+        open={confirmOpen}
+        title={`Delete "${item.name}"?`}
+        body="This is irreversible."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={onDelete}
+        onDismiss={() => setConfirmOpen(false)}
+      />
     </form>
   );
 }
