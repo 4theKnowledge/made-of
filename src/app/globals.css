@@ -1043,7 +1043,7 @@ a.btn.primary{color:var(--bg)}
 
 /* Age-up: level-up feel. Bigger frame, thicker border, a bright colour ribbon
    that sweeps across once on open, and sample tiles that pop in staggered. */
-.cbdisc.cbagebig{position:relative;overflow:hidden;top:46%;padding:16px 18px 18px;border-width:3px;box-shadow:5px 5px 0 var(--pk),0 0 0 4px color-mix(in srgb, var(--pk) 30%, transparent);animation:mdin .3s ease-out, cbageheadroom .5s ease-out}
+.cbdisc.cbagebig{overflow:hidden;top:46%;padding:16px 18px 18px;border-width:3px;box-shadow:5px 5px 0 var(--pk),0 0 0 4px color-mix(in srgb, var(--pk) 30%, transparent);animation:mdin .3s ease-out, cbageheadroom .5s ease-out}
 .cbdisc.cbagebig b{font-size:26px;line-height:1.05;letter-spacing:-.01em}
 .cbdisc.cbagebig p{font-size:14px}
 .cbagebody{position:relative;z-index:1;flex:1;min-width:0}
