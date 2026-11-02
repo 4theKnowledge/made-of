@@ -8,7 +8,7 @@
 
 import type { Snapshot } from "../graph/snapshot";
 import type { GraphNode } from "../graph/types";
-import { THEMES, isCombineExcluded } from "./filters";
+import { THEMES, inCombineTheme } from "./filters";
 import { computeRefine } from "./levels";
 import type {
   AgeSets,
@@ -37,11 +37,11 @@ function recipeParts(
 
 function recipesForTheme(
   snapshot: Snapshot,
-  _theme: ThemeKey,
+  theme: ThemeKey,
 ): CombineRecipe[] {
   const out: CombineRecipe[] = [];
   for (const node of snapshot.nodes.values()) {
-    if (isCombineExcluded(node)) continue;
+    if (!inCombineTheme(node, theme)) continue;
     for (const recipe of node.recipes) {
       const { from, with_, all } = recipeParts(node, recipe.id);
       if (all.length < 2 || all.length > 7) continue;
@@ -51,7 +51,7 @@ function recipesForTheme(
         .map((id) => snapshot.nodes.get(id))
         .filter((n): n is GraphNode => Boolean(n));
       if (partNodes.length < all.length) continue;
-      if (partNodes.some((p) => isCombineExcluded(p))) continue;
+      if (partNodes.some((p) => !inCombineTheme(p, theme))) continue;
 
       out.push({
         out: node.id,

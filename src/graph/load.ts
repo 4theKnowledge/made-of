@@ -27,13 +27,27 @@ export async function loadRowsFromDb(opts?: {
 
   const liveIds = new Set(items.map((i) => i.id));
 
-  const [recipes, links, evidence] = await Promise.all([
+  const [recipes, links, evidence, itemThemes] = await Promise.all([
     db.select().from(schema.recipes),
     db.select().from(schema.links),
     db
       .selectDistinct({ linkId: schema.linkEvidence.linkId })
       .from(schema.linkEvidence),
+    db
+      .select({
+        itemId: schema.itemCombineThemes.itemId,
+        themeCode: schema.itemCombineThemes.themeCode,
+      })
+      .from(schema.itemCombineThemes),
   ]);
+
+  const combineThemesByItem = new Map<string, string[]>();
+  for (const row of itemThemes) {
+    if (!liveIds.has(row.itemId)) continue;
+    const list = combineThemesByItem.get(row.itemId) ?? [];
+    list.push(row.themeCode);
+    combineThemesByItem.set(row.itemId, list);
+  }
 
   const liveRecipes = recipes.filter((r) => liveIds.has(r.itemId));
   const liveRecipeIds = new Set(liveRecipes.map((r) => r.id));
@@ -55,6 +69,7 @@ export async function loadRowsFromDb(opts?: {
     items,
     recipes: liveRecipes,
     links: liveLinks,
+    combineThemesByItem,
     // These three are only needed by the seed/round-trip test. The runtime
     // graph does not need evidence or sources — the per-link evidence API
     // fetches them straight from Postgres on demand.

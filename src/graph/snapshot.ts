@@ -43,6 +43,16 @@ export function buildSnapshot(rows: SeedRows): Snapshot {
       // the type is narrower (Tag[]) in our data module, so we cast here.
       // Values are validated at parse time by the DataItem type.
       tags: (it.tags ?? []) as GraphNode["tags"],
+      // When loading from Postgres, this comes from the item_combine_themes
+      // join. When building rows from the KB file (seed + tests), the map
+      // isn't populated — fall back to inferring 'everything' membership
+      // for every non-excluded item so the pre-migration behaviour holds
+      // and the Combine tests don't need DB access.
+      combineThemes: rows.combineThemesByItem
+        ? rows.combineThemesByItem.get(it.id!) ?? []
+        : (it.tags ?? []).includes("combine-exclude")
+          ? []
+          : ["everything"],
       up: [],
       down: [],
       neighbours: [],

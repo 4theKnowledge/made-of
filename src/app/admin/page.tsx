@@ -44,6 +44,7 @@ export default async function AdminHome() {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
           <Link href="/admin/tree" className="btn">Tree view</Link>
           <Link href="/admin/kinds" className="btn">Kinds</Link>
+          <Link href="/admin/combine/themes" className="btn">Combine themes</Link>
           <Link href="/admin/pictograms" className="btn">Pictogram audit</Link>
           <Link href="/admin/import" className="btn">Import JSON</Link>
           <Link href="/admin/codes" className="btn">Invite codes</Link>

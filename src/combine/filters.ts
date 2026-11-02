@@ -1,9 +1,15 @@
 /**
- * Combine theme metadata + tag-based filters.
+ * Combine theme metadata + membership helpers.
  *
- * Membership (which items appear in which theme) lives on each item as a
- * `Tag` in src/data/types.ts. This file holds only the themes themselves
- * and the helpers that read tags.
+ * Membership (which items appear in which theme) now lives in Postgres on
+ * the item_combine_themes join table, exposed on each GraphNode as
+ * `combineThemes: string[]`. This file holds the static per-theme metadata
+ * (ages, display strings) that doesn't belong in the DB.
+ *
+ * Legacy: `isCombineExcluded` previously drove Everything membership via
+ * the `combine-exclude` tag. It stays as a safety net — an item marked
+ * exclude is treated as if it weren't in any theme even if the join table
+ * says otherwise. The admin theme validator flags that contradiction.
  */
 
 import type { GraphNode } from "../graph/types";
@@ -18,7 +24,16 @@ export const THEMES: Record<ThemeKey, ThemeMeta> = {
   },
 };
 
-/** Never dealt or made in Combine (fab chain, big bang). */
+/** Never dealt or made in Combine (fab chain, big bang). Kept as a safety
+ *  net; the join table is the source of truth for Everything membership. */
 export function isCombineExcluded(node: GraphNode): boolean {
   return node.tags.includes("combine-exclude");
+}
+
+/** True when the node belongs to the given Combine theme. Enforces the
+ *  "exclude trumps membership" rule so a stray exclude tag can't leak into
+ *  the game via the join table. */
+export function inCombineTheme(node: GraphNode, theme: ThemeKey): boolean {
+  if (isCombineExcluded(node)) return false;
+  return node.combineThemes.includes(theme);
 }

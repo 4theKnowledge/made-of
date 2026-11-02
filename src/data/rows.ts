@@ -33,6 +33,10 @@ export interface SeedRows {
     position: number;
   }>;
   sources: NewSource[];
+  /** Combine theme memberships, item id → theme codes. Populated when reading
+   *  from the DB; empty when building from the knowledge base file (the file
+   *  format pre-dates themes-as-a-table). */
+  combineThemesByItem?: Map<string, string[]>;
   /** name → item uuid. Only populated when building rows from the knowledge
    *  base; empty when rows are loaded straight from the DB. */
   itemIdByName: Map<string, string>;

@@ -31,6 +31,8 @@ export interface GraphNode {
   recipes: Array<{ id: string; label: string | null; position: number }>;
   /** Membership markers. Empty array if none. */
   tags: Tag[];
+  /** Combine theme codes this item belongs to. Empty array if none. */
+  combineThemes: string[];
   /** All edges leading *up* (into the parents, i.e. what this item is made from). */
   up: GraphEdge[];
   /** All edges leading *down* (consumers of this item). */
