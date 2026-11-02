@@ -28,6 +28,7 @@ import {
 } from "@/combine/storage";
 import { useCollection } from "@/combine/useCollection";
 import {
+  dailyShareQuery,
   dailyShareText,
   endlessShareText,
   resolveItemName,
@@ -822,10 +823,18 @@ export function CombineBoard({ bundles: serialised }: Props) {
       `${dr.score.toLocaleString("en")} points · ${dr.made} made${
         topDisplay ? ` · best: ${topDisplay}` : ""
       }`;
+    const query = dailyShareQuery(dr.key, {
+      score: dr.score,
+      age: dr.age,
+      made: dr.made,
+      ageName: dr.ageName,
+      ageCount: bundles.everything.theme.ages.length,
+      best: topDisplay,
+    });
     await shareText({
       title: "Made Of · Daily Combine",
       text,
-      url: `https://madeof.app/combine?d=${encodeURIComponent(dr.key)}`,
+      url: `https://madeof.app/combine?${query}`,
     });
   }, [dailyDone, bundles.everything]);
 

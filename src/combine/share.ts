@@ -28,7 +28,7 @@ export function dailyShareText(
   const squares = ages
     .map((_, k) => (k <= state.age ? "🟩" : "⬜"))
     .join("");
-  const ageName = ages[state.age];
+  const ageName = ages[state.age] ?? "";
   const top = bestShelfItem(state, bundle);
   const text =
     `Made Of · Daily Combine ${dayKey}\n` +
@@ -39,8 +39,41 @@ export function dailyShareText(
   return {
     title: "Made Of · Daily Combine",
     text,
-    url: `${SHARE_URL}?d=${encodeURIComponent(dayKey)}`,
+    url: `${SHARE_URL}?${dailyShareQuery(dayKey, {
+      score: state.score,
+      age: state.age,
+      made: state.made,
+      ageName,
+      ageCount: ages.length,
+      best: top,
+    })}`,
   };
+}
+
+/** Query string for the shared URL — kept in sync with /combine/og and
+ *  the generateMetadata reader on /combine. Exported for the daily share
+ *  rebuild path, which doesn't have a GameState in hand. */
+export function dailyShareQuery(
+  dayKey: string,
+  r: {
+    score: number;
+    age: number;
+    made: number;
+    ageName: string;
+    ageCount: number;
+    best: string | null;
+  },
+): string {
+  const q = new URLSearchParams({
+    d: dayKey,
+    s: String(r.score),
+    a: String(r.age),
+    m: String(r.made),
+    an: r.ageName,
+    ac: String(r.ageCount),
+  });
+  if (r.best) q.set("b", r.best);
+  return q.toString();
 }
 
 export function endlessShareText(
