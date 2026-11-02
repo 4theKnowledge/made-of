@@ -6,9 +6,8 @@
  * replies with ready items / win / hint / par. No bulk graph ever leaves the
  * server.
  *
- * All logic ported from legacy/made-of.html's From Scratch block (lines
- * 2117-2420). We keep names close to the prototype: `recipesOf`, `reqs`,
- * `canMakeNow`, `costs`, `bestRecipe`, `missing`.
+ * Core functions: `recipesOf`, `reqs`, `canMakeNow`, `costs`, `bestRecipe`,
+ * `missing`.
  */
 
 import type { ItemKind, Tier } from "@/db/schema";

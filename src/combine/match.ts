@@ -5,9 +5,6 @@
  * Any shape counts: a line, an L, a 3×3, a zig-zag — the only rule is that
  * every tile in the group touches another tile in the group. Tiles out of
  * contact break the group.
- *
- * Ports `cbGrow`, `cbMatch`, `cbMatchOn` and `nbrs` from
- * legacy/made-of.html lines 3334–3417.
  */
 
 import type { CombineRecipe, ThemeBundle } from "./types";

@@ -1,9 +1,9 @@
 /**
- * Daily puzzle logic ported from legacy/made-of.html.
+ * Daily puzzle logic.
  *
- * The prototype generates a puzzle fresh each day from a deterministic seed.
- * We'd normally persist generated puzzles into `daily_puzzles` (phase 5 does
- * that), but for phase 3 we also derive today's puzzle on the fly so the
+ * A puzzle is generated fresh each day from a deterministic seed. We'd
+ * normally persist generated puzzles into `daily_puzzles` (phase 5 does
+ * that), but we also derive today's puzzle on the fly so the
  * game works before the phase 5 job runs.
  *
  * CLOSED hubs: the 10 busiest non-fundamental items plus every fundamental.

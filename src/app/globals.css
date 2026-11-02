@@ -1,8 +1,6 @@
 /* ============================================================================
  * Made Of design system.
- * Ported verbatim from legacy/made-of.html <style>. CLAUDE.md says: copy the
- * prototype's :root CSS variables (light and dark themes) and component rules
- * into the global stylesheet unchanged. Fonts are Chivo and Chivo Mono.
+ * Fonts are Chivo and Chivo Mono. Light + dark themes via :root variables.
  * Pictograms are 32x32 SVG paths rendered inside .ic tiles.
  *
  * The only lines removed are the three mode-visibility rules
@@ -730,9 +728,8 @@ a.btn.primary{color:var(--bg)}
 }
 
 /* ================= Combine ================= */
-/* Ported from legacy/made-of.html lines 881–1170. Blueprints (.cbbp*),
-   resting sources (.cbc.rest, .zz, .src), mystery/hint/clearable states,
-   book/sound menus and daily/sum variants are left for later phases. */
+/* Blueprints (.cbbp*), resting sources (.cbc.rest, .zz, .src),
+   mystery/hint/clearable states, book/sound menus and daily/sum variants. */
 
 .cbwrap{max-width:460px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:10px}
 #cb{position:relative;display:flex;flex-direction:column;gap:10px;user-select:none;-webkit-user-select:none}
@@ -935,7 +932,7 @@ a.btn.primary{color:var(--bg)}
   .cbh.cbtheme{padding:0 5px 0 8px}
 }
 
-/* Helpers dropdown — ported from legacy/made-of.html 893–907. */
+/* Helpers dropdown. */
 .cbhelpwrap,.cbmorewrap{position:relative}
 #cbHelp{gap:5px}
 #cbHelp b{min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:var(--ink);color:var(--bg);font-size:11px;line-height:18px;text-align:center}
@@ -958,7 +955,7 @@ a.btn.primary{color:var(--bg)}
 .cbhm .nm em{font-style:normal;font-size:12px;color:var(--muted);line-height:1.25}
 .cbhm .c{flex:none;font-family:var(--mono);font-size:15px;min-width:22px;text-align:right}
 
-/* Discovery toast — ported from legacy/made-of.html 1098–1103 + 953–956. */
+/* Discovery toast. */
 .cbdisc{position:absolute;left:0;right:0;top:52%;z-index:5;display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:2.5px solid var(--pk);border-radius:4px;background:var(--fM);color:#111417;box-shadow:4px 4px 0 var(--pk);cursor:pointer;animation:mdin .25s ease-out}
 .cbdisc .ic{width:48px;height:48px;flex:none;border:0;background:transparent}
 .cbdisc .ic svg{width:100%;height:100%}
@@ -1166,8 +1163,7 @@ a.btn.primary{color:var(--bg)}
 .cbcta .cbh{grid-column:2;grid-row:1 / span 2;align-self:center;height:34px;text-decoration:none;white-space:nowrap}
 
 /* ================= How to play ================= */
-/* Shared modal used by Daily, Combine and Scratch. Modelled on the prototype's
-   .how dialog (legacy/made-of.html:832-835) but mode-agnostic. */
+/* Shared modal used by Daily, Combine and Scratch. */
 .ibtn{width:36px;height:36px;padding:0;border:1.5px solid var(--ink);background:var(--surface);border-radius:3px;cursor:pointer;display:inline-grid;place-items:center;color:var(--ink);flex:none}
 .ibtn:hover{box-shadow:2px 2px 0 var(--ink);transform:translate(-1px,-1px)}
 .ibtn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}

@@ -5,16 +5,13 @@
  * moving. Every tray is checked before it is dealt: ~3 in 4 trays have a
  * tile that combines straight away, the rest need one set-up move.
  *
- * Ports `cbPick` + `cbDeal` from legacy/made-of.html lines 3377–3449, with
- * four congestion-breaking additions on top:
+ * Four congestion-breaking rules:
  *   1. Pile detection widens with pile size — a pile of 4 is 3x more likely
  *      to trigger partner-picking than a pile of 2.
  *   2. Layer 2 prefers recipes that actually consume the heaviest pile tile.
  *   3. The dealer remembers the last few trays and rejects obvious repeats.
  *   4. A pathological-pile escape hatch forces a diversifying pick when the
  *      recent trays have all been pile-adjacent.
- *
- * Ports `cbPick` + `cbDeal` from legacy/made-of.html lines 3377–3449.
  */
 
 import { ageSets } from "./data";

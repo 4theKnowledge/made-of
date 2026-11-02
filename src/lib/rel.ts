@@ -1,8 +1,7 @@
 import type { LinkType } from "@/db/schema";
 
 /**
- * Ported verbatim from legacy/made-of.html REL (line 1105) and REL_INFO
- * (line 2608). "up" is the view from the thing looking at its parent
+ * Link-type labels. "up" is the view from the thing looking at its parent
  * ("made from"); "down" is the view from the parent looking at its child
  * ("goes into").
  */

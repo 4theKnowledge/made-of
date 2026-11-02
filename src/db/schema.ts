@@ -17,10 +17,8 @@ import {
 /* ========================================================================
  * Enums.
  *
- * Mirrors the artifact's taxonomy (see legacy/made-of.html TIERS, KINDS, REL,
- * CONF). CLAUDE.md corrections applied:
- *   - link type includes `w` (made with) — five types total.
- *   - lowest confidence is `hypothesis`, not `weak`.
+ * Taxonomy: tier is F/N/M/C/P/S; link type is f/w/n/s/e; confidence
+ * ladder has four rungs with hypothesis at the bottom.
  * ====================================================================== */
 
 export const tierEnum = pgEnum("tier", ["F", "N", "M", "C", "P", "S"]);

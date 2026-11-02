@@ -1,8 +1,7 @@
 import Link from "next/link";
 
 /**
- * Shared footer. Ported from legacy/made-of.html line 1083, with legal
- * links appended (Privacy, Terms, Method) for the live site.
+ * Shared footer with legal links (Privacy, Terms, Method).
  *
  * `compactOnMobile` collapses to a single row on mobile for game pages
  * (Combine, Explore, Scratch) so the board isn't pushed down by a tall

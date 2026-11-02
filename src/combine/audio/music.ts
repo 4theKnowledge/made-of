@@ -5,8 +5,7 @@
  *   - drift: slow pad drones on the piano progression, ~every 6–8 s
  *
  * A single 120 ms scheduler loop reads the active track and dispatches to
- * the right tick function. Ports tickHandpan + tickPiano + startMusic/
- * stopMusic from legacy/made-of.html lines 4046–4091; drift is new.
+ * the right tick function.
  */
 
 import {

@@ -11,9 +11,8 @@
  * place that needed asyncness — the "pick what to make" prompt — becomes a
  * `choosing` state the engine stops at, resumable by a `choose(k)` action.
  *
- * Ports the game rules from legacy/made-of.html lines 3453–3604, with the
- * two tried-and-removed features (blueprints, resting sources) left out
- * per the spec.
+ * Blueprints and resting sources are intentionally omitted; they were
+ * tried in an earlier design and removed.
  */
 
 import { ageSets, buildThemeBundle } from "./data";

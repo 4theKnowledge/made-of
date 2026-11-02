@@ -1,6 +1,12 @@
 import type { ItemKind, Tier } from "@/db/schema";
 
-/** Ported from legacy/made-of.html TIERS, KINDS (lines 1096 and 1101). */
+/**
+ * Taxonomy: tiers and item kinds.
+ *
+ * Note: KIND is a hardcoded label fallback for the 12 originally-seeded
+ * kinds. The authoritative set lives in the `kinds` table; admin-managed.
+ * Prefer DB-fetched labels when possible.
+ */
 
 export const TIER: Record<Tier, { name: string; var: string }> = {
   F: { name: "Fundamental", var: "--tF" },

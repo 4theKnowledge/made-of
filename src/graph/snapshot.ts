@@ -99,8 +99,7 @@ export function buildSnapshot(rows: SeedRows): Snapshot {
   }
 
   // Dedupe up edges within each (recipeId, type, target) tuple. A single
-  // recipe listing `f:X` twice should still produce one chip; the prototype
-  // dedupes on `type+id` within a recipe (see legacy made-of.html line 1789).
+  // recipe listing `f:X` twice should still produce one chip.
   for (const n of nodes.values()) {
     n.up = pickBestPerKey(n.up, (e) => `${e.recipeId ?? "~"}|${e.type}|${e.id}`);
   }

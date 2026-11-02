@@ -9,8 +9,6 @@
  * `Math.random()` is reserved for visual and audio variation only (sparkle
  * phases, note pitches). Anything that moves game state must go through
  * this module.
- *
- * Ports `cbRand` + `cbHash` from legacy/made-of.html lines 3199–3201.
  */
 
 /** An opaque 32-bit integer that evolves as the RNG is called. */

@@ -1,9 +1,9 @@
 /**
  * Build Combine's per-theme recipe bundle from the live graph snapshot.
  *
- * One projection pass that mirrors `cbRecipesFor` + `cbUseTheme` in
- * legacy/made-of.html lines 3216–3261. Membership is tag-driven: no
- * hard-coded name lists.
+ * One projection pass over the graph. Membership comes from the
+ * item_combine_themes join table via inCombineTheme(); no hard-coded
+ * name lists.
  */
 
 import type { Snapshot } from "../graph/snapshot";
@@ -67,8 +67,7 @@ function recipesForTheme(
 }
 
 /** Assign refinement levels inside the theme, cut into ages, then push
- *  outputs forward so no recipe needs a later-age part. Mirrors cbUseTheme
- *  lines 3246–3260. */
+ *  outputs forward so no recipe needs a later-age part. */
 function assignAges(
   snapshot: Snapshot,
   recipes: CombineRecipe[],
@@ -300,9 +299,7 @@ export function buildThemeBundle(
  * The dealer picks only from tiles whose recipes live in bands [age, age+1]
  * (1-based). Crumbling clears tiles that aren't useful across bands
  * [age, age+1, age+2].
- *
- * Mirrors `cbAgeSets` in legacy/made-of.html line 3290.
- */
+  */
 export function ageSets(bundle: ThemeBundle, age: number): AgeSets {
   const k = age + 1; // 1-based band to match the prototype
   const dealBands = new Set<number>([k - 1, k]);
@@ -320,9 +317,7 @@ export function ageSets(bundle: ThemeBundle, age: number): AgeSets {
 /** Catalogue every output in the theme, grouped by age (1-based bands,
  *  stored as 0-based index arrays). Within an age, items appear in recipe
  *  order and are deduplicated. Returns the groups plus the catalogue number
- *  for each output (No. 001 is the first thing you could ever make).
- *
- *  Mirrors `cbCatalog` in legacy/made-of.html line 3325. */
+ *  for each output (No. 001 is the first thing you could ever make). */
 export function catalogue(bundle: ThemeBundle): {
   byAge: string[][];
   no: Map<string, number>;

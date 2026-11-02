@@ -1,29 +1,34 @@
 # Made Of
 
-Made Of is a web app that shows what anything is made of, traced all the way back to the big bang, with sourced evidence for every link. It has three original modes from the prototype — the **Daily link** puzzle (`/link`), **Explore** (bowtie view at `/i/[slug]` and `/explore/[slug]`) and **From scratch** / Craft (`/craft`) — plus **Combine** (`/combine`), a tile-combining mode added after the prototype.
+Made Of is a web app that shows what anything is made of, traced all the way back to the big bang, with sourced evidence for every link. It has four modes:
+
+- **Daily link** puzzle (`/link`)
+- **Explore** — bowtie view at `/i/[slug]` and `/explore/[slug]`
+- **From scratch** / Craft (`/craft`)
+- **Combine** (`/combine`), a tile-combining mode
 
 ### Combine, in short
 
 - Combine is a **high-score game first**. Each run has a score; `account/stats` leaderboards and the Combine total/best are what players care about. The item collection and discovery badges are a progression aid along the way, not the goal.
-- Combine has multiple themes (Everyday and Everything today, more later) plus a daily puzzle under the same board. All endless themes share one lifetime collection; the daily puzzle has **its own** collection so endless grinding can't walk a daily into pre-unlocked items. Scope lives on `combine_discoveries.scope` (`endless` | `daily`); existing rows were backfilled to `endless`.
+- Combine has multiple themes (Everything and Everyday today, more later) plus a daily puzzle under the same board. All endless themes share one lifetime collection; the daily puzzle has **its own** collection so endless grinding can't walk a daily into pre-unlocked items. Scope lives on `combine_discoveries.scope` (`endless` | `daily`); existing rows were backfilled to `endless`.
 - Finished-run records go to `progress` with `kind='combine'`, `ref=<theme>`, and `result.daily=<day key>` for daily runs. Future daily leaderboards filter on `result.daily`.
+- **Theme membership is in Postgres** (`combine_themes` + `item_combine_themes`). Admins curate it from `/admin/combine/themes`. The `combine-exclude` tag still trumps membership as a safety net.
 
 ## Current state
 
-- No app code yet and no commits. The next step is Phase 1 of the implementation guide.
-- `Made Of.html` is the working prototype and the reference implementation: one 509 KB file with all data embedded. Its look, copy and behaviour are the spec.
-- `docs/IMPLEMENTATION.md` is the build plan: stack, schema, API, routes and six phases with acceptance criteria. Read it before starting any phase.
-- Living versions of the plans, which may be newer than the repo copy:
-  - Implementation guide: https://claude.ai/artifact/La3k9ECzTyhbSg4vcaXanq
-  - Launch plan (product, pricing, analytics events, SEO, privacy): https://claude.ai/artifact/F7AE2bMkbXRoi3ugkQqkod
+- The app is built. The prototype port is done and the HTML reference file was removed; **the DB is authoritative** for all content, with `src/data/*.data.ts` seeding fresh databases.
+- Admin surfaces at `/admin`:
+  - `/admin/tree` — hierarchical disclosure list of all items with inline CRUD on links, recipes, and items; filters, flat view, bulk edit.
+  - `/admin/kinds` — manage the vocabulary of what an item *is*.
+  - `/admin/combine/themes` — manage Combine themes with a reachability validator.
+  - `/admin/items/[id]` — dedicated per-item editor (full form) still available alongside the modal.
+- `docs/IMPLEMENTATION.md` is historical: it was the original build plan. Treat it as context, not as a to-do list.
 
 ## How to work
 
-- One phase per branch, with a pull request at the end. Check the phase's acceptance criteria before starting the next.
-- Port behaviour, don't redesign. Match the prototype's layout, copy and interactions.
-- Write tests for the graph functions (neighbours, path, everything-it-takes, recipe switching, daily moves) before porting UI, using cases taken from the prototype.
-- Ask before adding a paid service, or before changing pricing, privacy behaviour or what is publicly visible.
-- Where the prototype and the guide disagree on data, the prototype wins (see Known discrepancies).
+- Match the app's existing look, copy, and interactions when adding features; don't redesign without reason.
+- Write tests for graph functions (neighbours, path, everything-it-takes, recipe switching, daily moves) before porting UI, using cases the tests already cover.
+- Ask before adding a paid service, or before changing pricing, privacy behaviour, or what is publicly visible.
 
 ## Hard rules
 
@@ -35,51 +40,28 @@ Made Of is a web app that shows what anything is made of, traced all the way bac
 - **Analytics go through the typed `track()` helper.** Identify users by their Better Auth user id only, never email or name.
 - **Crawlers:** allow search engines and AI search or citation crawlers on item pages; block AI training crawlers; block `/api/` and `/admin/` for all.
 
-## Reading the prototype
+## Content model
 
-The file contains one 262 KB line (the `EVIDENCE` JSON). Never read the whole file, and always truncate search output (for example `grep -n ... | cut -c1-200`). Line numbers below are approximate; search for the landmark text.
-
-| What | Landmark | Around line |
+| Entity | Table | Notes |
 | --- | --- | --- |
-| Tiers, kinds, link types | `const TIERS`, `const KINDS`, `const REL` | 1096 |
-| Item data (276 items) | `` const DATA = ` `` | 1118 to 1406 |
-| Evidence (354 links, 413 sources) | `const EVIDENCE = /*EVIDENCE*/` | 1411 |
-| Confidence levels | `const CONF` | 1412 |
-| Parser and graph build | `function parseParts`, `items.set(` | 1425 |
-| Graph helpers | `function ancestors`, `loopPath`, `bfsU`, `bfsOpen` | 1467 |
-| Pictograms | `const PICTO={` | 1545 |
-| Daily puzzle | `function makePuzzle`, `puzzleMove` | 2017 |
-| From scratch | `function ready`, `newScratch`, `scratchMake` | 2125 |
+| Item | `items` | `tier` (F N M C P S), `kind` → `kinds.code`, status (`draft` / `review` / `live`), `tags[]`, `isCanary` |
+| Kind | `kinds` | Admin-managed. Was a Postgres enum; see migration `0009`. |
+| Recipe | `recipes` | An item can have multiple recipes; recipe-scoped links hang off these. |
+| Link | `links` | Types: `f` made-from, `w` made-with, `n` needs, `s` comes-from, `e` evolved-from. Confidence: `established` / `strong` / `debated` / `hypothesis`. Exactly one of `recipeId` / `itemId` is set. |
+| Combine theme | `combine_themes` + `item_combine_themes` | Admin-managed sets of playable items. |
+| Discovery | `combine_discoveries` | Lifetime collection scoped `endless` or `daily`. |
 
-### Data format
+Link types in the current data (counts correct at seed, drift as admins edit):
 
-Each `DATA` line is `name|tier|kind|year|symbol|recipes|links|fact`.
+| Type | Meaning (up / down) |
+| --- | --- |
+| `f` | Made from / Goes into |
+| `w` | Made with / Used to make |
+| `n` | Needs / Needed by |
+| `s` | Comes from / Source of |
+| `e` | Evolved from / Evolved into |
 
-- `name` is the item id: lowercase, may contain spaces (`big bang`). The URL slug comes from `slug(name)`.
-- `tier` is one of `F N M C P S` (Fundamental, Natural, Material, Component, Product, System).
-- `year` looks like `13.8bya`, `385mya`, `10ka`, `1994` or `-3500` (BCE). A `~` prefix means circa; `?` means unknown. `parseYear` hard-codes 2026 as "now"; use the current year when porting.
-- `recipes` are alternatives separated by ` / `. Each may start with a `[label]` and holds `;`-separated parts of the form `type:a,b,c`. Recipes use the `f`, `w`, `n` and `e` link types.
-- `links` holds item-level `n:` and `s:` parts.
-
-Link types (from `REL`), with counts in the current data:
-
-| Type | Meaning (up / down) | Count |
-| --- | --- | --- |
-| `f` | Made from / Goes into | 289 |
-| `n` | Needs / Needed by | 101 |
-| `w` | Made with / Used to make | 69 |
-| `e` | Evolved from / Evolved into | 40 |
-| `s` | Comes from / Source of | 27 |
-
-`EVIDENCE.links[].ids` use the form `child<type<parent`, for example `RNA<f<nucleotides`. Confidence levels are `established`, `strong`, `debated` and `hypothesis`.
-
-### Known discrepancies
-
-`docs/IMPLEMENTATION.md` predates a close read of the prototype. Follow the prototype:
-
-- The `links.type` column needs all five types, including `w` (made with), not four.
-- The lowest confidence level is `hypothesis`, not `weak`. The daily puzzle generator should reject `debated` and `hypothesis` links.
-- The guide's migration step expects the prototype at `legacy/made-of.html`. Move `Made Of.html` there in Phase 1.
+Recipe-scoped: `f`, `w`, `e` (and `n` optionally). Item-level: `n`, `s`. The UI enforces this split; the schema doesn't.
 
 ## Target stack
 
@@ -92,7 +74,7 @@ One Next.js service (App Router, TypeScript), built as a standalone server from 
 
 ## Design
 
-Copy the prototype's `:root` CSS variables (light and dark themes) into the global stylesheet unchanged. The fonts are Chivo and Chivo Mono. Pictograms are 32×32 SVG paths in `PICTO`, drawn on tier-coloured tiles with ink borders; reuse them as they are.
+The design system's `:root` CSS variables (light and dark themes) live in `src/app/globals.css`. Fonts are Chivo and Chivo Mono. Pictograms are 32×32 SVG paths in `src/pictograms`, drawn on tier-coloured tiles with ink borders.
 
 ## Commands
 
@@ -104,10 +86,10 @@ Node 22, npm. All run from the repo root.
 - `npm run start` — run the production build
 - `npm run typecheck` — `tsc --noEmit`
 - `npm run lint` — Next's ESLint config
-- `npm test` — vitest run (parser + graph tests, no DB needed)
+- `npm test` — vitest run (parser + graph + validator tests, no DB needed)
 - `npm run db:generate` — regenerate Drizzle migrations from `src/db/schema.ts`
 - `npm run db:migrate` — apply migrations to `DATABASE_URL`
-- `npm run db:seed` — load `legacy/made-of.html` into the DB (idempotent)
+- `npm run db:seed` — load `src/data/*.data.ts` into the DB (idempotent on a fresh DB; destructive otherwise)
 - `npm run db:studio` — open Drizzle Studio
 
 Service and account setup (Railway, Cloudflare, Stripe, PostHog, etc.) lives in `docs/SERVICES.md`.

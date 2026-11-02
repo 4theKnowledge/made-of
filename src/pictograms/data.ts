@@ -1,13 +1,13 @@
 /**
- * Pictograms ported verbatim from legacy/made-of.html lines 1525-1737.
+ * Pictograms.
  *
  * One style: a white body (class b), ink lines (l), solid ink (k), white lines (w),
  * on a 32-unit grid. Specific pictures for items with an obvious image; every other
  * item uses its kind's fallback. Elements keep their letter symbols.
  *
  * These strings are inserted directly into an <svg> at render time via
- * dangerouslySetInnerHTML. All content is static and originates from the
- * prototype — never from user input — so XSS is not a concern.
+ * dangerouslySetInnerHTML. All content is static and admin-authored —
+ * never from end-user input — so XSS is not a concern.
  */
 
 const KIND_PICTO={

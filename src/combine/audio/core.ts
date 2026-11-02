@@ -8,8 +8,6 @@
  * until a user gesture. Call `ensureContext()` from the first pointerdown
  * handler.
  *
- * Ports SND from legacy/made-of.html lines 3978–4109. Numbers are kept
- * byte-for-byte so the port sounds like the prototype.
  */
 
 /** Snapshot of the sound settings the audio graph reads from. */

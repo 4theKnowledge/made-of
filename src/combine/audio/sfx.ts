@@ -2,9 +2,6 @@
  * Combine's sound effects. One function per event, each a short strike or
  * run of strikes on the current scale (D major pentatonic with piano
  * music; D Kurd with chimes or drift).
- *
- * Ports the `fx(kind, arg)` dispatch from legacy/made-of.html lines
- * 4093–4104.
  */
 
 import { getContext, midiToFreq, playHush, strike } from "./core";

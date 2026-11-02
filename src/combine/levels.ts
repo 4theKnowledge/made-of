@@ -8,8 +8,7 @@
  * that ignores unknown parts, which breaks loops (steel needs a furnace
  * that needs steel).
  *
- * Mirrors `cbRefine` in legacy/made-of.html line 3267. Computed once per
- * snapshot and memoised against the snapshot identity.
+ * Computed once per snapshot and memoised against the snapshot identity.
  */
 
 import type { Snapshot } from "../graph/snapshot";
@@ -81,8 +80,7 @@ export function computeRefine(snapshot: Snapshot): Map<string, number> {
     }
   }
 
-  // Treat items we couldn't place as raw (matches cbRefine fallback at
-  // legacy/made-of.html line 3275).
+  // Treat items we couldn't place as raw.
   for (const [k, v] of d) if (v === Number.POSITIVE_INFINITY) d.set(k, 0);
 
   CACHE.set(snapshot, d);

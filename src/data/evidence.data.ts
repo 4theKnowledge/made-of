@@ -1,9 +1,10 @@
 /**
  * Evidence for links in the knowledge base.
  *
- * Generated once from `legacy/made-of.html`. Each entry attaches to one or
- * more links by their `child<type<parent` id, carries a confidence level,
- * optional note, and 0..n evidence rows with their citations.
+ * Each entry attaches to one or more links by their `child<type<parent` id,
+ * carries a confidence level, optional note, and 0..n evidence rows with
+ * their citations. Admins edit live via the admin UI; this file remains
+ * the source of truth for `npm run db:seed` on a fresh database.
  */
 
 import type { DataEvidenceLink, DataSource } from "./types";
