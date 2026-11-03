@@ -13,6 +13,7 @@ import { ageSets, catalogue, catalogueByKind } from "@/combine/data";
 import { newGame, reduce, ageNeed } from "@/combine/engine";
 import type { Action, Event, GameState } from "@/combine/engine";
 import { matchAt, matchOn } from "@/combine/match";
+import { findHint as pureFindHint, type HintResult } from "@/combine/hint";
 import { ensureContext, suspend as suspendAudio, hasContext } from "@/combine/audio/core";
 import { fadeOutMusic, startMusic } from "@/combine/audio/music";
 import { fx as playFx } from "@/combine/audio/sfx";
@@ -177,6 +178,9 @@ interface ChainTrace {
   /** Local time (ms) when the trace first mounts; the overlay uses
    *  `performance.now() - startedAt` to pick which steps have "drawn". */
   startedAt: number;
+  /** True when the trace represents a single, non-chained combine.
+   *  Overlay renders a lighter variant and skips the member-cell aura. */
+  solo: boolean;
 }
 
 interface Props {
@@ -297,10 +301,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
   // Shore-mode: next tap on a crumbling tile resets its counter.
   const [shoreMode, setShoreMode] = useState(false);
   // Hint toast — a card with a recipe to try when nothing fits.
-  const [hintToast, setHintToast] = useState<{
-    out: string;
-    recipe: string[];
-  } | null>(null);
+  const [hintToast, setHintToast] = useState<HintResult | null>(null);
   const [fx, setFx] = useState<Fx>({});
   const [discovery, setDiscovery] = useState<{
     out: string;
@@ -498,12 +499,13 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         }
         if (current) groups.push(current);
       }
-      // Index of combine event → its group (or null if standalone single-step).
+      // Index of combine event → its group. Every combine (even a solo
+      // one) gets a group so the overlay can draw its arcs; the group's
+      // length tells us whether to render the full-fat chain visuals or
+      // the lighter solo variant.
       const eventGroup = new Map<number, Group>();
       for (const g of groups) {
-        if (g.endIdx > g.startIdx) {
-          for (let i = g.startIdx; i <= g.endIdx; i++) eventGroup.set(i, g);
-        }
+        for (let i = g.startIdx; i <= g.endIdx; i++) eventGroup.set(i, g);
       }
 
       // Per-group accumulator — the trace mounted at the group's start
@@ -605,6 +607,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
                 members: new Set<number>(),
                 tier: outTier,
                 startedAt: 0,
+                solo: group.endIdx === group.startIdx,
               };
               entry = { trace, mountAt: fuseAt };
               groupTrace.set(group, entry);
@@ -620,21 +623,30 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
             // The final output tier wins visual priority.
             entry.trace.tier = outTier;
             // If this is the last step of the group, schedule the mount
-            // + clear now that the trace is complete.
+            // + clear now that the trace is complete. Skip solo traces
+            // where no ingredient cell differs from the output — e.g. a
+            // 2-tile drop-on-top combines at a single cell, so there's
+            // no meaningful arc to draw. Chains always render.
             if (eIdx === group.endIdx) {
-              const finalPopEnd = popAt + POP_MS;
-              const traceSnapshot: ChainTrace = {
-                steps: entry.trace.steps,
-                members: entry.trace.members,
-                tier: entry.trace.tier,
-                startedAt: entry.mountAt,
-              };
-              schedule.push({
-                at: entry.mountAt,
-                patch: { trace: traceSnapshot },
-                clearAt: finalPopEnd + CHAIN_FADE_MS,
-                clearKeys: ["trace"],
-              });
+              const hasSpatialArc = entry.trace.steps.some((s) =>
+                s.from.some((c) => c !== s.to),
+              );
+              if (!entry.trace.solo || hasSpatialArc) {
+                const finalPopEnd = popAt + POP_MS;
+                const traceSnapshot: ChainTrace = {
+                  steps: entry.trace.steps,
+                  members: entry.trace.members,
+                  tier: entry.trace.tier,
+                  startedAt: entry.mountAt,
+                  solo: entry.trace.solo,
+                };
+                schedule.push({
+                  at: entry.mountAt,
+                  patch: { trace: traceSnapshot },
+                  clearAt: finalPopEnd + CHAIN_FADE_MS,
+                  clearKeys: ["trace"],
+                });
+              }
             }
           }
 
@@ -1298,28 +1310,27 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
     [act],
   );
 
-  const findHint = useCallback(() => {
-    // Teach a recipe from the current age that uses a tile we have in the
-    // tray (preferring unfound outputs). Mirrors step 4 of cbFindHint. If
-    // nothing in the tray is relevant, fall back to any recipe from this
-    // age with an unfound output; else any recipe from this age.
-    const A = ageSets(bundle, state.age);
-    const trayHas = new Set(
-      state.tray.filter((t): t is string => Boolean(t)),
-    );
+  const findHint = useCallback((): HintResult | null => {
     const found = new Set(state.found);
     for (const id of collection.keys()) found.add(id);
-    const scored = A.recipes
-      .map((r) => {
-        const touchesTray = r.all.some((x) => trayHas.has(x));
-        const unfound = !found.has(r.out);
-        return { r, score: (touchesTray ? 2 : 0) + (unfound ? 1 : 0) };
-      })
-      .sort((a, b) => b.score - a.score);
-    const pick = scored[0]?.r;
-    if (!pick) return null;
-    return { out: pick.out, recipe: pick.all };
-  }, [bundle, state.age, state.tray, state.found, collection]);
+    return pureFindHint(bundle, {
+      board: state.board,
+      size: state.n,
+      tray: state.tray,
+      hold: state.hold,
+      age: state.age,
+      found,
+    });
+  }, [
+    bundle,
+    state.age,
+    state.n,
+    state.board,
+    state.tray,
+    state.hold,
+    state.found,
+    collection,
+  ]);
 
   const onHelper = useCallback(
     (which: "hint" | "swap" | "clear" | "move" | "shore" | "undo") => {
@@ -1375,8 +1386,6 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         if (!h) return;
         act({ type: "hint" });
         setHintToast(h);
-        const id = window.setTimeout(() => setHintToast(null), 9000);
-        timers.current.push(id);
       }
     },
     [
@@ -1796,13 +1805,13 @@ function DragGhost({
   const lenClass = longest >= 10 ? " l2" : longest >= 7 ? " l1" : "";
   return (
     <div className="cbghost" style={style} aria-hidden="true">
+      <span className={`cbn${lenClass}`}>{cap(item.name)}</span>
       <Pictogram
         name={item.name}
         tier={item.tier}
         kind={item.kind}
         symbol={item.symbol}
       />
-      <span className={`cbn${lenClass}`}>{cap(item.name)}</span>
     </div>
   );
 }
@@ -2713,12 +2722,27 @@ function HintToast({
   bundle,
   onDismiss,
 }: {
-  hint: { out: string; recipe: string[] };
+  hint: HintResult;
   bundle: ThemeBundle;
   onDismiss: () => void;
 }) {
   const item = bundle.items.get(hint.out);
   if (!item) return null;
+  const using = hint.using ? bundle.items.get(hint.using) : null;
+  const headline =
+    hint.kind === "ready"
+      ? using
+        ? `Drop ${cap(using.name)} on the board — it combines now.`
+        : "A combination is ready on the board."
+      : hint.kind === "one-move"
+        ? using
+          ? `Place ${cap(using.name)} next to its match.`
+          : "One placement completes a combination."
+        : "Nothing fits right now. Try this:";
+  const footer =
+    hint.kind === "teach"
+      ? "Keep the pieces you have, and watch your tray for the rest."
+      : "Tap to close.";
   return (
     <div className="cbdisc" role="status" onClick={onDismiss}>
       <Pictogram
@@ -2729,7 +2753,7 @@ function HintToast({
       />
       <div>
         <span className="k">Hint · tap to close</span>
-        <b>Nothing fits right now. Try this:</b>
+        <b>{headline}</b>
         <div className="cbrcp">
           {hint.recipe.map((pid, k) => {
             const p = bundle.items.get(pid);
@@ -2750,7 +2774,7 @@ function HintToast({
           <i>=</i>
           <span>{cap(item.name)}</span>
         </div>
-        <p>Keep the pieces you have, and watch your tray for the rest.</p>
+        <p>{footer}</p>
       </div>
     </div>
   );
@@ -3560,7 +3584,8 @@ function Cell({
   const isNope = fx.nope === cell;
   const burst = fx.burst?.at === cell ? fx.burst : null;
   const isDiscover = fx.discover === cell;
-  const inChain = fx.trace?.members.has(cell) ?? false;
+  const inChain =
+    !!fx.trace && !fx.trace.solo && fx.trace.members.has(cell);
 
   const classes = ["cbc"];
   if (!empty) classes.push("full");
@@ -3805,6 +3830,7 @@ function Hold({
                 kind={item.kind}
                 symbol={item.symbol}
               />
+              <span className="cbheld-n">{cap(item.name)}</span>
             </button>
           );
         })}
@@ -3918,11 +3944,12 @@ function ChainOverlay({ trace }: { trace: ChainTrace }) {
     setGeo({ w: br.width, h: br.height, centers });
   }, [trace]);
 
+  const cls = `cbchainfx${trace.solo ? " cbchainfx-solo" : ""}`;
   if (!geo) {
     return (
       <svg
         ref={svgRef}
-        className="cbchainfx"
+        className={cls}
         aria-hidden="true"
       />
     );
@@ -3932,7 +3959,7 @@ function ChainOverlay({ trace }: { trace: ChainTrace }) {
   return (
     <svg
       ref={svgRef}
-      className="cbchainfx"
+      className={cls}
       viewBox={`0 0 ${geo.w} ${geo.h}`}
       width={geo.w}
       height={geo.h}
@@ -3944,6 +3971,7 @@ function ChainOverlay({ trace }: { trace: ChainTrace }) {
         return (
           <g key={si}>
             {step.from.map((fromCell, fi) => {
+              if (fromCell === step.to) return null;
               const from = geo.centers.get(fromCell);
               if (!from) return null;
               // Curved path — midpoint pulled toward the output and
