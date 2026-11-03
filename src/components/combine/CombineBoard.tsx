@@ -3143,7 +3143,7 @@ function AgeBar({
   const need = 7 + 2 * state.age;
   const pct = last ? 100 : Math.min(100, Math.round((state.ageMade / need) * 100));
   const ariaLabel = `Age ${ages[state.age]} of ${ages.length}${
-    last ? "" : `. Discover ${need - state.ageMade} more to reach Age ${ages[state.age + 1]}`
+    last ? "" : `. Make ${need - state.ageMade} more Age ${ages[state.age]} combos to reach Age ${ages[state.age + 1]}`
   }. Tap for details.`;
   return (
     <div className="cbage">
@@ -3181,8 +3181,9 @@ function AgesSheet({
   const last = current >= ages.length - 1;
   const need = 7 + 2 * current;
   const left = Math.max(0, need - state.ageMade);
-  // Group this run's discoveries by the band each item belongs to, so the
-  // dialog can show "what you've found in each age" under each row.
+  // Group this run's discoveries by the age the player actually made them
+  // in (recipe.band at make time), falling back to the item's canonical
+  // min-band for older saves that predate `madeAtBand`.
   const foundByBand = useMemo(() => {
     const bandOf = new Map<string, number>();
     for (const r of bundle.recipes) {
@@ -3191,7 +3192,7 @@ function AgesSheet({
     }
     const m = new Map<number, string[]>();
     for (const id of state.found) {
-      const b = bandOf.get(id);
+      const b = state.madeAtBand[id] ?? bandOf.get(id);
       if (b == null) continue;
       let list = m.get(b);
       if (!list) {
@@ -3228,10 +3229,12 @@ function AgesSheet({
           Age {ages[current]} — step {current + 1} of {ages.length}
         </h3>
         <p>
-          Combine tiles to make things at least this advanced.
+          Make combos at Age {ages[current]} to advance. Each successful
+          Age-{ages[current]} combo counts — chains and makes at earlier
+          ages don&apos;t.
           {last
             ? " You're on the final step — keep combining to push your score higher."
-            : ` ${left} more ${ages[current]} discover${left === 1 ? "y" : "ies"} and you unlock ${ages[current + 1]}.`}
+            : ` ${left} more Age-${ages[current]} combo${left === 1 ? "" : "s"} and you unlock ${ages[current + 1]}.`}
         </p>
         {chain.length >= 2 && (
           <div className="cbageex">
