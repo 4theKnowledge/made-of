@@ -942,34 +942,6 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
     [],
   );
 
-  // Close the helpers menu on any click outside it (except on the Helpers
-  // button itself, which toggles it).
-  useEffect(() => {
-    if (!helpersOpen) return;
-    const onDocClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
-      if (target.closest(".cbhelpmenu")) return;
-      if (target.closest("#cbHelp")) return;
-      setHelpersOpen(false);
-    };
-    window.addEventListener("click", onDocClick);
-    return () => window.removeEventListener("click", onDocClick);
-  }, [helpersOpen]);
-
-  useEffect(() => {
-    if (!moreOpen) return;
-    const onDocClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
-      if (target.closest(".cbmoremenu")) return;
-      if (target.closest("#cbMore")) return;
-      setMoreOpen(false);
-    };
-    window.addEventListener("click", onDocClick);
-    return () => window.removeEventListener("click", onDocClick);
-  }, [moreOpen]);
-
   // Escape closes the top overlay in prototype order: info card, discovery
   // toast, age toast, hint toast, helpers menu, helper mode, selected tray
   // tile. Doesn't dismiss the choice picker (the engine is paused and

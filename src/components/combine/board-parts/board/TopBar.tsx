@@ -2,6 +2,7 @@ import React from "react";
 import type { GameState } from "@/combine/engine";
 import type { Fx } from "@/components/combine/board-parts/types";
 import { formatDailyLabel } from "@/components/combine/board-parts/util";
+import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 
 export function TopBar({
   state,
@@ -110,11 +111,13 @@ export function TopBar({
             </>
           )}
         </button>
-        {helpersOpen && !state.over && (
-          <>
-            <div className="cbscrim cbhelpscrim" aria-hidden="true" />
-            <div className="cbhelpmenu" role="menu" aria-label="Helpers">
-            <span className="k cbhelptitle">Helpers</span>
+        <ResponsiveSheet
+          open={helpersOpen && !state.over}
+          onDismiss={onToggleHelpers}
+          ariaLabel="Helpers"
+          className="cbhelpmenu"
+        >
+          <span className="k cbhelptitle">Helpers</span>
             <button
               type="button"
               className="cbhm"
@@ -225,9 +228,7 @@ export function TopBar({
               </span>
               <b className="c">{state.undos}</b>
             </button>
-            </div>
-          </>
-        )}
+        </ResponsiveSheet>
       </div>
       <div className="cbmorewrap">
         <button
@@ -246,11 +247,13 @@ export function TopBar({
             <circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" />
           </svg>
         </button>
-        {moreOpen && (
-          <>
-            <div className="cbscrim cbhelpscrim" aria-hidden="true" />
-            <div className="cbmoremenu cbhelpmenu" role="menu" aria-label="More">
-              <span className="k cbhelptitle">More</span>
+        <ResponsiveSheet
+          open={moreOpen}
+          onDismiss={onToggleMore}
+          ariaLabel="More"
+          className="cbmoremenu cbhelpmenu"
+        >
+          <span className="k cbhelptitle">More</span>
               <button
                 type="button"
                 className="cbhm"
@@ -314,9 +317,7 @@ export function TopBar({
                   <em>Replay the welcome demo</em>
                 </span>
               </button>
-            </div>
-          </>
-        )}
+        </ResponsiveSheet>
       </div>
     </div>
   );
