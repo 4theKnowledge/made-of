@@ -58,6 +58,14 @@ export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 
 export const combineScopeEnum = pgEnum("combine_scope", ["endless", "daily"]);
 
+export const changelogStatusEnum = pgEnum("changelog_status", ["draft", "live"]);
+export const changelogTypeEnum = pgEnum("changelog_type", [
+  "feature",
+  "fix",
+  "content",
+  "note",
+]);
+
 // Access codes. `invite` gates sign-up during soft-launch; `promo` is left
 // open for future use (e.g. upgrade coupons, event drops). Both share the
 // same table so admin tooling and redemption bookkeeping stay in one place.
@@ -597,6 +605,38 @@ export const subscriptions = pgTable(
 );
 
 /* ========================================================================
+ * Changelog.
+ *
+ * Admin-authored release notes rendered at /changelog. `slug` gives entries
+ * stable anchor URLs. `body` is markdown. Only `status = 'live'` rows are
+ * public — `publishedAt` is stamped when an entry flips draft→live and
+ * drives the public ordering.
+ * ====================================================================== */
+
+export const changelogEntries = pgTable(
+  "changelog_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull().unique(),
+    title: text("title").notNull(),
+    type: changelogTypeEnum("type").notNull().default("feature"),
+    body: text("body").notNull().default(""),
+    status: changelogStatusEnum("status").notNull().default("draft"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("changelog_status_idx").on(t.status),
+    index("changelog_published_idx").on(t.publishedAt),
+  ],
+);
+
+/* ========================================================================
  * Relations.
  * ====================================================================== */
 
@@ -668,6 +708,10 @@ export type Confidence = (typeof confidenceEnum.enumValues)[number];
 export type EvidenceStance = (typeof evidenceStanceEnum.enumValues)[number];
 export type SourceKind = (typeof sourceKindEnum.enumValues)[number];
 export type UserRole = (typeof userRoleEnum.enumValues)[number];
+export type ChangelogStatus = (typeof changelogStatusEnum.enumValues)[number];
+export type ChangelogType = (typeof changelogTypeEnum.enumValues)[number];
+export type ChangelogEntry = typeof changelogEntries.$inferSelect;
+export type NewChangelogEntry = typeof changelogEntries.$inferInsert;
 
 export type Item = typeof items.$inferSelect;
 export type NewItem = typeof items.$inferInsert;

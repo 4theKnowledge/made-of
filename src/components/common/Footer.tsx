@@ -23,6 +23,7 @@ export function Footer({ compactOnMobile = false }: { compactOnMobile?: boolean 
         <Link href="/pricing">Pricing</Link>
         <Link href="/about">About</Link>
         <Link href="/method">Method</Link>
+        <Link href="/changelog">Changelog</Link>
         <Link href="/privacy">Privacy</Link>
         <Link href="/terms">Terms</Link>
       </nav>
