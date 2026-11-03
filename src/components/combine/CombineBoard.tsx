@@ -1918,7 +1918,12 @@ function DetailCard({
           </div>
         )}
         <div className="row2">
-          <a className="cbh" href={`/explore/${item.slug}`}>
+          <a
+            className="cbh"
+            href={`/explore/${item.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             Full story in Explore
           </a>
           <button type="button" className="cbh" onClick={onDismiss}>
