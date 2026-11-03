@@ -945,7 +945,7 @@ a.btn.primary{color:var(--bg)}
 /* First-run onboarding card. Three animated chapters teaching the core
  * loop, chains, and age progression. Abstract shapes so nothing depends
  * on the content data; key-remount restarts each chapter's animations. */
-.cbonboard{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:90;max-width:360px;width:calc(100% - 40px);padding:20px 22px 16px;border:2.5px solid var(--ink);border-radius:6px;background:var(--bg);box-shadow:6px 6px 0 var(--ink);display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;animation:mdin .2s ease-out}
+.cbonboard{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:90;max-width:320px;width:calc(100% - 32px);padding:18px 16px 14px;border:2.5px solid var(--ink);border-radius:6px;background:var(--bg);box-shadow:6px 6px 0 var(--ink);display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;animation:mdin .2s ease-out;box-sizing:border-box}
 .cbonboard h2{margin:0;font-family:var(--display);font-size:22px;font-weight:700}
 .cbonboard p{margin:0;font-size:13.5px;line-height:1.4;color:var(--muted);max-width:32ch;min-height:2.8em}
 .cbonboard-stage{position:relative;width:240px;height:112px;margin:2px 0}
