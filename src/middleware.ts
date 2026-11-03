@@ -1,3 +1,4 @@
+import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
@@ -14,7 +15,48 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const HEADER = "x-origin-lock";
 
+// Routes reachable without a session when STEALTH_MODE=1. Everything else
+// is bounced to /sign-in. Auth endpoints must stay open so the magic link
+// round-trip works; terms/privacy stay open because the sign-in form links
+// to them.
+const STEALTH_PUBLIC_PREFIXES = [
+  "/sign-in",
+  "/api/sign-in",
+  "/api/auth",
+  "/api/dev/sign-in",
+  "/api/health",
+  "/terms",
+  "/privacy",
+  "/favicon.ico",
+  "/icon",
+  "/apple-icon",
+  "/email",
+];
+
+function isStealthPublic(pathname: string): boolean {
+  return STEALTH_PUBLIC_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`) || pathname.startsWith(`${p}.`),
+  );
+}
+
 export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  // Stealth gate: when STEALTH_MODE=1, require a session cookie for every
+  // route except the sign-in flow and a short allowlist. We only check the
+  // cookie's presence here (middleware runs on the Edge, no DB); the real
+  // session is still validated server-side by getSession() wherever it
+  // matters. Flip STEALTH_MODE off to open the site publicly.
+  if (process.env.STEALTH_MODE === "1" && !isStealthPublic(pathname)) {
+    const hasSession = getSessionCookie(req, { cookiePrefix: "madeof" });
+    if (!hasSession) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/sign-in";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (process.env.NODE_ENV !== "production") return NextResponse.next();
 
   // Explicit kill switch: used while Cloudflare isn't yet in front of the
