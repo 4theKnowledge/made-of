@@ -3,7 +3,7 @@ import { loadKnowledgeBase } from "../../data/load";
 import { toRows } from "../../data/rows";
 import { buildSnapshot } from "../../graph/snapshot";
 import { buildThemeBundle } from "../data";
-import { newGame, reduce, type Action, type GameState } from "../engine";
+import { hasAnyLegalAction, newGame, reduce, type Action, type GameState } from "../engine";
 import type { CombineRecipe, ThemeBundle } from "../types";
 
 const snap = buildSnapshot(toRows(loadKnowledgeBase()));
@@ -312,18 +312,117 @@ describe("terminal outputs ship to the shelf", () => {
 });
 
 describe("age up + crumble + deal", () => {
-  it("game-over fires when the board is full", () => {
+  it("a full board alone is not game-over if the player can still act", () => {
+    // Full board, but tray tiles exist and the player has spends. The player
+    // can still `drop-on`, `move`, `swap`, etc., so the run continues.
     const bundle = fakeBundle({ recipes: [R("x", ["a", "b"])] });
     const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
     s0.board = Array(9).fill("a");
     s0.board[8] = null;
-    s0.tray = ["b", null, null];
-    // b at 7 is adjacent to a's at 4,6,8 — but matchAt may form {7,...}.
-    // We want to force a non-match so the board fills. Use a non-combining tile.
-    s0.tray = ["z", null, null];
+    s0.tray = ["z", null, null]; // non-combining
+    // Keep default spends: mv=2, swaps=2, clears=1, hold capacity=1.
     const { state, events } = reduce(s0, bundle, { type: "place", slot: 0, cell: 8 });
-    expect(state.over).toBe(true);
-    expect(events.some((e) => e.type === "over")).toBe(true);
+    expect(state.board.every((v) => v != null)).toBe(true);
+    expect(state.over).toBe(false);
+    expect(events.some((e) => e.type === "over")).toBe(false);
+  });
+
+  it("hasAnyLegalAction: dead-end full board returns false", () => {
+    // Full board of a tile that isn't in any recipe, empty tray and hold,
+    // all spends at 0 — truly nothing the player can do.
+    const bundle = fakeBundle({ recipes: [R("x", ["a", "b"])] });
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill("z"); // "z" is not an ingredient of any recipe
+    s0.tray = [null, null, null];
+    s0.hold = [];
+    s0.swaps = 0;
+    s0.clears = 0;
+    s0.mv = 0;
+    expect(hasAnyLegalAction(s0, bundle)).toBe(false);
+  });
+
+  it("hasAnyLegalAction: full board + drop-on match returns true", () => {
+    // Full board, no spends, no hold, but a tray tile combines onto an
+    // occupied cell. That `drop-on` is a legal action, so not game-over.
+    const bundle = fakeBundle({ recipes: [R("x", ["a", "b"])] });
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill("a");
+    s0.tray = ["b", null, null]; // `b` drop-on any `a` combines
+    s0.hold = [];
+    s0.swaps = 0;
+    s0.clears = 0;
+    s0.mv = 0;
+    expect(hasAnyLegalAction(s0, bundle)).toBe(true);
+  });
+
+  it("hasAnyLegalAction: full board + swap remaining returns true", () => {
+    // Full board of a dead tile, empty tray/hold, but `swaps > 0` means
+    // the player can still reroll. Not game-over.
+    const bundle = fakeBundle({ recipes: [R("x", ["a", "b"])] });
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill("z");
+    s0.tray = [null, null, null];
+    s0.hold = [];
+    s0.swaps = 1;
+    s0.clears = 0;
+    s0.mv = 0;
+    expect(hasAnyLegalAction(s0, bundle)).toBe(true);
+  });
+
+  it("hasAnyLegalAction: full board + mv but no empty neighbour returns false", () => {
+    // `mv > 0` only rescues when a move can either relocate to an empty
+    // cell or combine with a neighbour. Full board of a non-recipe tile
+    // means neither applies.
+    const bundle = fakeBundle({ recipes: [R("x", ["a", "b"])] });
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill("z");
+    s0.tray = [null, null, null];
+    s0.hold = [];
+    s0.swaps = 0;
+    s0.clears = 0;
+    s0.mv = 5;
+    expect(hasAnyLegalAction(s0, bundle)).toBe(false);
+  });
+
+  it("hasAnyLegalAction: full board of same tile + mv returns false", () => {
+    // Even if the tile is part of a recipe, `matchOn` needs distinct tiles,
+    // and no cell is empty for relocation.
+    const bundle = fakeBundle({ recipes: [R("x", ["a", "b"])] });
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill("a");
+    s0.tray = [null, null, null];
+    s0.hold = [];
+    s0.swaps = 0;
+    s0.clears = 0;
+    s0.mv = 5;
+    expect(hasAnyLegalAction(s0, bundle)).toBe(false);
+  });
+
+  it("hasAnyLegalAction: full board + clears > 0 returns true", () => {
+    // `clear` removes a cell — always legal when the board has any tile
+    // and the player has a clear left.
+    const bundle = fakeBundle({ recipes: [R("x", ["a", "b"])] });
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill("z");
+    s0.tray = [null, null, null];
+    s0.hold = [];
+    s0.swaps = 0;
+    s0.clears = 1;
+    s0.mv = 0;
+    expect(hasAnyLegalAction(s0, bundle)).toBe(true);
+  });
+
+  it("hasAnyLegalAction: full board + hold capacity + tray tile returns true", () => {
+    // A tray tile can always move into a free hold slot. Legal action.
+    const bundle = fakeBundle({ recipes: [R("x", ["a", "b"])] });
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill("z");
+    s0.tray = ["z", null, null];
+    s0.hold = [null]; // capacity 1, empty
+    s0.swaps = 0;
+    s0.clears = 0;
+    s0.mv = 0;
+    expect(hasAnyLegalAction(s0, bundle)).toBe(true);
   });
 });
 

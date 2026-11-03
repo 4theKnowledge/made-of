@@ -551,11 +551,72 @@ function afterMove(
     events.push({ type: "dealt" });
   }
 
-  // 4. Game over if the board has no empty cell.
-  if (state.board.every((v) => v != null)) {
+  // 4. Game over if the player has no legal action left. A full board is
+  //    *not* enough — a `drop-on` can still combine onto an occupied cell,
+  //    a `move` can relocate or combine on-board, and spends (`swap`,
+  //    `clear`, `hold`) give the player a way forward. See
+  //    `hasAnyLegalAction` for the full predicate.
+  if (!hasAnyLegalAction(state, bundle)) {
     state.over = true;
     events.push({ type: "over" });
   }
+}
+
+/** True if the player has at least one action available that changes state.
+ *  Used to decide game-over: a full board is not game-over as long as a
+ *  tray/hold tile can `drop-on`, a `move` is available, or the player has
+ *  a `swap` / `clear` / `hold` spend to take.
+ *
+ *  Does not consider `undo` (reverts rather than progresses) or `shore`
+ *  (doesn't open new placements on its own). */
+export function hasAnyLegalAction(state: GameState, bundle: ThemeBundle): boolean {
+  const size = state.n;
+  const anyEmpty = state.board.some((v) => v == null);
+  const anyOccupied = state.board.some((v) => v != null);
+  const traySlots: Array<string | null> = state.tray;
+  const holdSlots: Array<string | null> = state.hold;
+  const trayHasTile = traySlots.some((t) => t != null);
+  const holdHasTile = holdSlots.some((t) => t != null);
+
+  // place: any tray/hold tile + any empty cell is a legal action.
+  if (anyEmpty && (trayHasTile || holdHasTile)) return true;
+
+  // drop-on: any tray/hold tile that combines onto some occupied cell.
+  if (anyOccupied) {
+    for (const sources of [traySlots, holdSlots]) {
+      for (const t of sources) {
+        if (t == null) continue;
+        for (let j = 0; j < state.board.length; j++) {
+          if (state.board[j] == null) continue;
+          if (matchOn(bundle, state.board, j, t, size)) return true;
+        }
+      }
+    }
+  }
+
+  // move: with `mv > 0` the player can relocate any on-board tile to an
+  // adjacent empty cell OR trigger a combine on an adjacent occupied cell.
+  if (state.mv > 0 && anyOccupied) {
+    for (let i = 0; i < state.board.length; i++) {
+      const t = state.board[i];
+      if (!t) continue;
+      for (const j of edgeNeighbours(i, size)) {
+        if (state.board[j] == null) return true; // relocate
+        if (matchOn(bundle, state.board, j, t, size)) return true; // combine
+      }
+    }
+  }
+
+  // hold: a tray tile can move into a free hold slot.
+  if (trayHasTile && holdSlots.some((v) => v == null)) return true;
+
+  // swap: rerolls the tray. Counts as a legal action.
+  if (state.swaps > 0) return true;
+
+  // clear: removes a tile from the board.
+  if (state.clears > 0 && anyOccupied) return true;
+
+  return false;
 }
 
 /* ========================================================================
