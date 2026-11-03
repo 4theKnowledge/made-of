@@ -18,21 +18,46 @@ import type {
   ThemeKey,
 } from "./types";
 
-/** Collect the parts for one of a node's recipes (f + w only, deduped). */
+/** Collect the parts for one of a node's recipes. All four recipe-scoped
+ *  link types (f = made from, w = made with, n = needs, e = evolved from)
+ *  are treated as combinable ingredients: the player places them together
+ *  on the board. The sets stay separate so the UI/debug can distinguish
+ *  them, but matching only cares about the deduped `all`. */
 function recipeParts(
   node: GraphNode,
   recipeId: string,
-): { from: string[]; with_: string[]; all: string[] } {
+): {
+  from: string[];
+  with_: string[];
+  needs: string[];
+  evolved: string[];
+  all: string[];
+} {
   const fromSet = new Set<string>();
   const withSet = new Set<string>();
+  const needsSet = new Set<string>();
+  const evolvedSet = new Set<string>();
   for (const e of node.up) {
     if (e.recipeId !== recipeId) continue;
     if (e.id === node.id) continue;
     if (e.type === "f") fromSet.add(e.id);
     else if (e.type === "w") withSet.add(e.id);
+    else if (e.type === "n") needsSet.add(e.id);
+    else if (e.type === "e") evolvedSet.add(e.id);
   }
-  const all = new Set<string>([...fromSet, ...withSet]);
-  return { from: [...fromSet], with_: [...withSet], all: [...all] };
+  const all = new Set<string>([
+    ...fromSet,
+    ...withSet,
+    ...needsSet,
+    ...evolvedSet,
+  ]);
+  return {
+    from: [...fromSet],
+    with_: [...withSet],
+    needs: [...needsSet],
+    evolved: [...evolvedSet],
+    all: [...all],
+  };
 }
 
 function recipesForTheme(
@@ -43,7 +68,7 @@ function recipesForTheme(
   for (const node of snapshot.nodes.values()) {
     if (!inCombineTheme(node, theme)) continue;
     for (const recipe of node.recipes) {
-      const { from, with_, all } = recipeParts(node, recipe.id);
+      const { from, with_, needs, evolved, all } = recipeParts(node, recipe.id);
       if (all.length < 2 || all.length > 7) continue;
       if (all.some((partId) => partId === node.id)) continue;
 
@@ -57,6 +82,8 @@ function recipesForTheme(
         out: node.id,
         from,
         with: with_,
+        needs,
+        evolved,
         all,
         lvl: 0,
         band: 1,

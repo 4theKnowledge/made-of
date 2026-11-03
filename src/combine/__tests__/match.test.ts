@@ -63,6 +63,8 @@ const R = (out: string, all: string[]): CombineRecipe => ({
   out,
   from: all,
   with: [],
+  needs: [],
+  evolved: [],
   all,
   lvl: 1,
   band: 1,

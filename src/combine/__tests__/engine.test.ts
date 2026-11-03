@@ -96,6 +96,8 @@ const R = (out: string, all: string[]): CombineRecipe => ({
   out,
   from: all,
   with: [],
+  needs: [],
+  evolved: [],
   all,
   lvl: 1,
   band: 1,
@@ -477,7 +479,7 @@ describe("hold zone", () => {
       // "future" sits in band 3; its ingredients aren't in `USE` for ages
       // 0 or 1 (which see bands [0,1,2] and [1,2,3] respectively), so a
       // held "future-tool" tile should crumble when ageing from 0 → 1.
-      { out: "warp", from: ["spice"], with: [], all: ["spice"], lvl: 1, band: 3 },
+      { out: "warp", from: ["spice"], with: [], needs: [], evolved: [], all: ["spice"], lvl: 1, band: 3 },
     ],
   });
 

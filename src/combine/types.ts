@@ -26,7 +26,15 @@ export interface CombineRecipe {
   from: string[];
   /** Ingredients that are "made with" — tools. */
   with: string[];
-  /** `uniq([...from, ...with])` — the match set. 2..7 items. */
+  /** Prerequisites — "needs" links. Treated as ingredients for matching
+   *  purposes (the player must place them with everything else) but kept
+   *  separate so UI/debug can distinguish catalyst-flavoured inputs. */
+  needs: string[];
+  /** Ancestors — "evolved from" links. Treated as ingredients for matching
+   *  so evolve chains (fish → amphibians) actually combine on the board. */
+  evolved: string[];
+  /** `uniq([...from, ...with, ...needs, ...evolved])` — the match set.
+   *  2..7 items. */
   all: string[];
   /** Level in the whole-theme refinement order. */
   lvl: number;
