@@ -311,6 +311,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
   const [ageToast, setAgeToast] = useState<{
     age: number;
     sample: string[];
+    grants: { mv: number; swap: number; clear: number; hint: number; shore: number };
   } | null>(null);
   // Admin-only debug panel visibility. Only ever flipped from the FAB
   // button below the board, which itself only renders when the server
@@ -455,7 +456,11 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
       let latestDiscovery:
         | { out: string; recipe: string[]; firstLifetime: boolean }
         | null = null;
-      let latestAgeUp: { age: number; sample: string[] } | null = null;
+      let latestAgeUp: {
+        age: number;
+        sample: string[];
+        grants: { mv: number; swap: number; clear: number; hint: number; shore: number };
+      } | null = null;
 
       // Outputs discovered in this batch — used to flash the forming cell
       // when the matching combine pops. (Discovery event precedes its combine
@@ -678,7 +683,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
           discoveredOuts.add(e.out);
           window.setTimeout(() => playFx("discover"), 250);
         } else if (e.type === "age-up") {
-          latestAgeUp = { age: e.age, sample: e.sample };
+          latestAgeUp = { age: e.age, sample: e.sample, grants: e.grants };
           playFx("age");
           vibrate([15, 30, 15, 30, 30]);
         } else if (e.type === "over") {
@@ -2671,11 +2676,22 @@ function AgeToast({
   bundle,
   onDismiss,
 }: {
-  toast: { age: number; sample: string[] };
+  toast: {
+    age: number;
+    sample: string[];
+    grants: { mv: number; swap: number; clear: number; hint: number; shore: number };
+  };
   bundle: ThemeBundle;
   onDismiss: () => void;
 }) {
   const ageName = bundle.theme.ages[toast.age];
+  const grantBits = [
+    toast.grants.mv > 0 ? `${toast.grants.mv} move` : null,
+    toast.grants.swap > 0 ? `${toast.grants.swap} swap` : null,
+    toast.grants.clear > 0 ? `${toast.grants.clear} clear` : null,
+    toast.grants.hint > 0 ? `${toast.grants.hint} hint` : null,
+    toast.grants.shore > 0 ? `${toast.grants.shore} shore` : null,
+  ].filter(Boolean) as string[];
   return (
     <div
       className="cbdisc cbagetoast cbagebig"
@@ -2690,6 +2706,9 @@ function AgeToast({
           New things start arriving. Old ones nobody needs will crumble
           away.
         </p>
+        {grantBits.length > 0 && (
+          <p className="cbagegrants">Replenished: +{grantBits.join(", +")}.</p>
+        )}
         {toast.sample.length > 0 && (
           <div className="cbrcp cbagesample">
             {toast.sample.map((id, i) => {

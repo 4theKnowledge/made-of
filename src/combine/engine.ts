@@ -165,7 +165,7 @@ export type Event =
       close: number;
     }
   | { type: "shipped"; at: number; out: string; bonus: number }
-  | { type: "age-up"; age: number; sample: string[] }
+  | { type: "age-up"; age: number; sample: string[]; grants: HelperGrants }
   | { type: "crumble"; cells: number[] }
   | { type: "hold-crumble"; slots: number[]; tiles: string[] }
   | { type: "discovery"; out: string; recipe: string[] }
@@ -261,18 +261,57 @@ function baselineNeed(age: number): number {
   return 7 + 2 * age;
 }
 
+/** Number of distinct on-band outputs in the age's band. Shared by
+ *  `ageNeed` and helper-grant scaling so both reward and demand move
+ *  together as the KB (or an admin edit) reshapes a band. */
+export function bandSize(age: number, bundle: ThemeBundle): number {
+  const targetBand = age + 1;
+  let n = 0;
+  for (const b of bundle.outBand.values()) {
+    if (b === targetBand) n++;
+  }
+  return n;
+}
+
 /** Unique discoveries at the current age's band needed to leave each age.
  *  Only first-time makes of items whose minimum band is `age + 1` count —
  *  see `finishResolve`. Scales with band population so a mature KB demands
  *  more exploration; floors to the baseline so sparse bands stay playable. */
 export function ageNeed(age: number, bundle: ThemeBundle): number {
-  const targetBand = age + 1;
-  let onBand = 0;
-  for (const b of bundle.outBand.values()) {
-    if (b === targetBand) onBand++;
-  }
-  const scaled = Math.round(onBand * UNLOCK_FRACTION);
+  const scaled = Math.round(bandSize(age, bundle) * UNLOCK_FRACTION);
   return Math.max(baselineNeed(age), scaled);
+}
+
+/** Helper grants per age. Each helper gets `floor(bandSize / divisor)`,
+ *  clamped to `[min, max]`. Scales with band population so dense ages
+ *  (e.g. Everything's band 4/5 at ~95/107 outputs) get proportionally
+ *  more help without flooding the player; the caps keep late-game
+ *  crumble pressure meaningful. */
+export const HELPER_PER_ITEMS = { mv: 10, swap: 15, clear: 20, hint: 20, shore: 15 } as const;
+export const HELPER_MIN = { mv: 2, swap: 1, clear: 1, hint: 1, shore: 1 } as const;
+export const HELPER_MAX = { mv: 8, swap: 5, clear: 3, hint: 4, shore: 4 } as const;
+
+export type HelperGrants = { mv: number; swap: number; clear: number; hint: number; shore: number };
+
+export function helperGrants(age: number, bundle: ThemeBundle): HelperGrants {
+  const n = bandSize(age, bundle);
+  const grant = (k: keyof typeof HELPER_PER_ITEMS) =>
+    Math.min(HELPER_MAX[k], Math.max(HELPER_MIN[k], Math.floor(n / HELPER_PER_ITEMS[k])));
+  return {
+    mv: grant("mv"),
+    swap: grant("swap"),
+    clear: grant("clear"),
+    hint: grant("hint"),
+    shore: grant("shore"),
+  };
+}
+
+function applyHelperGrants(state: GameState, g: HelperGrants): void {
+  state.mv += g.mv;
+  state.swaps += g.swap;
+  state.clears += g.clear;
+  state.hints += g.hint;
+  state.shore += g.shore;
 }
 
 /** Tier value for scoring. Falls back to M=2 for unknown tiers. */
@@ -454,10 +493,11 @@ function afterMove(
     state.age++;
     state.ageMade = 0;
     state.score += 100 * state.age;
-    state.mv++;
+    const grants = helperGrants(state.age, bundle);
+    applyHelperGrants(state, grants);
     const A = ageSets(bundle, state.age);
     const sample = [...new Set(A.recipes.filter((r) => r.band === state.age + 1).map((r) => r.out))].slice(0, 4);
-    events.push({ type: "age-up", age: state.age, sample });
+    events.push({ type: "age-up", age: state.age, sample, grants });
     // Clear the tray so step 3 re-deals from the new age's pool. Keeps I→II
     // feeling like a transition instead of just a label swap.
     state.tray.fill(null);
@@ -645,11 +685,11 @@ export function newGame(
     found: [],
     howMade: {},
     madeAtBand: {},
-    swaps: 2,
-    clears: 1,
-    hints: 2,
-    mv: 2,
-    shore: 2,
+    swaps: 0,
+    clears: 0,
+    hints: 0,
+    mv: 0,
+    shore: 0,
     over: false,
     newBest: false,
     moves: 0,
@@ -666,6 +706,9 @@ export function newGame(
     lastSnapshot: null,
     debug: false,
   };
+
+  // Initial helpers scale to age-0's band population — see HELPER_PER_ITEMS.
+  applyHelperGrants(state, helperGrants(0, bundle));
 
   // Seed a few starting tiles that don't already combine. The prototype
   // used fixed cells per board size (lines 3364); we sample positions from
@@ -1024,7 +1067,11 @@ export function reduce(
           A.recipes.filter((r) => r.band === target + 1).map((r) => r.out),
         ),
       ].slice(0, 4);
-      events.push({ type: "age-up", age: target, sample });
+      // Debug jump mirrors a real age-up's grants so the UI toast renders
+      // normally; admin-only path, never reached in prod play.
+      const grants = helperGrants(target, bundle);
+      applyHelperGrants(state, grants);
+      events.push({ type: "age-up", age: target, sample, grants });
       events.push({ type: "dealt" });
       return { state, events };
     }
