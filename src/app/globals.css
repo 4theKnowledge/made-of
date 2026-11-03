@@ -753,7 +753,10 @@ a.btn.primary{color:var(--bg)}
 .cbh.on{background:var(--ink);color:var(--bg)}
 .cbh:disabled{opacity:.4;cursor:default}
 .cbh.cbtheme{gap:3px;padding:0 8px 0 11px}
-.cbh.cbtheme span{font-weight:700}
+.cbh.cbtheme span{font-weight:700;display:inline-flex;align-items:baseline;gap:5px}
+.cbh.cbtheme .cbtheme-day{font-style:normal;font-family:var(--mono);font-weight:600;font-size:11px;letter-spacing:.04em;color:var(--muted);text-transform:uppercase}
+.cbtop-daily .cbh.cbtheme{background:color-mix(in srgb, var(--accent) 14%, var(--surface));border-color:var(--accent)}
+.cbtop-daily .cbh.cbtheme .cbtheme-day{color:var(--accent)}
 
 .cbtip{margin:0;font-size:13px;color:var(--muted);min-height:2.6em;line-height:1.3}
 
@@ -800,7 +803,9 @@ a.btn.primary{color:var(--bg)}
 .cbagechainarrow{position:absolute;right:-14px;top:6px;font-size:16px;line-height:1;color:var(--muted);pointer-events:none}
 .cbagechainnode .cbslot .ic.el{color:#111417}
 
-.cbshelf{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:5px;min-height:34px;padding:4px 6px;border:1.5px dashed color-mix(in srgb, var(--ink) 30%, transparent);border-radius:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+.cbshelf{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:5px;min-height:34px;padding:4px 6px;border:1.5px dashed color-mix(in srgb, var(--ink) 30%, transparent);border-radius:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;--fade-l:#000;--fade-r:#000;-webkit-mask-image:linear-gradient(to right, var(--fade-l), #000 18px, #000 calc(100% - 18px), var(--fade-r));mask-image:linear-gradient(to right, var(--fade-l), #000 18px, #000 calc(100% - 18px), var(--fade-r))}
+.cbshelf.ov-l{--fade-l:transparent}
+.cbshelf.ov-r{--fade-r:transparent}
 .cbhold{min-height:50px}
 .cbshelf.none{background:color-mix(in srgb, var(--ink) 3%, transparent);border-color:color-mix(in srgb, var(--ink) 20%, transparent);overflow:hidden}
 .cbshelf-slots{display:inline-flex;align-items:center;gap:5px;flex-wrap:nowrap;min-width:0;flex:1 1 auto}
@@ -912,11 +917,16 @@ a.btn.primary{color:var(--bg)}
 .cbp .ic{width:56%;height:auto;aspect-ratio:1;border:0;background:transparent}
 .cbp .ic svg{width:100%;height:100%}
 .cbp .cbn{font-size:clamp(10px, 13cqw, 12px);line-height:1.05;text-align:center;font-weight:700;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:break-word;max-width:92%}
+.cbp .cbn.l2{-webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 6px), transparent 100%);mask-image:linear-gradient(to bottom, #000 calc(100% - 6px), transparent 100%)}
 .cbp.sel{outline:3px solid var(--accent);outline-offset:3px;transform:translateY(-4px)}
 .cbp.empty{border:1.5px dashed color-mix(in srgb, var(--ink) 25%, transparent);background:transparent;box-shadow:none;cursor:default}
 .cbp .tool{position:absolute;top:-8px;right:-8px;font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;background:var(--ink);color:var(--bg);padding:1px 5px;border-radius:2px}
 
 .cbghost{position:fixed;z-index:95;width:64px;height:64px;pointer-events:none;border:2px solid #111417;border-radius:4px;background:var(--fill);box-shadow:5px 7px 0 rgba(17,20,23,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#111417;transform:rotate(-5deg)}
+.cbghost-v{position:absolute;top:-10px;right:-10px;width:22px;height:22px;border-radius:50%;border:2px solid #111417;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;line-height:1;color:#fff;box-shadow:2px 2px 0 rgba(17,20,23,.3);transform:rotate(5deg);animation:cbghostvpop .18s ease-out}
+.cbghost-v-ok{background:#1b8a3a}
+.cbghost-v-bad{background:var(--bad)}
+@keyframes cbghostvpop{0%{transform:rotate(5deg) scale(.4)}100%{transform:rotate(5deg) scale(1)}}
 .cbghost .ic{width:60%;height:auto;aspect-ratio:1;border:0;background:transparent}
 .cbghost .cbn{font-size:9px}
 
@@ -931,6 +941,287 @@ a.btn.primary{color:var(--bg)}
 .cbopt:active{transform:translateY(1px)}
 
 .cbscrim{position:fixed;inset:0;z-index:80;background:rgba(17,20,23,.4)}
+
+/* First-run onboarding card. Three animated chapters teaching the core
+ * loop, chains, and age progression. Abstract shapes so nothing depends
+ * on the content data; key-remount restarts each chapter's animations. */
+.cbonboard{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:90;max-width:360px;width:calc(100% - 40px);padding:20px 22px 16px;border:2.5px solid var(--ink);border-radius:6px;background:var(--bg);box-shadow:6px 6px 0 var(--ink);display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;animation:mdin .2s ease-out}
+.cbonboard h2{margin:0;font-family:var(--display);font-size:22px;font-weight:700}
+.cbonboard p{margin:0;font-size:13.5px;line-height:1.4;color:var(--muted);max-width:32ch;min-height:2.8em}
+.cbonboard-stage{position:relative;width:240px;height:112px;margin:2px 0}
+.cbob-tile{position:absolute;top:18px;width:48px;height:48px;border:2px solid var(--ink);border-radius:4px;box-shadow:3px 3px 0 var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;--pk:#111417;padding:3px 2px 2px}
+.cbob-tile .ic{width:62%;height:62%;border:0;background:transparent;border-radius:0;overflow:visible;flex:none}
+.cbob-tile .ic svg{width:100%;height:100%}
+.cbob-lbl{font-family:var(--mono);font-style:normal;font-size:8px;font-weight:700;line-height:1;color:#111417;text-align:center;letter-spacing:.02em;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+
+/* Chapter 1: combine + score + new. Rock slides right until it visibly
+ * overlaps water (~40px overlap of the 48px tiles), sells the 'contact'
+ * moment, then both fuse. Clay blooms at the overlap midpoint, not the
+ * stage centre. */
+.cbob-a{left:12px;background:var(--fF);z-index:2;animation:cbob1-a 3800ms ease-in-out forwards}
+.cbob-b{right:12px;background:var(--fN);z-index:1;animation:cbob1-b 3800ms ease-in-out forwards}
+.cbob-c{left:166px;background:var(--fM);opacity:0;animation:cbob1-c 3800ms ease-in-out forwards}
+.cbob-score{position:absolute;left:50%;top:0;transform:translateX(-50%) translateY(0);font-family:var(--mono);font-size:18px;font-weight:800;color:var(--accent);opacity:0;animation:cbob1-score 3800ms ease-out forwards;pointer-events:none}
+.cbob-new{position:absolute;left:50%;bottom:0;transform:translateX(-50%);font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:var(--accent);padding:2px 8px;border-radius:99px;opacity:0;animation:cbob1-new 3800ms ease-out forwards;pointer-events:none}
+@keyframes cbob1-a{
+  0%{transform:translateX(0);opacity:1}
+  40%{transform:translateX(140px);opacity:1}
+  55%{transform:translateX(140px) scale(1.1);opacity:1}
+  65%{transform:translateX(140px) scale(.6);opacity:0}
+  100%{transform:translateX(140px) scale(.6);opacity:0}
+}
+@keyframes cbob1-b{
+  0%{transform:translateX(0);opacity:1}
+  55%{transform:translateX(0) scale(1.1);opacity:1}
+  65%{transform:translateX(0) scale(.6);opacity:0}
+  100%{transform:translateX(0) scale(.6);opacity:0}
+}
+@keyframes cbob1-c{
+  0%{opacity:0;transform:scale(.3)}
+  63%{opacity:0;transform:scale(.3)}
+  72%{opacity:1;transform:scale(1.25)}
+  80%{opacity:1;transform:scale(1)}
+  100%{opacity:1;transform:scale(1)}
+}
+@keyframes cbob1-score{
+  0%{opacity:0;transform:translateX(-50%) translateY(4px)}
+  70%{opacity:0;transform:translateX(-50%) translateY(4px)}
+  78%{opacity:1;transform:translateX(-50%) translateY(-14px)}
+  95%{opacity:1;transform:translateX(-50%) translateY(-22px)}
+  100%{opacity:0;transform:translateX(-50%) translateY(-28px)}
+}
+@keyframes cbob1-new{
+  0%{opacity:0;transform:translateX(-50%) scale(.5)}
+  78%{opacity:0;transform:translateX(-50%) scale(.5)}
+  86%{opacity:1;transform:translateX(-50%) scale(1.1)}
+  92%{opacity:1;transform:translateX(-50%) scale(1)}
+  100%{opacity:1;transform:translateX(-50%) scale(1)}
+}
+
+/* Chapter 2: chain reaction (rock + water → clay, then clay + kiln →
+ * brick). How chains actually work: the engine places the fuse output
+ * on a cell *adjacent* to a matching tile, and they fuse in place.
+ * Nothing physically "moves into" the adjacent tile — they just are
+ * next to each other and the chain fires.
+ *
+ * Here: rock slides right onto water → clay blooms at water's spot,
+ * which is already adjacent to the pre-placed kiln. Clay + kiln pulse
+ * in place and vanish. Brick blooms at clay's spot. ×2 chain chip pops. */
+.cbob-tile.cbob-ch-a,.cbob-tile.cbob-ch-b,.cbob-tile.cbob-ch-c,
+.cbob-tile.cbob-ch-d,.cbob-tile.cbob-ch-e{width:44px;height:44px;top:22px}
+.cbob-ch-a{left:8px;background:var(--fN);z-index:2;animation:cbob2-a 3800ms ease-in-out forwards}
+.cbob-ch-b{left:68px;background:var(--fF);z-index:1;animation:cbob2-b 3800ms ease-in-out forwards}
+.cbob-ch-c{left:68px;background:var(--fN);z-index:1;opacity:0;animation:cbob2-c 3800ms ease-in-out forwards}
+.cbob-ch-d{left:116px;background:var(--fM);z-index:1;animation:cbob2-d 3800ms ease-in-out forwards}
+.cbob-ch-e{left:92px;background:var(--fM);z-index:3;opacity:0;animation:cbob2-e 3800ms ease-in-out forwards}
+.cbob-mult{position:absolute;right:-6px;top:-10px;font-family:var(--mono);font-size:12px;font-weight:800;color:#111417;background:var(--fC);border:2px solid var(--ink);padding:3px 7px;border-radius:99px;box-shadow:2px 2px 0 var(--ink);opacity:0;animation:cbob2-mult 3800ms ease-out forwards;pointer-events:none}
+/* Step 1: rock slides right, overlaps water, both pulse, both vanish. */
+@keyframes cbob2-a{
+  0%{opacity:1;transform:translateX(0)}
+  22%{opacity:1;transform:translateX(50px)}
+  28%{opacity:1;transform:translateX(50px) scale(1.1)}
+  34%{opacity:0;transform:translateX(50px) scale(.6)}
+  100%{opacity:0;transform:translateX(50px) scale(.6)}
+}
+@keyframes cbob2-b{
+  0%{opacity:1;transform:scale(1)}
+  28%{opacity:1;transform:scale(1.1)}
+  34%{opacity:0;transform:scale(.6)}
+  100%{opacity:0;transform:scale(.6)}
+}
+/* Clay blooms where water was. It's already adjacent to the kiln
+ * (pre-placed just to its right) so the chain fires in place — clay
+ * and kiln pulse together and fuse. */
+@keyframes cbob2-c{
+  0%{opacity:0;transform:scale(.3)}
+  34%{opacity:0;transform:scale(.3)}
+  42%{opacity:1;transform:scale(1.25)}
+  50%{opacity:1;transform:scale(1)}
+  72%{opacity:1;transform:scale(1.1)}
+  78%{opacity:0;transform:scale(.6)}
+  100%{opacity:0;transform:scale(.6)}
+}
+/* Kiln is stationary — just pulses when clay forms next to it, then
+ * vanishes together with clay. */
+@keyframes cbob2-d{
+  0%{opacity:1;transform:scale(1)}
+  72%{opacity:1;transform:scale(1.1)}
+  78%{opacity:0;transform:scale(.6)}
+  100%{opacity:0;transform:scale(.6)}
+}
+/* Brick blooms between clay and kiln's positions. */
+@keyframes cbob2-e{
+  0%{opacity:0;transform:scale(.3)}
+  78%{opacity:0;transform:scale(.3)}
+  86%{opacity:1;transform:scale(1.3)}
+  92%{opacity:1;transform:scale(1)}
+  100%{opacity:1;transform:scale(1)}
+}
+@keyframes cbob2-mult{
+  0%{opacity:0;transform:scale(.3) rotate(-8deg)}
+  80%{opacity:0;transform:scale(.3) rotate(-8deg)}
+  88%{opacity:1;transform:scale(1.2) rotate(-6deg)}
+  94%{opacity:1;transform:scale(1) rotate(-4deg)}
+  100%{opacity:1;transform:scale(1) rotate(-4deg)}
+}
+
+/* Chapter 3: recipe lands in collection book */
+.cbob-recipe{position:absolute;left:50%;top:6px;transform:translateX(-50%);display:flex;align-items:center;gap:4px;--pk:#111417}
+.cbob-recipe .cbob-mini{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1.5px solid var(--ink);border-radius:3px;box-shadow:1.5px 1.5px 0 var(--ink);background:var(--fN)}
+.cbob-recipe .cbob-mini .ic{width:72%;height:72%;border:0;background:transparent;overflow:visible}
+.cbob-recipe .cbob-mini .ic svg{width:100%;height:100%}
+.cbob-recipe .cbob-mini-out{background:var(--fM);animation:cbob3-out 3800ms ease-out forwards}
+.cbob-recipe .cbob-plus,.cbob-recipe .cbob-eq{font-family:var(--mono);font-style:normal;font-size:12px;font-weight:700;color:var(--muted)}
+.cbob-book{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);display:flex;gap:4px;padding:4px;border:1.5px dashed color-mix(in srgb, var(--ink) 30%, transparent);border-radius:4px}
+.cbob-book-slot{width:22px;height:22px;border:1.5px dashed color-mix(in srgb, var(--ink) 25%, transparent);border-radius:3px;background:transparent;display:flex;align-items:center;justify-content:center}
+.cbob-book-slot-fill{background:transparent;--pk:#111417;animation:cbob3-slot-bg 3800ms ease-out forwards}
+.cbob-book-slot-fill .ic{width:76%;height:76%;border:0;background:transparent;overflow:visible;opacity:0;transform:scale(.4);animation:cbob3-slot-ic 3800ms ease-out forwards}
+.cbob-book-slot-fill .ic svg{width:100%;height:100%}
+.cbob-collect{position:absolute;right:0;top:50%;transform:translateY(-50%);font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--accent);padding:3px 7px;border-radius:99px;opacity:0;animation:cbob3-collect 3800ms ease-out forwards;pointer-events:none}
+/* Progress counter: ticks 0 → 1 as the recipe lands, paired with the
+ * total so the player sees how much there is to collect. The current
+ * digit lives in a fixed-width wrapper with two stacked <b>s so the
+ * slash and total don't jump as the number changes. */
+/* Sits at the top-left of the book. Book is centred (108px wide) so
+ * its left edge is 54px left of stage centre; counter anchors slightly
+ * left and above that, clear of both the slots and the 'Recipe
+ * collected' badge. */
+.cbob-count{position:absolute;left:50%;bottom:46px;transform:translateX(-66px);display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap}
+.cbob-count-current{position:relative;display:inline-block;width:0.75em;height:1.1em;vertical-align:text-bottom;overflow:visible}
+.cbob-count-n{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--ink);opacity:0;line-height:1}
+.cbob-count-n-0{animation:cbob3-count-0 3800ms ease-out forwards}
+.cbob-count-n-1{animation:cbob3-count-1 3800ms ease-out forwards}
+.cbob-count-sep{opacity:.6}
+.cbob-count-total{color:var(--muted);font-weight:600}
+@keyframes cbob3-count-0{
+  0%{opacity:1;transform:scale(1)}
+  70%{opacity:1;transform:scale(1)}
+  75%{opacity:0;transform:scale(.6)}
+  100%{opacity:0;transform:scale(.6)}
+}
+@keyframes cbob3-count-1{
+  0%,70%{opacity:0;transform:scale(.4)}
+  78%{opacity:1;transform:scale(1.4);color:var(--accent)}
+  86%{opacity:1;transform:scale(1);color:var(--accent)}
+  100%{opacity:1;transform:scale(1);color:var(--ink)}
+}
+/* Output clay flies from the end of the recipe row down-left into the
+ * first (leftmost) book slot. The -75px / 42px offset roughly aligns
+ * with the slot centre given the stage geometry. */
+@keyframes cbob3-out{
+  0%{transform:translate(0,0) scale(1)}
+  38%{transform:translate(0,0) scale(1)}
+  48%{transform:translate(0,0) scale(1.4)}
+  60%{transform:translate(-75px,42px) scale(.7);opacity:.5}
+  70%{transform:translate(-75px,42px) scale(.7);opacity:0}
+  100%{transform:translate(-75px,42px) scale(.7);opacity:0}
+}
+/* Slot box stays full-size always; background fills in when the
+ * recipe's output arrives, and the pictogram inside pops into place. */
+@keyframes cbob3-slot-bg{
+  0%,65%{background:transparent}
+  75%,100%{background:var(--fM)}
+}
+@keyframes cbob3-slot-ic{
+  0%,65%{opacity:0;transform:scale(.4)}
+  75%{opacity:1;transform:scale(1.25)}
+  85%,100%{opacity:1;transform:scale(1)}
+}
+@keyframes cbob3-collect{
+  0%{opacity:0;transform:translateY(-50%) scale(.5)}
+  80%{opacity:0;transform:translateY(-50%) scale(.5)}
+  90%{opacity:1;transform:translateY(-50%) scale(1.1)}
+  100%{opacity:1;transform:translateY(-50%) scale(1)}
+}
+
+/* Chapter 4: age bar + crumble counter. Tile sits on the left, bar +
+ * label are centred in the remaining space so the composition stays
+ * balanced after the tile crumbles away. */
+/* Age tile uses the same crumbling look as the real board (grayscale +
+ * desaturated pastel + diagonal stripe) so players recognise the state
+ * when they see it in-game. */
+.cbob-age-tile{left:16px;background-color:var(--fF);background-image:repeating-linear-gradient(135deg,transparent 0 6px,rgba(17,20,23,.08) 6px 7px);filter:grayscale(.85);opacity:.6;animation:cbob4-tile 3800ms ease-in forwards}
+.cbob-age-counter{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:var(--bad);color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;line-height:18px;text-align:center;opacity:0}
+.cbob-age-counter-3{animation:cbob4-counter-3 3800ms linear forwards}
+.cbob-age-counter-2{animation:cbob4-counter-2 3800ms linear forwards}
+.cbob-age-counter-1{animation:cbob4-counter-1 3800ms linear forwards}
+.cbob-bar{position:absolute;left:87px;top:50%;margin-top:-6px;width:130px;height:12px;border:2px solid var(--ink);border-radius:99px;background:var(--surface);overflow:hidden}
+.cbob-bar-fill{display:block;height:100%;width:0%;background:var(--accent);animation:cbob4-bar 3800ms ease-out forwards}
+.cbob-age-label{position:absolute;left:87px;width:130px;text-align:center;bottom:4px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);opacity:0;animation:cbob4-label 3800ms ease-out forwards}
+@keyframes cbob4-tile{
+  0%{transform:translateY(0);opacity:.6}
+  70%{transform:translateY(0) rotate(-6deg);opacity:.6}
+  85%{transform:translateY(16px) rotate(10deg) scale(.5);opacity:0}
+  100%{transform:translateY(16px) rotate(10deg) scale(.5);opacity:0}
+}
+/* Counter ticks 3 → 2 → 1 → gone. Each digit owns a time slice;
+ * pulses on entry so the drop is felt, not just read. The tile
+ * itself crumbles around 85% (cbob4-tile). */
+@keyframes cbob4-counter-3{
+  0%{opacity:0;transform:scale(.4)}
+  5%{opacity:1;transform:scale(1.3)}
+  10%{opacity:1;transform:scale(1)}
+  28%{opacity:1;transform:scale(1)}
+  32%{opacity:0;transform:scale(.6)}
+  100%{opacity:0;transform:scale(.6)}
+}
+@keyframes cbob4-counter-2{
+  0%,30%{opacity:0;transform:scale(.4)}
+  35%{opacity:1;transform:scale(1.3)}
+  40%{opacity:1;transform:scale(1)}
+  53%{opacity:1;transform:scale(1)}
+  57%{opacity:0;transform:scale(.6)}
+  100%{opacity:0;transform:scale(.6)}
+}
+@keyframes cbob4-counter-1{
+  0%,55%{opacity:0;transform:scale(.4)}
+  60%{opacity:1;transform:scale(1.3)}
+  65%{opacity:1;transform:scale(1)}
+  78%{opacity:1;transform:scale(1)}
+  83%{opacity:0;transform:scale(.6)}
+  100%{opacity:0;transform:scale(.6)}
+}
+@keyframes cbob4-bar{
+  0%{width:0%}
+  30%{width:28%}
+  50%{width:52%}
+  70%{width:78%}
+  100%{width:100%}
+}
+@keyframes cbob4-label{
+  0%{opacity:0}
+  80%{opacity:0}
+  90%{opacity:1}
+  100%{opacity:1}
+}
+
+.cbonboard-dots{display:flex;gap:10px;margin-top:4px}
+.cbonboard-dot{display:block;width:16px;height:16px;flex:none;border-radius:50%;border:2px solid var(--ink);background:transparent;padding:0;margin:0;line-height:0;font-size:0;box-sizing:border-box;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .15s ease-out;appearance:none;-webkit-appearance:none}
+.cbonboard-dot.on{background:var(--ink)}
+.cbonboard-actions{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:center}
+.cbonboard-skip{height:36px;padding:0 12px;border:2px solid var(--ink);border-radius:99px;background:transparent;color:var(--ink);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.cbonboard-go{height:36px;padding:0 18px;border:2px solid var(--ink);border-radius:99px;background:var(--ink);color:var(--bg);font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.cbonboard-skip:active,.cbonboard-go:active{transform:translateY(1px)}
+
+@media (prefers-reduced-motion: reduce){
+  .cbob-a,.cbob-b,.cbob-c,.cbob-score,.cbob-new,
+  .cbob-ch-a,.cbob-ch-b,.cbob-ch-c,.cbob-ch-d,.cbob-ch-e,.cbob-mult,
+  .cbob-mini-out,.cbob-book-slot-fill,.cbob-book-slot-fill .ic,.cbob-collect,
+  .cbob-age-tile,.cbob-age-counter,.cbob-bar-fill,.cbob-age-label{animation:none}
+  .cbob-a{transform:translateX(140px);opacity:0}
+  .cbob-b{opacity:0}
+  .cbob-c{opacity:1;transform:scale(1)}
+  .cbob-score,.cbob-new{opacity:1}
+  .cbob-ch-a,.cbob-ch-b,.cbob-ch-c,.cbob-ch-d{opacity:0}
+  .cbob-ch-e,.cbob-mult{opacity:1}
+  .cbob-mini-out{opacity:0;transform:translate(-75px,42px) scale(.7)}
+  .cbob-book-slot-fill{background:var(--fM)}
+  .cbob-book-slot-fill .ic{opacity:1;transform:scale(1)}
+  .cbob-collect{opacity:1}
+  .cbob-age-tile{opacity:0}
+  .cbob-bar-fill{width:100%}
+  .cbob-age-label{opacity:1}
+}
 
 @media (max-width: 600px){
   .cbscore b{font-size:26px}
@@ -954,7 +1245,8 @@ a.btn.primary{color:var(--bg)}
   .cbsnd{width:32px;height:32px}
   .cbsnd svg{width:14px;height:14px}
   .cbscore span{white-space:nowrap}
-  .cbh.cbtheme span{max-width:62px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+  .cbh.cbtheme span{max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+  .cbh.cbtheme .cbtheme-day{font-size:10px}
   .cbh.cbtheme{padding:0 5px 0 8px}
 }
 
