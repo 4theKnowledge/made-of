@@ -3,14 +3,15 @@
  * Postgres.
  *
  * Row ids are uuids assigned at build time, so the DB foreign keys don't
- * carry names. Each run of `toRows` generates a fresh set of uuids; the seed
- * script wipes and re-inserts, so stability across runs is not required.
- * Within one run, we keep in-memory maps (name → uuid, slug → uuid) so the
- * evidence resolver can translate `child<type<parent` strings to concrete
- * link ids.
+ * carry names. **Item ids are derived from slug via UUIDv5** so the same
+ * slug always resolves to the same uuid across runs — otherwise a reseed
+ * would cascade-delete every user's `combine_discoveries` row (and anything
+ * else FK'd to items). Recipes/links/evidence/sources stay random; they're
+ * only referenced by other seeded rows that get wiped and reinserted
+ * together.
  */
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type {
   LinkType,
   NewItem,
@@ -55,6 +56,32 @@ export interface SeedRows {
   };
 }
 
+// Stable namespace for per-item UUIDv5. Never change this value — it's the
+// anchor that makes item ids reproducible across reseeds, which is what
+// keeps `combine_discoveries` and other FK'd user data intact.
+const ITEM_UUID_NAMESPACE = "6f1b2b4e-7a3e-5f8e-9a0b-made0f17e115";
+
+/** UUIDv5 (name-based, SHA-1) per RFC 4122 §4.3. Deterministic from
+ *  (namespace, name). */
+function uuidv5(namespace: string, name: string): string {
+  const nsBytes = Buffer.from(namespace.replace(/-/g, ""), "hex");
+  const hash = createHash("sha1")
+    .update(nsBytes)
+    .update(name)
+    .digest();
+  const bytes = Buffer.from(hash.subarray(0, 16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x50; // version 5
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC 4122 variant
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+/** Deterministic item id from slug. Exported so admin flows that need to
+ *  resolve "what id will this slug have after a reseed" can use it. */
+export function itemIdForSlug(slug: string): string {
+  return uuidv5(ITEM_UUID_NAMESPACE, slug);
+}
+
 /** Build all seed rows from the loaded knowledge base. */
 export function toRows(kb: LoadedKnowledgeBase): SeedRows {
   const items: NewItem[] = [];
@@ -77,8 +104,10 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
   };
 
   // First pass: assign item uuids so recipes/links can reference them.
+  // Item ids are derived from slug (UUIDv5) so a reseed produces the same
+  // id for the same slug — see note at top of file.
   for (const item of kb.items) {
-    const itemId = randomUUID();
+    const itemId = itemIdForSlug(item.slug);
     itemIdByName.set(item.name, itemId);
     itemIdBySlug.set(item.slug, itemId);
     items.push({

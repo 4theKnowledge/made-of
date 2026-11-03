@@ -55,6 +55,13 @@ export interface DataRecipe {
 
 export interface DataItem {
   name: string;
+  /** Pinned slug. Omit and it derives from `name`. **Set this before
+   *  renaming an item** — the slug is the identity anchor for the item's
+   *  UUIDv5 (see `itemIdForSlug` in `src/data/rows.ts`), and changing it
+   *  on a reseed will prune the old row and cascade-delete any
+   *  discoveries/reports attached to it. Stick the old slug here when
+   *  renaming and the identity carries over. */
+  slug?: string;
   tier: Tier;
   kind: ItemKind;
   firstAppeared?: string | null;

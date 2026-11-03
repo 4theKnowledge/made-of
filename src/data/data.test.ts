@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { loadKnowledgeBase, parseLinkId, parseYear, slug } from "./load";
-import { countEvidencedLinkIds, toRows } from "./rows";
+import {
+  loadKnowledgeBase,
+  normaliseItem,
+  parseLinkId,
+  parseYear,
+  slug,
+} from "./load";
+import { countEvidencedLinkIds, itemIdForSlug, toRows } from "./rows";
 
 /** Items that are not physical things you could hold. These are not stored
  *  in the knowledge base at all — this test guards against anyone adding
@@ -185,5 +191,68 @@ describe("toRows", () => {
 
   it("evidence has no unresolved ids", () => {
     expect(rows.stats.unresolvedEvidenceIds).toEqual([]);
+  });
+});
+
+/** Regression: item ids must be stable across reseeds. If they drift,
+ *  a reseed cascades through `combine_discoveries.itemId` (ON DELETE
+ *  CASCADE) and wipes every user's Combine collection. See
+ *  src/data/rows.ts for the UUIDv5-from-slug derivation. */
+describe("item id stability", () => {
+  const parsed = loadKnowledgeBase();
+
+  it("produces the same item ids on repeated runs", () => {
+    const first = toRows(parsed);
+    const second = toRows(parsed);
+    expect(first.items.length).toBe(second.items.length);
+    const firstBySlug = new Map(first.items.map((it) => [it.slug, it.id]));
+    for (const it of second.items) {
+      expect(it.id).toBe(firstBySlug.get(it.slug));
+    }
+  });
+
+  it("derives ids from slug via itemIdForSlug", () => {
+    const rows = toRows(parsed);
+    for (const it of rows.items) {
+      expect(it.id).toBe(itemIdForSlug(it.slug));
+    }
+  });
+
+  it("pinned slug survives a rename end-to-end", () => {
+    // DataItem.slug is the identity anchor. Pinning it lets admins rename
+    // an item without changing its UUIDv5 (and cascading away any
+    // discoveries attached to the old row).
+    const before = normaliseItem({
+      name: "hydrogen",
+      tier: "F",
+      kind: "element",
+    });
+    const afterRename = normaliseItem({
+      name: "hydrogen gas",
+      slug: "hydrogen",
+      tier: "F",
+      kind: "element",
+    });
+    expect(before.slug).toBe("hydrogen");
+    expect(afterRename.slug).toBe("hydrogen");
+    expect(itemIdForSlug(afterRename.slug)).toBe(itemIdForSlug(before.slug));
+  });
+
+  it("omitting slug still derives it from name", () => {
+    const n = normaliseItem({
+      name: "liquid water",
+      tier: "F",
+      kind: "substance",
+    });
+    expect(n.slug).toBe("liquid-water");
+  });
+
+  it("itemIdForSlug returns a well-formed UUIDv5", () => {
+    const id = itemIdForSlug("hydrogen");
+    // RFC 4122: xxxxxxxx-xxxx-5xxx-[89ab]xxx-xxxxxxxxxxxx
+    expect(id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(itemIdForSlug("hydrogen")).toBe(id);
   });
 });

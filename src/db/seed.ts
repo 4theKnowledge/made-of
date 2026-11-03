@@ -5,6 +5,7 @@
  * already contains edited content.
  */
 
+import { notInArray, sql } from "drizzle-orm";
 import { loadKnowledgeBase } from "../data/load";
 import { toRows } from "../data/rows";
 import { buildCanaryLinks } from "../data/canaries";
@@ -40,16 +41,22 @@ async function main() {
 
   const db = getDb();
   await db.transaction(async (tx) => {
-    // Order matters: parents before children because of foreign keys.
-    // Delete first for idempotency on a non-fresh dev DB.
+    // Children that are regenerated wholesale each reseed. Their ids are
+    // random on every run (recipes/links/evidence/sources), and nothing
+    // outside this transaction FKs to them, so delete-all is fine.
+    //
+    // CRITICALLY: we do NOT delete `items` anymore. Item ids are now
+    // derived from slug (UUIDv5), so a reseed produces the same id for the
+    // same slug. We upsert items by id and delete only items whose slug is
+    // no longer in the knowledge base. This keeps `combine_discoveries`
+    // (and anything else FK'd to items with ON DELETE CASCADE) intact
+    // across reseeds. We also no longer wipe `daily_puzzles` or `reports`
+    // — they reference items by id, which now survive.
     await tx.delete(schema.evidenceSources);
     await tx.delete(schema.linkEvidence);
     await tx.delete(schema.links);
     await tx.delete(schema.recipes);
-    await tx.delete(schema.dailyPuzzles);
-    await tx.delete(schema.reports);
     await tx.delete(schema.sources);
-    await tx.delete(schema.items);
 
     // Kinds table is populated by the migration, but a fresh DB that runs
     // this seeder may still need them. onConflictDoNothing keeps this
@@ -72,21 +79,45 @@ async function main() {
       ])
       .onConflictDoNothing();
 
-    await bulkInsert(tx, schema.items, rows.items);
+    // Prune items (and, via cascade, link/recipe/theme/discovery rows)
+    // whose slug is no longer in the knowledge base. Do this BEFORE the
+    // upsert so a rename (which changes the derived id) doesn't collide
+    // with the old row's unique(name) or unique(slug) constraints. These
+    // are legitimate removals — discoveries for them cascade too, which is
+    // the right call (the item no longer exists).
+    const keepIds = rows.items.map((it) => it.id!);
+    const removed = await tx
+      .delete(schema.items)
+      .where(keepIds.length === 0 ? sql`true` : notInArray(schema.items.id, keepIds))
+      .returning({ id: schema.items.id, slug: schema.items.slug });
+    if (removed.length > 0) {
+      console.log(
+        `seed: pruned ${removed.length} items no longer in KB:`,
+        removed.map((r) => r.slug).join(", "),
+      );
+    }
+
+    await upsertItems(tx, rows.items);
     await bulkInsert(tx, schema.sources, rows.sources);
     await bulkInsert(tx, schema.recipes, rows.recipes);
     await bulkInsert(tx, schema.links, rows.links);
     await bulkInsert(tx, schema.linkEvidence, rows.linkEvidence);
     await bulkInsert(tx, schema.evidenceSources, rows.evidenceSources);
 
-    // Everything theme membership. The 'everything' row itself is created by
-    // migration 0010. Every item goes in except those tagged combine-exclude
-    // (currently just big bang). Deleting items cascades to this join table,
-    // so a reseed re-populates from scratch.
+    // Everything theme membership. The 'everything' row itself is created
+    // by migration 0010. Every item goes in except those tagged
+    // combine-exclude (currently just big bang).
     const everythingMembership = rows.items
       .filter((it) => !(it.tags ?? []).includes("combine-exclude"))
       .map((it) => ({ itemId: it.id!, themeCode: "everything" }));
-    await bulkInsert(tx, schema.itemCombineThemes, everythingMembership);
+    if (everythingMembership.length > 0) {
+      for (let i = 0; i < everythingMembership.length; i += 500) {
+        await tx
+          .insert(schema.itemCombineThemes)
+          .values(everythingMembership.slice(i, i + 500))
+          .onConflictDoNothing();
+      }
+    }
   });
 
   console.log("seed complete");
@@ -104,6 +135,37 @@ async function bulkInsert<T>(
   if (rows.length === 0) return;
   for (let i = 0; i < rows.length; i += chunkSize) {
     await tx.insert(table).values(rows.slice(i, i + chunkSize));
+  }
+}
+
+/** Upsert items by id. KB updates should refresh existing rows in place
+ *  rather than deleting + reinserting, so nothing downstream (discoveries,
+ *  reports, daily puzzles) gets cascaded away. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function upsertItems(tx: any, items: any[]) {
+  if (items.length === 0) return;
+  for (let i = 0; i < items.length; i += 500) {
+    await tx
+      .insert(schema.items)
+      .values(items.slice(i, i + 500))
+      .onConflictDoUpdate({
+        target: schema.items.id,
+        set: {
+          slug: sql`excluded.slug`,
+          name: sql`excluded.name`,
+          tier: sql`excluded.tier`,
+          kind: sql`excluded.kind`,
+          firstAppeared: sql`excluded.first_appeared`,
+          firstAppearedYa: sql`excluded.first_appeared_ya`,
+          symbol: sql`excluded.symbol`,
+          fact: sql`excluded.fact`,
+          pictogram: sql`excluded.pictogram`,
+          status: sql`excluded.status`,
+          isCanary: sql`excluded.is_canary`,
+          tags: sql`excluded.tags`,
+          updatedAt: sql`now()`,
+        },
+      });
   }
 }
 

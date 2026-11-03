@@ -1,12 +1,16 @@
 /**
  * Import a `Data*`-shape payload (see `src/data/types.ts`) into Postgres.
  *
- * Semantics: full replace. The payload is the source of truth; items,
- * recipes, links, evidence and sources in the DB are deleted and
- * repopulated from the payload. New items land as `status='live'` to match
- * the seeder (admins publish/unpublish from the UI). Canary links are not
- * touched here — `buildCanaryLinks()` is reapplied so canaries survive an
- * import.
+ * Semantics: full replace of KB content, but item ids are preserved across
+ * imports. Items are upserted by id (UUIDv5 derived from slug), and items
+ * whose slug is no longer in the payload are pruned. Recipes, links,
+ * evidence and sources have random ids and are wiped + reinserted. This
+ * means FKs from user data (`combine_discoveries`, etc.) keep resolving
+ * — an import that re-adds the same slug lands on the same row.
+ *
+ * New items land as `status='live'` to match the seeder (admins
+ * publish/unpublish from the UI). Canary links are not touched here —
+ * `buildCanaryLinks()` is reapplied so canaries survive an import.
  *
  * Returns stats including `unresolvedEvidenceIds`. When `dryRun: true` the
  * transaction is rolled back so callers can preview the outcome.
@@ -27,6 +31,7 @@ import {
 import { toRows } from "@/data/rows";
 import { buildCanaryLinks } from "@/data/canaries";
 import { getDb, schema } from "@/db/client";
+import { notInArray, sql } from "drizzle-orm";
 
 export interface AdminImportPayload {
   items: DataItem[];
@@ -127,9 +132,17 @@ export async function runImport(
       await tx.delete(schema.links);
       await tx.delete(schema.recipes);
       await tx.delete(schema.sources);
-      await tx.delete(schema.items);
 
-      await bulkInsert(tx, schema.items, rows.items);
+      // Prune items no longer in the payload BEFORE upsert so a renamed
+      // slug (which changes the derived id) doesn't collide with the old
+      // row's unique(slug)/unique(name). Cascades drop their links,
+      // recipes, discoveries — correct, since the item is gone.
+      const keepIds = rows.items.map((it) => it.id!);
+      await tx
+        .delete(schema.items)
+        .where(keepIds.length === 0 ? sql`true` : notInArray(schema.items.id, keepIds));
+
+      await upsertItems(tx, rows.items);
       await bulkInsert(tx, schema.sources, rows.sources);
       await bulkInsert(tx, schema.recipes, rows.recipes);
       await bulkInsert(tx, schema.links, rows.links);
@@ -203,5 +216,35 @@ async function bulkInsert<T>(
   if (rows.length === 0) return;
   for (let i = 0; i < rows.length; i += chunkSize) {
     await tx.insert(table).values(rows.slice(i, i + chunkSize));
+  }
+}
+
+/** Upsert items by id. Keeps FK referents (discoveries, reports, daily
+ *  puzzles) alive across imports. Mirrors the helper in src/db/seed.ts. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function upsertItems(tx: any, items: any[]) {
+  if (items.length === 0) return;
+  for (let i = 0; i < items.length; i += 500) {
+    await tx
+      .insert(schema.items)
+      .values(items.slice(i, i + 500))
+      .onConflictDoUpdate({
+        target: schema.items.id,
+        set: {
+          slug: sql`excluded.slug`,
+          name: sql`excluded.name`,
+          tier: sql`excluded.tier`,
+          kind: sql`excluded.kind`,
+          firstAppeared: sql`excluded.first_appeared`,
+          firstAppearedYa: sql`excluded.first_appeared_ya`,
+          symbol: sql`excluded.symbol`,
+          fact: sql`excluded.fact`,
+          pictogram: sql`excluded.pictogram`,
+          status: sql`excluded.status`,
+          isCanary: sql`excluded.is_canary`,
+          tags: sql`excluded.tags`,
+          updatedAt: sql`now()`,
+        },
+      });
   }
 }

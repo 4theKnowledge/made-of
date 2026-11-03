@@ -104,7 +104,9 @@ export function normaliseItem(it: DataItem): LoadedItem {
   }));
   return {
     name: it.name,
-    slug: slug(it.name),
+    // Pinned slug wins; fall back to derivation from name. See DataItem.slug
+    // for why pinning matters (identity anchor for UUIDv5 item ids).
+    slug: it.slug ?? slug(it.name),
     tier: it.tier,
     kind: it.kind,
     firstAppeared: it.firstAppeared ?? null,
