@@ -173,20 +173,36 @@ function assignAges(
   const byLevel = new Map<number, number>();
   for (const r of recipes) byLevel.set(r.lvl, (byLevel.get(r.lvl) ?? 0) + 1);
   const uniqueLevels = [...byLevel.keys()].sort((a, b) => a - b);
+  // The cut algorithm can produce at most `uniqueLevels.length` bands —
+  // each cut sits between two adjacent levels. If `numAges` exceeds that,
+  // the `levelsLeft >= bandsAfterCut` guard below refuses every cut
+  // (there aren't enough levels left to populate the planned-remaining
+  // bands), and everything collapses to band 1. Cap to what's actually
+  // achievable so the guard behaves as intended.
+  const targetAges = Math.min(numAges, Math.max(1, uniqueLevels.length));
   const cuts: number[] = [];
   let remaining = recipes.length;
   let acc = 0;
-  for (let i = 0; i < uniqueLevels.length && cuts.length < numAges - 1; i++) {
+  for (let i = 0; i < uniqueLevels.length && cuts.length < targetAges - 1; i++) {
     const lvl = uniqueLevels[i];
     const n = byLevel.get(lvl) ?? 0;
     acc += n;
     remaining -= n;
-    const bandsLeft = numAges - cuts.length;
+    const bandsLeft = targetAges - cuts.length;
     const target = Math.ceil((acc + remaining) / bandsLeft);
-    // Cut here unless the final bands wouldn't get at least one level each.
     const levelsLeft = uniqueLevels.length - 1 - i;
     const bandsAfterCut = bandsLeft - 1;
-    if (acc >= target && levelsLeft >= bandsAfterCut) {
+    // Three gates:
+    // 1. `levelsLeft >= bandsAfterCut` — never cut if doing so would leave
+    //    more future bands than remaining levels (empty bands break the UI).
+    // 2. `acc >= target` — prefer cuts that respect the balanced-size target.
+    // 3. `levelsLeft == bandsAfterCut` — forced cut: from here on every
+    //    remaining boundary must be used or we'll run out of levels. Without
+    //    this, early misses on gate 2 lock us out of ever cutting (prod's
+    //    2026-11 bug where numAges > uniqueLevels caused band collapse).
+    const mustCut = levelsLeft === bandsAfterCut;
+    const canCut = levelsLeft >= bandsAfterCut;
+    if (canCut && (mustCut || acc >= target)) {
       cuts.push(lvl);
       acc = 0;
     }
@@ -194,7 +210,7 @@ function assignAges(
   for (const r of recipes) {
     let band = 1;
     for (const c of cuts) if (r.lvl > c) band++;
-    r.band = Math.min(numAges, band);
+    r.band = Math.min(targetAges, band);
   }
 
   // Push a recipe forward if any of its parts is only made in a later age.
