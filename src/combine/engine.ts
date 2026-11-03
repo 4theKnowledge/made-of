@@ -138,6 +138,12 @@ export interface GameState {
    *  null when there's nothing to undo (fresh game, after a discovery,
    *  after undo has already fired). Not serialised. */
   lastSnapshot: GameState | null;
+  /** Admin-only testing mode. Skips helper counters, enables the debug
+   *  actions below, and short-circuits saving so a debug session doesn't
+   *  overwrite the real endless save. Session-only — never persisted.
+   *  Gated UI-side: the panel only mounts when the server says the user
+   *  is admin, so the reducer trusting this flag is fine. */
+  debug: boolean;
 }
 
 /* Events — fire-and-forget notifications for the UI/audio layer. */
@@ -180,7 +186,13 @@ export type Action =
   | { type: "move"; from: number; to: number }
   | { type: "shore"; cell: number }
   | { type: "hold"; slot: number }
-  | { type: "undo" };
+  | { type: "undo" }
+  // Debug actions (admin-only). The toggle flips `state.debug`; the others
+  // are no-ops unless `state.debug` is already true. UI mounting is gated
+  // on an admin session check so these never surface to normal players.
+  | { type: "debug-toggle" }
+  | { type: "debug-deal"; slot: number; tile: string }
+  | { type: "debug-set-age"; age: number };
 
 export interface ReduceResult {
   state: GameState;
@@ -237,11 +249,30 @@ function fullness(board: Board): number {
   return board.filter(Boolean).length / board.length;
 }
 
-/** Unique discoveries at the current age's band needed to leave each age
- *  (0-based): 7, 9, 11, 13, 15, 17. Only first-time makes of items whose
- *  minimum band is `age + 1` count — see `finishResolve`. */
-function ageNeed(age: number): number {
+/** Fraction of unique on-band items the player must discover before advancing.
+ *  40% feels like real exploration without forcing exhaustive clearing — tuned
+ *  against Everything (~34 items/age) where 0.4 lands near 13–15 unlocks. */
+const UNLOCK_FRACTION = 0.4;
+
+/** Baseline ramp used when the KB is too small for the band-aware floor to
+ *  take over: 7, 9, 11, 13, 15, 17. Preserves the test fixtures and keeps
+ *  tiny themes playable. */
+function baselineNeed(age: number): number {
   return 7 + 2 * age;
+}
+
+/** Unique discoveries at the current age's band needed to leave each age.
+ *  Only first-time makes of items whose minimum band is `age + 1` count —
+ *  see `finishResolve`. Scales with band population so a mature KB demands
+ *  more exploration; floors to the baseline so sparse bands stay playable. */
+export function ageNeed(age: number, bundle: ThemeBundle): number {
+  const targetBand = age + 1;
+  let onBand = 0;
+  for (const b of bundle.outBand.values()) {
+    if (b === targetBand) onBand++;
+  }
+  const scaled = Math.round(onBand * UNLOCK_FRACTION);
+  return Math.max(baselineNeed(age), scaled);
 }
 
 /** Tier value for scoring. Falls back to M=2 for unknown tiers. */
@@ -419,7 +450,7 @@ function afterMove(
 ): void {
   // 1. Age up?
   const totalAges = bundle.theme.ages.length;
-  if (state.age < totalAges - 1 && state.ageMade >= ageNeed(state.age)) {
+  if (state.age < totalAges - 1 && state.ageMade >= ageNeed(state.age, bundle)) {
     state.age++;
     state.ageMade = 0;
     state.score += 100 * state.age;
@@ -432,7 +463,7 @@ function afterMove(
     state.tray.fill(null);
   } else if (
     state.age === totalAges - 1 &&
-    state.ageMade >= ageNeed(state.age)
+    state.ageMade >= ageNeed(state.age, bundle)
   ) {
     // Final-age victory: once the player has made enough on-band things in
     // the last era, end the run with a flourish rather than letting the
@@ -572,6 +603,7 @@ export function newGame(
     choosing: null,
     undos: 1,
     lastSnapshot: null,
+    debug: false,
   };
 
   // Seed a few starting tiles that don't already combine. The prototype
@@ -745,8 +777,8 @@ export function reduce(
     }
 
     case "swap": {
-      if (state.swaps <= 0) return { state: prev, events: [] };
-      state.swaps--;
+      if (!state.debug && state.swaps <= 0) return { state: prev, events: [] };
+      if (!state.debug) state.swaps--;
       state.tray = [null, null, null];
       dealTray({
         bundle,

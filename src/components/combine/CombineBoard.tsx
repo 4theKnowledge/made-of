@@ -10,7 +10,7 @@ import React, {
 import Link from "next/link";
 import { Pictogram } from "@/pictograms/Pictogram";
 import { ageSets, catalogue, catalogueByKind } from "@/combine/data";
-import { newGame, reduce } from "@/combine/engine";
+import { newGame, reduce, ageNeed } from "@/combine/engine";
 import type { Action, Event, GameState } from "@/combine/engine";
 import { matchAt, matchOn } from "@/combine/match";
 import { ensureContext, suspend as suspendAudio, hasContext } from "@/combine/audio/core";
@@ -3140,7 +3140,7 @@ function AgeBar({
 }) {
   const ages = bundle.theme.ages;
   const last = state.age >= ages.length - 1;
-  const need = 7 + 2 * state.age;
+  const need = ageNeed(state.age, bundle);
   const pct = last ? 100 : Math.min(100, Math.round((state.ageMade / need) * 100));
   const ariaLabel = `Age ${ages[state.age]} of ${ages.length}${
     last ? "" : `. Make ${need - state.ageMade} more Age ${ages[state.age]} combos to reach Age ${ages[state.age + 1]}`
@@ -3179,7 +3179,7 @@ function AgesSheet({
   const ages = bundle.theme.ages;
   const current = state.age;
   const last = current >= ages.length - 1;
-  const need = 7 + 2 * current;
+  const need = ageNeed(current, bundle);
   const left = Math.max(0, need - state.ageMade);
   // Group this run's discoveries by the age the player actually made them
   // in (recipe.band at make time), falling back to the item's canonical
@@ -3274,7 +3274,7 @@ function AgesSheet({
           {ages.map((name, i) => {
             const isNow = i === current;
             const isPast = i < current;
-            const metaNeed = 7 + 2 * i;
+            const metaNeed = ageNeed(i, bundle);
             const meta = isNow
               ? last
                 ? "Final"
