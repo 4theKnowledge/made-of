@@ -19,6 +19,7 @@
     "predeploy": "node dist-scripts/migrate.js && node dist-scripts/seed-if-empty.js && node dist-scripts/backfill-handles.js"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.14.25",
     "better-auth": "^1.7.14",
     "drizzle-orm": "^0.36.4",
     "next": "^15.5.28",

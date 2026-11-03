@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Confidence, ItemKind, ItemStatus, LinkType, Tier } from "@/db/schema";
 import { REL } from "@/lib/rel";
 import { TIER, TIER_ORDER } from "@/lib/taxonomy";
@@ -222,11 +223,32 @@ function TreeMobileStyles() {
         }
 
         /* Hide inline row actions behind the overflow menu. */
-        .tree-root .tree-row-actions-inline {
+        .tree-root .tree-row-actions-inline,
+        .tree-root .tree-recipe-actions-inline {
           display: none !important;
         }
-        .tree-root .tree-row-actions-overflow {
+        .tree-root .tree-row-actions-overflow,
+        .tree-root .tree-recipe-actions-overflow {
           display: inline-flex !important;
+        }
+
+        /* Clamp row content so action buttons stay in view. The item name is
+           the elastic middle; everything else keeps its natural width. */
+        .tree-root .tree-row,
+        .tree-root .tree-recipe-row {
+          flex-wrap: nowrap !important;
+          overflow: hidden;
+        }
+        .tree-root .tree-row-name {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        /* Hide the kind label on mobile — the item page shows it. Keeps the
+           name column from losing room to a secondary label. */
+        .tree-root .tree-row-kind {
+          display: none !important;
         }
 
         /* Reduce indent, add lineage guide lines so ancestry stays readable. */
@@ -356,6 +378,47 @@ function Toasts({ list, dismiss }: { list: Toast[]; dismiss: (id: number) => voi
       ))}
     </div>
   );
+}
+
+/* ========================================================================
+ * TreeContext — stable per-render state shared by every Row/RecipeGroup.
+ *
+ * We pull everything that isn't identity-specific out of props so Row can be
+ * React.memo'd and a single edit doesn't cascade through the whole tree.
+ * The context value itself is memoised, so subscribers only re-render when a
+ * dependency they actually read changes.
+ * ====================================================================== */
+
+interface TreeContextValue {
+  data: TreeData;
+  views: Views;
+  expanded: Set<string>;
+  matches: Set<string> | null;
+  visibleIds: Set<string> | null;
+  selectedSet: Set<string>;
+  toggle: (path: string) => void;
+  forceExpand: (path: string) => void;
+  onEditItem: (id: string) => void;
+  onToggleSelected: (itemId: string, shiftKey: boolean) => void;
+  onCreateLink: (input: {
+    type: LinkType;
+    targetItemId: string;
+    recipeId: string | null;
+    itemId: string | null;
+    confidence: Confidence;
+  }) => Promise<void>;
+  onPatchLink: (id: string, patch: { confidence?: Confidence }) => Promise<void>;
+  onDeleteLink: (id: string) => Promise<void>;
+  onCreateRecipe: (itemId: string, label: string | null) => Promise<void>;
+  onDeleteRecipe: (id: string) => Promise<void>;
+}
+
+const TreeContext = createContext<TreeContextValue | null>(null);
+
+function useTree(): TreeContextValue {
+  const v = useContext(TreeContext);
+  if (!v) throw new Error("TreeContext missing");
+  return v;
 }
 
 /* ========================================================================
@@ -910,19 +973,37 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
   }, [matches, data.items]);
 
   const expandAll = useCallback(() => {
+    // Hard caps keep this safe as the KB grows: without them, "expand all" on
+    // a dense graph can mount tens of thousands of rows and lock the tab.
     const MAX_DEPTH = 8;
+    const MAX_EXPANSIONS = 2000;
     const all = new Set<string>();
+    let aborted = false;
     const walk = (itemId: string, path: string, depth: number, seen: Set<string>) => {
-      if (depth >= MAX_DEPTH || seen.has(itemId)) return;
+      if (aborted || depth >= MAX_DEPTH || seen.has(itemId)) return;
       const bucket = views.linksByItem.get(itemId);
       const kids = bucket ? [...bucket.itemLevel, ...Array.from(bucket.recipe.values()).flat()] : [];
       if (!kids.length) return;
       all.add(path);
+      if (all.size >= MAX_EXPANSIONS) {
+        aborted = true;
+        return;
+      }
       const next = new Set(seen);
       next.add(itemId);
       for (const k of kids) walk(k.targetItemId, `${path}/${k.targetItemId}`, depth + 1, next);
     };
-    for (const r of views.roots) walk(r, r, 0, new Set());
+    for (const r of views.roots) {
+      if (aborted) break;
+      walk(r, r, 0, new Set());
+    }
+    if (aborted) {
+      const proceed = confirm(
+        `Expanding would show ${MAX_EXPANSIONS}+ branches. Expand the first ${all.size}? ` +
+          `Narrow with search/filters first for better results.`,
+      );
+      if (!proceed) return;
+    }
     setExpanded(all);
     persistExpanded(all);
   }, [views, persistExpanded]);
@@ -937,6 +1018,60 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const editingItem = editingItemId ? data.items.find((it) => it.id === editingItemId) ?? null : null;
+
+  /* -- Context + virtualisation ---------------------------------------- */
+
+  // Keep the toggle-selected callback stable across renders. Shift-click
+  // range select depends on the current visibleOrderedIds, but we don't want
+  // the context value to churn whenever that list changes — stash it in a
+  // ref and read it inside the stable callback.
+  const visibleOrderedIdsRef = useRef(visibleOrderedIds);
+  useEffect(() => {
+    visibleOrderedIdsRef.current = visibleOrderedIds;
+  }, [visibleOrderedIds]);
+
+  const stableToggleSelected = useCallback(
+    (itemId: string, shift: boolean) => {
+      onRowSelectionToggle(itemId, shift, visibleOrderedIdsRef.current);
+    },
+    [onRowSelectionToggle],
+  );
+
+  const treeContextValue: TreeContextValue = useMemo(
+    () => ({
+      data,
+      views,
+      expanded,
+      matches,
+      visibleIds,
+      selectedSet: selected,
+      toggle,
+      forceExpand,
+      onEditItem: setEditingItemId,
+      onToggleSelected: stableToggleSelected,
+      onCreateLink: createLink,
+      onPatchLink: patchLink,
+      onDeleteLink: deleteLink,
+      onCreateRecipe: createRecipe,
+      onDeleteRecipe: deleteRecipe,
+    }),
+    [
+      data,
+      views,
+      expanded,
+      matches,
+      visibleIds,
+      selected,
+      toggle,
+      forceExpand,
+      stableToggleSelected,
+      createLink,
+      patchLink,
+      deleteLink,
+      createRecipe,
+      deleteRecipe,
+    ],
+  );
 
   return (
     <div className="tree-root">
@@ -983,33 +1118,9 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
       </div>
 
       {view === "tree" ? (
-        <ul style={{ listStyle: "none", margin: 0, padding: "6px 0" }}>
-          {views.roots.map((rootId) => (
-            <Row
-              key={rootId}
-              itemId={rootId}
-              path={rootId}
-              depth={0}
-              edge={null}
-              data={data}
-              views={views}
-              expanded={expanded}
-              toggle={toggle}
-              forceExpand={forceExpand}
-              ancestors={new Set()}
-              matches={matches}
-              visibleIds={visibleIds}
-              onCreateLink={createLink}
-              onPatchLink={patchLink}
-              onDeleteLink={deleteLink}
-              onCreateRecipe={createRecipe}
-              onDeleteRecipe={deleteRecipe}
-              onEditItem={setEditingItemId}
-              selectedSet={selected}
-              onToggleSelected={(id, shift) => onRowSelectionToggle(id, shift, visibleOrderedIds)}
-            />
-          ))}
-        </ul>
+        <TreeContext.Provider value={treeContextValue}>
+          <VirtualRootList roots={views.roots} />
+        </TreeContext.Provider>
       ) : (
         <FlatView
           items={data.items}
@@ -1418,7 +1529,7 @@ function Legend() {
                 strokeDasharray={REL[t].dash || undefined}
               />
             </svg>
-            {t}
+            {t} ({REL[t].group.toLowerCase()})
           </span>
         </Tooltip>
       ))}
@@ -1445,6 +1556,126 @@ function Legend() {
 }
 
 /* ========================================================================
+ * VirtualRootList — windowed render of top-level roots.
+ *
+ * Scope: we virtualise the roots axis only, not the full flattened tree.
+ * Row's expansion body (forms, recipes, children) is deeply recursive and
+ * stateful; flattening that too would mean hoisting per-row state into a
+ * central store — a bigger refactor that pairs with the server-side
+ * lazy-load work.
+ *
+ * What this bounds: on a 10k-item KB with thousands of roots, DOM mounts are
+ * limited to roots whose subtrees intersect the viewport. On both desktop
+ * and mobile, scrolling stays smooth because the heavy mount/unmount is
+ * confined to this one axis.
+ *
+ * What this does NOT bound: a single root with a deep expanded subtree
+ * still renders every descendant row. "Expand all" has a hard cap elsewhere;
+ * individual click-expands do not. If a user drills into a thousand-child
+ * item we'll feel it. The lazy-load pass (step 4) addresses that properly
+ * by fetching children on demand.
+ *
+ * Scrolling is on the window, not an inner container — mobile browsers hide
+ * their chrome on page scroll, and nested scroll containers break that.
+ * ====================================================================== */
+
+const VirtualRootList = memo(function VirtualRootList({ roots }: { roots: string[] }) {
+  // Window-scrolling virtualiser: the page scrolls as normal, we just don't
+  // mount roots whose subtrees are off-screen. This preserves the previous
+  // feel (one page scroll, sticky-like toolbar) while bounding DOM.
+  const parentRef = useRef<HTMLDivElement | null>(null);
+  const virt = useVirtualizer({
+    count: roots.length,
+    getScrollElement: () => (typeof window === "undefined" ? null : (window as unknown as HTMLElement)),
+    observeElementRect: (instance, cb) => {
+      const measure = () =>
+        cb({ width: window.innerWidth, height: window.innerHeight });
+      // Defer first call: react-virtual sets observers up during render and
+      // calling `cb` synchronously can trigger flushSync inside a lifecycle.
+      const id = requestAnimationFrame(measure);
+      window.addEventListener("resize", measure);
+      return () => {
+        cancelAnimationFrame(id);
+        window.removeEventListener("resize", measure);
+      };
+    },
+    observeElementOffset: (instance, cb) => {
+      const notify = () => {
+        const rect = parentRef.current?.getBoundingClientRect();
+        // Offset is how far the list's top is above the viewport top.
+        cb(rect ? -rect.top : 0, true);
+      };
+      const id = requestAnimationFrame(notify);
+      window.addEventListener("scroll", notify, { passive: true });
+      window.addEventListener("resize", notify);
+      return () => {
+        cancelAnimationFrame(id);
+        window.removeEventListener("scroll", notify);
+        window.removeEventListener("resize", notify);
+      };
+    },
+    scrollToFn: (offset) => {
+      const rect = parentRef.current?.getBoundingClientRect();
+      const top = (rect ? rect.top + window.scrollY : 0) + offset;
+      window.scrollTo({ top, behavior: "auto" });
+    },
+    estimateSize: () => 32,
+    overscan: 10,
+    getItemKey: (i) => roots[i],
+    measureElement: (el) => el.getBoundingClientRect().height,
+  });
+
+  const items = virt.getVirtualItems();
+
+  return (
+    <div ref={parentRef}>
+      <ul
+        style={{
+          listStyle: "none",
+          margin: 0,
+          padding: 0,
+          height: virt.getTotalSize(),
+          position: "relative",
+        }}
+      >
+        {items.map((v) => {
+          const rootId = roots[v.index];
+          return (
+            <li
+              key={v.key}
+              data-index={v.index}
+              ref={virt.measureElement}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                transform: `translateY(${v.start}px)`,
+              }}
+            >
+              <RootSubtree itemId={rootId} />
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+});
+
+/**
+ * One root subtree. Thin wrapper around Row that provides the empty ancestor
+ * set and depth=0. Memoised; prop identity is just `itemId`.
+ */
+const RootSubtree = memo(function RootSubtree({ itemId }: { itemId: string }) {
+  const emptyAncestors = useMemo(() => new Set<string>(), []);
+  return (
+    <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+      <Row itemId={itemId} path={itemId} depth={0} edge={null} ancestors={emptyAncestors} />
+    </ul>
+  );
+});
+
+/* ========================================================================
  * Row — single tree node (an item in a lineage). Also renders its recipes
  * and children when expanded.
  * ====================================================================== */
@@ -1458,53 +1689,27 @@ interface RowProps {
     type: LinkType;
     confidence: Confidence;
   } | null;
-  data: TreeData;
-  views: Views;
-  expanded: Set<string>;
-  toggle: (path: string) => void;
-  forceExpand: (path: string) => void;
   ancestors: Set<string>;
-  matches: Set<string> | null;
-  visibleIds: Set<string> | null;
-  onCreateLink: (input: {
-    type: LinkType;
-    targetItemId: string;
-    recipeId: string | null;
-    itemId: string | null;
-    confidence: Confidence;
-  }) => Promise<void>;
-  onPatchLink: (id: string, patch: { confidence?: Confidence }) => Promise<void>;
-  onDeleteLink: (id: string) => Promise<void>;
-  onCreateRecipe: (itemId: string, label: string | null) => Promise<void>;
-  onDeleteRecipe: (id: string) => Promise<void>;
-  onEditItem: (id: string) => void;
-  selectedSet: Set<string>;
-  onToggleSelected: (itemId: string, shiftKey: boolean) => void;
 }
 
-function Row(props: RowProps) {
+const Row = memo(function Row(props: RowProps) {
+  const { itemId, path, depth, edge, ancestors } = props;
   const {
-    itemId,
-    path,
-    depth,
-    edge,
     data,
     views,
     expanded,
     toggle,
     forceExpand,
-    ancestors,
     matches,
     visibleIds,
     onCreateLink,
     onPatchLink,
     onDeleteLink,
     onCreateRecipe,
-    onDeleteRecipe,
     onEditItem,
     selectedSet,
     onToggleSelected,
-  } = props;
+  } = useTree();
   const isSelected = selectedSet.has(itemId);
 
   const [showAddChild, setShowAddChild] = useState(false);
@@ -1512,15 +1717,38 @@ function Row(props: RowProps) {
   const [showRecipeForm, setShowRecipeForm] = useState(false);
 
   const item = views.itemById.get(itemId);
-  if (!item) return null;
-
-  // Under a filter, hide any item not in the match-or-ancestor set.
-  if (visibleIds && !visibleIds.has(itemId)) return null;
-
   const bucket = views.linksByItem.get(itemId);
   const recipes = views.recipesByItem.get(itemId) ?? [];
-  const itemLevel = bucket?.itemLevel ?? [];
+  const itemLevel = useMemo(() => bucket?.itemLevel ?? [], [bucket]);
   const recipeLinks = bucket?.recipe ?? new Map<string, LinkRow[]>();
+
+  // Pre-sort item-level links and build a stable edges map so child Row
+  // props stay reference-stable across unrelated parent re-renders.
+  const sortedItemLevel = useMemo(
+    () =>
+      itemLevel.slice().sort((a, b) => {
+        const an = views.itemById.get(a.targetItemId)?.name ?? "";
+        const bn = views.itemById.get(b.targetItemId)?.name ?? "";
+        return an.localeCompare(bn);
+      }),
+    [itemLevel, views],
+  );
+  const rowEdges = useMemo(() => {
+    const m = new Map<string, { linkId: string; type: LinkType; confidence: Confidence }>();
+    for (const l of itemLevel) {
+      m.set(l.linkId, { linkId: l.linkId, type: l.type, confidence: l.confidence });
+    }
+    return m;
+  }, [itemLevel]);
+  const nextAncestors = useMemo(() => {
+    const s = new Set(ancestors);
+    s.add(itemId);
+    return s;
+  }, [ancestors, itemId]);
+
+  if (!item) return null;
+  // Under a filter, hide any item not in the match-or-ancestor set.
+  if (visibleIds && !visibleIds.has(itemId)) return null;
 
   const totalChildren =
     itemLevel.length + Array.from(recipeLinks.values()).reduce((n, arr) => n + arr.length, 0);
@@ -1598,9 +1826,9 @@ function Row(props: RowProps) {
           </span>
         </Tooltip>
 
-        <span style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</span>
+        <span className="tree-row-name" style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</span>
         <Tooltip title={data.kinds.find((k) => k.code === item.kind)?.label ?? item.kind}>
-          <span style={{ fontSize: 11, color: "var(--muted)" }}>{item.kind}</span>
+          <span className="tree-row-kind" style={{ fontSize: 11, color: "var(--muted)" }}>{item.kind}</span>
         </Tooltip>
 
         {edge && (
@@ -1789,22 +2017,8 @@ function Row(props: RowProps) {
               path={`${path}/recipe:${r.id}`}
               depth={depth + 1}
               links={recipeLinks.get(r.id) ?? []}
-              data={data}
-              views={views}
-              expanded={expanded}
-              toggle={toggle}
-              forceExpand={forceExpand}
               ancestors={ancestors}
               itemId={itemId}
-              matches={matches}
-              visibleIds={visibleIds}
-              onCreateLink={onCreateLink}
-              onPatchLink={onPatchLink}
-              onDeleteLink={onDeleteLink}
-              onDeleteRecipe={onDeleteRecipe}
-              onEditItem={onEditItem}
-              selectedSet={selectedSet}
-              onToggleSelected={onToggleSelected}
             />
           ))}
 
@@ -1827,38 +2041,16 @@ function Row(props: RowProps) {
                   Item-level links
                 </li>
               )}
-              {itemLevel
-                .slice()
-                .sort((a, b) => {
-                  const an = views.itemById.get(a.targetItemId)?.name ?? "";
-                  const bn = views.itemById.get(b.targetItemId)?.name ?? "";
-                  return an.localeCompare(bn);
-                })
-                .map((l) => (
-                  <Row
-                    key={`${path}/${l.targetItemId}/${l.linkId}`}
-                    itemId={l.targetItemId}
-                    path={`${path}/${l.targetItemId}`}
-                    depth={depth + 1}
-                    edge={{ linkId: l.linkId, type: l.type, confidence: l.confidence }}
-                    data={data}
-                    views={views}
-                    expanded={expanded}
-                    toggle={toggle}
-                    forceExpand={forceExpand}
-                    ancestors={new Set([...ancestors, itemId])}
-                    matches={matches}
-                    visibleIds={visibleIds}
-                    onCreateLink={onCreateLink}
-                    onPatchLink={onPatchLink}
-                    onDeleteLink={onDeleteLink}
-                    onCreateRecipe={onCreateRecipe}
-                    onDeleteRecipe={onDeleteRecipe}
-                    onEditItem={onEditItem}
-                    selectedSet={selectedSet}
-                    onToggleSelected={onToggleSelected}
-                  />
-                ))}
+              {sortedItemLevel.map((l) => (
+                <Row
+                  key={`${path}/${l.targetItemId}/${l.linkId}`}
+                  itemId={l.targetItemId}
+                  path={`${path}/${l.targetItemId}`}
+                  depth={depth + 1}
+                  edge={rowEdges.get(l.linkId)!}
+                  ancestors={nextAncestors}
+                />
+              ))}
             </>
           )}
 
@@ -1892,7 +2084,7 @@ function Row(props: RowProps) {
       )}
     </li>
   );
-}
+});
 
 const rowBtn: React.CSSProperties = { fontSize: 11, padding: "2px 8px" };
 
@@ -2019,6 +2211,106 @@ function RowActionSheet({
   );
 }
 
+/* ========================================================================
+ * RecipeActionSheet — mobile overflow menu for a recipe header row.
+ * ====================================================================== */
+
+function RecipeActionSheet({
+  label,
+  onAddLink,
+  onDeleteRecipe,
+}: {
+  label: string;
+  onAddLink: () => void;
+  onDeleteRecipe: () => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const close = () => setOpen(false);
+  const runAnd = (fn: () => void | Promise<void>) => async () => {
+    close();
+    await fn();
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="btn tree-row-btn"
+        style={{ ...rowBtn, minWidth: 32 }}
+        aria-label={`Actions for ${label}`}
+        onClick={() => setOpen(true)}
+      >
+        ⋯
+      </button>
+      {typeof document !== "undefined" &&
+        open &&
+        createPortal(
+          <>
+            <div
+              onClick={close}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 90 }}
+              aria-hidden
+            />
+            <div
+              role="dialog"
+              aria-label={`Actions for ${label}`}
+              style={{
+                position: "fixed",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: "var(--surface)",
+                borderTop: "1.5px solid var(--ink)",
+                borderRadius: "12px 12px 0 0",
+                boxShadow: "0 -4px 16px rgba(0,0,0,0.15)",
+                padding: "12px 16px",
+                paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
+                zIndex: 100,
+                animation: "tree-sheet-up 180ms ease-out",
+              }}
+            >
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, fontFamily: "var(--mono, monospace)" }}>
+                {label}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button type="button" className="btn" style={sheetBtn} onClick={runAnd(onAddLink)}>
+                  + Link in recipe
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ ...sheetBtn, borderColor: "#f85149", color: "#f85149" }}
+                  onClick={runAnd(onDeleteRecipe)}
+                >
+                  Delete recipe
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ ...sheetBtn, marginTop: 4, background: "var(--soft)" }}
+                  onClick={close}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </>,
+          document.body,
+        )}
+    </>
+  );
+}
+
 const sheetBtn: React.CSSProperties = {
   width: "100%",
   justifyContent: "center",
@@ -2037,42 +2329,38 @@ interface RecipeGroupProps {
   path: string;
   depth: number;
   links: LinkRow[];
-  data: TreeData;
-  views: Views;
-  expanded: Set<string>;
-  toggle: (path: string) => void;
-  forceExpand: (path: string) => void;
   ancestors: Set<string>;
   itemId: string;
-  matches: Set<string> | null;
-  visibleIds: Set<string> | null;
-  onCreateLink: RowProps["onCreateLink"];
-  onPatchLink: RowProps["onPatchLink"];
-  onDeleteLink: RowProps["onDeleteLink"];
-  onDeleteRecipe: (id: string) => Promise<void>;
-  onEditItem: RowProps["onEditItem"];
-  selectedSet: RowProps["selectedSet"];
-  onToggleSelected: RowProps["onToggleSelected"];
 }
 
-function RecipeGroup(props: RecipeGroupProps) {
-  const [showAddChild, setShowAddChild] = useState(false);
+const RecipeGroup = memo(function RecipeGroup(props: RecipeGroupProps) {
+  const { recipe, parentItem, path, depth, links, ancestors, itemId } = props;
   const {
-    recipe,
-    parentItem,
-    path,
-    depth,
-    links,
+    data,
     views,
     expanded,
     toggle,
     forceExpand,
-    ancestors,
-    itemId,
-    matches,
     visibleIds,
-    data,
-  } = props;
+    onCreateLink,
+    onDeleteRecipe,
+  } = useTree();
+  const [showAddChild, setShowAddChild] = useState(false);
+
+  const sortedLinks = useMemo(
+    () =>
+      links.slice().sort((a, b) => {
+        const an = views.itemById.get(a.targetItemId)?.name ?? "";
+        const bn = views.itemById.get(b.targetItemId)?.name ?? "";
+        return an.localeCompare(bn);
+      }),
+    [links, views],
+  );
+  const nextAncestors = useMemo(() => {
+    const s = new Set(ancestors);
+    s.add(itemId);
+    return s;
+  }, [ancestors, itemId]);
 
   // Under a filter, hide this recipe group entirely if none of its link
   // targets are in the visible set — nothing of interest to show.
@@ -2087,6 +2375,7 @@ function RecipeGroup(props: RecipeGroupProps) {
   return (
     <li>
       <div
+        className="tree-recipe-row"
         style={{
           display: "flex",
           alignItems: "center",
@@ -2111,12 +2400,17 @@ function RecipeGroup(props: RecipeGroupProps) {
           {canExpand ? (isExpanded ? "▾" : "▸") : "·"}
         </span>
         <span
+          className="tree-recipe-label"
           style={{
             fontFamily: "var(--mono, monospace)",
             fontSize: 10,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
             color: "var(--muted)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            minWidth: 0,
           }}
         >
           Recipe #{recipe.position}
@@ -2125,7 +2419,11 @@ function RecipeGroup(props: RecipeGroupProps) {
         <span style={{ fontSize: 11, color: "var(--muted)" }}>
           {links.length} link{links.length === 1 ? "" : "s"}
         </span>
-        <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }} onClick={(e) => e.stopPropagation()}>
+        <span
+          className="tree-recipe-actions-inline"
+          style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <button
             className="btn"
             style={rowBtn}
@@ -2142,11 +2440,33 @@ function RecipeGroup(props: RecipeGroupProps) {
             onClick={async () => {
               if (!confirm(`Delete recipe #${recipe.position}${recipe.label ? ` (${recipe.label})` : ""} and all its links?`))
                 return;
-              await props.onDeleteRecipe(recipe.id);
+              await onDeleteRecipe(recipe.id);
             }}
           >
             Delete recipe
           </button>
+        </span>
+        <span
+          className="tree-recipe-actions-overflow"
+          style={{ marginLeft: "auto", display: "none" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <RecipeActionSheet
+            label={`Recipe #${recipe.position}${recipe.label ? ` · ${recipe.label}` : ""}`}
+            onAddLink={() => {
+              forceExpand(path);
+              setShowAddChild(true);
+            }}
+            onDeleteRecipe={async () => {
+              if (
+                !confirm(
+                  `Delete recipe #${recipe.position}${recipe.label ? ` (${recipe.label})` : ""} and all its links?`,
+                )
+              )
+                return;
+              await onDeleteRecipe(recipe.id);
+            }}
+          />
         </span>
       </div>
 
@@ -2159,7 +2479,7 @@ function RecipeGroup(props: RecipeGroupProps) {
             lockedScope={{ kind: "recipe", recipeId: recipe.id }}
             onCancel={() => setShowAddChild(false)}
             onSubmit={async (input) => {
-              await props.onCreateLink({
+              await onCreateLink({
                 type: input.type,
                 targetItemId: input.targetItemId,
                 recipeId: recipe.id,
@@ -2174,45 +2494,21 @@ function RecipeGroup(props: RecipeGroupProps) {
 
       {isExpanded && canExpand && (
         <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          {links
-            .slice()
-            .sort((a, b) => {
-              const an = views.itemById.get(a.targetItemId)?.name ?? "";
-              const bn = views.itemById.get(b.targetItemId)?.name ?? "";
-              return an.localeCompare(bn);
-            })
-            .map((l) => (
-              <Row
-                key={`${path}/${l.targetItemId}/${l.linkId}`}
-                itemId={l.targetItemId}
-                path={`${path}/${l.targetItemId}`}
-                depth={depth + 1}
-                edge={{ linkId: l.linkId, type: l.type, confidence: l.confidence }}
-                data={data}
-                views={views}
-                expanded={expanded}
-                toggle={toggle}
-                forceExpand={forceExpand}
-                ancestors={new Set([...ancestors, itemId])}
-                matches={matches}
-                visibleIds={props.visibleIds}
-                onCreateLink={props.onCreateLink}
-                onPatchLink={props.onPatchLink}
-                onDeleteLink={props.onDeleteLink}
-                onCreateRecipe={async () => {
-                  /* can't add a recipe to a child from here */
-                }}
-                onDeleteRecipe={props.onDeleteRecipe}
-                onEditItem={props.onEditItem}
-                selectedSet={props.selectedSet}
-                onToggleSelected={props.onToggleSelected}
-              />
-            ))}
+          {sortedLinks.map((l) => (
+            <Row
+              key={`${path}/${l.targetItemId}/${l.linkId}`}
+              itemId={l.targetItemId}
+              path={`${path}/${l.targetItemId}`}
+              depth={depth + 1}
+              edge={{ linkId: l.linkId, type: l.type, confidence: l.confidence }}
+              ancestors={nextAncestors}
+            />
+          ))}
         </ul>
       )}
     </li>
   );
-}
+});
 
 /* ========================================================================
  * Forms — small inline editors.
