@@ -1829,7 +1829,7 @@ export const ITEMS: DataItem[] = [
         n: ["ultrapure water"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "ink",
@@ -2030,7 +2030,7 @@ export const ITEMS: DataItem[] = [
         w: ["packaging plant"],
       },
     ],
-    tags: ["combine-everyday", "combine-exclude", "fab-chain"],
+    tags: ["combine-everyday", "fab-chain"],
   },
   {
     name: "circuit board",
@@ -2043,7 +2043,7 @@ export const ITEMS: DataItem[] = [
         f: ["copper wire","plastic","solder"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "screen",
@@ -2784,7 +2784,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["ultrapure water"],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "factory",
@@ -2904,7 +2904,7 @@ export const ITEMS: DataItem[] = [
         f: ["carbon","oxygen"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "phosphorus",
@@ -2931,7 +2931,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "argon",
@@ -2945,7 +2945,7 @@ export const ITEMS: DataItem[] = [
         f: ["supernova"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "neon",
@@ -2959,7 +2959,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "sulfur",
@@ -2987,7 +2987,7 @@ export const ITEMS: DataItem[] = [
         f: ["supernova"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "cobalt",
@@ -3001,7 +3001,7 @@ export const ITEMS: DataItem[] = [
         f: ["supernova"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "zirconium",
@@ -3015,7 +3015,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "hafnium",
@@ -3029,7 +3029,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "molybdenum",
@@ -3043,7 +3043,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "tantalum",
@@ -3057,7 +3057,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "tungsten",
@@ -3071,7 +3071,7 @@ export const ITEMS: DataItem[] = [
         f: ["star"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "carbon dioxide",
@@ -3097,7 +3097,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "fluorite",
@@ -3111,7 +3111,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "phosphate rock",
@@ -3125,7 +3125,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "borax",
@@ -3139,7 +3139,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "tungsten ore",
@@ -3153,7 +3153,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "molybdenite",
@@ -3167,7 +3167,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "zircon",
@@ -3181,7 +3181,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "cobalt ore",
@@ -3195,7 +3195,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "coltan",
@@ -3209,7 +3209,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "chromite",
@@ -3223,7 +3223,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksS: ["mine"],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "metallurgical silicon",
@@ -3237,7 +3237,7 @@ export const ITEMS: DataItem[] = [
         w: ["arc furnace"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "hydrogen gas",
@@ -3255,7 +3255,7 @@ export const ITEMS: DataItem[] = [
         f: ["water"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "chlorine gas",
@@ -3268,7 +3268,7 @@ export const ITEMS: DataItem[] = [
         f: ["salt","water"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "hydrogen chloride",
@@ -3281,7 +3281,7 @@ export const ITEMS: DataItem[] = [
         f: ["hydrogen gas","chlorine gas"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "trichlorosilane",
@@ -3295,7 +3295,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "polysilicon",
@@ -3309,7 +3309,7 @@ export const ITEMS: DataItem[] = [
         w: ["siemens reactor"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "argon gas",
@@ -3323,7 +3323,7 @@ export const ITEMS: DataItem[] = [
         w: ["air separation unit"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "neon gas",
@@ -3337,7 +3337,7 @@ export const ITEMS: DataItem[] = [
         w: ["air separation unit"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "fluorine gas",
@@ -3350,7 +3350,7 @@ export const ITEMS: DataItem[] = [
         f: ["hydrofluoric acid"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "sulfuric acid",
@@ -3364,7 +3364,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "hydrofluoric acid",
@@ -3378,7 +3378,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "etching gas",
@@ -3392,7 +3392,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "dopant gases",
@@ -3406,7 +3406,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "silicon ingot",
@@ -3421,7 +3421,7 @@ export const ITEMS: DataItem[] = [
         n: ["argon gas"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "polishing slurry",
@@ -3434,7 +3434,7 @@ export const ITEMS: DataItem[] = [
         f: ["sand","soda ash","water"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "synthetic diamond",
@@ -3453,7 +3453,7 @@ export const ITEMS: DataItem[] = [
         f: ["natural gas","hydrogen gas"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "ultrapure water",
@@ -3466,7 +3466,7 @@ export const ITEMS: DataItem[] = [
         f: ["water"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "solvent",
@@ -3480,7 +3480,7 @@ export const ITEMS: DataItem[] = [
         w: ["refinery"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "photoresist",
@@ -3494,7 +3494,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "fused silica",
@@ -3508,7 +3508,7 @@ export const ITEMS: DataItem[] = [
         w: ["furnace"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "photomask",
@@ -3522,7 +3522,7 @@ export const ITEMS: DataItem[] = [
         w: ["electron beam writer"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "refined copper",
@@ -3541,7 +3541,7 @@ export const ITEMS: DataItem[] = [
         f: ["copper ore","sulfuric acid"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "tantalum metal",
@@ -3555,7 +3555,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "cobalt metal",
@@ -3568,7 +3568,7 @@ export const ITEMS: DataItem[] = [
         f: ["cobalt ore","sulfuric acid"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "tungsten metal",
@@ -3581,7 +3581,7 @@ export const ITEMS: DataItem[] = [
         f: ["tungsten ore","hydrogen gas"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "molybdenum metal",
@@ -3594,7 +3594,7 @@ export const ITEMS: DataItem[] = [
         f: ["molybdenite","hydrogen gas"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "hafnium oxide",
@@ -3608,7 +3608,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "ABF film",
@@ -3622,7 +3622,7 @@ export const ITEMS: DataItem[] = [
         w: ["chemical plant"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "transistor layer",
@@ -3637,7 +3637,7 @@ export const ITEMS: DataItem[] = [
         n: ["ultrapure water"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "finished wafer",
@@ -3651,7 +3651,7 @@ export const ITEMS: DataItem[] = [
         w: ["lithography scanner","plasma etcher","chip fab"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "die",
@@ -3665,7 +3665,7 @@ export const ITEMS: DataItem[] = [
         w: ["dicing saw"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "package substrate",
@@ -3678,7 +3678,7 @@ export const ITEMS: DataItem[] = [
         f: ["ABF film","refined copper","glass"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "quartz crucible",
@@ -3692,7 +3692,7 @@ export const ITEMS: DataItem[] = [
         w: ["furnace"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "EUV mirror",
@@ -3705,7 +3705,7 @@ export const ITEMS: DataItem[] = [
         f: ["molybdenum metal","polysilicon","fused silica"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "CO2 laser",
@@ -3718,7 +3718,7 @@ export const ITEMS: DataItem[] = [
         f: ["carbon dioxide","helium","nitrogen","copper wire","steel"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "argon fluoride laser",
@@ -3731,7 +3731,7 @@ export const ITEMS: DataItem[] = [
         f: ["argon gas","fluorine gas","neon gas","steel"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "arc furnace",
@@ -3744,7 +3744,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","brick","graphite"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "siemens reactor",
@@ -3757,7 +3757,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","copper wire"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "czochralski puller",
@@ -3770,7 +3770,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","graphite","copper wire"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "air separation unit",
@@ -3783,7 +3783,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","electric motor"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "wire saw",
@@ -3796,7 +3796,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","synthetic diamond"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "dicing saw",
@@ -3809,7 +3809,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","synthetic diamond"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "diamond press",
@@ -3822,7 +3822,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "electron beam writer",
@@ -3835,7 +3835,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","magnet","copper wire"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "ion implanter",
@@ -3848,7 +3848,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","magnet","copper wire"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "plasma etcher",
@@ -3861,7 +3861,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","fused silica","copper wire"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "lithography scanner",
@@ -3879,7 +3879,7 @@ export const ITEMS: DataItem[] = [
         f: ["argon fluoride laser","fused silica","steel"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "chemical plant",
@@ -3893,7 +3893,7 @@ export const ITEMS: DataItem[] = [
       },
     ],
     linksN: ["water"],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "packaging plant",
@@ -3906,7 +3906,7 @@ export const ITEMS: DataItem[] = [
         f: ["steel","concrete"],
       },
     ],
-    tags: ["combine-exclude", "fab-chain"],
+    tags: ["fab-chain"],
   },
   {
     name: "apple tree",

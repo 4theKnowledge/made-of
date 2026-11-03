@@ -78,6 +78,15 @@ async function main() {
     await bulkInsert(tx, schema.links, rows.links);
     await bulkInsert(tx, schema.linkEvidence, rows.linkEvidence);
     await bulkInsert(tx, schema.evidenceSources, rows.evidenceSources);
+
+    // Everything theme membership. The 'everything' row itself is created by
+    // migration 0010. Every item goes in except those tagged combine-exclude
+    // (currently just big bang). Deleting items cascades to this join table,
+    // so a reseed re-populates from scratch.
+    const everythingMembership = rows.items
+      .filter((it) => !(it.tags ?? []).includes("combine-exclude"))
+      .map((it) => ({ itemId: it.id!, themeCode: "everything" }));
+    await bulkInsert(tx, schema.itemCombineThemes, everythingMembership);
   });
 
   console.log("seed complete");
