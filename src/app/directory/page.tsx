@@ -11,10 +11,10 @@ export const metadata: Metadata = {
   title: "Index · Made Of",
   description:
     "Every item in Made Of, A to Z. Tap any name to see what it is made of.",
-  alternates: { canonical: "/index" },
+  alternates: { canonical: "/directory" },
 };
 
-export default async function IndexPage() {
+export default async function DirectoryPage() {
   const live = await getLiveSnapshot();
 
   const entries: IndexEntry[] = [];
