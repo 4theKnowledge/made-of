@@ -1,0 +1,323 @@
+import React from "react";
+import type { GameState } from "@/combine/engine";
+import type { Fx } from "@/components/combine/board-parts/types";
+import { formatDailyLabel } from "@/components/combine/board-parts/util";
+
+export function TopBar({
+  state,
+  fx,
+  best,
+  helpersOpen,
+  moreOpen,
+  clearMode,
+  moveMode,
+  shoreMode,
+  soundOn,
+  onToggleHelpers,
+  onToggleMore,
+  onHelper,
+  onTheme,
+  onBook,
+  onSound,
+  onHelp,
+  onIntro,
+}: {
+  state: GameState;
+  fx: Fx;
+  best: number;
+  helpersOpen: boolean;
+  moreOpen: boolean;
+  clearMode: boolean;
+  moveMode: boolean;
+  shoreMode: boolean;
+  soundOn: boolean;
+  onToggleHelpers: () => void;
+  onToggleMore: () => void;
+  onHelper: (which: "hint" | "swap" | "clear" | "move" | "shore" | "undo") => void;
+  onTheme: () => void;
+  onBook: () => void;
+  onSound: () => void;
+  onHelp: () => void;
+  onIntro: () => void;
+}) {
+  const canUndo = state.undos > 0 && state.lastSnapshot != null;
+  const helpersLeft =
+    state.swaps +
+    state.clears +
+    state.hints +
+    state.mv +
+    state.shore +
+    (canUndo ? 1 : 0);
+  const themeName = state.daily ? "Daily" : "Endless";
+  const dailyLabel = state.daily ? formatDailyLabel(state.daily) : null;
+  const bestDisplay = Math.max(best, state.over ? state.score : 0);
+  const modeActive = clearMode || moveMode || shoreMode;
+  return (
+    <div className={`cbtop${state.daily ? " cbtop-daily" : ""}`}>
+      <div className="cbscore">
+        <b>{state.score.toLocaleString("en")}</b>
+        <span>best {bestDisplay.toLocaleString("en")}</span>
+      </div>
+      {fx.chain && fx.chain > 1 ? (
+        <span className="cbchain" aria-live="polite">
+          ×{fx.chain} chain
+        </span>
+      ) : null}
+      {fx.close ? (
+        <span className="cbchain cbclose" aria-live="polite">
+          Close call! +{fx.close}
+        </span>
+      ) : null}
+      <button
+        className="cbh cbtheme"
+        type="button"
+        aria-label={`Theme: ${themeName}${dailyLabel ? `, ${dailyLabel}` : ""}. Change theme`}
+        onClick={onTheme}
+      >
+        <span>
+          {themeName}
+          {dailyLabel && <em className="cbtheme-day">{dailyLabel}</em>}
+        </span>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      <div className="cbhelpwrap">
+        <button
+          className={`cbh${modeActive ? " on" : ""}${helpersOpen ? " open" : ""}`}
+          id="cbHelp"
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={helpersOpen}
+          aria-label={modeActive ? "Cancel" : "Helpers"}
+          onClick={onToggleHelpers}
+          disabled={state.over || (!modeActive && helpersLeft === 0)}
+        >
+          {modeActive ? (
+            <>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+              <span className="lbl">Cancel</span>
+            </>
+          ) : (
+            <>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 9h18v11H3zM8 9V5h8v4M3 13h18M11 12v3h2v-3" />
+              </svg>
+              <span className="lbl">Helpers</span>
+              <b>{helpersLeft}</b>
+            </>
+          )}
+        </button>
+        {helpersOpen && !state.over && (
+          <>
+            <div className="cbscrim cbhelpscrim" aria-hidden="true" />
+            <div className="cbhelpmenu" role="menu" aria-label="Helpers">
+            <span className="k cbhelptitle">Helpers</span>
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("hint")}
+              disabled={state.hints === 0}
+              aria-label={`Hint: show one new combo, ${state.hints} left`}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z" />
+              </svg>
+              <span className="nm">
+                <b className="t">Hint</b>
+                <em>
+                  Point out a combo, new ones first. If nothing fits, it teaches a recipe.
+                </em>
+              </span>
+              <b className="c">{state.hints}</b>
+            </button>
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("move")}
+              disabled={state.mv === 0}
+              aria-label={`Move a tile on the board, ${state.mv} left`}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" />
+              </svg>
+              <span className="nm">
+                <b className="t">Move</b>
+                <em>
+                  Pick up a tile on the board and put it somewhere else. Not a turn.
+                </em>
+              </span>
+              <b className="c">{state.mv}</b>
+            </button>
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("swap")}
+              disabled={state.swaps === 0}
+              aria-label={`Swap the tray, ${state.swaps} left`}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 7h11l-3-3M17 17H6l3 3" />
+              </svg>
+              <span className="nm">
+                <b className="t">Swap</b>
+                <em>Trade your three tiles for three new ones</em>
+              </span>
+              <b className="c">{state.swaps}</b>
+            </button>
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("clear")}
+              disabled={state.clears === 0}
+              aria-label={`Clear a tile, ${state.clears} left`}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 6l4 4M12 8l6-6 4 4-6 6M13 11 4 20" />
+              </svg>
+              <span className="nm">
+                <b className="t">Clear</b>
+                <em>Remove one tile from the board</em>
+              </span>
+              <b className="c">{state.clears}</b>
+            </button>
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("shore")}
+              disabled={state.shore === 0}
+              aria-label={`Shore up a crumbling tile, ${state.shore} left`}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 20h16M6 20V11l6-6 6 6v9M9 20v-6h6v6" />
+              </svg>
+              <span className="nm">
+                <b className="t">Shore</b>
+                <em>
+                  Anchor a crumbling tile — it won&apos;t crumble again.
+                </em>
+              </span>
+              <b className="c">{state.shore}</b>
+            </button>
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("undo")}
+              disabled={!canUndo}
+              aria-label={
+                canUndo
+                  ? `Undo last move, ${state.undos} left`
+                  : state.undos > 0
+                    ? "Undo unavailable — no move to undo or last turn unlocked something"
+                    : "Undo used"
+              }
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 14l-5-5 5-5M4 9h10a6 6 0 0 1 0 12h-4" />
+              </svg>
+              <span className="nm">
+                <b className="t">Undo</b>
+                <em>
+                  Take back your last tile. Can&apos;t undo past a new discovery.
+                </em>
+              </span>
+              <b className="c">{state.undos}</b>
+            </button>
+            </div>
+          </>
+        )}
+      </div>
+      <div className="cbmorewrap">
+        <button
+          type="button"
+          id="cbMore"
+          className={`cbsnd${moreOpen ? " on" : ""}`}
+          aria-haspopup="menu"
+          aria-expanded={moreOpen}
+          aria-label="More"
+          title="More"
+          onClick={onToggleMore}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" />
+            <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+            <circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
+        {moreOpen && (
+          <>
+            <div className="cbscrim cbhelpscrim" aria-hidden="true" />
+            <div className="cbmoremenu cbhelpmenu" role="menu" aria-label="More">
+              <span className="k cbhelptitle">More</span>
+              <button
+                type="button"
+                className="cbhm"
+                onClick={onBook}
+                aria-label="Open collection"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 5c3-1 6-1 8 1v14c-2-2-5-2-8-1zM20 5c-3-1-6-1-8 1v14c2-2 5-2 8-1z" />
+                </svg>
+                <span className="nm">
+                  <b className="t">Collection</b>
+                  <em>Everything you&apos;ve ever found</em>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="cbhm"
+                onClick={onSound}
+                aria-label="Music and sound settings"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 9h4l5-4v14l-5-4H4z" />
+                  {soundOn ? (
+                    <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
+                  ) : (
+                    <path d="M17 9l5 6M22 9l-5 6" />
+                  )}
+                </svg>
+                <span className="nm">
+                  <b className="t">Music &amp; sound</b>
+                  <em>{soundOn ? "On" : "Off"}</em>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="cbhm"
+                onClick={onHelp}
+                aria-label="How to play"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M9.3 9.2a2.7 2.7 0 1 1 4.2 2.4c-1 .6-1.5 1.2-1.5 2.4" />
+                  <circle cx="12" cy="17.2" r="0.9" fill="currentColor" stroke="none" />
+                </svg>
+                <span className="nm">
+                  <b className="t">How to play</b>
+                  <em>Rules and tips</em>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="cbhm"
+                onClick={onIntro}
+                aria-label="Show intro"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                <span className="nm">
+                  <b className="t">Show intro</b>
+                  <em>Replay the welcome demo</em>
+                </span>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
