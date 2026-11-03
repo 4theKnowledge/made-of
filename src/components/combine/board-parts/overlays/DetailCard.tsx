@@ -3,6 +3,7 @@ import { Pictogram } from "@/pictograms/Pictogram";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
+import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 
 export function DetailCard({
   tileId,
@@ -44,14 +45,13 @@ export function DetailCard({
   const foundGoesInto = goesInto.filter((r) => known.has(r.out));
   const unfoundCount = goesInto.length - foundGoesInto.length;
   return (
-    <>
-      <div className="cbscrim" onClick={onDismiss} />
-      <section
-        className="cbover cbinfo"
-        role="dialog"
-        aria-label={cap(item.name)}
-      >
-        <div className="cbinfohd" style={fillVar(item)}>
+    <ResponsiveSheet
+      open
+      onDismiss={onDismiss}
+      ariaLabel={cap(item.name)}
+      className="cbinfo"
+    >
+      <div className="cbinfohd" style={fillVar(item)}>
           <Pictogram
             name={item.name}
             tier={item.tier}
@@ -127,7 +127,6 @@ export function DetailCard({
             Back to the game
           </button>
         </div>
-      </section>
-    </>
+    </ResponsiveSheet>
   );
 }

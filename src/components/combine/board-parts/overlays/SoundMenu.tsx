@@ -1,5 +1,6 @@
 import React from "react";
 import type { MusicTrack } from "@/combine/storage";
+import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 
 export function SoundMenu({
   value,
@@ -17,58 +18,56 @@ export function SoundMenu({
     ["off", "No music", ""],
   ];
   return (
-    <>
-      <div className="cbscrim" onClick={onDismiss} />
-      <section
-        className="cbover cbsoundm"
-        role="dialog"
-        aria-label="Music and sound"
+    <ResponsiveSheet
+      open
+      onDismiss={onDismiss}
+      ariaLabel="Music and sound"
+      className="cbsoundm"
+    >
+      <span className="k">Music</span>
+      {tracks.map(([k, n, d]) => (
+        <button
+          key={k}
+          type="button"
+          className={`cbtopt${value.music === k ? " on" : ""}`}
+          onClick={() => onChange({ ...value, music: k })}
+        >
+          <b>{n}</b>
+          {d && <span>{d}</span>}
+        </button>
+      ))}
+      <span className="k">Sound</span>
+      <button
+        type="button"
+        className={`cbtopt cbsw${value.sfx ? " on" : ""}`}
+        role="switch"
+        aria-checked={value.sfx}
+        onClick={() => onChange({ ...value, sfx: !value.sfx })}
       >
-        <span className="k">Music</span>
-        {tracks.map(([k, n, d]) => (
-          <button
-            key={k}
-            type="button"
-            className={`cbtopt${value.music === k ? " on" : ""}`}
-            onClick={() => onChange({ ...value, music: k })}
-          >
-            <b>{n}</b>
-            {d && <span>{d}</span>}
-          </button>
-        ))}
-        <span className="k">Sound</span>
-        <button
-          type="button"
-          className={`cbtopt cbsw${value.sfx ? " on" : ""}`}
-          role="switch"
-          aria-checked={value.sfx}
-          onClick={() => onChange({ ...value, sfx: !value.sfx })}
-        >
-          <b>Sound effects</b>
-          <span>{value.sfx ? "On" : "Off"}</span>
-        </button>
-        <label className="cbvol">
-          <span>Volume</span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={value.vol}
-            onChange={(e) =>
-              onChange({ ...value, vol: Number(e.currentTarget.value) })
-            }
-            aria-label="Volume"
-          />
-        </label>
-        <button
-          type="button"
-          className="cbh"
-          onClick={onDismiss}
-          style={{ width: "100%", justifyContent: "center" }}
-        >
-          Done
-        </button>
-      </section>
-    </>
+        <b>Sound effects</b>
+        <span>{value.sfx ? "On" : "Off"}</span>
+      </button>
+      <label className="cbvol">
+        <span>Volume</span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={value.vol}
+          onChange={(e) =>
+            onChange({ ...value, vol: Number(e.currentTarget.value) })
+          }
+          aria-label="Volume"
+        />
+      </label>
+      <button
+        type="button"
+        className="cbh"
+        onClick={onDismiss}
+        style={{ width: "100%", justifyContent: "center" }}
+      >
+        Done
+      </button>
+    </ResponsiveSheet>
   );
 }

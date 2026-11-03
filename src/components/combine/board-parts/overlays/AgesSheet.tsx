@@ -6,6 +6,7 @@ import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { AGE_CHAINS } from "@/components/combine/board-parts/types";
 import { fillVar } from "@/components/combine/board-parts/util";
+import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 
 export function AgesSheet({
   state,
@@ -59,14 +60,13 @@ export function AgesSheet({
     .map((name) => nameToId.get(name.toLowerCase()))
     .filter((id): id is string => id != null);
   return (
-    <>
-      <div className="cbscrim cbagescrim" onClick={onDismiss} />
-      <section
-        className="cbover cbagesheet"
-        role="dialog"
-        aria-label="Ages"
-      >
-        <span className="k">Ages</span>
+    <ResponsiveSheet
+      open
+      onDismiss={onDismiss}
+      ariaLabel="Ages"
+      className="cbagesheet"
+    >
+      <span className="k">Ages</span>
         <h3>
           Age {ages[current]} — step {current + 1} of {ages.length}
         </h3>
@@ -164,15 +164,14 @@ export function AgesSheet({
             );
           })}
         </ol>
-        <button
-          type="button"
-          className="cbh"
-          onClick={onDismiss}
-          style={{ width: "100%", justifyContent: "center" }}
-        >
-          Done
-        </button>
-      </section>
-    </>
+      <button
+        type="button"
+        className="cbh"
+        onClick={onDismiss}
+        style={{ width: "100%", justifyContent: "center" }}
+      >
+        Done
+      </button>
+    </ResponsiveSheet>
   );
 }

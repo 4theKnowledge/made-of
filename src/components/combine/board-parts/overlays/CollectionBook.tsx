@@ -6,6 +6,7 @@ import type { GameState } from "@/combine/engine";
 import type { CombineRecipe, ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
+import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 
 export function CollectionBook({
   bundle,
@@ -105,16 +106,15 @@ export function CollectionBook({
     }
   }, [findsForTheme, sort, bundle.items, bundle.outBand, cat.no]);
   return (
-    <>
-      <div className="cbscrim" onClick={onDismiss} />
-      <section
-        className="cbover cbbook"
-        role="dialog"
-        aria-label="Collection"
-      >
-        <span className="k">
-          Collection · {state.daily ? "Daily" : bundle.theme.name}
-        </span>
+    <ResponsiveSheet
+      open
+      onDismiss={onDismiss}
+      ariaLabel="Collection"
+      className="cbbook"
+    >
+      <span className="k">
+        Collection · {state.daily ? "Daily" : bundle.theme.name}
+      </span>
         <b className="big2">
           {got} <small>of {total}</small>
         </b>
@@ -308,11 +308,10 @@ export function CollectionBook({
           })}
         </div>
         )}
-        <button type="button" className="cbh cbback" onClick={onDismiss}>
-          Back to the game
-        </button>
-      </section>
-    </>
+      <button type="button" className="cbh cbback" onClick={onDismiss}>
+        Back to the game
+      </button>
+    </ResponsiveSheet>
   );
 }
 

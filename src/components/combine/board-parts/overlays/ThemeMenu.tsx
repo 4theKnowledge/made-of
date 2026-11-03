@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { DailyResult } from "@/combine/storage";
 import type { ThemeBundle, ThemeKey } from "@/combine/types";
+import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 
 export function ThemeMenu({
   bundles,
@@ -25,14 +26,13 @@ export function ThemeMenu({
 }) {
   const [confirmRestart, setConfirmRestart] = useState(false);
   return (
-    <>
-      <div className="cbscrim" onClick={onDismiss} />
-      <section
-        className="cbover cbthemes"
-        role="dialog"
-        aria-label="Choose a theme"
-      >
-        <span className="k">Today</span>
+    <ResponsiveSheet
+      open
+      onDismiss={onDismiss}
+      ariaLabel="Choose a theme"
+      className="cbthemes"
+    >
+      <span className="k">Today</span>
         {dailyDone ? (
           <div
             className="cbtopt cbdaily done"
@@ -132,18 +132,17 @@ export function ThemeMenu({
             </div>
           </div>
         )}
-        <button
-          type="button"
-          className="cbh"
-          onClick={onDismiss}
-          style={{
-            width: "100%",
-            justifyContent: "center",
-          }}
-        >
-          Cancel
-        </button>
-      </section>
-    </>
+      <button
+        type="button"
+        className="cbh"
+        onClick={onDismiss}
+        style={{
+          width: "100%",
+          justifyContent: "center",
+        }}
+      >
+        Cancel
+      </button>
+    </ResponsiveSheet>
   );
 }

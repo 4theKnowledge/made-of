@@ -4,6 +4,7 @@ import type { GameState } from "@/combine/engine";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
+import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 
 export function GameOverCard({
   state,
@@ -42,15 +43,13 @@ export function GameOverCard({
   const themeDiscovered = themeDiscoveredSet.size;
   const totalOutputs = bundle.outputs.size;
   return (
-    <>
-      <div className="cbscrim" onClick={onClose} />
-      <section className="cbover" role="dialog" aria-label="Run over">
-        <button
-          type="button"
-          className="cbx"
-          aria-label="View board"
-          onClick={onClose}
-        >
+    <ResponsiveSheet open onDismiss={onClose} ariaLabel="Run over">
+      <button
+        type="button"
+        className="cbx"
+        aria-label="View board"
+        onClick={onClose}
+      >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
@@ -143,7 +142,6 @@ export function GameOverCard({
             {state.daily ? "Play endless" : "Play again"}
           </button>
         </div>
-      </section>
-    </>
+    </ResponsiveSheet>
   );
 }

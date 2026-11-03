@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
+import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 
 export type LinkMode = "daily" | "free";
 
@@ -30,65 +30,54 @@ export function LinkModeDialog({
   useEffect(() => {
     if (!open) return;
     closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onDismiss();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onDismiss]);
+  }, [open]);
 
-  if (typeof document === "undefined" || !open) return null;
-
-  return createPortal(
-    <>
-      <div className="cbscrim" onClick={onDismiss} aria-hidden="true" />
-      <section
-        className="cbover cbthemes"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Choose a Link mode"
+  return (
+    <ResponsiveSheet
+      open={open}
+      onDismiss={onDismiss}
+      ariaLabel="Choose a Link mode"
+      className="cbthemes"
+    >
+      <span className="k">Mode</span>
+      <Link
+        className={`cbtopt cbdaily${current === "daily" ? " on" : ""}`}
+        href="/link"
       >
-        <span className="k">Mode</span>
-        <Link
-          className={`cbtopt cbdaily${current === "daily" ? " on" : ""}`}
-          href="/link"
-        >
-          <b>Today&rsquo;s puzzle{current === "daily" ? " · playing" : ""}</b>
-          <span>
-            Same start and goal for everyone today. A fresh one every day.
-          </span>
-        </Link>
-        <Link
-          className={`cbtopt${current === "free" && !onPickFreshFreePlay ? " on" : ""}`}
-          href="/link?mode=free"
-        >
-          <b>Free play{current === "free" ? " · playing" : ""}</b>
-          <span>Pick any two things. Link them your way.</span>
-        </Link>
-        {current === "free" && onPickFreshFreePlay && (
-          <button
-            type="button"
-            className="cbtopt"
-            onClick={() => {
-              onDismiss();
-              onPickFreshFreePlay();
-            }}
-          >
-            <b>Pick a new pair</b>
-            <span>Reset Free play and choose different things.</span>
-          </button>
-        )}
+        <b>Today&rsquo;s puzzle{current === "daily" ? " · playing" : ""}</b>
+        <span>
+          Same start and goal for everyone today. A fresh one every day.
+        </span>
+      </Link>
+      <Link
+        className={`cbtopt${current === "free" && !onPickFreshFreePlay ? " on" : ""}`}
+        href="/link?mode=free"
+      >
+        <b>Free play{current === "free" ? " · playing" : ""}</b>
+        <span>Pick any two things. Link them your way.</span>
+      </Link>
+      {current === "free" && onPickFreshFreePlay && (
         <button
-          ref={closeRef}
           type="button"
-          className="cbh"
-          onClick={onDismiss}
-          style={{ width: "100%", justifyContent: "center" }}
+          className="cbtopt"
+          onClick={() => {
+            onDismiss();
+            onPickFreshFreePlay();
+          }}
         >
-          Cancel
+          <b>Pick a new pair</b>
+          <span>Reset Free play and choose different things.</span>
         </button>
-      </section>
-    </>,
-    document.body,
+      )}
+      <button
+        ref={closeRef}
+        type="button"
+        className="cbh"
+        onClick={onDismiss}
+        style={{ width: "100%", justifyContent: "center" }}
+      >
+        Cancel
+      </button>
+    </ResponsiveSheet>
   );
 }
