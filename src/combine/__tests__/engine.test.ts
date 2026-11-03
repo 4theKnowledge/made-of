@@ -824,3 +824,162 @@ describe("undo", () => {
     expect(undone.lastSnapshot).toBeNull();
   });
 });
+
+describe("move helper spends a charge", () => {
+  const bundle = fakeBundle({ recipes: [R("dough", ["flour", "water"])] });
+
+  it("move decrements state.mv on success", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    s0.board[0] = "flour";
+    const before = s0.mv;
+    const { state } = reduce(s0, bundle, { type: "move", from: 0, to: 8 });
+    expect(state.mv).toBe(before - 1);
+  });
+
+  it("move refuses when state.mv is 0 and leaves state untouched", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    s0.board[0] = "flour";
+    s0.mv = 0;
+    const { state } = reduce(s0, bundle, { type: "move", from: 0, to: 8 });
+    expect(state).toBe(s0);
+    expect(state.board[0]).toBe("flour");
+    expect(state.board[8]).toBeNull();
+  });
+});
+
+describe("debug mode", () => {
+  const bundle = fakeBundle({ recipes: [R("dough", ["flour", "water"])] });
+
+  function debugGame(): GameState {
+    const s = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s.debug = true;
+    s.board = Array(9).fill(null);
+    return s;
+  }
+
+  it("debug-toggle flips the flag", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    expect(s0.debug).toBe(false);
+    const { state: on } = reduce(s0, bundle, { type: "debug-toggle" });
+    expect(on.debug).toBe(true);
+    const { state: off } = reduce(on, bundle, { type: "debug-toggle" });
+    expect(off.debug).toBe(false);
+  });
+
+  it("swap does not consume a charge in debug mode", () => {
+    const s0 = newGame("everything", everything, { seed: 2, size: 5 }).state;
+    s0.debug = true;
+    s0.swaps = 0;
+    const { state } = reduce(s0, everything, { type: "swap" });
+    expect(state.swaps).toBe(0);
+    expect(state.tray.filter(Boolean).length).toBeGreaterThan(0);
+  });
+
+  it("clear works with no charges in debug mode", () => {
+    const s0 = debugGame();
+    s0.clears = 0;
+    s0.board[4] = "flour";
+    const { state } = reduce(s0, bundle, { type: "clear", cell: 4 });
+    expect(state.clears).toBe(0);
+    expect(state.board[4]).toBeNull();
+  });
+
+  it("hint works with no charges in debug mode", () => {
+    const s0 = debugGame();
+    s0.hints = 0;
+    const { state } = reduce(s0, bundle, { type: "hint" });
+    expect(state.hints).toBe(0);
+    expect(state).not.toBe(s0);
+  });
+
+  it("move works with no charges in debug mode", () => {
+    const s0 = debugGame();
+    s0.mv = 0;
+    s0.board[0] = "flour";
+    const { state } = reduce(s0, bundle, { type: "move", from: 0, to: 8 });
+    expect(state.mv).toBe(0);
+    expect(state.board[0]).toBeNull();
+    expect(state.board[8]).toBe("flour");
+  });
+
+  it("shore works with no charges in debug mode", () => {
+    const s0 = debugGame();
+    s0.shore = 0;
+    s0.board[4] = "flour";
+    s0.crumb[4] = { id: "flour", n: 2 };
+    const { state } = reduce(s0, bundle, { type: "shore", cell: 4 });
+    expect(state.shore).toBe(0);
+    expect(state.shored[4]).toBe(true);
+  });
+
+  it("debug-deal places a specific tile into the given slot", () => {
+    const s0 = debugGame();
+    s0.tray = [null, null, null];
+    const { state } = reduce(s0, bundle, {
+      type: "debug-deal",
+      slot: 1,
+      tile: "flour",
+    });
+    expect(state.tray[1]).toBe("flour");
+  });
+
+  it("debug-deal is a no-op when not in debug mode", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.tray = [null, null, null];
+    const { state } = reduce(s0, bundle, {
+      type: "debug-deal",
+      slot: 0,
+      tile: "flour",
+    });
+    expect(state).toBe(s0);
+  });
+
+  it("debug-deal rejects a tile not in the bundle", () => {
+    const s0 = debugGame();
+    const { state } = reduce(s0, bundle, {
+      type: "debug-deal",
+      slot: 0,
+      tile: "unobtainium",
+    });
+    expect(state).toBe(s0);
+  });
+
+  it("debug-set-age jumps age, clears board, re-deals the tray", () => {
+    const s0 = newGame("everything", everything, { seed: 2, size: 5 }).state;
+    s0.debug = true;
+    s0.age = 0;
+    s0.board.fill("flour");
+    const { state, events } = reduce(s0, everything, {
+      type: "debug-set-age",
+      age: 2,
+    });
+    expect(state.age).toBe(2);
+    expect(state.ageMade).toBe(0);
+    expect(state.board.every((c) => c == null)).toBe(true);
+    expect(state.tray.filter(Boolean).length).toBeGreaterThan(0);
+    expect(events.some((e) => e.type === "age-up")).toBe(true);
+    expect(events.some((e) => e.type === "dealt")).toBe(true);
+  });
+
+  it("debug-set-age clamps to the last available age", () => {
+    const s0 = newGame("everything", everything, { seed: 2, size: 5 }).state;
+    s0.debug = true;
+    const last = everything.theme.ages.length - 1;
+    const { state } = reduce(s0, everything, {
+      type: "debug-set-age",
+      age: 999,
+    });
+    expect(state.age).toBe(last);
+  });
+
+  it("debug-set-age is a no-op when not in debug mode", () => {
+    const s0 = newGame("everything", everything, { seed: 2, size: 5 }).state;
+    const { state } = reduce(s0, everything, {
+      type: "debug-set-age",
+      age: 2,
+    });
+    expect(state).toBe(s0);
+  });
+});

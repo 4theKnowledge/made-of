@@ -794,9 +794,9 @@ export function reduce(
     }
 
     case "clear": {
-      if (state.clears <= 0) return { state: prev, events: [] };
+      if (!state.debug && state.clears <= 0) return { state: prev, events: [] };
       if (state.board[action.cell] == null) return { state: prev, events: [] };
-      state.clears--;
+      if (!state.debug) state.clears--;
       state.board[action.cell] = null;
       state.crumb[action.cell] = null;
       state.shored[action.cell] = false;
@@ -804,8 +804,10 @@ export function reduce(
     }
 
     case "move": {
+      if (!state.debug && state.mv <= 0) return { state: prev, events: [] };
       const tile = state.board[action.from];
       if (!tile) return { state: prev, events: [] };
+      if (!state.debug) state.mv--;
       // Moving onto an empty cell: relocate, then check for a combine at
       // the new cell (symmetric with `place`). The shore flag follows the
       // tile — a shored tile stays shored when the player relocates it.
@@ -873,8 +875,8 @@ export function reduce(
       // Phase 2 engine doesn't yet pre-plan hint content; just decrement
       // if a hint is available. The UI/engine integration lands with the
       // overlays in Phase 4.
-      if (state.hints <= 0) return { state: prev, events: [] };
-      state.hints--;
+      if (!state.debug && state.hints <= 0) return { state: prev, events: [] };
+      if (!state.debug) state.hints--;
       return { state, events };
     }
 
@@ -884,12 +886,12 @@ export function reduce(
       // (combine, move, clear, or a new placement on top). Only applies
       // to a tile that's actually counting down — on-age tiles have a
       // null counter and gain nothing.
-      if (state.shore <= 0) return { state: prev, events: [] };
+      if (!state.debug && state.shore <= 0) return { state: prev, events: [] };
       const tile = state.board[action.cell];
       if (!tile) return { state: prev, events: [] };
       const c = state.crumb[action.cell];
       if (!c || c.id !== tile) return { state: prev, events: [] };
-      state.shore--;
+      if (!state.debug) state.shore--;
       state.crumb[action.cell] = null;
       state.shored[action.cell] = true;
       return { state, events };
@@ -907,6 +909,63 @@ export function reduce(
       restored.undos = prev.undos - 1;
       restored.lastSnapshot = null;
       return { state: restored, events: [] };
+    }
+
+    case "debug-toggle": {
+      // Flip the debug flag. The only action that always works regardless
+      // of current debug state — turning it on from the panel toggle.
+      state.debug = !state.debug;
+      return { state, events };
+    }
+
+    case "debug-deal": {
+      // Place a specific tile into a tray slot. Overwrites whatever was
+      // there. No cost, no re-deal; the player can swap afterwards if
+      // they want the rest of the tray reshuffled too.
+      if (!state.debug) return { state: prev, events: [] };
+      if (action.slot < 0 || action.slot >= state.tray.length) {
+        return { state: prev, events: [] };
+      }
+      if (!bundle.items.has(action.tile)) return { state: prev, events: [] };
+      state.tray[action.slot] = action.tile;
+      return { state, events };
+    }
+
+    case "debug-set-age": {
+      // Jump straight to the requested age. Clears the board and tray,
+      // then re-deals from the new age's pool — same path a real age-up
+      // takes, minus the score bump. The age-up event is fired so the
+      // UI's age-banner path still runs.
+      if (!state.debug) return { state: prev, events: [] };
+      const totalAges = bundle.theme.ages.length;
+      const target = Math.max(0, Math.min(action.age, totalAges - 1));
+      state.age = target;
+      state.ageMade = 0;
+      state.board.fill(null);
+      state.tray.fill(null);
+      state.crumb.fill(null);
+      state.shored.fill(false);
+      state.hold = Array(holdCapacity(target)).fill(null);
+      state.choosing = null;
+      state.lastSnapshot = null;
+      dealTray({
+        bundle,
+        board: state.board,
+        tray: state.tray,
+        size: state.n,
+        age: state.age,
+        rng: state.rng,
+        recentTrays: state.recentTrays,
+      });
+      const A = ageSets(bundle, target);
+      const sample = [
+        ...new Set(
+          A.recipes.filter((r) => r.band === target + 1).map((r) => r.out),
+        ),
+      ].slice(0, 4);
+      events.push({ type: "age-up", age: target, sample });
+      events.push({ type: "dealt" });
+      return { state, events };
     }
   }
 }

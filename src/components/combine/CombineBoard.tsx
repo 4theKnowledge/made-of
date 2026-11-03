@@ -49,6 +49,7 @@ import type {
 } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { HowToPlay } from "@/components/common/HowToPlay";
+import { CombineDebugPanel } from "@/components/combine/CombineDebugPanel";
 
 /** Hand-picked example chains shown in the Ages dialog, keyed by theme and
  *  then by 0-based age index. One canonical chain per age so the dialog is
@@ -182,10 +183,14 @@ interface Props {
   bundles: {
     everything: SerialisedBundle;
   };
+  /** Server-provided admin flag. Only mounts the debug panel entry point.
+   *  The reducer trusts the flag UI-side; real security is at the admin
+   *  session check that produced this. */
+  admin?: boolean;
 }
 
 /** The top-level client component that owns engine state. */
-export function CombineBoard({ bundles: serialised }: Props) {
+export function CombineBoard({ bundles: serialised, admin = false }: Props) {
   const bundles = useMemo<Record<ThemeKey, ThemeBundle>>(
     () => ({
       everything: hydrateBundle(serialised.everything),
@@ -306,6 +311,10 @@ export function CombineBoard({ bundles: serialised }: Props) {
     age: number;
     sample: string[];
   } | null>(null);
+  // Admin-only debug panel visibility. Only ever flipped from the FAB
+  // button below the board, which itself only renders when the server
+  // said this session is admin.
+  const [debugOpen, setDebugOpen] = useState(false);
   // The tile pressed and currently being held / dragged. Mirrors the
   // prototype's cbDrag record. Ghost x/y are in viewport coords.
   const [drag, setDrag] = useState<{
@@ -1734,6 +1743,27 @@ export function CombineBoard({ bundles: serialised }: Props) {
             size={64}
           />
         )}
+      {admin && (
+        <>
+          <button
+            type="button"
+            className="cbdebug-fab"
+            onClick={() => setDebugOpen((v) => !v)}
+            aria-label={debugOpen ? "Close debug panel" : "Open debug panel"}
+            aria-expanded={debugOpen}
+          >
+            debug
+          </button>
+          {debugOpen && (
+            <CombineDebugPanel
+              state={state}
+              bundle={bundle}
+              dispatch={act}
+              onClose={() => setDebugOpen(false)}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { buildAllBundles } from "@/combine/data";
 import { serialiseBundle } from "@/combine/serialise";
 import { loadAllSeasons, promoteSeason } from "@/combine/season";
 import { CombineBoard } from "@/components/combine/CombineBoard";
+import { isAdmin } from "@/lib/session";
 
 export async function CombinePageBody() {
   const live = await getLiveSnapshot();
@@ -21,11 +22,12 @@ export async function CombinePageBody() {
   const serialised = {
     everything: serialiseBundle(bundles.everything),
   };
+  const admin = await isAdmin();
 
   return (
     <main className="wrap">
       <Header current="combine" />
-      <CombineBoard bundles={serialised} />
+      <CombineBoard bundles={serialised} admin={admin} />
       <Footer compactOnMobile />
     </main>
   );

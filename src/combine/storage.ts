@@ -142,6 +142,10 @@ function toStored(state: GameState): StoredGame {
 
 export function saveGame(state: GameState): void {
   if (typeof window === "undefined") return;
+  // Debug sessions never persist — a cheat run shouldn't overwrite the
+  // player's real endless save, and on reload we want to hydrate the
+  // real save instead of the debug one.
+  if (state.debug) return;
   try {
     const key = state.daily ? DAILY_KEY : ENDLESS_KEY;
     if (state.over && !state.daily) {
@@ -257,6 +261,9 @@ export function hydrateGame(s: StoredGame): GameState {
     // fresh charge; there's no snapshot to undo back to on reload.
     undos: 1,
     lastSnapshot: null,
+    // Debug mode is session-only and never persisted — any save we
+    // hydrate from is a real player save, so start clean.
+    debug: false,
   };
 }
 
