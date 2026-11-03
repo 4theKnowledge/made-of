@@ -56,7 +56,7 @@ export default async function AdminCombineThemesPage() {
       <section className="feat">
         <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>
           Edit an item&apos;s theme memberships from the{" "}
-          <Link href="/admin/tree">tree view</Link> — open an item and toggle themes in the Edit modal.
+          <Link href="/admin/tree">knowledge base</Link> — open an item and toggle themes in the Edit modal.
         </p>
       </section>
 

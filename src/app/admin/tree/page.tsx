@@ -86,8 +86,8 @@ export default async function AdminGraphPage() {
     <main className="wrap">
       <Header />
       <section className="phero">
-        <Breadcrumb trail={[{ label: "Admin", href: "/admin" }, { label: "Tree" }]} />
-        <h2>Knowledge tree</h2>
+        <Breadcrumb trail={[{ label: "Admin", href: "/admin" }, { label: "Knowledge base" }]} />
+        <h2>Knowledge base</h2>
         <p>
           {items.length} items, {allLinks.length} links. Click a row to expand. Items with multiple parents appear in each lineage.
         </p>

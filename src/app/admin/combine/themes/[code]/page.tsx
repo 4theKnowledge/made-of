@@ -217,7 +217,7 @@ export default async function AdminCombineThemeDetailPage({
         )}
         <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 12 }}>
           Membership is edited from each item&apos;s Edit modal in the{" "}
-          <Link href="/admin/tree">tree view</Link>.
+          <Link href="/admin/tree">knowledge base</Link>.
         </p>
       </section>
 

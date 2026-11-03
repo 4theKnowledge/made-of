@@ -42,7 +42,7 @@ export default async function AdminHome() {
       <section className="feat">
         <h3 style={{ marginTop: 0 }}>Actions</h3>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-          <Link href="/admin/tree" className="btn">Tree view</Link>
+          <Link href="/admin/tree" className="btn">Knowledge base</Link>
           <Link href="/admin/kinds" className="btn">Kinds</Link>
           <Link href="/admin/combine/themes" className="btn">Combine themes</Link>
           <Link href="/admin/pictograms" className="btn">Pictogram audit</Link>
