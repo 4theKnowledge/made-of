@@ -102,6 +102,13 @@ export function deriveNumAges(
  *  their predecessor until every surviving band meets this floor. */
 const MIN_BAND_SIZE = 10;
 
+/** The merge pass will not drop below this many effective ages, even if the
+ *  surviving bands would be sparse. Collapsing to a single age is worse UX
+ *  (no progression visible) than keeping a thin top age. If the KB is so
+ *  small it genuinely only populates fewer than this many bands, the
+ *  effective count caps to the populated count. */
+const MIN_EFFECTIVE_AGES = 3;
+
 /** Assign refinement levels inside the theme, cut into ages, push outputs
  *  forward so no recipe needs a later-age part, then merge any sparse band
  *  into its predecessor. Returns the effective number of distinct bands
@@ -224,11 +231,19 @@ function assignAges(
   // so they get stuck. Fold any such band into its predecessor (or into
   // the following band if it's band 1 with no predecessor), then renumber
   // bands to be contiguous 1..M. Iterate until stable.
+  //
+  // Floor: never collapse below MIN_EFFECTIVE_AGES, even if that leaves a
+  // sparse band behind. A single-age game is worse UX than a thin last age.
+  // When the whole KB really is tiny, the floor caps to how many bands are
+  // actually populated.
   let effective = numAges;
   // Clamp: effective can't exceed the current max band actually in use.
   const seenBands = new Set<number>(recipes.map((r) => r.band));
   effective = Math.min(effective, Math.max(0, ...seenBands));
+  const populatedBands = seenBands.size;
+  const floor = Math.min(MIN_EFFECTIVE_AGES, populatedBands);
   for (let pass = 0; pass < numAges; pass++) {
+    if (effective <= floor) break;
     const sizes = new Array(effective + 1).fill(0);
     for (const r of recipes) sizes[r.band] = (sizes[r.band] ?? 0) + 1;
     let mergedAt = -1;
@@ -257,7 +272,7 @@ function assignAges(
     }
     effective -= 1;
   }
-  return effective;
+  return Math.max(1, effective);
 }
 
 function makeItemView(node: GraphNode): CombineItem {

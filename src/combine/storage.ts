@@ -15,8 +15,11 @@ import type { CrumbleCounter, GameState } from "./engine";
 import type { ThemeBundle, ThemeKey } from "./types";
 
 /** Bump when the StoredGame shape changes so older saves fall through to
- *  a fresh game instead of hydrating into a broken state. */
-const SAVE_VERSION = 4;
+ *  a fresh game instead of hydrating into a broken state. v5: derived
+ *  ages + sparse-band merge changed the band layout and age count. A
+ *  pre-v5 save at age=4 under 9 ages can't be hydrated into a 6-age
+ *  bundle without warping to "Final age" nonsense. */
+const SAVE_VERSION = 5;
 
 /** Bump to force every player who has already finished today's daily to
  *  be able to play it again. Stamped into DailyResult + the review save
@@ -207,6 +210,11 @@ export function loadGame(
   if (Array.isArray(s.hold)) {
     for (const v of s.hold) if (v && !bundle.items.has(v)) return null;
   }
+  // Age must fit inside the current bundle's age layout. If the KB evolved
+  // (merge collapsed a sparse band, admin removed content) and the stored
+  // age is past the current last age, drop the save — hydrating would land
+  // the player on "Final age" with a nonsensical "step N+1 of N" header.
+  if (s.age < 0 || s.age >= bundle.theme.ages.length) return null;
   return s;
 }
 
