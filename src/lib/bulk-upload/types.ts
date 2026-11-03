@@ -14,10 +14,24 @@ import type {
   DataSource,
 } from "@/data/types";
 
+/** Admin-authored kind entry inside a pack. Lets a pack introduce a new
+ *  kind (e.g. "fossil") together with its fallback pictogram, so new
+ *  items referencing that kind can land in one upload. Omit when a pack
+ *  only reuses existing kinds. */
+export interface DataKind {
+  /** Human-readable label (sentence case). */
+  label?: string;
+  description?: string | null;
+  /** SVG inner-markup for the kind's fallback pictogram. */
+  pictogram?: string | null;
+}
+
 export interface BulkPack {
   items: DataItem[];
   evidenceLinks: DataEvidenceLink[];
   sources: Record<string, DataSource>;
+  /** New kinds introduced by this pack (keyed by kind code). Optional. */
+  kinds?: Record<string, DataKind>;
 }
 
 /** Minimum DB projection the planner needs. Loaded once per plan request so

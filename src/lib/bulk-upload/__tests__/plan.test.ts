@@ -295,6 +295,88 @@ describe("buildPlan — counts", () => {
   });
 });
 
+describe("buildPlan — pictograms", () => {
+  it("rejects a bad pictogram on an item", () => {
+    const plan = buildPlan(
+      pack({
+        items: [
+          {
+            name: "foo",
+            tier: "N",
+            kind: "element",
+            pictogram: '<script>alert(1)</script>',
+          },
+        ],
+      }),
+      kb(),
+    );
+    expect(
+      plan.issues.find((i) => i.code === "item_bad_pictogram"),
+    ).toBeDefined();
+  });
+
+  it("accepts a canonical pictogram", () => {
+    const plan = buildPlan(
+      pack({
+        items: [
+          {
+            name: "foo",
+            tier: "N",
+            kind: "element",
+            pictogram: '<circle class="b" cx="16" cy="16" r="6"/>',
+          },
+        ],
+      }),
+      kb(),
+    );
+    expect(
+      plan.issues.find((i) => i.code === "item_bad_pictogram"),
+    ).toBeUndefined();
+    expect(plan.items).toHaveLength(1);
+  });
+
+  it("allows an item to reference a kind defined in the pack", () => {
+    const plan = buildPlan(
+      pack({
+        items: [{ name: "foo", tier: "N", kind: "fossil" }],
+        kinds: {
+          fossil: {
+            label: "Fossil",
+            pictogram: '<circle class="b" cx="16" cy="16" r="10"/>',
+          },
+        },
+      }),
+      kb(),
+    );
+    expect(plan.issues.find((i) => i.code === "item_bad_kind")).toBeUndefined();
+    expect(plan.items).toHaveLength(1);
+  });
+
+  it("rejects a bad kind pictogram", () => {
+    const plan = buildPlan(
+      pack({
+        kinds: {
+          fossil: {
+            pictogram: '<circle class="danger" cx="1" cy="1" r="1"/>',
+          },
+        },
+      }),
+      kb(),
+    );
+    expect(
+      plan.issues.find((i) => i.code === "kind_bad_pictogram"),
+    ).toBeDefined();
+  });
+
+  it("rejects a kind code that isn't lowercase-hyphenated", () => {
+    const plan = buildPlan(
+      pack({ kinds: { "Bad Kind": {} } }),
+      kb(),
+    );
+    expect(plan.issues.find((i) => i.code === "kind_bad_code")).toBeDefined();
+  });
+});
+
 describe("buildPlan — sources", () => {
   it("marks new vs existing source codes", () => {
     const plan = buildPlan(

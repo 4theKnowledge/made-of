@@ -5,6 +5,7 @@
  */
 
 import { slug as toSlug, parseLinkId } from "@/data/load";
+import { sanitisePictogram } from "@/pictograms/sanitise";
 import type { BulkPack, Issue, KbIndex } from "./types";
 
 const TIERS = new Set(["F", "N", "M", "C", "P", "S"]);
@@ -37,6 +38,8 @@ export interface SchemaResult {
   /** Same for evidence/source entries. */
   validEvidenceLinks: BulkPack["evidenceLinks"];
   validSources: BulkPack["sources"];
+  /** New kinds surviving validation. */
+  validKinds: NonNullable<BulkPack["kinds"]>;
 }
 
 /** Pass 1 — schema/vocab validation per entry. Doesn't look across entries. */
@@ -45,6 +48,39 @@ export function validateSchema(pack: BulkPack, kb: KbIndex): SchemaResult {
   const validItems: BulkPack["items"] = [];
   const validEvidenceLinks: BulkPack["evidenceLinks"] = [];
   const validSources: BulkPack["sources"] = {};
+  const validKinds: NonNullable<BulkPack["kinds"]> = {};
+
+  // Validate pack-level kinds first — items can reference new kinds the
+  // pack introduces, so kind codes join the "known" set before we check
+  // item.kind below.
+  const packKindCodes = new Set<string>();
+  for (const [code, k] of Object.entries(pack.kinds ?? {})) {
+    if (!/^[a-z][a-z0-9-]*$/.test(code)) {
+      issues.push({
+        severity: "error",
+        code: "kind_bad_code",
+        message: `Kind code "${code}" must be lowercase, start with a letter, and contain only letters, digits and hyphens.`,
+        at: code,
+      });
+      continue;
+    }
+    if (k.pictogram !== undefined && k.pictogram !== null) {
+      const result = sanitisePictogram(k.pictogram);
+      if (!result.ok) {
+        for (const e of result.errors) {
+          issues.push({
+            severity: "error",
+            code: "kind_bad_pictogram",
+            message: `Kind "${code}" pictogram: ${e}`,
+            at: code,
+          });
+        }
+        continue;
+      }
+    }
+    validKinds[code] = k;
+    packKindCodes.add(code);
+  }
 
   for (const it of pack.items ?? []) {
     const where = it?.name ?? "<unnamed>";
@@ -66,14 +102,28 @@ export function validateSchema(pack: BulkPack, kb: KbIndex): SchemaResult {
       });
       continue;
     }
-    if (!kb.existingKindCodes.has(it.kind)) {
+    if (!kb.existingKindCodes.has(it.kind) && !packKindCodes.has(it.kind)) {
       issues.push({
         severity: "error",
         code: "item_bad_kind",
-        message: `Item "${it.name}" has unknown kind "${it.kind}". Add the kind first under /admin/kinds, or use an existing one.`,
+        message: `Item "${it.name}" has unknown kind "${it.kind}". Add the kind under pack.kinds, create it in /admin/kinds, or use an existing one.`,
         at: it.name,
       });
       continue;
+    }
+    if (it.pictogram !== undefined && it.pictogram !== null) {
+      const result = sanitisePictogram(it.pictogram);
+      if (!result.ok) {
+        for (const e of result.errors) {
+          issues.push({
+            severity: "error",
+            code: "item_bad_pictogram",
+            message: `Item "${it.name}" pictogram: ${e}`,
+            at: it.name,
+          });
+        }
+        continue;
+      }
     }
     for (const r of it.recipes ?? []) {
       // Recipe-level links must not include `s` — s is item-level only.
@@ -187,7 +237,7 @@ export function validateSchema(pack: BulkPack, kb: KbIndex): SchemaResult {
     validSources[code] = s;
   }
 
-  return { issues, validItems, validEvidenceLinks, validSources };
+  return { issues, validItems, validEvidenceLinks, validSources, validKinds };
 }
 
 /** Pass 2 — intra-pack duplicates and reference checks. Runs on the

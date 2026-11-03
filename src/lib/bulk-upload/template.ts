@@ -25,6 +25,8 @@ export const BULK_UPLOAD_TEMPLATE = {
       "Legal `tier` values: F, N, M, C, P, S. Legal `kind` values are listed under _readme.vocab.kinds (fetch /api/admin/kinds for live list).",
       "Legal `confidence` values: established, strong, debated, hypothesis. Legal `stance` values: supports, contradicts.",
       "Legal `tags`: combine-exclude (never dealt in Combine), combine-everyday (legacy marker), fab-chain. Omit when empty.",
+      "`pictogram` is an SVG inner-markup string (no outer <svg> tag). 32×32 viewBox, allowlisted elements and classes only. Download /api/admin/bulk/pictogram-style for the authoring rules and worked examples before writing one.",
+      "To introduce a new `kind`, add it under top-level `kinds` with its fallback `pictogram`. Items can then reference it from `kind`.",
     ],
     vocab: {
       tiers: ["F", "N", "M", "C", "P", "S"],
@@ -71,6 +73,8 @@ export const BULK_UPLOAD_TEMPLATE = {
       firstAppeared: "~4.5bya",
       symbol: null,
       fact: "A short, factual sentence or two that would read well on an item page.",
+      pictogram:
+        '<path class="b" d="M4 24l3-9 7-6 8 2 6 8-2 6z"/><path class="l" d="M14 9l2 8 10 2M16 17l-6 8"/>',
       tags: [],
       recipes: [
         {
@@ -91,6 +95,15 @@ export const BULK_UPLOAD_TEMPLATE = {
       fact: "Only required fields present. Optional fields can be omitted entirely.",
     },
   ],
+
+  kinds: {
+    "example-kind": {
+      label: "Example kind",
+      description: "A newly introduced kind, with a fallback pictogram used by any item of this kind that doesn't override.",
+      pictogram:
+        '<circle class="b" cx="16" cy="16" r="10"/><path class="l" d="M16 6v20M6 16h20"/>',
+    },
+  },
 
   evidenceLinks: [
     {

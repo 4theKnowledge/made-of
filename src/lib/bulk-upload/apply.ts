@@ -152,6 +152,34 @@ export async function applyBulk(input: ApplyInput): Promise<ApplyResult> {
 
   try {
     await db.transaction(async (tx) => {
+      // ---------- 0. Upsert kinds introduced by the pack ----------
+      // New kinds are inserted; existing kinds have their pictogram
+      // backfilled only when the DB value is null (same editorial-fields
+      // rule as items on merge: don't overwrite admin choices).
+      for (const [code, k] of Object.entries(input.pack.kinds ?? {})) {
+        if (!kb.existingKindCodes.has(code)) {
+          await tx.insert(schema.kinds).values({
+            code,
+            label: k.label ?? code,
+            description: k.description ?? null,
+            pictogram: k.pictogram ?? null,
+          });
+        } else if (k.pictogram) {
+          // Fill-when-empty merge for existing kinds.
+          const [row] = await tx
+            .select({ pictogram: schema.kinds.pictogram })
+            .from(schema.kinds)
+            .where(eq(schema.kinds.code, code))
+            .limit(1);
+          if (row && row.pictogram === null) {
+            await tx
+              .update(schema.kinds)
+              .set({ pictogram: k.pictogram, updatedAt: new Date() })
+              .where(eq(schema.kinds.code, code));
+          }
+        }
+      }
+
       // ---------- 1. Insert new items ----------
       const toInsert = [...effective.values()].filter(
         (e) => e.decision === "insert",
@@ -171,6 +199,7 @@ export async function applyBulk(input: ApplyInput): Promise<ApplyResult> {
           firstAppearedYa: parsedYears ? Math.round(parsedYears.ya) : null,
           symbol: it.symbol ?? null,
           fact: it.fact ?? "",
+          pictogram: it.pictogram ?? null,
           status: "live" as const,
           isCanary: false,
           tags: (it.tags ?? []) as string[],
@@ -423,19 +452,34 @@ export async function applyBulk(input: ApplyInput): Promise<ApplyResult> {
           // we know how to key — skip to avoid false attaches.
         }
 
-        // Union tags into the DB row on merge. Editorial fields untouched.
-        if (eff.decision === "merge" && packItem.tags && packItem.tags.length > 0) {
-          const [row] = await tx
-            .select({ tags: schema.items.tags })
-            .from(schema.items)
-            .where(eq(schema.items.id, itemId))
-            .limit(1);
-          const existingTags = new Set(row?.tags ?? []);
-          for (const t of packItem.tags) existingTags.add(t);
-          await tx
-            .update(schema.items)
-            .set({ tags: [...existingTags], updatedAt: new Date() })
-            .where(eq(schema.items.id, itemId));
+        // Merge-time updates on the item row. Tags union, pictogram
+        // fill-when-empty. Editorial fields (fact, tier, kind, symbol,
+        // firstAppeared) are deliberately not touched.
+        if (eff.decision === "merge") {
+          const hasTags = packItem.tags && packItem.tags.length > 0;
+          const hasPicto = packItem.pictogram !== undefined && packItem.pictogram !== null;
+          if (hasTags || hasPicto) {
+            const [row] = await tx
+              .select({
+                tags: schema.items.tags,
+                pictogram: schema.items.pictogram,
+              })
+              .from(schema.items)
+              .where(eq(schema.items.id, itemId))
+              .limit(1);
+            const update: Partial<typeof schema.items.$inferInsert> = {
+              updatedAt: new Date(),
+            };
+            if (hasTags) {
+              const existingTags = new Set(row?.tags ?? []);
+              for (const t of packItem.tags ?? []) existingTags.add(t);
+              update.tags = [...existingTags];
+            }
+            if (hasPicto && row && row.pictogram === null) {
+              update.pictogram = packItem.pictogram ?? null;
+            }
+            await tx.update(schema.items).set(update).where(eq(schema.items.id, itemId));
+          }
         }
       }
 

@@ -28,6 +28,9 @@ export interface GraphNode {
   firstAppearedYa: number | null;
   symbol: string | null;
   fact: string;
+  /** Item-specific SVG inner-markup. When null, Pictogram.tsx falls back
+   *  to the kind's pictogram (and, for elements, the letter tile). */
+  pictogram: string | null;
   recipes: Array<{ id: string; label: string | null; position: number }>;
   /** Membership markers. Empty array if none. */
   tags: Tag[];

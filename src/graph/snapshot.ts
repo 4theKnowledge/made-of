@@ -38,6 +38,7 @@ export function buildSnapshot(rows: SeedRows): Snapshot {
       firstAppearedYa: it.firstAppearedYa ?? null,
       symbol: it.symbol ?? null,
       fact: it.fact ?? "",
+      pictogram: (it as { pictogram?: string | null }).pictogram ?? null,
       recipes: [],
       // `tags` is `text[]` in Postgres which Drizzle infers as `string[]`;
       // the type is narrower (Tag[]) in our data module, so we cast here.

@@ -8,10 +8,11 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { loadRowsFromDb } from "./load";
+import { loadRowsFromDb, loadKindPictograms } from "./load";
 import { buildSnapshot, type Snapshot } from "./snapshot";
 import { buildCodeMap, type CodeMap } from "./codes";
 import { buildClosedSet } from "./link";
+import { applyPictogramOverrides } from "@/pictograms/Pictogram";
 
 export interface LiveSnapshot {
   snapshot: Snapshot;
@@ -23,6 +24,9 @@ export interface LiveSnapshot {
   linkCodes: CodeMap<string>;
   /** Item uuids closed in daily puzzles (fundamentals + 10 busiest hubs). */
   closed: Set<string>;
+  /** Per-kind fallback pictograms (SVG inner-markup), keyed by kind code.
+   *  Items without their own `pictogram` fall back to this map. */
+  kindPictograms: Map<string, string>;
   /** Monotonic version id; bumped on every reload. */
   version: number;
   /** Code for an item uuid, going through the slug map. */
@@ -78,7 +82,10 @@ export function setLiveSnapshotForTesting(snap: LiveSnapshot | null) {
 }
 
 async function buildLive(): Promise<LiveSnapshot> {
-  const rows = await loadRowsFromDb({ liveOnly: true });
+  const [rows, kindPictograms] = await Promise.all([
+    loadRowsFromDb({ liveOnly: true }),
+    loadKindPictograms(),
+  ]);
   const snapshot = buildSnapshot(rows);
   const itemCodes = buildCodeMap(
     [...snapshot.nodes.values()].map((n) => n.slug),
@@ -89,12 +96,23 @@ async function buildLive(): Promise<LiveSnapshot> {
     slot.codeSeed + ":links",
   );
   const closed = buildClosedSet(snapshot);
+
+  // Hydrate the Pictogram module's override maps from this snapshot. The
+  // call is synchronous and idempotent; subsequent reloads overwrite the
+  // previous overrides atomically.
+  const itemPictograms = new Map<string, string>();
+  for (const node of snapshot.nodes.values()) {
+    if (node.pictogram) itemPictograms.set(node.name, node.pictogram);
+  }
+  applyPictogramOverrides(itemPictograms, kindPictograms);
+
   slot.version += 1;
   return makeLiveSnapshot({
     snapshot,
     itemCodes,
     linkCodes,
     closed,
+    kindPictograms,
     version: slot.version,
   });
 }

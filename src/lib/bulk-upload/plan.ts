@@ -27,6 +27,7 @@ export function buildPlan(pack: BulkPack, kb: KbIndex): Plan {
     items: schema.validItems,
     evidenceLinks: schema.validEvidenceLinks,
     sources: schema.validSources,
+    kinds: schema.validKinds,
   };
 
   // 2. Intra-pack checks (duplicate names, unresolved references).

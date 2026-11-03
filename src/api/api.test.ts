@@ -39,6 +39,7 @@ function buildFixture(): LiveSnapshot {
     itemCodes,
     linkCodes,
     closed,
+    kindPictograms: new Map(),
     version: 1,
   });
 }

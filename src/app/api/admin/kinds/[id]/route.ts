@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { count, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
+import { sanitisePictogram } from "@/pictograms/sanitise";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +39,21 @@ export async function PATCH(
   }
   if (typeof body.position === "number" && Number.isInteger(body.position) && body.position >= 0) {
     patch.position = body.position;
+  }
+  if ("pictogram" in body) {
+    const raw = body.pictogram as string | null;
+    if (raw === null || (typeof raw === "string" && raw.trim() === "")) {
+      patch.pictogram = null;
+    } else if (typeof raw === "string") {
+      const result = sanitisePictogram(raw);
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: "bad_pictogram", details: result.errors },
+          { status: 400 },
+        );
+      }
+      patch.pictogram = result.value;
+    }
   }
 
   // {updatedAt} alone shouldn't be a valid patch.

@@ -22,21 +22,30 @@ import type {
   Tag,
 } from "@/data/types";
 
+export interface AdminExportKind {
+  label: string;
+  description?: string | null;
+  pictogram?: string | null;
+}
+
 export interface AdminExport {
   items: DataItem[];
   evidenceLinks: DataEvidenceLink[];
   sources: Record<string, DataSource>;
+  /** Kind metadata so a round-trip export carries pictogram fallbacks. */
+  kinds: Record<string, AdminExportKind>;
 }
 
 export async function exportAll(): Promise<AdminExport> {
   const db = getDb();
-  const [items, recipes, links, evidence, evSources, sources] = await Promise.all([
+  const [items, recipes, links, evidence, evSources, sources, kinds] = await Promise.all([
     db.select().from(schema.items).orderBy(asc(schema.items.slug)),
     db.select().from(schema.recipes).orderBy(asc(schema.recipes.itemId), asc(schema.recipes.position)),
     db.select().from(schema.links),
     db.select().from(schema.linkEvidence).orderBy(asc(schema.linkEvidence.linkId), asc(schema.linkEvidence.position)),
     db.select().from(schema.evidenceSources).orderBy(asc(schema.evidenceSources.evidenceId), asc(schema.evidenceSources.position)),
     db.select().from(schema.sources).orderBy(asc(schema.sources.code)),
+    db.select().from(schema.kinds).orderBy(asc(schema.kinds.position), asc(schema.kinds.code)),
   ]);
 
   // Index items by id so we can resolve targetItemId -> name for the Data* shape.
@@ -100,6 +109,7 @@ export async function exportAll(): Promise<AdminExport> {
     if (i.firstAppeared) d.firstAppeared = i.firstAppeared;
     if (i.symbol) d.symbol = i.symbol;
     if (i.fact) d.fact = i.fact;
+    if (i.pictogram) d.pictogram = i.pictogram;
     if (itemRecipes.length) d.recipes = itemRecipes;
     if (linksN.length) d.linksN = linksN;
     if (linksS.length) d.linksS = linksS;
@@ -214,5 +224,18 @@ export async function exportAll(): Promise<AdminExport> {
     if (s.url) d.url = s.url;
     sourceMap[s.code] = d;
   }
-  return { items: dataItems, evidenceLinks: dataEvidenceLinks, sources: sourceMap };
+  const kindMap: Record<string, AdminExportKind> = {};
+  for (const k of kinds) {
+    const d: AdminExportKind = { label: k.label };
+    if (k.description) d.description = k.description;
+    if (k.pictogram) d.pictogram = k.pictogram;
+    kindMap[k.code] = d;
+  }
+
+  return {
+    items: dataItems,
+    evidenceLinks: dataEvidenceLinks,
+    sources: sourceMap,
+    kinds: kindMap,
+  };
 }

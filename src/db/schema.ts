@@ -78,6 +78,12 @@ export const kinds = pgTable(
     label: text("label").notNull(),
     description: text("description"),
     position: integer("position").notNull().default(0),
+    // Fallback SVG inner-markup for this kind, used by items that don't have
+    // their own `pictogram`. 32×32 viewBox, admin-authored. Nullable so a
+    // newly-added kind can render with the generic frame until an admin
+    // supplies one. See src/pictograms/data.ts for the original set and
+    // docs/PICTOGRAM-STYLE.md for the authoring rules.
+    pictogram: text("pictogram"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -116,6 +122,10 @@ export const items = pgTable(
     firstAppearedYa: bigint("first_appeared_ya", { mode: "number" }),
     symbol: text("symbol"),
     fact: text("fact").notNull().default(""),
+    // Item-specific SVG inner-markup. When null, Pictogram.tsx falls back
+    // to the kind's pictogram (and, for elements, the symbol tile). 32×32
+    // viewBox, admin-authored. See docs/PICTOGRAM-STYLE.md.
+    pictogram: text("pictogram"),
     status: itemStatusEnum("status").notNull().default("live"),
     isCanary: boolean("is_canary").notNull().default(false),
     // Membership markers (see src/data/types.ts Tag). Treated as a closed

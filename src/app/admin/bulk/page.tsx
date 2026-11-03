@@ -25,6 +25,9 @@ export default function AdminBulkPage() {
           <a href="/api/admin/bulk/snapshot" className="btn" download>
             Download KB snapshot
           </a>
+          <a href="/api/admin/bulk/pictogram-style" className="btn" download>
+            Download pictogram style guide
+          </a>
         </div>
       </section>
       <section className="feat">

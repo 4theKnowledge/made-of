@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
 import { parseYear } from "@/data/load";
+import { sanitisePictogram } from "@/pictograms/sanitise";
 import type { ItemKind, ItemStatus, Tier } from "@/db/schema";
 
 export const runtime = "nodejs";
@@ -74,6 +75,21 @@ export async function PATCH(
   if (Array.isArray(body.tags)) patch.tags = body.tags as string[];
   if (typeof body.status === "string") patch.status = body.status as ItemStatus;
   if (typeof body.isCanary === "boolean") patch.isCanary = body.isCanary;
+  if ("pictogram" in body) {
+    const raw = body.pictogram as string | null;
+    if (raw === null || (typeof raw === "string" && raw.trim() === "")) {
+      patch.pictogram = null;
+    } else if (typeof raw === "string") {
+      const result = sanitisePictogram(raw);
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: "bad_pictogram", details: result.errors },
+          { status: 400 },
+        );
+      }
+      patch.pictogram = result.value;
+    }
+  }
 
   const db = getDb();
   const [updated] = await db

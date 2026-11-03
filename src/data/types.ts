@@ -60,6 +60,10 @@ export interface DataItem {
   firstAppeared?: string | null;
   symbol?: string | null;
   fact?: string;
+  /** SVG inner-markup for this item's pictogram. 32×32 viewBox,
+   *  allowlisted elements/attrs/classes only. See
+   *  docs/PICTOGRAM-STYLE.md or /api/admin/bulk/pictogram-style. */
+  pictogram?: string | null;
   recipes?: DataRecipe[];
   linksN?: string[];
   linksS?: string[];

@@ -91,6 +91,20 @@ export async function loadRowsFromDb(opts?: {
   };
 }
 
+/** Load the fallback pictograms keyed by kind code. Called once per snapshot
+ *  build; the result is pinned alongside the snapshot in memory. */
+export async function loadKindPictograms(): Promise<Map<string, string>> {
+  const db = getDb();
+  const rows = await db
+    .select({ code: schema.kinds.code, pictogram: schema.kinds.pictogram })
+    .from(schema.kinds);
+  const m = new Map<string, string>();
+  for (const r of rows) {
+    if (r.pictogram) m.set(r.code, r.pictogram);
+  }
+  return m;
+}
+
 /** Fetch one link's evidence + sources. Used by GET /api/links/:code/evidence. */
 export async function loadLinkEvidence(linkId: string) {
   const db = getDb();

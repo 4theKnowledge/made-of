@@ -1,41 +1,56 @@
+import Link from "next/link";
+import { asc } from "drizzle-orm";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
-import { Pictogram } from "@/pictograms/Pictogram";
-import { PICTO } from "@/pictograms/data";
-import { ITEMS } from "@/data/items.data";
+import { getDb, schema } from "@/db/client";
 import type { ItemKind, Tier } from "@/db/schema";
 import { Breadcrumb } from "../Breadcrumb";
+import { PictogramAuditClient, type AuditItem, type AuditKind } from "./PictogramAuditClient";
 
 export const dynamic = "force-dynamic";
 
-const KIND_ORDER: ItemKind[] = [
-  "cosmic",
-  "element",
-  "mineral",
-  "substance",
-  "living",
-  "food",
-  "part",
-  "object",
-  "tool",
-  "place",
-  "information",
-  "energy",
-];
+export default async function PictogramAuditPage() {
+  const db = getDb();
+  const [items, kinds] = await Promise.all([
+    db
+      .select({
+        id: schema.items.id,
+        name: schema.items.name,
+        tier: schema.items.tier,
+        kind: schema.items.kind,
+        symbol: schema.items.symbol,
+        pictogram: schema.items.pictogram,
+      })
+      .from(schema.items)
+      .orderBy(asc(schema.items.name)),
+    db
+      .select({
+        code: schema.kinds.code,
+        label: schema.kinds.label,
+        position: schema.kinds.position,
+        pictogram: schema.kinds.pictogram,
+      })
+      .from(schema.kinds)
+      .orderBy(asc(schema.kinds.position), asc(schema.kinds.code)),
+  ]);
 
-export default function PictogramAuditPage() {
-  const hasSpecific = new Set(Object.keys(PICTO));
-  const byKind = new Map<ItemKind, typeof ITEMS>();
-  for (const item of ITEMS) {
-    const arr = byKind.get(item.kind) ?? [];
-    arr.push(item);
-    byKind.set(item.kind, arr);
-  }
-  for (const arr of byKind.values()) {
-    arr.sort((a, b) => a.name.localeCompare(b.name));
+  const itemsByKind: Record<string, AuditItem[]> = {};
+  for (const it of items) {
+    (itemsByKind[it.kind] ??= []).push({
+      id: it.id,
+      name: it.name,
+      tier: it.tier as Tier,
+      kind: it.kind as ItemKind,
+      symbol: it.symbol,
+      pictogram: it.pictogram,
+    });
   }
 
-  const kinds = KIND_ORDER.filter((k) => byKind.has(k));
+  const kindRows: AuditKind[] = kinds.map((k) => ({
+    code: k.code,
+    label: k.label,
+    pictogram: k.pictogram,
+  }));
 
   return (
     <main className="wrap">
@@ -44,77 +59,20 @@ export default function PictogramAuditPage() {
         <Breadcrumb trail={[{ label: "Admin", href: "/admin" }, { label: "Pictograms" }]} />
         <h2>Pictogram audit</h2>
         <p>
-          Every item in the knowledge base, grouped by kind. Items marked{" "}
-          <strong>fallback</strong> use their kind&apos;s default picto; everything
-          else has a specific one in PICTO.
+          Every item, grouped by kind. Items marked{" "}
+          <strong>fallback</strong> use their kind&apos;s default pictogram.
+          Click any tile to edit it; click <em>Edit fallback</em> next to a
+          kind header to edit that kind&apos;s default.
         </p>
+        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+          <Link href="/admin/pictograms/upload" className="btn">
+            Bulk upload pictograms
+          </Link>
+        </div>
       </section>
 
-      {kinds.map((kind) => {
-        const items = byKind.get(kind)!;
-        const specifics = items.filter((i) => hasSpecific.has(i.name) || i.symbol);
-        const fallbacks = items.filter((i) => !hasSpecific.has(i.name) && !i.symbol);
-        return (
-          <section className="feat" key={kind} style={{ marginBottom: 16 }}>
-            <h3 style={{ marginTop: 0 }}>
-              {kind}{" "}
-              <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 14 }}>
-                ({items.length} items — {specifics.length} specific, {fallbacks.length} fallback)
-              </span>
-            </h3>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-                gap: 12,
-              }}
-            >
-              {items.map((item) => {
-                const isFallback = !hasSpecific.has(item.name) && !item.symbol;
-                return (
-                  <div
-                    key={item.name}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: 8,
-                      borderRadius: 6,
-                      border: isFallback
-                        ? "1px dashed var(--muted)"
-                        : "1px solid var(--line, rgba(0,0,0,0.08))",
-                      background: isFallback ? "rgba(0,0,0,0.02)" : "transparent",
-                    }}
-                  >
-                    <div style={{ transform: "scale(2.2)", transformOrigin: "center", margin: "16px 0 20px" }}>
-                      <Pictogram
-                        name={item.name}
-                        tier={item.tier as Tier}
-                        kind={item.kind}
-                        symbol={item.symbol ?? null}
-                      />
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        textAlign: "center",
-                        wordBreak: "break-word",
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      {item.name}
-                    </div>
-                    {isFallback && (
-                      <div style={{ fontSize: 9, color: "var(--muted)" }}>fallback</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
+      <PictogramAuditClient itemsByKind={itemsByKind} kinds={kindRows} />
+
       <Footer />
     </main>
   );
