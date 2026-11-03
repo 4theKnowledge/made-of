@@ -8,7 +8,7 @@ import { IndexList, type IndexEntry } from "./IndexList";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Index · Made Of",
+  title: "Directory · Made Of",
   description:
     "Every item in Made Of, A to Z. Tap any name to see what it is made of.",
   alternates: { canonical: "/directory" },
@@ -34,10 +34,10 @@ export default async function DirectoryPage() {
 
   return (
     <main className="wrap">
-      <Header current="index" />
+      <Header current="directory" />
 
       <section className="phero" style={{ paddingBottom: 10 }}>
-        <h2 style={{ margin: 0 }}>Index</h2>
+        <h2 style={{ margin: 0 }}>Directory</h2>
         <p className="sub" style={{ margin: "4px 0 0" }}>
           Everything in Made Of, A to Z. {entries.length} items.
         </p>

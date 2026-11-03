@@ -21,7 +21,7 @@ interface Hit {
  * - Pictogram preview + tier badge per result for visual recognition.
  * - Bold match highlighting in the name.
  * - Keyboard nav still works (↑ ↓ Enter Escape) for desktop.
- * - Picking a result navigates via `linkFor(hit)` (defaults to /explore/[code]).
+ * - Picking a result navigates via `linkFor(hit)` (defaults to /explore/[slug]).
  */
 export function ItemSearch({
   placeholder = "Search for anything…",
@@ -87,7 +87,7 @@ export function ItemSearch({
   }, [open]);
 
   function pick(hit: Hit) {
-    const href = linkFor ? linkFor(hit) : `/explore/${hit.code}`;
+    const href = linkFor ? linkFor(hit) : `/explore/${hit.slug}`;
     setQ("");
     setHits([]);
     setOpen(false);

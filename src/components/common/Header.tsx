@@ -10,7 +10,7 @@ type Current =
   | "link"
   | "craft"
   | "explore"
-  | "index"
+  | "directory"
   | "pricing"
   | "about"
   | "account";
@@ -23,7 +23,7 @@ function buildLinks(
     { href: "/link", label: "Link", key: "link" },
     { href: "/craft", label: "Craft", key: "craft" },
     { href: exploreHref, label: "Explore", key: "explore" },
-    { href: "/index", label: "Index", key: "index" },
+    { href: "/directory", label: "Directory", key: "directory" },
     { href: "/pricing", label: "Pricing", key: "pricing" },
     { href: "/about", label: "About", key: "about" },
   ];
