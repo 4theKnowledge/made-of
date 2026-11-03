@@ -95,14 +95,28 @@ describe("buildThemeBundle", () => {
     }
   });
 
-  it("numAges is monotonic in prevNumAges", () => {
-    let last = 0;
+  it("effective age count never exceeds the derived target", () => {
+    // Monotonicity lives on `deriveNumAges` (the target). The effective
+    // age count — bundle.theme.ages.length — can shrink below the target
+    // when sparse bands merge, which is desirable: no dead ages.
     for (const prev of [0, 3, 5, 8, 12]) {
       const bundle = buildThemeBundle(snapshot, "everything", prev);
       const n = bundle.theme.ages.length;
-      expect(n).toBeGreaterThanOrEqual(prev);
-      expect(n).toBeGreaterThanOrEqual(last);
-      last = n;
+      expect(n).toBeGreaterThanOrEqual(1);
+      expect(n).toBeLessThanOrEqual(Math.max(prev, 15));
+    }
+  });
+
+  it("no band holds fewer than the sparse-band floor", () => {
+    // The merge pass guarantees every surviving band has enough recipes
+    // for the dealer to surface current-age combos. If this ever regresses,
+    // Age-II-style "stuck" complaints come back.
+    const sizes = new Map<number, number>();
+    for (const r of everything.recipes) {
+      sizes.set(r.band, (sizes.get(r.band) ?? 0) + 1);
+    }
+    for (const [band, size] of sizes) {
+      expect(size, `band ${band} is too sparse`).toBeGreaterThanOrEqual(10);
     }
   });
 

@@ -96,14 +96,22 @@ export function deriveNumAges(
   return Math.max(prevNumAges, target);
 }
 
-/** Assign refinement levels inside the theme, cut into ages, then push
- *  outputs forward so no recipe needs a later-age part. */
+/** Minimum recipes a band may hold after push-forward. Below this the band
+ *  is a "dead age" — the dealer can't produce enough current-age combos for
+ *  the player to progress. The merge pass folds under-populated bands into
+ *  their predecessor until every surviving band meets this floor. */
+const MIN_BAND_SIZE = 10;
+
+/** Assign refinement levels inside the theme, cut into ages, push outputs
+ *  forward so no recipe needs a later-age part, then merge any sparse band
+ *  into its predecessor. Returns the effective number of distinct bands
+ *  after merging (≤ `numAges`). */
 function assignAges(
   snapshot: Snapshot,
   recipes: CombineRecipe[],
   outputs: Set<string>,
   numAges: number,
-): void {
+): number {
   const refine = computeRefine(snapshot);
 
   // Theme outputs start at infinity; ingredients the theme doesn't make
@@ -208,6 +216,48 @@ function assignAges(
     }
     if (!changed) break;
   }
+
+  // Merge sparse bands. The balanced cut aims for equal recipe counts per
+  // band, but push-forward can gut a band by shoving its outputs later.
+  // Any band holding < MIN_BAND_SIZE recipes becomes a "dead age" — the
+  // dealer can't surface enough current-age combos for players to progress,
+  // so they get stuck. Fold any such band into its predecessor (or into
+  // the following band if it's band 1 with no predecessor), then renumber
+  // bands to be contiguous 1..M. Iterate until stable.
+  let effective = numAges;
+  // Clamp: effective can't exceed the current max band actually in use.
+  const seenBands = new Set<number>(recipes.map((r) => r.band));
+  effective = Math.min(effective, Math.max(0, ...seenBands));
+  for (let pass = 0; pass < numAges; pass++) {
+    const sizes = new Array(effective + 1).fill(0);
+    for (const r of recipes) sizes[r.band] = (sizes[r.band] ?? 0) + 1;
+    let mergedAt = -1;
+    for (let b = 1; b <= effective; b++) {
+      if (sizes[b] > 0 && sizes[b] < MIN_BAND_SIZE) {
+        mergedAt = b;
+        break;
+      }
+    }
+    if (mergedAt === -1) break;
+    // Merge direction:
+    //  - band X>1: fold band X into band X-1, slide everything above down.
+    //  - band 1  : fold band 1 forward into band 2 (its successor), slide
+    //              everything above down. (Band 1 has no predecessor.)
+    // Both cases: dependency invariant is preserved — merging adjacent
+    // bands can never introduce a "needs a later part" violation since the
+    // relative order of all parts/outputs is unchanged.
+    const mergeTarget = mergedAt === 1 ? 2 : mergedAt - 1;
+    for (const r of recipes) {
+      if (r.band === mergedAt) r.band = mergeTarget;
+    }
+    // Now compress: anything above the vacated slot slides down by one.
+    const vacated = mergedAt === 1 ? 1 : mergedAt;
+    for (const r of recipes) {
+      if (r.band > vacated) r.band -= 1;
+    }
+    effective -= 1;
+  }
+  return effective;
 }
 
 function makeItemView(node: GraphNode): CombineItem {
@@ -260,11 +310,14 @@ export function buildThemeBundle(
   // Never exceed the authored name pool; a KB that outgrows it needs new
   // authored names before promotion can take effect.
   const numAges = Math.min(rawNumAges, pool.length);
+  // `assignAges` may merge sparse bands and return a smaller effective count.
+  // The displayed age list reflects the merged layout — no "dead ages" with
+  // too few recipes for the dealer to surface progression combos.
+  const effectiveNumAges = assignAges(snapshot, recipes, outputs, numAges);
   const meta: typeof base_meta = {
     ...base_meta,
-    ages: pool.slice(0, numAges),
+    ages: pool.slice(0, effectiveNumAges),
   };
-  assignAges(snapshot, recipes, outputs, numAges);
 
   // Index recipes by every ingredient, biggest first.
   const byIngredient = new Map<string, CombineRecipe[]>();
