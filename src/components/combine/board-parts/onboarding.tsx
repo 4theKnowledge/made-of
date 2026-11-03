@@ -45,15 +45,17 @@ export function OnboardingDemo({ onDismiss }: { onDismiss: () => void }) {
     <div className="cbscrim" role="dialog" aria-modal="true" onClick={onDismiss}>
       <div className="cbonboard" onClick={(e) => e.stopPropagation()}>
         <h2>{chapter.title}</h2>
-        <div
-          className={`cbonboard-stage cbonboard-stage-${step}`}
-          key={`${step}-${restartKey}`}
-          aria-hidden="true"
-        >
-          {step === 0 && <OnboardStageCombine />}
-          {step === 1 && <OnboardStageChain />}
-          {step === 2 && <OnboardStageCollection />}
-          {step === 3 && <OnboardStageAges />}
+        <div className="cbonboard-stage-wrap">
+          <div
+            className={`cbonboard-stage cbonboard-stage-${step}`}
+            key={`${step}-${restartKey}`}
+            aria-hidden="true"
+          >
+            {step === 0 && <OnboardStageCombine />}
+            {step === 1 && <OnboardStageChain />}
+            {step === 2 && <OnboardStageCollection />}
+            {step === 3 && <OnboardStageAges />}
+          </div>
         </div>
         <p>{chapter.body}</p>
         <div className="cbonboard-dots" role="tablist">

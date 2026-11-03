@@ -945,10 +945,25 @@ a.btn.primary{color:var(--bg)}
 /* First-run onboarding card. Three animated chapters teaching the core
  * loop, chains, and age progression. Abstract shapes so nothing depends
  * on the content data; key-remount restarts each chapter's animations. */
-.cbonboard{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:90;max-width:320px;width:calc(100% - 32px);padding:18px 16px 14px;border:2.5px solid var(--ink);border-radius:6px;background:var(--bg);box-shadow:6px 6px 0 var(--ink);display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;animation:mdin .2s ease-out;box-sizing:border-box}
+.cbonboard{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:90;width:min(340px, calc(100vw - 20px));padding:18px 16px 14px;border:2.5px solid var(--ink);border-radius:6px;background:var(--bg);box-shadow:6px 6px 0 var(--ink);display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;animation:mdin .2s ease-out;box-sizing:border-box}
 .cbonboard h2{margin:0;font-family:var(--display);font-size:22px;font-weight:700}
 .cbonboard p{margin:0;font-size:13.5px;line-height:1.4;color:var(--muted);max-width:32ch;min-height:2.8em}
-.cbonboard-stage{position:relative;width:240px;height:112px;margin:2px 0}
+/* The stage is a 240×112 animated diagram with pixel-positioned children.
+ * Rather than rewriting dozens of absolute offsets as percentages, we keep
+ * the pixel math intact and scale the whole stage when the viewport is
+ * narrow. The wrapper reserves the scaled height so the dialog doesn't
+ * leave a gap below. --cbob-scale is 1 by default; media queries below
+ * drop it on narrow screens. */
+.cbonboard-stage-wrap{--cbob-scale:1;width:100%;display:flex;justify-content:center;height:calc(112px * var(--cbob-scale))}
+.cbonboard-stage{position:relative;width:240px;height:112px;margin:2px 0;flex:none;transform-origin:top center;transform:scale(var(--cbob-scale))}
+/* Dialog maxes at 340px, interior ~308px — stage fits native. Below ~360px
+ * viewport we start scaling. 0.82 fits a ~220px interior; 0.7 fits ~168px. */
+@media (max-width: 360px){
+  .cbonboard-stage-wrap{--cbob-scale:0.82}
+}
+@media (max-width: 320px){
+  .cbonboard-stage-wrap{--cbob-scale:0.7}
+}
 .cbob-tile{position:absolute;top:18px;width:48px;height:48px;border:2px solid var(--ink);border-radius:4px;box-shadow:3px 3px 0 var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;--pk:#111417;padding:3px 2px 2px}
 .cbob-tile .ic{width:62%;height:62%;border:0;background:transparent;border-radius:0;overflow:visible;flex:none}
 .cbob-tile .ic svg{width:100%;height:100%}
@@ -1725,7 +1740,7 @@ a.btn.primary{color:var(--bg)}
 /* Combine debug panel (admin-only). */
 .cbdebug-fab{position:fixed;right:12px;bottom:12px;z-index:200;padding:6px 10px;border:1.5px solid var(--ink);background:var(--surface);color:var(--ink);font:inherit;font-size:12px;font-weight:600;cursor:pointer;border-radius:3px;box-shadow:2px 2px 0 var(--ink)}
 .cbdebug-fab:hover{background:var(--ink);color:var(--bg)}
-.cbdebug{position:fixed;right:12px;bottom:52px;z-index:201;width:300px;max-height:min(560px, calc(100dvh - 80px));display:flex;flex-direction:column;gap:10px;padding:12px;background:var(--surface);border:1.5px solid var(--ink);border-radius:4px;box-shadow:3px 3px 0 var(--ink);font-size:12.5px;overflow:hidden}
+.cbdebug{position:fixed;right:12px;bottom:52px;z-index:201;width:min(300px, calc(100vw - 24px));max-height:min(560px, calc(100dvh - 80px));display:flex;flex-direction:column;gap:10px;padding:12px;background:var(--surface);border:1.5px solid var(--ink);border-radius:4px;box-shadow:3px 3px 0 var(--ink);font-size:12.5px;overflow:hidden;box-sizing:border-box}
 .cbdebug-top{display:flex;align-items:center;gap:8px}
 .cbdebug-top strong{font-size:13px}
 .cbdebug-on{color:var(--good,#1a7a3a);font-weight:700;font-size:11px}
