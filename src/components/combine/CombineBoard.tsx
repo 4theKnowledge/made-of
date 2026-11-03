@@ -1796,14 +1796,20 @@ function DetailCard({
 }) {
   const item = bundle.items.get(tileId);
   if (!item) return null;
-  // Prefer the recipe the player actually used this run. Otherwise fall back
-  // to the first bundle recipe, then to the item's knowledge-base lore so the
-  // card still reads "hydrogen + oxygen = water" for items not yet made.
+  // Only reveal a recipe the player has earned the right to see — either
+  // because they made it this run, or because the output is already known
+  // (previous run, lifetime collection, or raw starting item). Otherwise
+  // hide ingredients so long-pressing a tile can't be used to peek at how
+  // to craft an undiscovered item.
   const playerRecipe = howMade[tileId];
-  const bundleRecipe = bundle.recipes.find((r) => r.out === tileId);
+  const isKnown = known.has(tileId);
+  const bundleRecipe = isKnown
+    ? bundle.recipes.find((r) => r.out === tileId)
+    : undefined;
+  const loreRecipe = isKnown && item.lore ? { all: item.lore } : null;
   const madeFrom: { all: string[] } | null = playerRecipe
     ? { all: playerRecipe }
-    : (bundleRecipe ?? (item.lore ? { all: item.lore } : null));
+    : (bundleRecipe ?? loreRecipe);
   // Goes into: recipes that use this tile as an ingredient.
   const goesInto = (bundle.byIngredient.get(tileId) ?? []).filter(
     (r) => r.out !== tileId,
@@ -1848,8 +1854,10 @@ function DetailCard({
             <i>=</i>
             <span>{cap(item.name)}</span>
           </div>
-        ) : (
+        ) : isKnown ? (
           <p className="fact">A raw thing.</p>
+        ) : (
+          <p className="fact">You haven&rsquo;t made this yet.</p>
         )}
         {item.fact && <p className="fact">{item.fact}</p>}
         {goesInto.length > 0 && (
