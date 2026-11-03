@@ -87,6 +87,10 @@ export interface GameState {
   longest: number;
   /** Items first-found during this game. */
   found: string[];
+  /** How many times each output has been made this run. Powers the
+   *  on-board history tray, which shows every make with a ×N count rather
+   *  than only terminal items shipped to the shelf. */
+  madeCounts: Record<string, number>;
   /** The ingredient list the player actually used the first time they
    *  made each output this run. Lets the info card show "How you made it"
    *  with the right recipe when an item has multiple valid recipes
@@ -219,6 +223,7 @@ function cloneState(s: GameState): GameState {
     board: cloneBoard(s.board),
     tray: cloneTray(s.tray),
     found: [...s.found],
+    madeCounts: { ...s.madeCounts },
     howMade: { ...s.howMade },
     madeAtBand: { ...s.madeAtBand },
     shelf: [...s.shelf],
@@ -435,6 +440,7 @@ function finishResolve(
     state.madeAtBand[recipe.out] = recipe.band;
     events.push({ type: "discovery", out: recipe.out, recipe: recipe.all });
   }
+  state.madeCounts[recipe.out] = (state.madeCounts[recipe.out] ?? 0) + 1;
   // Age progression: count makes against the age they fire in, not the
   // output's canonical min-band. The player's mental model is "I did Age-II
   // work → my Age-II counter moves", not "I made a thing that happens to
@@ -683,6 +689,7 @@ export function newGame(
     made: 0,
     longest: 0,
     found: [],
+    madeCounts: {},
     howMade: {},
     madeAtBand: {},
     swaps: 0,

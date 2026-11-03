@@ -17,14 +17,15 @@ export function Shelf({
   fx: Fx;
   onInfo: (id: string) => void;
 }) {
-  // Group by output id with a count badge.
-  const counts = new Map<string, number>();
-  for (const id of state.shelf) counts.set(id, (counts.get(id) ?? 0) + 1);
-  const empty = counts.size === 0;
-  // The id that just landed on the shelf, so it gets .new.
-  const freshlyShipped = fx.shipped
-    ? state.shelf[state.shelf.length - 1]
-    : null;
+  // Every make shows here (ingredients-that-are-also-outputs, mids, and
+  // terminal shipped items alike). `found` is first-time-discovery order;
+  // newest-first reads better here so recent activity is always visible
+  // without scrolling.
+  const ids = [...state.found].reverse();
+  const empty = ids.length === 0;
+  // Flash the most recent discovery when its sparkle fx fires. Repeats
+  // don't flash — the badge count change is the cue.
+  const freshlyMade = fx.discover != null ? ids[0] ?? null : null;
   const shelfRef = useRef<HTMLDivElement | null>(null);
   const [overflow, setOverflow] = useState<{ left: boolean; right: boolean }>({
     left: false,
@@ -48,18 +49,19 @@ export function Shelf({
       el.removeEventListener("scroll", update);
       ro.disconnect();
     };
-  }, [state.shelf.length]);
+  }, [ids.length]);
   return (
     <div
       ref={shelfRef}
       className={`cbshelf${empty ? " none" : ""}${overflow.left ? " ov-l" : ""}${overflow.right ? " ov-r" : ""}`}
-      aria-label={`Made and shipped: ${state.shelf.length}`}
+      aria-label={`Made this run: ${ids.length}`}
     >
       <span className="cbshelf-slots">
-        {[...counts.entries()].map(([id, n]) => {
+        {ids.map((id) => {
           const item = bundle.items.get(id);
           if (!item) return null;
-          const isNew = id === freshlyShipped;
+          const n = state.madeCounts[id] ?? 1;
+          const isNew = id === freshlyMade;
           return (
             <button
               key={id}

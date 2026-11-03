@@ -60,6 +60,7 @@ export interface StoredGame {
   made: number;
   longest: number;
   found: string[];
+  madeCounts?: Record<string, number>;
   howMade?: Record<string, string[]>;
   madeAtBand?: Record<string, number>;
   swaps: number;
@@ -119,6 +120,7 @@ function toStored(state: GameState): StoredGame {
     made: state.made,
     longest: state.longest,
     found: state.found.slice(),
+    madeCounts: { ...state.madeCounts },
     howMade: { ...state.howMade },
     madeAtBand: { ...state.madeAtBand },
     swaps: state.swaps,
@@ -235,6 +237,12 @@ export function hydrateGame(s: StoredGame): GameState {
     made: s.made,
     longest: s.longest,
     found: s.found.slice(),
+    // Older saves predate madeCounts: seed the tray with each found item
+    // at ×1 so a resumed game isn't missing history for prior finds. New
+    // makes this session increment from there.
+    madeCounts: s.madeCounts
+      ? { ...s.madeCounts }
+      : Object.fromEntries(s.found.map((id) => [id, 1])),
     howMade: s.howMade ? { ...s.howMade } : {},
     madeAtBand: s.madeAtBand ? { ...s.madeAtBand } : {},
     swaps: s.swaps,
