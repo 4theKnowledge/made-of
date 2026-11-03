@@ -177,7 +177,7 @@ function TreeMobileStyles() {
           font-size: 12px !important;
         }
         .tree-root .tree-row-chevron {
-          min-width: 32px !important;
+          min-width: 20px !important;
           min-height: 32px !important;
           display: inline-flex !important;
           align-items: center !important;
@@ -245,29 +245,51 @@ function TreeMobileStyles() {
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-        /* Hide the kind label on mobile — the item page shows it. Keeps the
-           name column from losing room to a secondary label. */
-        .tree-root .tree-row-kind {
+        /* Hide secondary chrome on mobile. The kind label is on the item page;
+           the edge indicator is in the Legend and Edit modal. Removing them
+           gives the name column the room it needs. */
+        .tree-root .tree-row-kind,
+        .tree-root .tree-row-edge {
           display: none !important;
+        }
+
+        /* Compact everything: tighter gaps, smaller padding, shallower indent.
+           Depth eats width fastest, so we halve indent per level. */
+        .tree-root .tree-row,
+        .tree-root .tree-recipe-row {
+          gap: 4px !important;
+          padding: 3px 8px !important;
+        }
+        .tree-root .tree-row-tier {
+          width: 18px !important;
+          height: 18px !important;
+          font-size: 10px !important;
+        }
+        /* Compact ⋯ button — remove the big framed look. */
+        .tree-root .tree-row-actions-overflow .tree-row-btn,
+        .tree-root .tree-recipe-actions-overflow .tree-row-btn {
+          min-height: 28px !important;
+          min-width: 28px !important;
+          padding: 4px 8px !important;
         }
 
         /* Reduce indent, add lineage guide lines so ancestry stays readable. */
         .tree-root .tree-row {
           position: relative;
         }
-        .tree-root .tree-row[data-depth="1"] { padding-left: 24px !important; }
-        .tree-root .tree-row[data-depth="2"] { padding-left: 36px !important; }
-        .tree-root .tree-row[data-depth="3"] { padding-left: 48px !important; }
-        .tree-root .tree-row[data-depth="4"] { padding-left: 60px !important; }
-        .tree-root .tree-row[data-depth="5"] { padding-left: 72px !important; }
-        .tree-root .tree-row[data-depth="6"] { padding-left: 84px !important; }
-        .tree-root .tree-row[data-depth="7"] { padding-left: 96px !important; }
-        .tree-root .tree-row[data-depth="8"] { padding-left: 108px !important; }
+        .tree-root .tree-row[data-depth="1"] { padding-left: 16px !important; }
+        .tree-root .tree-row[data-depth="2"] { padding-left: 24px !important; }
+        .tree-root .tree-row[data-depth="3"] { padding-left: 32px !important; }
+        .tree-root .tree-row[data-depth="4"] { padding-left: 40px !important; }
+        .tree-root .tree-row[data-depth="5"] { padding-left: 48px !important; }
+        .tree-root .tree-row[data-depth="6"] { padding-left: 56px !important; }
+        .tree-root .tree-row[data-depth="7"] { padding-left: 64px !important; }
+        .tree-root .tree-row[data-depth="8"] { padding-left: 72px !important; }
 
         .tree-root .tree-row::before {
           content: "";
           position: absolute;
-          left: calc(14px + (var(--depth, 0) - 1) * 12px);
+          left: calc(8px + (var(--depth, 0) - 1) * 8px);
           top: 0;
           bottom: 0;
           width: 1px;
@@ -1808,6 +1830,7 @@ const Row = memo(function Row(props: RowProps) {
 
         <Tooltip title={`${item.tier} — ${TIER[item.tier].name}`}>
           <span
+            className="tree-row-tier"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -1820,6 +1843,7 @@ const Row = memo(function Row(props: RowProps) {
               fontSize: 11,
               fontWeight: 700,
               fontFamily: "var(--mono, monospace)",
+              flexShrink: 0,
             }}
           >
             {item.tier}
@@ -1833,6 +1857,7 @@ const Row = memo(function Row(props: RowProps) {
 
         {edge && (
           <span
+            className="tree-row-edge"
             style={{
               display: "inline-flex",
               alignItems: "center",
