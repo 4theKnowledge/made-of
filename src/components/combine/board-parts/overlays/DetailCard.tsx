@@ -95,7 +95,15 @@ export function DetailCard({
               );
             })}
             <i>=</i>
-            <span>{cap(item.name)}</span>
+            <span>
+              <Pictogram
+                name={item.name}
+                tier={item.tier}
+                kind={item.kind}
+                symbol={item.symbol}
+              />
+              {cap(item.name)}
+            </span>
           </div>
         ) : isKnown ? (
           <p className="fact">A raw thing.</p>
