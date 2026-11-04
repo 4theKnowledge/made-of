@@ -27,10 +27,13 @@ export function ThemeMenu({
   onPickDaily: () => void;
   onPickFast: (which: ThemeKey) => void;
   onShareDaily: () => void;
-  onRestart: (which: ThemeKey) => void;
+  onRestart: (which: ThemeKey, mode: Mode) => void;
   onDismiss: () => void;
 }) {
   const [confirmRestart, setConfirmRestart] = useState(false);
+  const modeLabel = mode === "fast" ? "Fast" : "Endless";
+  const activeBundle = mode === "fast" ? fastBundles[current] : bundles[current];
+  const themeName = activeBundle.theme.name;
   return (
     <ResponsiveSheet
       open
@@ -127,14 +130,17 @@ export function ThemeMenu({
             onClick={() => setConfirmRestart(true)}
             style={{ width: "100%", justifyContent: "center" }}
           >
-            Restart {bundles[current].theme.name}
+            Restart {modeLabel} · {themeName}
           </button>
         )}
         {!daily && confirmRestart && (
           <div className="cbrestartconfirm">
             <p>
-              End this run and start a fresh {bundles[current].theme.name}
-              {" "}game? Your current score and board will be lost.
+              End this run and start a fresh {modeLabel} · {themeName} game?
+              Your current score and board will be lost.
+              {mode === "fast"
+                ? " Your best score stays put."
+                : " Your collection stays put."}
             </p>
             <div className="cbrestartrow">
               <button
@@ -150,7 +156,7 @@ export function ThemeMenu({
                 className="cbh cbrestart"
                 onClick={() => {
                   setConfirmRestart(false);
-                  onRestart(current);
+                  onRestart(current, mode);
                 }}
                 style={{ flex: 1, justifyContent: "center" }}
               >

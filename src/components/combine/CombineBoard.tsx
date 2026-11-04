@@ -45,7 +45,7 @@ import {
   resolveItemName,
   shareText,
 } from "@/combine/share";
-import type { ThemeBundle, ThemeKey } from "@/combine/types";
+import type { Mode, ThemeBundle, ThemeKey } from "@/combine/types";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 import { HowToPlay } from "@/components/common/HowToPlay";
@@ -820,16 +820,18 @@ export function CombineBoard({
   );
 
   const restartTheme = useCallback(
-    (which: ThemeKey) => {
+    (which: ThemeKey, nextMode: Mode) => {
+      const nextBundle = nextMode === "fast" ? fastBundles[which] : bundles[which];
       setState(
-        newGame(which, bundles[which], {
+        newGame(which, nextBundle, {
+          mode: nextMode,
           seed: freshEndlessSeed(),
           size: 6,
         }).state,
       );
       resetTransient();
     },
-    [bundles, resetTransient],
+    [bundles, fastBundles, resetTransient],
   );
 
   const startFast = useCallback(
@@ -1750,9 +1752,9 @@ export function CombineBoard({
             onShareDaily={() => {
               shareDaily();
             }}
-            onRestart={(which) => {
+            onRestart={(which, nextMode) => {
               setThemeOpen(false);
-              restartTheme(which);
+              restartTheme(which, nextMode);
             }}
             onDismiss={() => setThemeOpen(false)}
           />
