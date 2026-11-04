@@ -26,7 +26,7 @@ import {
 } from "./match";
 import { dealTray } from "./deal";
 import { dailySeed, freshEndlessSeed, makeRng, pick, shuffle, type RngState } from "./rng";
-import type { CombineRecipe, ThemeBundle, ThemeKey } from "./types";
+import type { CombineRecipe, Mode, ThemeBundle, ThemeKey } from "./types";
 
 /* ========================================================================
  * State + actions
@@ -77,6 +77,9 @@ export interface ChoosingState {
 
 export interface GameState {
   theme: ThemeKey;
+  /** Play mode. `classic` = age-banded (endless/daily). `fast` = 2-part
+   *  recipes only, single band, score-only (no collection unlocks). */
+  mode: Mode;
   daily: string | null;
   n: number;
   rng: RngState;
@@ -185,7 +188,7 @@ export type Event =
 export type TileSource = "tray" | "hold";
 
 export type Action =
-  | { type: "new-game"; theme: ThemeKey; daily: string | null; size: number; seed?: number }
+  | { type: "new-game"; theme: ThemeKey; mode: Mode; daily: string | null; size: number; seed?: number }
   | { type: "place"; slot: number; cell: number; source?: TileSource }
   | { type: "drop-on"; slot: number; cell: number; source?: TileSource }
   | { type: "choose"; outputIndex: number }
@@ -457,7 +460,10 @@ function finishResolve(
     state.closeCalls++;
   }
 
-  const first = !state.found.includes(recipe.out);
+  // Fast mode is score-only: no first-find tracking, no discovery events.
+  // Players still score and chain, but the collection stays untouched so
+  // classic progression is never shortcutted by combo-dense fast runs.
+  const first = state.mode !== "fast" && !state.found.includes(recipe.out);
   if (first) {
     state.found.push(recipe.out);
     state.howMade[recipe.out] = recipe.all.slice();
@@ -720,14 +726,16 @@ export function hasAnyLegalAction(state: GameState, bundle: ThemeBundle): boolea
 export function newGame(
   theme: ThemeKey,
   bundle: ThemeBundle,
-  opts: { daily?: string | null; size?: number; seed?: number } = {},
+  opts: { mode?: Mode; daily?: string | null; size?: number; seed?: number } = {},
 ): ReduceResult {
   const daily = opts.daily ?? null;
+  const mode: Mode = opts.mode ?? "classic";
   const size = opts.size ?? 6;
   const seed =
     opts.seed ?? (daily ? dailySeed(daily) : freshEndlessSeed());
   const state: GameState = {
     theme,
+    mode,
     daily,
     n: size,
     rng: makeRng(seed),
@@ -830,6 +838,7 @@ export function reduce(
   switch (action.type) {
     case "new-game":
       return newGame(action.theme, bundle, {
+        mode: action.mode,
         daily: action.daily,
         size: action.size,
         seed: action.seed,

@@ -66,8 +66,13 @@ export function TopBar({
     state.pluck +
     (wipeUnlocked ? 1 : 0) +
     (canUndo ? 1 : 0);
-  const themeName = state.daily ? "Daily" : "Endless";
+  const themeName = state.daily
+    ? "Daily"
+    : state.mode === "fast"
+      ? "Fast"
+      : "Endless";
   const dailyLabel = state.daily ? formatDailyLabel(state.daily) : null;
+  const fast = state.mode === "fast";
   const bestDisplay = Math.max(best, state.over ? state.score : 0);
   const modeActive = clearMode || moveMode || shoreMode || pluckMode;
   return (
@@ -87,11 +92,42 @@ export function TopBar({
         </span>
       ) : null}
       <button
-        className="cbh cbtheme"
+        className={`cbh cbtheme${fast ? " cbtheme-fast" : ""}`}
         type="button"
         aria-label={`Theme: ${themeName}${dailyLabel ? `, ${dailyLabel}` : ""}. Change theme`}
         onClick={onTheme}
       >
+        {fast ? (
+          <svg
+            className="cbtheme-mode cbtheme-bolt"
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+          >
+            <path
+              d="M9 1 L3 9 h3 l-2 6 L13 7 h-3 l2 -6 z"
+              fill="currentColor"
+              stroke="currentColor"
+              strokeWidth={0.5}
+              strokeLinejoin="round"
+            />
+          </svg>
+        ) : state.daily ? (
+          <svg
+            className="cbtheme-mode cbtheme-cal"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4" />
+          </svg>
+        ) : (
+          <svg
+            className="cbtheme-mode cbtheme-inf"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path d="M8 8c-2.76 0-5 1.79-5 4s2.24 4 5 4c1.75 0 3.19-.72 4-1.84C12.81 15.28 14.25 16 16 16c2.76 0 5-1.79 5-4s-2.24-4-5-4c-1.75 0-3.19.72-4 1.84C11.19 8.72 9.75 8 8 8z" />
+          </svg>
+        )}
         <span>
           {themeName}
           {dailyLabel && <em className="cbtheme-day">{dailyLabel}</em>}

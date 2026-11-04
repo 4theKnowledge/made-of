@@ -36,6 +36,7 @@ export async function POST(req: Request) {
     age?: unknown;
     daily?: unknown;
     season?: unknown;
+    mode?: unknown;
   };
   try {
     body = await req.json();
@@ -69,7 +70,10 @@ export async function POST(req: Request) {
       ? Math.max(0, Math.min(serverSeason, Math.floor(body.season)))
       : null;
   const season = clientSeason ?? serverSeason;
-  const base = { score, made, age, season };
+  // Mode stamps a run so leaderboards can partition classic (endless/daily)
+  // from fast without a schema change. Unknown/missing → classic.
+  const mode = body.mode === "fast" ? "fast" : "classic";
+  const base = { score, made, age, season, mode };
 
   await getDb()
     .insert(schema.progress)

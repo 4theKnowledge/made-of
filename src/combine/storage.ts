@@ -12,7 +12,7 @@
  */
 
 import type { CrumbleCounter, GameState } from "./engine";
-import type { ThemeBundle, ThemeKey } from "./types";
+import type { Mode, ThemeBundle, ThemeKey } from "./types";
 
 /** Bump when the StoredGame shape changes so older saves fall through to
  *  a fresh game instead of hydrating into a broken state. v5: derived
@@ -150,6 +150,9 @@ export function saveGame(state: GameState): void {
   // player's real endless save, and on reload we want to hydrate the
   // real save instead of the debug one.
   if (state.debug) return;
+  // Fast runs are ephemeral. They're score-only sprints; persisting them
+  // would clash with the endless save slot and offers no resume value.
+  if (state.mode === "fast") return;
   try {
     const key = state.daily ? DAILY_KEY : ENDLESS_KEY;
     if (state.over && !state.daily) {
@@ -235,6 +238,9 @@ export function loadGame(
 export function hydrateGame(s: StoredGame): GameState {
   return {
     theme: s.theme,
+    // Pre-mode saves are all classic (fast never persists). Default here
+    // keeps hydration safe without a version bump.
+    mode: "classic",
     daily: s.daily,
     n: s.n,
     rng: { rs: s.rs | 0 },
@@ -324,20 +330,26 @@ export function saveDailyDone(r: DailyResult): void {
   }
 }
 
-/** Best score for the given theme. */
-export function loadBest(theme: ThemeKey): number {
+/** Best score for the given theme. Fast mode uses a separate key so its
+ *  score curve (shorter, higher throughput) doesn't inflate the classic
+ *  best for the same theme. Legacy entries (no `:mode`) remain classic. */
+function bestKey(theme: ThemeKey, mode?: Mode): string {
+  return mode === "fast" ? `${BEST_PREFIX}${theme}:fast` : BEST_PREFIX + theme;
+}
+
+export function loadBest(theme: ThemeKey, mode?: Mode): number {
   if (typeof window === "undefined") return 0;
   try {
-    return Number(window.localStorage.getItem(BEST_PREFIX + theme) ?? 0) || 0;
+    return Number(window.localStorage.getItem(bestKey(theme, mode)) ?? 0) || 0;
   } catch {
     return 0;
   }
 }
 
-export function saveBest(theme: ThemeKey, score: number): void {
+export function saveBest(theme: ThemeKey, score: number, mode?: Mode): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(BEST_PREFIX + theme, String(score));
+    window.localStorage.setItem(bestKey(theme, mode), String(score));
   } catch {
     // ignore
   }

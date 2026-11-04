@@ -90,6 +90,12 @@ interface Props {
   bundles: {
     everything: SerialisedBundle;
   };
+  /** Fast-mode bundles (2-part recipes only, single band). Served alongside
+   *  classic bundles so the same CombineBoard can swap modes without a
+   *  round-trip. Fast runs are score-only — no collection unlocks. */
+  fastBundles: {
+    everything: SerialisedBundle;
+  };
   /** Server-provided admin flag. Only mounts the debug panel entry point.
    *  The reducer trusts the flag UI-side; real security is at the admin
    *  session check that produced this. */
@@ -97,12 +103,22 @@ interface Props {
 }
 
 /** The top-level client component that owns engine state. */
-export function CombineBoard({ bundles: serialised, admin = false }: Props) {
+export function CombineBoard({
+  bundles: serialised,
+  fastBundles: fastSerialised,
+  admin = false,
+}: Props) {
   const bundles = useMemo<Record<ThemeKey, ThemeBundle>>(
     () => ({
       everything: hydrateBundle(serialised.everything),
     }),
     [serialised],
+  );
+  const fastBundles = useMemo<Record<ThemeKey, ThemeBundle>>(
+    () => ({
+      everything: hydrateBundle(fastSerialised.everything),
+    }),
+    [fastSerialised],
   );
   // The initial render must be deterministic across SSR and the first
   // client paint — read nothing that depends on window/localStorage here.
@@ -115,7 +131,10 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
   );
 
   const [state, setState] = useState<GameState>(initial);
-  const bundle = bundles[state.theme];
+  // Active bundle follows the current mode: fast runs use the 2-part
+  // projection; classic (endless/daily) uses the full age-banded bundle.
+  const bundle =
+    state.mode === "fast" ? fastBundles[state.theme] : bundles[state.theme];
   // Collection is partitioned by scope: endless (both endless themes share
   // one bucket) vs. daily (its own bucket so daily puzzles are a fair start,
   // not fed by endless grinding). See useCollection for the full contract.
@@ -127,8 +146,12 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
     record: recordDiscoveries,
   } = useCollection(collectionScope);
   // Per-theme best scores + today's daily result. Loaded in an effect so
-  // SSR/hydration stay deterministic.
+  // SSR/hydration stay deterministic. Fast mode keeps its own best record
+  // so the two score curves don't contaminate each other.
   const [best, setBest] = useState<Record<ThemeKey, number>>({
+    everything: 0,
+  });
+  const [fastBest, setFastBest] = useState<Record<ThemeKey, number>>({
     everything: 0,
   });
   const [dailyDone, setDailyDone] = useState<DailyResult | null>(null);
@@ -145,6 +168,9 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
     didResume.current = true;
     setBest({
       everything: loadBest("everything"),
+    });
+    setFastBest({
+      everything: loadBest("everything", "fast"),
     });
     setDailyDone(loadDailyDone(todayKey()));
     // Age-promotion banner: compare each theme's live numAges to what we
@@ -661,12 +687,20 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
       applyEvents(r.events);
       setSelectedSlot(null);
 
-      // If the game just ended, write best + daily done.
+      // If the game just ended, write best + daily done. Fast mode has its
+      // own best bucket — see storage.saveBest.
       if (r.state.over && !state.over) {
-        const prevBest = best[r.state.theme] ?? 0;
+        const isFast = r.state.mode === "fast";
+        const prevBest = isFast
+          ? fastBest[r.state.theme] ?? 0
+          : best[r.state.theme] ?? 0;
         if (r.state.score > prevBest) {
-          saveBest(r.state.theme, r.state.score);
-          setBest((b) => ({ ...b, [r.state.theme]: r.state.score }));
+          saveBest(r.state.theme, r.state.score, r.state.mode);
+          if (isFast) {
+            setFastBest((b) => ({ ...b, [r.state.theme]: r.state.score }));
+          } else {
+            setBest((b) => ({ ...b, [r.state.theme]: r.state.score }));
+          }
           r.state.newBest = true;
         }
         // Fire-and-forget: record the finished run in the user's account
@@ -680,6 +714,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
             made: r.state.made,
             age: r.state.age,
             daily: r.state.daily,
+            mode: r.state.mode,
             season: bundles[r.state.theme].theme.ages.length,
           }),
         }).catch(() => {});
@@ -734,7 +769,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
       }
       if (found.length) recordDiscoveries(found);
     },
-    [state, bundle, applyEvents, best, recordDiscoveries],
+    [state, bundle, applyEvents, best, fastBest, bundles, recordDiscoveries],
   );
 
   // Save after every settled state transition. Skip while a choice is open
@@ -755,10 +790,17 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
 
   const switchTheme = useCallback(
     (which: ThemeKey) => {
-      // If we're already playing this theme in endless, nothing to do.
-      if (which === state.theme && !state.daily) return;
+      // If we're already playing this theme in classic endless, nothing to do.
+      if (
+        which === state.theme &&
+        !state.daily &&
+        state.mode === "classic"
+      )
+        return;
       // Save the current game before swapping; try to resume the chosen
-      // theme's endless save, otherwise start fresh.
+      // theme's endless save, otherwise start fresh. Fast runs don't persist,
+      // so switching out of fast always lands on a fresh classic game (or the
+      // saved classic resume, if any).
       saveGame(state);
       const nextBundle = bundles[which];
       const saved = loadGame(nextBundle, { daily: null });
@@ -788,6 +830,23 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
       resetTransient();
     },
     [bundles, resetTransient],
+  );
+
+  const startFast = useCallback(
+    (which: ThemeKey) => {
+      // Fast runs don't persist — they're pure score-chase. Save the current
+      // (classic) game first so switching away doesn't lose progress.
+      saveGame(state);
+      setState(
+        newGame(which, fastBundles[which], {
+          mode: "fast",
+          seed: freshEndlessSeed(),
+          size: 6,
+        }).state,
+      );
+      resetTransient();
+    },
+    [state, fastBundles, resetTransient],
   );
 
   const startDaily = useCallback(() => {
@@ -1453,7 +1512,9 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         <TopBar
           state={state}
           fx={fx}
-          best={best[state.theme] ?? 0}
+          best={
+            (state.mode === "fast" ? fastBest : best)[state.theme] ?? 0
+          }
           helpersOpen={helpersOpen}
           clearMode={clearMode}
           moveMode={moveMode != null}
@@ -1594,7 +1655,9 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
             state={state}
             bundle={bundle}
             collection={collection}
-            best={best[state.theme] ?? 0}
+            best={
+              (state.mode === "fast" ? fastBest : best)[state.theme] ?? 0
+            }
             onClose={() => setOverCardOpen(false)}
             onPlayAgain={() => {
               // From a finished daily, "Play endless" starts a fresh
@@ -1665,6 +1728,8 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         {themeOpen && (
           <ThemeMenu
             bundles={bundles}
+            fastBundles={fastBundles}
+            mode={state.mode}
             daily={state.daily}
             current={state.theme}
             dailyDone={dailyDone}
@@ -1675,6 +1740,10 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
             onPickDaily={() => {
               setThemeOpen(false);
               startDaily();
+            }}
+            onPickFast={(which) => {
+              setThemeOpen(false);
+              startFast(which);
             }}
             onShareDaily={() => {
               shareDaily();

@@ -1,7 +1,7 @@
 import { getLiveSnapshot } from "@/graph/live";
 import { Footer } from "@/components/common/Footer";
 import { Header } from "@/components/common/Header";
-import { buildAllBundles } from "@/combine/data";
+import { buildAllBundles, buildAllFastBundles } from "@/combine/data";
 import { serialiseBundle } from "@/combine/serialise";
 import { loadAllSeasons, promoteSeason } from "@/combine/season";
 import { CombineBoard } from "@/components/combine/CombineBoard";
@@ -19,15 +19,23 @@ export async function CombinePageBody() {
       void promoteSeason(theme as keyof typeof prev, curr);
     }
   }
+  const fastBundles = buildAllFastBundles(live.snapshot);
   const serialised = {
     everything: serialiseBundle(bundles.everything),
+  };
+  const fastSerialised = {
+    everything: serialiseBundle(fastBundles.everything),
   };
   const admin = await isAdmin();
 
   return (
     <main className="wrap">
       <Header current="combine" />
-      <CombineBoard bundles={serialised} admin={admin} />
+      <CombineBoard
+        bundles={serialised}
+        fastBundles={fastSerialised}
+        admin={admin}
+      />
       <Footer compactOnMobile />
     </main>
   );

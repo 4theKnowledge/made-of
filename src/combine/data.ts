@@ -14,6 +14,7 @@ import type {
   AgeSets,
   CombineItem,
   CombineRecipe,
+  Mode,
   ThemeBundle,
   ThemeKey,
 } from "./types";
@@ -350,9 +351,15 @@ export function buildThemeBundle(
   snapshot: Snapshot,
   theme: ThemeKey,
   prevNumAges: number = 0,
+  mode: Mode = "classic",
 ): ThemeBundle {
   const base_meta = THEMES[theme];
-  const recipes = recipesForTheme(snapshot, theme);
+  let recipes = recipesForTheme(snapshot, theme);
+  if (mode === "fast") {
+    // Fast mode: 2-ingredient recipes only. Rapid-fire combos on a dense
+    // board; no age progression, so every recipe lives in a single band.
+    recipes = recipes.filter((r) => r.all.length === 2);
+  }
 
   const outputs = new Set<string>(recipes.map((r) => r.out));
   const ingredients = new Set<string>(recipes.flatMap((r) => r.all));
@@ -363,19 +370,28 @@ export function buildThemeBundle(
     [...outputs].filter((x) => !ingredients.has(x)),
   );
 
-  const pool = themeAgePool(theme);
-  const rawNumAges = deriveNumAges(recipes.length, prevNumAges);
-  // Never exceed the authored name pool; a KB that outgrows it needs new
-  // authored names before promotion can take effect.
-  const numAges = Math.min(rawNumAges, pool.length);
-  // `assignAges` may merge sparse bands and return a smaller effective count.
-  // The displayed age list reflects the merged layout — no "dead ages" with
-  // too few recipes for the dealer to surface progression combos.
-  const effectiveNumAges = assignAges(snapshot, recipes, outputs, numAges);
-  const meta: typeof base_meta = {
-    ...base_meta,
-    ages: pool.slice(0, effectiveNumAges),
-  };
+  let meta: typeof base_meta;
+  if (mode === "fast") {
+    // Fast mode has no age progression — every recipe stays in band 1 and
+    // the theme exposes a single age label so UI surfaces that render age
+    // chips still have something to show.
+    for (const r of recipes) {
+      r.lvl = 0;
+      r.band = 1;
+    }
+    meta = { ...base_meta, ages: ["Fast"] };
+  } else {
+    const pool = themeAgePool(theme);
+    const rawNumAges = deriveNumAges(recipes.length, prevNumAges);
+    // Never exceed the authored name pool; a KB that outgrows it needs new
+    // authored names before promotion can take effect.
+    const numAges = Math.min(rawNumAges, pool.length);
+    // `assignAges` may merge sparse bands and return a smaller effective count.
+    // The displayed age list reflects the merged layout — no "dead ages" with
+    // too few recipes for the dealer to surface progression combos.
+    const effectiveNumAges = assignAges(snapshot, recipes, outputs, numAges);
+    meta = { ...base_meta, ages: pool.slice(0, effectiveNumAges) };
+  }
 
   // Index recipes by every ingredient, biggest first.
   const byIngredient = new Map<string, CombineRecipe[]>();
@@ -553,5 +569,16 @@ export function buildAllBundles(
       "everything",
       prevNumAges.everything ?? 0,
     ),
+  };
+}
+
+/** Build fast-mode bundles for every theme. Fast mode shares the endless
+ *  collection scope, but projects a different recipe set (2-part only, single
+ *  band) so the board stays combinable without the age-progression tax. */
+export function buildAllFastBundles(
+  snapshot: Snapshot,
+): Record<ThemeKey, ThemeBundle> {
+  return {
+    everything: buildThemeBundle(snapshot, "everything", 0, "fast"),
   };
 }

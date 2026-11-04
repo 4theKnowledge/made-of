@@ -766,6 +766,10 @@ a.btn.primary{color:var(--bg)}
 .cbh.cbtheme .cbtheme-day{font-style:normal;font-family:var(--mono);font-weight:600;font-size:11px;letter-spacing:.04em;color:var(--muted);text-transform:uppercase}
 .cbtop-daily .cbh.cbtheme{background:color-mix(in srgb, var(--accent) 14%, var(--surface));border-color:var(--accent)}
 .cbtop-daily .cbh.cbtheme .cbtheme-day{color:var(--accent)}
+.cbh.cbtheme.cbtheme-fast{background:color-mix(in srgb, var(--warn,#e8a33a) 16%, var(--surface));border-color:var(--warn,#e8a33a);color:var(--warn,#e8a33a)}
+.cbh.cbtheme .cbtheme-mode{width:14px;height:14px;flex:0 0 auto}
+.cbh.cbtheme .cbtheme-bolt{stroke:none}
+.cbh.cbtheme .cbtheme-cal,.cbh.cbtheme .cbtheme-inf{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 .cbtip{margin:0;font-size:13px;color:var(--muted);min-height:2.6em;line-height:1.3}
 

@@ -7,6 +7,12 @@ import type { ItemKind, Tier } from "../db/schema";
 
 export type ThemeKey = "everything";
 
+/** Combine play mode. `classic` is the age-banded progression game (what
+ *  endless and daily both play). `fast` restricts to 2-part recipes and
+ *  flattens the age structure so every tile is almost always combinable —
+ *  tuned for rapid-fire combos on the same 6×6 board. */
+export type Mode = "classic" | "fast";
+
 export interface ThemeMeta {
   k: ThemeKey;
   name: string;

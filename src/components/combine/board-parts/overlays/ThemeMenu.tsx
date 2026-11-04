@@ -1,25 +1,31 @@
 import React, { useState } from "react";
 import type { DailyResult } from "@/combine/storage";
-import type { ThemeBundle, ThemeKey } from "@/combine/types";
+import type { Mode, ThemeBundle, ThemeKey } from "@/combine/types";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 
 export function ThemeMenu({
   bundles,
+  fastBundles,
+  mode,
   daily,
   current,
   dailyDone,
   onPickTheme,
   onPickDaily,
+  onPickFast,
   onShareDaily,
   onRestart,
   onDismiss,
 }: {
   bundles: Record<ThemeKey, ThemeBundle>;
+  fastBundles: Record<ThemeKey, ThemeBundle>;
+  mode: Mode;
   daily: string | null;
   current: ThemeKey;
   dailyDone: DailyResult | null;
   onPickTheme: (which: ThemeKey) => void;
   onPickDaily: () => void;
+  onPickFast: (which: ThemeKey) => void;
   onShareDaily: () => void;
   onRestart: (which: ThemeKey) => void;
   onDismiss: () => void;
@@ -77,16 +83,37 @@ export function ThemeMenu({
         <span className="k">Endless</span>
         {(Object.keys(bundles) as ThemeKey[]).map((key) => {
           const b = bundles[key];
+          const on = key === current && !daily && mode === "classic";
           return (
             <button
               key={key}
               type="button"
-              className={`cbtopt${key === current && !daily ? " on" : ""}`}
+              className={`cbtopt${on ? " on" : ""}`}
               onClick={() => onPickTheme(key)}
             >
               <b>{b.theme.name}</b>
               <span>{b.theme.desc}</span>
               <em>{b.outputs.size} things to make</em>
+            </button>
+          );
+        })}
+        <span className="k">Fast</span>
+        {(Object.keys(fastBundles) as ThemeKey[]).map((key) => {
+          const b = fastBundles[key];
+          const on = key === current && !daily && mode === "fast";
+          return (
+            <button
+              key={`fast-${key}`}
+              type="button"
+              className={`cbtopt cbfast${on ? " on" : ""}`}
+              onClick={() => onPickFast(key)}
+            >
+              <b>{b.theme.name} · Fast</b>
+              <span>
+                Pair-only combos. Clear the board fast, chain hard, score high.
+                No unlocks — leaderboards only.
+              </span>
+              <em>{b.recipes.length} pair recipes</em>
             </button>
           );
         })}
