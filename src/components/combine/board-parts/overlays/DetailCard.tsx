@@ -4,6 +4,7 @@ import type { ThemeBundle } from "@/combine/types";
 import { cap, KIND } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
+import { ButtonGroup } from "@/components/common/ButtonGroup";
 
 export function DetailCard({
   tileId,
@@ -127,7 +128,7 @@ export function DetailCard({
           </div>
         )}
         {canExplore ? (
-          <div className="row2">
+          <ButtonGroup>
             <a
               className="cbh"
               href={`/explore/${item.slug}`}
@@ -139,7 +140,7 @@ export function DetailCard({
             <button type="button" className="cbh" onClick={onDismiss}>
               Back to the game
             </button>
-          </div>
+          </ButtonGroup>
         ) : (
           <button type="button" className="cbh cbback" onClick={onDismiss}>
             Back to the game

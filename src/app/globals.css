@@ -408,6 +408,31 @@ a.btn.primary{color:var(--bg)}
 .share{margin:0;font-family:var(--mono);font-size:13px;background:var(--bg);border:1.5px solid var(--ink);border-radius:3px;padding:10px 12px;white-space:pre-wrap;user-select:all}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 
+/* Button group — shared primitive for any horizontal row of action buttons
+   in dialogs, sheets, and result screens. Replaces ad-hoc .row / .row2 /
+   .cbrestartrow / .cbresultsrow usages so new surfaces can't ship with
+   missing gaps. Size + align + stack behaviour via modifier classes. */
+.btngroup{display:flex;width:100%;flex-wrap:wrap}
+.btngroup-tight{gap:8px}
+.btngroup-default{gap:12px;margin-top:4px}
+.btngroup-spaced{gap:16px;margin-top:6px}
+.btngroup-align-stretch > *{flex:1;justify-content:center}
+.btngroup-align-stretch > .cbh,.btngroup-align-stretch > .btn{flex:1;justify-content:center}
+/* Tall thumb-friendly touch targets for dialog actions (was .cbover/.cbinfo .row2 .cbh). */
+.btngroup-default > .cbh{height:44px;font-size:14px;text-decoration:none}
+.btngroup-align-start{justify-content:flex-start}
+.btngroup-align-start > *{flex:none}
+.btngroup-align-end{justify-content:flex-end}
+.btngroup-align-end > *{flex:none}
+.btngroup-align-center{justify-content:center}
+.btngroup-align-center > *{flex:none}
+.btngroup-stack-always{flex-direction:column}
+.btngroup-stack-always > *{flex:none;width:100%}
+@media (max-width:520px){
+  .btngroup-stack-mobile{flex-direction:column}
+  .btngroup-stack-mobile > *{flex:none;width:100%}
+}
+
 /* From scratch */
 .sbar{background:var(--surface);border:1.5px solid var(--ink);border-radius:4px;padding:14px 16px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
 .sbar .goal{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;font-size:20px;flex-wrap:wrap}
@@ -742,8 +767,6 @@ a.btn.primary{color:var(--bg)}
 .cbagebanner-x:hover{color:var(--ink)}
 
 .cblastchance-sheet{border-color:var(--bad);box-shadow:5px 5px 0 var(--bad)}
-.cblastchance-sheet .row2{display:flex;gap:10px;width:100%;margin-top:8px}
-.cblastchance-sheet .row2 .cbh{flex:1;justify-content:center}
 .cblastchance-finish{align-self:center;padding:6px 14px;border:1.5px dashed var(--bad);border-radius:4px;background:var(--bg);color:var(--bad);font-family:inherit;font-size:13px;font-weight:600;letter-spacing:0.01em;cursor:pointer}
 .cblastchance-finish:hover{background:var(--bad);color:var(--bg)}
 
@@ -787,7 +810,6 @@ a.btn.primary{color:var(--bg)}
 .cbrestart{color:var(--bad);border-color:color-mix(in srgb, var(--bad) 55%, var(--ink))}
 .cbrestartconfirm{display:flex;flex-direction:column;gap:8px;width:100%;padding:12px;border:1.5px dashed color-mix(in srgb, var(--bad) 55%, var(--ink));border-radius:4px;background:color-mix(in srgb, var(--bad) 6%, var(--surface));box-sizing:border-box}
 .cbrestartconfirm p{margin:0;font-size:13px;line-height:1.4;color:var(--ink);text-align:left}
-.cbrestartrow{display:flex;gap:8px;width:100%}
 .cbagesheet h3{margin:0;font-size:16px}
 .cbagesheet .k{align-self:flex-start}
 .cbagesheet p{margin:0;font-size:13px;line-height:1.4;color:var(--muted)}
@@ -1237,7 +1259,7 @@ a.btn.primary{color:var(--bg)}
 .cbonboard-dots{display:flex;gap:10px;margin-top:4px}
 .cbonboard-dot{display:block;width:16px;height:16px;flex:none;border-radius:50%;border:2px solid var(--ink);background:transparent;padding:0;margin:0;line-height:0;font-size:0;box-sizing:border-box;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .15s ease-out;appearance:none;-webkit-appearance:none}
 .cbonboard-dot.on{background:var(--ink)}
-.cbonboard-actions{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:center}
+.cbonboard-actions{margin-top:6px}
 .cbonboard-skip{height:36px;padding:0 12px;border:2px solid var(--ink);border-radius:99px;background:transparent;color:var(--ink);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
 .cbonboard-go{height:36px;padding:0 18px;border:2px solid var(--ink);border-radius:99px;background:var(--ink);color:var(--bg);font:inherit;font-size:13px;font-weight:700;cursor:pointer}
 .cbonboard-skip:active,.cbonboard-go:active{transform:translateY(1px)}
@@ -1398,8 +1420,6 @@ a.btn.primary{color:var(--bg)}
 
 /* DetailCard uses the shared .cbchip primitive; its row2 button pair sits below. */
 .cbinfo .cbchip{justify-content:center}
-.cbover .row2,.cbinfo .row2{display:flex;gap:12px;width:100%;margin-top:4px}
-.cbover .row2 .cbh,.cbinfo .row2 .cbh{flex:1;justify-content:center;height:44px;font-size:14px;text-decoration:none}
 /* Full-width primary dismiss used by overlays with a single bottom action
    (e.g. the collection book). Matches the thumb-friendly height of row2. */
 .cbh.cbback{width:100%;justify-content:center;height:48px;font-size:14px;flex:none}
@@ -1493,7 +1513,8 @@ a.btn.primary{color:var(--bg)}
 /* "Results" chip shown when the GameOverCard has been dismissed, so the
    player can re-open their summary from the board view. */
 .cbh.cbresults{box-shadow:0 2px 8px rgba(17,20,23,.18)}
-.cbresultsrow{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:70;display:flex;gap:8px}
+/* Positioning only — layout comes from the nested ButtonGroup. */
+.cbresultsrow{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:70;width:auto}
 .cbresultsrow .cbh{box-shadow:0 2px 8px rgba(17,20,23,.18)}
 
 /* Theme menu / Sound menu / Collection book — prototype lines

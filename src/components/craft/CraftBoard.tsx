@@ -13,6 +13,7 @@ import type {
 } from "./types";
 import { PENALTY } from "./types";
 import { HelpButton, HowToPlay } from "@/components/common/HowToPlay";
+import { ButtonGroup } from "@/components/common/ButtonGroup";
 
 interface GameState {
   targetCode: string;
@@ -466,7 +467,7 @@ export function CraftBoard({
               <b>{game.steps}</b>steps (fewest about {state.par})
             </span>
           </div>
-          <div className="row">
+          <ButtonGroup size="tight" align="start">
             <button className="btn primary" type="button" onClick={onReset}>
               Play again
             </button>
@@ -477,7 +478,7 @@ export function CraftBoard({
             >
               New target
             </button>
-          </div>
+          </ButtonGroup>
         </section>
       )}
 

@@ -48,6 +48,7 @@ import {
 import type { Mode, ThemeBundle, ThemeKey } from "@/combine/types";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
+import { ButtonGroup } from "@/components/common/ButtonGroup";
 import { HowToPlay } from "@/components/common/HowToPlay";
 import { CombineDebugPanel } from "@/components/combine/CombineDebugPanel";
 import {
@@ -1687,25 +1688,27 @@ export function CombineBoard({
         )}
         {state.over && !overCardOpen && !state.debug && (
           <div className="cbresultsrow">
-            <button
-              type="button"
-              className="cbh cbresults"
-              onClick={() => setOverCardOpen(true)}
-            >
-              Results
-            </button>
-            <button
-              type="button"
-              className="cbh"
-              onClick={async () => {
-                const payload = state.daily
-                  ? dailyShareText(state.daily, state, bundle)
-                  : endlessShareText(state, bundle);
-                await shareText(payload);
-              }}
-            >
-              Share
-            </button>
+            <ButtonGroup size="tight" align="start">
+              <button
+                type="button"
+                className="cbh cbresults"
+                onClick={() => setOverCardOpen(true)}
+              >
+                Results
+              </button>
+              <button
+                type="button"
+                className="cbh"
+                onClick={async () => {
+                  const payload = state.daily
+                    ? dailyShareText(state.daily, state, bundle)
+                    : endlessShareText(state, bundle);
+                  await shareText(payload);
+                }}
+              >
+                Share
+              </button>
+            </ButtonGroup>
           </div>
         )}
         {ageToast && (
@@ -1856,7 +1859,7 @@ export function CombineBoard({
             a helper — move, swap, clear, pluck, or wipe — to keep going, or
             finish now and bank your score.
           </p>
-          <div className="row2">
+          <ButtonGroup>
             <button
               type="button"
               className="cbh"
@@ -1879,7 +1882,7 @@ export function CombineBoard({
             >
               Finish now
             </button>
-          </div>
+          </ButtonGroup>
         </ResponsiveSheet>
         <ConfirmDialog
           open={wipeConfirm}

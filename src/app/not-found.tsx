@@ -3,6 +3,7 @@ import { getLiveSnapshot } from "@/graph/live";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { Chip } from "@/components/Chip";
+import { ButtonGroup } from "@/components/common/ButtonGroup";
 import { cap } from "@/lib/taxonomy";
 
 /** Familiar items we'd like to suggest first on the 404. Any that aren't
@@ -83,7 +84,7 @@ export default async function NotFound() {
 
       <section className="feat">
         <h3>Or try a mode</h3>
-        <div className="row" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <ButtonGroup size="tight" align="start">
           <Link href="/" className="btn primary">
             Play Combine
           </Link>
@@ -96,7 +97,7 @@ export default async function NotFound() {
           <Link href="/craft" className="btn">
             Craft
           </Link>
-        </div>
+        </ButtonGroup>
       </section>
 
       <Footer />

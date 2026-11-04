@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
+import { ButtonGroup } from "@/components/common/ButtonGroup";
 
 /**
  * Modal replacement for window.confirm(). Uses the shared ResponsiveSheet
@@ -43,7 +44,7 @@ export function ConfirmDialog({
           {body}
         </p>
       )}
-      <div className="row2">
+      <ButtonGroup>
         <button
           ref={cancelRef}
           type="button"
@@ -68,7 +69,7 @@ export function ConfirmDialog({
         >
           {confirmLabel}
         </button>
-      </div>
+      </ButtonGroup>
     </ResponsiveSheet>
   );
 }

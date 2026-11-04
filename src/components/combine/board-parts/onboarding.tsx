@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { ButtonGroup } from "@/components/common/ButtonGroup";
 
 export const ONBOARD_CHAPTERS = [
   {
@@ -74,7 +75,7 @@ export function OnboardingDemo({ onDismiss }: { onDismiss: () => void }) {
             />
           ))}
         </div>
-        <div className="cbonboard-actions">
+        <ButtonGroup size="tight" align="center" className="cbonboard-actions">
           {!isLast && (
             <button
               type="button"
@@ -112,7 +113,7 @@ export function OnboardingDemo({ onDismiss }: { onDismiss: () => void }) {
           >
             {isLast ? "Got it" : "Next"}
           </button>
-        </div>
+        </ButtonGroup>
       </div>
     </div>
   );

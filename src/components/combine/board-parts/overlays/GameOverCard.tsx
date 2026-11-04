@@ -5,6 +5,7 @@ import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
+import { ButtonGroup } from "@/components/common/ButtonGroup";
 
 export function GameOverCard({
   state,
@@ -134,14 +135,14 @@ export function GameOverCard({
           {themeDiscovered} of {totalOutputs} things discovered in{" "}
           {bundle.theme.name} so far.
         </p>
-        <div className="row2">
+        <ButtonGroup>
           <button type="button" className="cbh" onClick={onShare}>
             Share
           </button>
           <button type="button" className="cbh" onClick={onPlayAgain}>
             {state.daily ? "Play endless" : "Play again"}
           </button>
-        </div>
+        </ButtonGroup>
     </ResponsiveSheet>
   );
 }

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { DailyResult } from "@/combine/storage";
 import type { Mode, ThemeBundle, ThemeKey } from "@/combine/types";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
+import { ButtonGroup } from "@/components/common/ButtonGroup";
 
 export function ThemeMenu({
   bundles,
@@ -142,12 +143,11 @@ export function ThemeMenu({
                 ? " Your best score stays put."
                 : " Your collection stays put."}
             </p>
-            <div className="cbrestartrow">
+            <ButtonGroup size="tight">
               <button
                 type="button"
                 className="cbh"
                 onClick={() => setConfirmRestart(false)}
-                style={{ flex: 1, justifyContent: "center" }}
               >
                 Keep playing
               </button>
@@ -158,11 +158,10 @@ export function ThemeMenu({
                   setConfirmRestart(false);
                   onRestart(current, mode);
                 }}
-                style={{ flex: 1, justifyContent: "center" }}
               >
                 Restart
               </button>
-            </div>
+            </ButtonGroup>
           </div>
         )}
       <button
