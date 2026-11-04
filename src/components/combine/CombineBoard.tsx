@@ -1457,12 +1457,14 @@ export function CombineBoard({
     return s;
   }, [state.found, collection]);
 
-  // "Last chance": the player can't finish a combine organically this turn,
-  // but a helper spend (mv/swap/clear/pluck/wipe) could still produce one.
-  // Runs on every state change; both predicates are O(board × tray+hold) at
-  // worst, which is small enough to not need extra guarding.
+  // "Last chance": the board is full, no combine can be finished from
+  // tray/holds, but a helper spend (mv/swap/clear/pluck/wipe) could still
+  // produce one. A board with empty cells isn't a dead end — the player can
+  // keep placing tiles — so we gate on full-board here.
   const lastChanceLive = useMemo(() => {
     if (state.over) return false;
+    const boardFull = state.board.every((v) => v != null);
+    if (!boardFull) return false;
     if (hasOrganicFinishingMove(state, bundle)) return false;
     return hasHelperMove(state, bundle);
   }, [state, bundle]);
