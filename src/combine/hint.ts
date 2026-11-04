@@ -2,10 +2,11 @@
  * Pick the most actionable hint we can offer right now. Three tiers,
  * best first:
  *
- *   1. "ready"    — a tray or hold tile dropped on an existing cell
- *                   completes a recipe this moment.
- *   2. "one-move" — placing a tray or hold tile on some empty cell
- *                   completes a recipe with the adjacent board tiles.
+ *   1. "ready"    — a tray, hold, or already-placed board tile dropped
+ *                   on an existing cell completes a recipe this moment.
+ *   2. "one-move" — placing a tray, hold, or relocated board tile on
+ *                   some empty cell completes a recipe with the
+ *                   adjacent board tiles.
  *   3. "teach"    — nothing is reachable in one placement; fall back
  *                   to a recipe from the current age that overlaps
  *                   what the player already has.
@@ -25,10 +26,13 @@ export interface HintResult {
   out: string;
   recipe: string[];
   kind: HintKind;
-  /** Tray or hold tile the player should use. Unset for the teach tier. */
+  /** Item id the player should use. Unset for the teach tier. */
   using?: string;
   /** Board cells involved in the completed group. Unset for the teach tier. */
   cells?: number[];
+  /** Board cell to pick the mover from, when the suggested move relocates
+   *  an already-placed tile. Unset when the mover comes from tray/hold. */
+  moveFrom?: number;
 }
 
 export interface HintInput {
@@ -41,15 +45,31 @@ export interface HintInput {
   found: Set<string>;
 }
 
+/** A tile the player can move this turn. `from` is the board cell index
+ *  when the mover is relocated from the board; undefined when it comes
+ *  from tray or hold. */
+interface Source {
+  item: string;
+  from?: number;
+}
+
 export function findHint(
   bundle: ThemeBundle,
   input: HintInput,
 ): HintResult | null {
   const { board, size, tray, hold, age, found } = input;
 
-  const sources: string[] = [];
-  for (const t of tray) if (t) sources.push(t);
-  for (const h of hold) if (h) sources.push(h);
+  const offBoard: Source[] = [];
+  for (const t of tray) if (t) offBoard.push({ item: t });
+  for (const h of hold) if (h) offBoard.push({ item: h });
+
+  const onBoard: Source[] = [];
+  for (let k = 0; k < board.length; k++) {
+    const v = board[k];
+    if (v) onBoard.push({ item: v, from: k });
+  }
+
+  const sources = [...offBoard, ...onBoard];
 
   // Tier 1 — ready-on-board.
   const ready = scanReady(bundle, board, size, sources, found);
@@ -59,29 +79,49 @@ export function findHint(
   const oneMove = scanOneMove(bundle, board, size, sources, found);
   if (oneMove) return oneMove;
 
-  // Tier 3 — teach a recipe from the current age.
-  return teach(bundle, age, sources, found);
+  // Tier 3 — teach a recipe from the current age. Tray/hold items are
+  // the natural "stuff you have off-board"; board tiles don't count as
+  // teach inputs because the teach tier is about what to aim for next.
+  return teach(
+    bundle,
+    age,
+    offBoard.map((s) => s.item),
+    found,
+  );
+}
+
+/** Vacate the source cell when the mover comes from the board, so
+ *  grow() doesn't re-count the tile we're picking up. For off-board
+ *  sources the original board is returned unchanged. */
+function boardFor(board: Board, from: number | undefined): Board {
+  if (from == null) return board;
+  const b2 = board.slice();
+  b2[from] = null;
+  return b2;
 }
 
 function scanReady(
   bundle: ThemeBundle,
   board: Board,
   size: number,
-  sources: string[],
+  sources: Source[],
   found: Set<string>,
 ): HintResult | null {
   let fallback: HintResult | null = null;
-  for (const x of sources) {
-    for (let j = 0; j < board.length; j++) {
-      if (!board[j]) continue;
-      const m = matchOn(bundle, board, j, x, size);
+  for (const s of sources) {
+    const b = boardFor(board, s.from);
+    for (let j = 0; j < b.length; j++) {
+      if (j === s.from) continue;
+      if (!b[j]) continue;
+      const m = matchOn(bundle, b, j, s.item, size);
       if (!m) continue;
       const hit: HintResult = {
         out: m.recipe.out,
         recipe: m.recipe.all,
         kind: "ready",
-        using: x,
+        using: s.item,
         cells: m.cells,
+        ...(s.from != null ? { moveFrom: s.from } : {}),
       };
       if (!found.has(m.recipe.out)) return hit;
       if (!fallback) fallback = hit;
@@ -94,21 +134,23 @@ function scanOneMove(
   bundle: ThemeBundle,
   board: Board,
   size: number,
-  sources: string[],
+  sources: Source[],
   found: Set<string>,
 ): HintResult | null {
   let fallback: HintResult | null = null;
-  for (const x of sources) {
-    for (let i = 0; i < board.length; i++) {
-      if (board[i]) continue;
-      const m = matchAt(bundle, board, i, x, size);
+  for (const s of sources) {
+    const b = boardFor(board, s.from);
+    for (let i = 0; i < b.length; i++) {
+      if (b[i]) continue;
+      const m = matchAt(bundle, b, i, s.item, size);
       if (!m) continue;
       const hit: HintResult = {
         out: m.recipe.out,
         recipe: m.recipe.all,
         kind: "one-move",
-        using: x,
+        using: s.item,
         cells: m.cells,
+        ...(s.from != null ? { moveFrom: s.from } : {}),
       };
       if (!found.has(m.recipe.out)) return hit;
       if (!fallback) fallback = hit;

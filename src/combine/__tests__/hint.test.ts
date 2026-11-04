@@ -225,6 +225,101 @@ describe("findHint — unfound preference", () => {
   });
 });
 
+describe("findHint — board-tile relocation", () => {
+  it("suggests moving a board tile when it completes a group", () => {
+    const bundle = fakeBundle([R("bread", ["flour", "water", "oven"])]);
+    const board = empty();
+    // flour@0, water@1 adjacent. oven sits off in a corner (@24).
+    // No tray/hold moves help; the win is to relocate oven onto one of
+    // the existing tiles — that's a "ready" match (drop-on) using the
+    // board tile as the mover.
+    board[0] = "flour";
+    board[1] = "water";
+    board[24] = "oven";
+    const h = findHint(bundle, {
+      board,
+      size,
+      tray: [null, null, null],
+      hold: [],
+      age: 0,
+      found: new Set(),
+    });
+    expect(h?.kind).toBe("ready");
+    expect(h?.out).toBe("bread");
+    expect(h?.moveFrom).toBe(24);
+    expect(h?.using).toBe("oven");
+  });
+
+  it("suggests a one-move relocation when no ready drop exists", () => {
+    // Two tiles exist but can't pair directly, and dropping one on the
+    // other doesn't complete a recipe either. The win is relocating a
+    // third tile to an empty cell that bridges them into contact.
+    const bundle = fakeBundle([R("alpha", ["a", "b", "c"])]);
+    const board = empty();
+    // a@0, b@2 — too far to pair directly; c@24 is the mover. Placing
+    // c at cell 1 bridges them into alpha. matchOn(c, 0) would need
+    // b to be adjacent to cell 0 — it isn't (b is at 2). Likewise
+    // matchOn(c, 2) needs a adjacent to 2 — nope. So no ready; only
+    // the one-move at cell 1 works.
+    board[0] = "a";
+    board[2] = "b";
+    board[24] = "c";
+    const h = findHint(bundle, {
+      board,
+      size,
+      tray: [null, null, null],
+      hold: [],
+      age: 0,
+      found: new Set(),
+    });
+    expect(h?.kind).toBe("one-move");
+    expect(h?.out).toBe("alpha");
+    expect(h?.moveFrom).toBe(24);
+  });
+
+  it("prefers a tray move over a board relocation when both complete", () => {
+    const bundle = fakeBundle([R("dough", ["flour", "water"])]);
+    const board = empty();
+    // flour@0, water@24: dropping tray water on flour@0 is ready via a
+    // tray source. Relocating board water would also work; tray should
+    // win because off-board sources are scanned first.
+    board[0] = "flour";
+    board[24] = "water";
+    const h = findHint(bundle, {
+      board,
+      size,
+      tray: ["water", null, null],
+      hold: [],
+      age: 0,
+      found: new Set(),
+    });
+    expect(h?.kind).toBe("ready");
+    expect(h?.moveFrom).toBeUndefined();
+    expect(h?.using).toBe("water");
+  });
+
+  it("picks the shortest path — relocates straight onto the partner", () => {
+    // water@0 + fire@24 with no off-board tiles. The cleanest completion
+    // is to pick up water and drop it on fire (ready, drop-on), rather
+    // than any longer sequence.
+    const bundle = fakeBundle([R("steam", ["water", "fire"])]);
+    const board = empty();
+    board[0] = "water";
+    board[24] = "fire";
+    const h = findHint(bundle, {
+      board,
+      size,
+      tray: [null, null, null],
+      hold: [],
+      age: 0,
+      found: new Set(),
+    });
+    expect(h?.kind).toBe("ready");
+    expect(h?.out).toBe("steam");
+    expect(h?.moveFrom).not.toBeUndefined();
+  });
+});
+
 describe("findHint — tier 3: teach", () => {
   const bundle = fakeBundle([
     R("dough", ["flour", "water"], 1),
