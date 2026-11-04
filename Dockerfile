@@ -18,6 +18,10 @@ RUN --mount=type=cache,id=s/a903dfcf-2076-4671-bd17-a1186f028e5b-/root/.npm,targ
 FROM node:${NODE_VERSION} AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# `next build` loads the DB client module while prerendering /_not-found;
+# the module throws if DATABASE_URL is unset. No connection is made at build
+# time — the stub just satisfies the module-load guard.
+ENV DATABASE_URL=postgres://stub:stub@localhost:5432/stub
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build \
