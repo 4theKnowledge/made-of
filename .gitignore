@@ -29,3 +29,9 @@ drizzle/.snapshots
 
 # tsc
 *.tsbuildinfo
+
+# pm/ Python tool (uv)
+pm/.venv
+pm/__pycache__
+pm/*.pyc
+pm/uv.lock

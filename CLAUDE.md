@@ -24,6 +24,24 @@ Made Of is a web app that shows what anything is made of, traced all the way bac
   - `/admin/items/[id]` — dedicated per-item editor (full form) still available alongside the modal.
 - `docs/IMPLEMENTATION.md` is historical: it was the original build plan. Treat it as context, not as a to-do list.
 
+## READ FIRST: How to handle requests
+
+**Route every repo-changing request through the pm store.** Before you touch code for a user request that edits, refactors, adds a mode/admin surface/puzzle, changes docs, or modifies the schema:
+
+1. `add_task` (assignee=claude).
+2. `update_task` → `in_progress`.
+3. **`add_comment` with the approach** — what files/routes/tables you plan to touch, key decisions, tradeoffs.
+4. Do the work.
+5. **`add_comment` with the landing summary** — what actually changed (files:lines), notable follow-ups, any tests skipped/blocked.
+6. `update_task` → `done` + `append_changelog` (if user-visible or a decision).
+
+Comments are load-bearing, not optional. A status flip + one-line changelog does not carry enough context — future work reads the task record. File the task from the first message of the request; do not start work and file retroactively.
+
+- **Exempt:** pure Q&A, reads, explanations, or one-off investigation with no repo change.
+- **"Just add it" escape:** if the user says "just add it", "file it", "log it", "don't work on it yet" (or similar), only create the task and stop.
+- **Workflow reference:** `pm/ways_of_working.md` (status conventions, `assignee=claude`, MCP restart, review-tracking).
+- **Don't clear `needs_review`.** `add_comment` and `status=done` auto-flag it — that's the user's inbox signal. Only the user clears it.
+
 ## How to work
 
 - Match the app's existing look, copy, and interactions when adding features; don't redesign without reason.

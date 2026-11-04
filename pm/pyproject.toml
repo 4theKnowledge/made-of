@@ -1,0 +1,15 @@
+[project]
+name = "made-of-pm"
+version = "0.0.0"
+description = "Project-management store + MCP server for the Made Of repo (pm/ tool only; the app itself is Next.js/TypeScript)."
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+pm = [
+    "mcp>=1.0",
+    "watchfiles>=0.22",
+]
+
+[tool.uv]
+package = false

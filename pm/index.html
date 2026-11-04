@@ -1,0 +1,3023 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Project Manager · Made Of</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='6' y='6' width='20' height='20' transform='rotate(45 16 16)' fill='%236aa9ff'/></svg>" />
+<style>
+  :root {
+    --bg: #0b0d10;
+    --fg: #d7dbe0;
+    --fg-strong: #eee;
+    --muted: #9ba3ad;
+    --border: #2a2f36;
+    --code-bg: #1a1e23;
+    --pre-bg: #14181d;
+    --link: #6aa9ff;
+    --row-hover: rgba(255,255,255,0.04);
+    --danger: #ff9c9c;
+    --ok: #9cffc0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header { display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; border-bottom: 1px solid var(--border); gap: 12px; }
+  header h1 { margin: 0; font-size: 16px; font-weight: 600; color: var(--fg-strong); }
+  header .brand { display: flex; align-items: baseline; gap: 20px; }
+  header nav.app-nav { display: flex; gap: 14px; }
+  header nav.app-nav a { color: var(--muted); font-size: 13px; font-weight: 500;
+    text-decoration: none; padding: 4px 2px; border-bottom: 2px solid transparent; }
+  header nav.app-nav a:hover { color: var(--fg); }
+  header nav.app-nav a.active { color: var(--fg-strong); border-bottom-color: var(--link); }
+  header .header-actions { display: flex; gap: 8px; }
+  header .header-actions button { background: var(--link); color: #0b0d10; border: 0;
+    border-radius: 4px; padding: 6px 12px; font: inherit; font-weight: 600; cursor: pointer;
+    font-size: 12px; }
+  header .header-actions button:hover { filter: brightness(1.1); }
+  header .header-actions button.secondary { background: var(--code-bg); color: var(--fg);
+    border: 1px solid var(--border); }
+  header .header-actions button.secondary:hover { background: var(--row-hover); }
+  /* Header "needs review" chip: at-a-glance inbox count that also applies
+     the Review=needs filter. Amber accent when there's work to look at,
+     dim when count === 0, link-blue when the filter is already engaged. */
+  header .header-actions .review-chip { background: rgba(255,180,80,0.12);
+    color: #ffd08a; border: 1px solid rgba(255,180,80,0.35); border-radius: 999px;
+    padding: 4px 12px; font: inherit; font-size: 12px; font-weight: 600;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  header .header-actions .review-chip:hover { filter: brightness(1.1); }
+  header .review-chip .chip-count { font-variant-numeric: tabular-nums; opacity: 0.9; }
+  header .review-chip.zero { background: var(--code-bg); color: var(--muted);
+    border-color: var(--border); }
+  header .review-chip.zero .chip-count { opacity: 0.6; }
+  header .review-chip.active { background: var(--link); color: #0b0d10;
+    border-color: var(--link); }
+  /* Header "pinned" chip: mirrors review-chip shape but uses a distinct
+     accent (soft gold) so pinned ≠ needs-review at a glance. Personal
+     shortlist marker; toggles the Pinned=only filter. */
+  header .header-actions .pinned-chip { background: rgba(255,215,120,0.10);
+    color: #ffe1a3; border: 1px solid rgba(255,215,120,0.30); border-radius: 999px;
+    padding: 4px 12px; font: inherit; font-size: 12px; font-weight: 600;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  header .header-actions .pinned-chip:hover { filter: brightness(1.1); }
+  header .pinned-chip .chip-count { font-variant-numeric: tabular-nums; opacity: 0.9; }
+  header .pinned-chip.zero { background: var(--code-bg); color: var(--muted);
+    border-color: var(--border); }
+  header .pinned-chip.zero .chip-count { opacity: 0.6; }
+  header .pinned-chip.active { background: #ffd47a; color: #0b0d10; border-color: #ffd47a; }
+  /* Per-row pin toggle: outline star when unpinned, filled gold when pinned.
+     Sits in its own tiny cell so it doesn't fight the row-click. */
+  .pin-btn { background: transparent; border: 0; color: var(--muted); cursor: pointer;
+    font-size: 15px; line-height: 1; padding: 0 2px; }
+  .pin-btn:hover { color: #ffd47a; }
+  .pin-btn.pinned { color: #ffd47a; }
+  td.pin-cell { text-align: center; width: 22px; padding: 0 4px; }
+  tr.pinned-row td.pin-cell { color: #ffd47a; }
+  main { padding: 16px 24px 40px; }
+  section { margin-top: 24px; }
+  section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+
+  /* Tasks layout: [sidebar][table]. Sidebar sticky so it stays visible
+     while the table scrolls. Collapsed → narrow icon strip. */
+  .tasks-layout { display: grid; grid-template-columns: 240px 1fr; gap: 16px; align-items: start; }
+  .tasks-layout.collapsed { grid-template-columns: 36px 1fr; }
+  .tasks-main { min-width: 0; }
+  .sidebar { position: sticky; top: 12px; align-self: start;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--pre-bg);
+    padding: 10px 12px 12px; max-height: calc(100vh - 24px); overflow-y: auto;
+    scrollbar-width: thin; }
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .sidebar-header { display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .sidebar-header .title { color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.06em; font-size: 11px; font-weight: 600; }
+  .sidebar-toggle { background: transparent; color: var(--muted); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 8px; font: inherit; font-size: 12px; cursor: pointer;
+    line-height: 1; }
+  .sidebar-toggle:hover { color: var(--fg-strong); border-color: var(--fg-strong); }
+  .tasks-layout.collapsed .sidebar { padding: 8px 4px; }
+  .tasks-layout.collapsed .sidebar-header { flex-direction: column; gap: 6px;
+    margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+  .tasks-layout.collapsed .sidebar-header .title { display: none; }
+  .tasks-layout.collapsed .filter-group,
+  .tasks-layout.collapsed .sidebar-footer { display: none; }
+
+  .filter-group { margin-top: 10px; }
+  .filter-group:first-of-type { margin-top: 4px; }
+  .filter-group label.group-label { display: block; color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; font-weight: 600; }
+  .filter-group select { width: 100%; background: var(--code-bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 3px 4px; font: inherit;
+    font-size: 12px; }
+  .filter-group select:focus { outline: none; border-color: var(--link); }
+  .filter-group select[multiple] option { padding: 2px 6px; }
+  .filter-group select[multiple] option:checked {
+    background: var(--link) linear-gradient(0deg, var(--link), var(--link)); color: #0b0d10; }
+  .filter-group .hint { color: var(--muted); font-size: 10px; margin-top: 2px; font-style: italic; }
+
+  /* Tri-state listbox: replaces native <select multiple> for the axes that
+     support include/exclude toggling. Click cycles unapplied → include → exclude
+     → unapplied. Rendered as a scrollable stack of rows so we can paint the
+     tri-state marker inline; native <option> can't carry three visual states. */
+  .tri-list { width: 100%; background: var(--code-bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; font: inherit;
+    font-size: 12px; max-height: 168px; overflow-y: auto; padding: 2px; }
+  .tri-list:focus-within { border-color: var(--link); outline: none; }
+  .tri-row { display: flex; align-items: center; gap: 6px; padding: 2px 6px;
+    cursor: pointer; user-select: none; border-radius: 3px; line-height: 1.5; }
+  .tri-row:hover { background: var(--pre-bg); }
+  .tri-row .tri-mark { flex: 0 0 12px; width: 12px; height: 12px; border-radius: 3px;
+    border: 1px solid var(--border); background: transparent; display: inline-flex;
+    align-items: center; justify-content: center; color: transparent; font-size: 11px;
+    line-height: 1; font-weight: 700; }
+  .tri-row .tri-label { flex: 1 1 auto; min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .tri-row .tri-count { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums;
+    font-size: 11px; opacity: 0.75; }
+  .tri-row.include { color: #0b0d10; background: var(--link); }
+  .tri-row.include:hover { background: var(--link); filter: brightness(1.05); }
+  .tri-row.include .tri-mark { border-color: #0b0d10; color: #0b0d10; background: transparent; }
+  .tri-row.include .tri-mark::before { content: "✓"; }
+  .tri-row.include .tri-count { color: #0b0d10; opacity: 0.75; }
+  .tri-row.exclude { color: #ffb3b3; background: #2a1414; }
+  .tri-row.exclude:hover { background: #3a1818; }
+  .tri-row.exclude .tri-mark { border-color: var(--danger); color: var(--danger); background: transparent; }
+  .tri-row.exclude .tri-mark::before { content: "−"; }
+  .tri-row.exclude .tri-label { text-decoration: line-through; text-decoration-color: rgba(255,180,180,0.55); }
+  .tri-row.exclude .tri-count { color: #ffb3b3; opacity: 0.75; }
+  .sidebar-footer { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 6px; }
+  .sidebar-footer .match-count { color: var(--muted); font-size: 11px;
+    font-family: ui-monospace, SF Mono, Menlo, monospace; }
+  .sidebar-footer button { background: var(--code-bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; font: inherit;
+    font-size: 12px; cursor: pointer; }
+  .sidebar-footer button:hover:not(:disabled) { border-color: var(--fg-strong); color: var(--fg-strong); }
+  .sidebar-footer button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .sidebar-footer button.active-clear { color: var(--danger); border-color: #5a1e1e; }
+  .sidebar-footer button.active-clear:hover { background: #2a1414; color: var(--danger); }
+  @media (max-width: 900px) {
+    .tasks-layout { grid-template-columns: 1fr; }
+    .tasks-layout.collapsed { grid-template-columns: 1fr; }
+    .sidebar { position: static; max-height: none; }
+  }
+
+  .filters { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: nowrap;
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: thin;
+    padding: 2px 4px 6px 0; }
+  .filters::-webkit-scrollbar { height: 6px; }
+  .filters::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .filters::-webkit-scrollbar-track { background: transparent; }
+  .chip { padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--code-bg); color: var(--fg); cursor: pointer; font-size: 12px; user-select: none;
+    flex: 0 0 auto; white-space: nowrap; }
+  .chip.active { background: var(--link); border-color: var(--link); color: #0b0d10;
+    font-weight: 600; }
+  .chip .chip-count { margin-left: 5px; opacity: 0.65; font-variant-numeric: tabular-nums; }
+  .chip.active .chip-count { opacity: 0.9; color: #0b0d10; }
+  .chip.zero:not(.active) { color: var(--muted); }
+  .chip.zero:not(.active) .chip-count { opacity: 0.55; }
+  /* Pin the first chip (the "clear" chip) so it stays visible while the row scrolls.
+     A single label with a disabled state when there's nothing to clear. */
+  .chip.sticky { position: sticky; left: 0; z-index: 1;
+    background: #2a1414; color: #ffb3b3; border-color: var(--danger);
+    font-weight: 600; box-shadow: 8px 0 8px -6px var(--bg); }
+  .chip.sticky:hover { background: #3a1818; color: #ffd0d0; }
+  .chip.sticky.disabled { background: var(--pre-bg); color: var(--muted);
+    border-color: var(--border); border-style: dashed; cursor: not-allowed;
+    font-weight: 400; }
+  .chip.sticky.disabled:hover { background: var(--pre-bg); color: var(--muted); }
+
+  .pager { display: flex; align-items: center; justify-content: flex-end;
+    gap: 10px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .pager button { background: var(--code-bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  .pager button:hover:not(:disabled) { border-color: var(--fg-strong); color: var(--fg-strong); }
+  .pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .pager .pager-count { font-family: ui-monospace, SF Mono, Menlo, monospace; }
+
+  .search-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .search-row input { flex: 1; background: var(--code-bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font: inherit; }
+  .search-row input:focus { outline: none; border-color: var(--link); }
+  .search-count { color: var(--muted); font-size: 12px; font-family: ui-monospace, SF Mono, Menlo, monospace;
+    white-space: nowrap; }
+
+  .form { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 12px;
+    padding: 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--pre-bg); }
+  .form-row { display: contents; }
+  .form input[type=text], .form select, .form textarea {
+    background: var(--code-bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 6px 8px; font: inherit; min-width: 0; width: 100%; }
+  .form textarea { resize: vertical; min-height: 34px; grid-column: 1 / -1; }
+  .form .grid { display: grid; gap: 8px 10px; grid-column: 1 / -1;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+  .form .field-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .form .field-cell label { color: var(--muted); font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: 0.05em; }
+  .form button { background: var(--link); color: #0b0d10; border: 0; border-radius: 4px;
+    padding: 6px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  .form button:hover { filter: brightness(1.1); }
+  /* Legacy .inline still used by the changelog form (single-row of small fields). */
+  .form .inline { display: flex; gap: 8px; grid-column: 1 / -1; flex-wrap: wrap; }
+  .form .inline > * { flex: 1 1 140px; min-width: 0; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border);
+    vertical-align: top; font-size: 13px; }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.05em; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--fg-strong); }
+  th.sortable .sort-arrow { color: var(--link); margin-left: 3px; }
+  tbody tr:hover { background: var(--row-hover); }
+  td.id { font-family: ui-monospace, SF Mono, Menlo, monospace; color: var(--muted); white-space: nowrap; }
+  td.title { color: var(--fg-strong); }
+
+  /* Click-to-copy task id. Behaves as a small inline button; stops row-click
+     propagation so it doesn't also open the modal. Copy icon appears on hover. */
+  .copy-id { display: inline-flex; align-items: center; gap: 4px;
+    font: inherit; color: inherit; cursor: pointer; user-select: none;
+    padding: 1px 5px; margin: -1px -5px; border-radius: 3px;
+    border: 1px solid transparent; transition: background 80ms, border-color 80ms, color 80ms; }
+  .copy-id:hover { background: var(--code-bg); border-color: var(--border); color: var(--fg-strong); }
+  .copy-id:focus-visible { outline: none; background: var(--code-bg);
+    border-color: var(--link); color: var(--fg-strong); }
+  .copy-id::after { content: "⧉"; font-size: 0.9em; opacity: 0; margin-left: 1px;
+    transition: opacity 80ms; }
+  .copy-id:hover::after, .copy-id:focus-visible::after { opacity: 0.7; }
+  .copy-id.copied { color: #9cffc0; border-color: transparent; background: transparent; }
+  .copy-id.copied::after { content: "✓"; opacity: 1; }
+
+  select.status-select {
+    background: var(--code-bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 4px; font: inherit; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;
+  }
+  .status-select.open        { color: #9ecbff; }
+  .status-select.in_progress { color: #ffcf7a; }
+  .status-select.blocked     { color: #ff9c9c; }
+  .status-select.on_hold     { color: #c8a2ff; }
+  .status-select.done        { color: #9cffc0; }
+  .status-select.cancelled   { color: #9ba3ad; }
+  .status-select.wont_do     { color: #7a828c; font-style: italic; }
+
+  select.priority-select {
+    background: var(--code-bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 4px; font: inherit; font-size: 11px;
+    letter-spacing: 0.04em; font-weight: 600;
+  }
+  .priority-select.P0 { color: #ff9c9c; }
+  .priority-select.P1 { color: #ffcf7a; }
+  .priority-select.P2 { color: var(--fg); }
+  .priority-select.P3 { color: var(--muted); }
+
+  .group-pill { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px;
+    background: rgba(106,169,255,0.12); color: var(--link); border: 1px solid rgba(106,169,255,0.25); }
+
+  /* Review-state cell: leftmost column, tight width. */
+  td.review, th.review { width: 22px; text-align: center; padding-left: 6px; padding-right: 6px; }
+  .review-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: #ffcf7a; box-shadow: 0 0 6px rgba(255,207,122,0.5); vertical-align: middle; }
+  .review-check { color: var(--ok); opacity: 0.55; font-size: 12px; line-height: 1; }
+  .review-none { color: var(--border); font-size: 11px; }
+  .modal-footer .secondary { background: var(--code-bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 6px 12px;
+    font: inherit; cursor: pointer; }
+  .modal-footer .secondary:hover { border-color: var(--fg-strong); color: var(--fg-strong); }
+  .row-actions { display: flex; gap: 4px; }
+  .icon-btn { background: transparent; color: var(--muted); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 6px; font: inherit; font-size: 11px; cursor: pointer; }
+  .icon-btn:hover { color: var(--fg-strong); border-color: var(--fg-strong); }
+  .icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+
+  tbody tr.clickable { cursor: pointer; }
+
+  /* Each comment is a bordered card so entries stay visually distinct even
+     when their bodies contain rich markdown (headings, lists, code blocks). */
+  .comment { background: var(--pre-bg); border: 1px solid var(--border);
+    border-radius: 6px; margin-bottom: 10px; overflow: hidden; }
+  .comment:last-child { margin-bottom: 0; }
+  .comment-header { display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; background: var(--code-bg); border-bottom: 1px solid var(--border);
+    color: var(--muted); font-size: 11px;
+    font-family: ui-monospace, SF Mono, Menlo, monospace;
+    cursor: pointer; user-select: none; }
+  .comment-header:hover { background: var(--pre-bg); }
+  .comment-header .collapse-arrow { font-size: 9px; color: var(--muted);
+    width: 10px; display: inline-block; transition: transform 0.1s ease-in-out; }
+  .comment.collapsed .comment-body { display: none; }
+  .comment.collapsed .comment-header { border-bottom: 0; }
+  .comment.collapsed .collapse-arrow { transform: rotate(-90deg); }
+  .comment-index { color: var(--fg-strong); font-weight: 600; }
+  .comment-author { color: var(--fg); background: var(--pre-bg);
+    border: 1px solid var(--border); border-radius: 3px; padding: 0 6px; }
+  .comment-ts { margin-left: auto; }
+  /* Muted absolute-timestamp shown next to a relative "x ago" — hybrid so
+     the reader gets scan speed AND cross-timestamp comparison without a
+     hover per cell. Applied inside .comment-ts / .q-ts / .r-ts headers
+     and inside .q-answer-label / review resolved-meta. */
+  .ts-abs { color: var(--muted); font-size: 11px; margin-left: 4px; }
+  .comment-delete { background: transparent; border: 0; color: var(--muted);
+    font-size: 15px; line-height: 1; padding: 2px 6px; cursor: pointer;
+    opacity: 0; transition: opacity 100ms ease, color 100ms ease;
+    border-radius: 3px; }
+  .comment-header:hover .comment-delete { opacity: 0.7; }
+  .comment-delete:hover { opacity: 1; color: var(--danger, #d33); background: var(--pre-bg); }
+  /* Copy-to-clipboard button used across comment / question / review cards.
+     Same reveal-on-hover shape as .comment-delete: hidden by default,
+     0.7 opacity when the parent card header is hovered, full opacity
+     + blue on the button itself, kept visible + green during the 1s
+     "copied" flash so the feedback is legible even after the pointer
+     moves off. Any `*-header` ancestor triggers the reveal — that's
+     how one class serves all three card types. */
+  .card-copy { background: transparent; border: 0; color: var(--muted);
+    font-size: 12px; line-height: 1; padding: 2px 6px; cursor: pointer;
+    opacity: 0; transition: opacity 100ms ease, color 100ms ease;
+    border-radius: 3px; font-family: inherit; }
+  .comment-header:hover .card-copy,
+  .q-header:hover .card-copy,
+  .r-header:hover .card-copy { opacity: 0.7; }
+  .card-copy:hover { opacity: 1; color: var(--link); background: var(--pre-bg); }
+  .card-copy.copied { opacity: 1; color: var(--ok); }
+  /* Answer-block copy sits outside a header — always faintly visible
+     so the reader knows the answer is copyable. */
+  .q-answer .card-copy { opacity: 0.5; }
+  .q-answer .card-copy:hover { opacity: 1; }
+  .comment-body { color: var(--fg-strong); padding: 10px 12px; }
+  /* Demote heading scale *inside* a comment so an h2 in the body doesn't
+     read like a section break in the modal itself. */
+  .comment-body.md-body h1 { font-size: 15px; margin: 10px 0 4px; }
+  .comment-body.md-body h2 { font-size: 14px; margin: 10px 0 4px; }
+  .comment-body.md-body h3 { font-size: 13px; margin: 8px 0 4px; }
+  .comment-body.md-body h4 { font-size: 12px; margin: 8px 0 4px;
+    text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+
+  /* Rendered markdown (comments, task body preview, changelog summary).
+     `.md-body` is block-level; `.md-inline` (used for changelog summary,
+     which sits inside a grid cell) contains inline formatting only and
+     is emitted without wrapping <p>. */
+  .md-body > *:first-child { margin-top: 0; }
+  .md-body > *:last-child { margin-bottom: 0; }
+  .md-body p { margin: 0 0 8px; line-height: 1.5; }
+  .md-body h1, .md-body h2, .md-body h3, .md-body h4 {
+    color: var(--fg-strong); margin: 14px 0 6px; font-weight: 600; line-height: 1.3; }
+  .md-body h1 { font-size: 18px; }
+  .md-body h2 { font-size: 16px; }
+  .md-body h3 { font-size: 14px; }
+  .md-body h4 { font-size: 13px; }
+  .md-body ul, .md-body ol { margin: 0 0 8px; padding-left: 22px; }
+  .md-body li { margin: 2px 0; line-height: 1.5; }
+  .md-body li > p { margin: 0; }
+  .md-body code { background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: 1px 4px; font-family: ui-monospace, SF Mono, Menlo, monospace;
+    font-size: 12px; max-width: 100%; overflow-wrap: anywhere; }
+  .md-body pre { background: var(--pre-bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 8px 10px; margin: 0 0 8px;
+    max-width: 100%; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .md-body pre code { background: transparent; border: 0; padding: 0; font-size: 12px; }
+  .md-body blockquote { margin: 0 0 8px; padding-left: 10px; border-left: 3px solid var(--border);
+    color: var(--muted); }
+  .md-body a { color: var(--link); }
+  .md-body hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
+  .md-body table { border-collapse: collapse; margin: 0 0 8px; }
+  .md-body th, .md-body td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; }
+  .md-body th { background: var(--code-bg); color: var(--fg-strong); }
+  .md-inline code { background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: 1px 4px; font-family: ui-monospace, SF Mono, Menlo, monospace;
+    font-size: 12px; }
+  .md-inline a { color: var(--link); }
+
+  /* Task-body view/edit toggle. Body defaults to rendered view when
+     opening an existing task; a small "Edit" button flips to textarea.
+     Both the rendered view and the textarea are capped and scroll
+     internally so long bodies don't push the modal past the viewport. */
+  .body-view { background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 10px 12px; min-height: 120px;
+    max-height: 55vh; overflow-y: auto; color: var(--fg-strong); }
+  .body-view.empty { color: var(--muted); font-style: italic; }
+  .body-toggle { display: flex; align-items: center; gap: 8px; }
+  .body-toggle .flex { flex: 1; }
+  .comment-form { display: flex; gap: 6px; margin-top: 10px; }
+  .comment-form input { flex: 1; background: var(--code-bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font: inherit; }
+  .comment-form button { background: var(--link); color: #0b0d10; border: 0;
+    border-radius: 4px; padding: 6px 12px; font: inherit; font-weight: 600; cursor: pointer; }
+
+  /* Modal */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    display: none; align-items: flex-start; justify-content: center;
+    z-index: 100; padding: 60px 16px 16px; overflow-y: auto; }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    width: 100%; max-width: 960px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+  .modal-header { display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .modal-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--fg-strong); }
+  .modal-header .modal-id { color: var(--muted); font-family: ui-monospace, SF Mono, Menlo, monospace;
+    font-size: 12px; margin-left: 10px; display: inline-flex; vertical-align: middle; }
+  .modal-close { background: transparent; border: 0; color: var(--muted); cursor: pointer;
+    font-size: 20px; line-height: 1; padding: 0 4px; }
+  .modal-close:hover { color: var(--fg-strong); }
+  .modal-tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 18px; }
+  .modal-tab { background: transparent; border: 0; color: var(--muted); cursor: pointer;
+    padding: 10px 14px; font: inherit; font-size: 13px; border-bottom: 2px solid transparent;
+    margin-bottom: -1px; }
+  .modal-tab:hover { color: var(--fg); }
+  .modal-tab.active { color: var(--fg-strong); border-bottom-color: var(--link); }
+  .modal-body { padding: 16px 18px 18px; }
+  .modal-panel { display: none; }
+  .modal-panel.active { display: block; }
+  /* Comments and Questions panels: cap their list height so the modal
+     stays a stable size regardless of how many entries a task has. The
+     list scrolls internally; the "add" form stays pinned below the scroll
+     area so posting is always in reach. */
+  .modal-panel[data-panel="comments"].active,
+  .modal-panel[data-panel="questions"].active,
+  .modal-panel[data-panel="review"].active { display: flex; flex-direction: column; min-height: 0; }
+  #modal-comments, #modal-questions, #modal-review-items { max-height: 55vh; overflow-y: auto;
+    padding-right: 4px; scrollbar-width: thin; }
+  #modal-comments::-webkit-scrollbar,
+  #modal-questions::-webkit-scrollbar,
+  #modal-review-items::-webkit-scrollbar { width: 6px; }
+  #modal-comments::-webkit-scrollbar-thumb,
+  #modal-questions::-webkit-scrollbar-thumb,
+  #modal-review-items::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .field { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: start;
+    margin-bottom: 10px; }
+  .field.field-wide { grid-template-columns: 1fr; gap: 4px; }
+  .field.field-wide label { padding-top: 0; }
+  .field.field-wide > * { min-width: 0; }
+  .field label { color: var(--muted); font-size: 12px; padding-top: 6px;
+    text-transform: uppercase; letter-spacing: 0.04em; }
+  .field input[type=text], .field select, .field textarea {
+    background: var(--code-bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 6px 8px; font: inherit; width: 100%; }
+  .field textarea { min-height: 220px; resize: vertical; }
+  /* Task modal details form: Title spans full width; below it, a 30/70
+     split with metadata fields on the left and the Body textarea on the
+     right. Footer stays full-width. */
+  .modal-split { display: grid; grid-template-columns: 3fr 7fr; gap: 18px; align-items: start; }
+  .modal-split > * { min-width: 0; }
+  .modal-split .field-wide textarea { min-height: 340px; max-height: 55vh; }
+  .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .modal-footer .footer-right { display: flex; align-items: center; gap: 10px; }
+  .save-flash { color: var(--ok); font-size: 12px; opacity: 0; transition: opacity 0.15s ease-in-out; }
+  .save-flash.show { opacity: 1; }
+  .save-flash.error { color: var(--danger); }
+  .modal-footer .primary { background: var(--link); color: #0b0d10; border: 0;
+    border-radius: 4px; padding: 6px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  .modal-footer .primary:hover { filter: brightness(1.1); }
+  .modal-footer .danger { background: transparent; color: var(--danger); border: 1px solid #5a1e1e;
+    border-radius: 4px; padding: 6px 14px; font: inherit; cursor: pointer; }
+  .modal-footer .danger:hover { background: #2a1414; }
+  .modal-meta { color: var(--muted); font-size: 11px; font-family: ui-monospace, SF Mono, Menlo, monospace;
+    margin-top: 8px; }
+  .modal-meta .draft-restored { color: var(--link); font-weight: 600; }
+  .modal-meta .linklike { background: none; border: 0; padding: 0; margin-left: 6px;
+    color: var(--link); font: inherit; font-family: inherit; cursor: pointer; text-decoration: underline; }
+  .modal-meta .linklike:hover { filter: brightness(1.15); }
+
+  .kind { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;
+    background: var(--code-bg); color: var(--muted); margin-right: 8px; }
+  .kind.feature  { color: #9ecbff; }
+  .kind.fix      { color: #ff9c9c; }
+  .kind.refactor { color: #ffcf7a; }
+  .kind.decision { color: #c8a2ff; }
+  .kind.note     { color: var(--muted); }
+
+  .tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px;
+    background: var(--code-bg); color: var(--muted); margin-right: 4px; }
+  .dep { font-family: ui-monospace, SF Mono, Menlo, monospace; font-size: 11px; color: var(--muted); }
+  .dep.blocked { color: var(--danger); }
+  .dep.done { color: var(--ok); }
+
+  .empty { color: var(--muted); font-style: italic; padding: 16px 0; }
+  .error { color: var(--danger); padding: 8px 12px; border: 1px solid #5a1e1e; border-radius: 4px;
+    background: #2a1414; margin: 8px 0; font-size: 12px; }
+
+  .cl-day { color: var(--muted); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; margin: 14px 0 4px; padding-bottom: 3px;
+    border-bottom: 1px solid var(--border); font-family: ui-monospace, SF Mono, Menlo, monospace; }
+  .cl-day:first-child { margin-top: 0; }
+  .cl-row { display: grid; grid-template-columns: 80px minmax(0, 1fr) minmax(0, 200px) auto;
+    gap: 12px; align-items: center; padding: 7px 8px; border-bottom: 1px solid var(--border);
+    cursor: pointer; font-size: 13px; }
+  .cl-row:last-child { border-bottom: none; }
+  .cl-row:hover { background: var(--row-hover); }
+  .cl-row .cl-summary { color: var(--fg-strong); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .cl-row .cl-refs { color: var(--muted); font-size: 11px;
+    font-family: ui-monospace, SF Mono, Menlo, monospace; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .cl-row .cl-ts { color: var(--muted); font-size: 11px;
+    font-family: ui-monospace, SF Mono, Menlo, monospace; white-space: nowrap; }
+  .cl-row .kind { margin-right: 0; }
+
+  /* Questions section (modal tab). Unresolved questions render at the top
+     as a bordered card each, mirroring the comment card shape but with a
+     distinct accent (soft purple → "actionable state" vs. comments'
+     neutral). Resolved questions render below in a dimmer, collapsed form. */
+  .q-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .q-empty { color: var(--muted); font-style: italic; padding: 12px 0; }
+  .q-card { background: var(--pre-bg); border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden; }
+  .q-card.open { border-color: rgba(200,162,255,0.35); }
+  .q-header { display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; background: rgba(200,162,255,0.08);
+    border-bottom: 1px solid var(--border); color: var(--muted); font-size: 11px;
+    font-family: ui-monospace, SF Mono, Menlo, monospace;
+    cursor: pointer; user-select: none; }
+  .q-header:hover { filter: brightness(1.15); }
+  .q-header .collapse-arrow { font-size: 9px; color: var(--muted);
+    width: 10px; display: inline-block; transition: transform 0.1s ease-in-out; }
+  .q-card.collapsed .q-body,
+  .q-card.collapsed .q-answer,
+  .q-card.collapsed .q-actions,
+  .q-card.collapsed .q-answer-form { display: none; }
+  .q-card.collapsed .q-header { border-bottom: 0; }
+  .q-card.collapsed .collapse-arrow { transform: rotate(-90deg); }
+  .q-card.resolved .q-header { background: var(--code-bg); }
+  .q-header .q-id { color: var(--fg-strong); font-weight: 600; }
+  .q-header .q-chip { color: var(--fg); background: var(--pre-bg);
+    border: 1px solid var(--border); border-radius: 3px; padding: 0 6px; }
+  .q-header .q-chip.asked-of { color: #c8a2ff; border-color: rgba(200,162,255,0.35); }
+  .q-header .q-chip.asked-of.self { color: #ffcf7a; border-color: rgba(255,207,122,0.35); }
+  .q-header .q-status { margin-left: auto; text-transform: uppercase;
+    letter-spacing: 0.04em; font-weight: 600; }
+  .q-card.open .q-status { color: #c8a2ff; }
+  .q-card.resolved .q-status { color: var(--ok); opacity: 0.7; }
+  .q-body { padding: 10px 12px; color: var(--fg-strong); }
+  .q-answer { padding: 10px 12px; border-top: 1px dashed var(--border);
+    background: rgba(156,255,192,0.04); }
+  .q-answer .q-answer-label { color: var(--muted); font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;
+    font-family: ui-monospace, SF Mono, Menlo, monospace;
+    display: flex; align-items: center; gap: 8px; }
+  .q-answer .q-answer-label .card-copy { margin-left: auto; text-transform: none;
+    letter-spacing: 0; }
+  .q-actions { display: flex; gap: 6px; align-items: center; padding: 8px 12px;
+    border-top: 1px solid var(--border); background: var(--code-bg); }
+  .q-actions .spacer { flex: 1; }
+  .q-actions .icon-btn { font-size: 11px; }
+  .q-answer-form { display: none; padding: 10px 12px; border-top: 1px solid var(--border);
+    background: var(--code-bg); gap: 6px; flex-direction: column; }
+  .q-answer-form.open { display: flex; }
+  .q-answer-form textarea { background: var(--pre-bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px;
+    font: inherit; resize: vertical; min-height: 60px; }
+  .q-answer-form .q-answer-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .q-form { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--pre-bg); margin-top: 10px; }
+  .q-form textarea { background: var(--code-bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px;
+    font: inherit; resize: vertical; min-height: 44px; }
+  .q-form-row { display: flex; gap: 6px; align-items: center; }
+  .q-form-row select, .q-form-row input {
+    background: var(--code-bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 4px 6px; font: inherit; font-size: 12px; }
+  .q-form-row .spacer { flex: 1; }
+  .q-form-row label { color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.04em; }
+  .q-form-row button { background: var(--link); color: #0b0d10; border: 0;
+    border-radius: 4px; padding: 5px 12px; font: inherit; font-weight: 600;
+    cursor: pointer; font-size: 12px; }
+  .q-resolved-header { margin: 14px 0 6px; color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
+    padding-bottom: 3px; border-bottom: 1px solid var(--border); }
+
+  /* Task-row question badges (main list): show "?N" when there are unresolved
+     questions on a task. Uses the same soft-purple accent as the modal card
+     header so the row and the drill-down feel visually connected. */
+  .q-badge { display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 11px; font-weight: 600; background: rgba(200,162,255,0.10);
+    color: #c8a2ff; border: 1px solid rgba(200,162,255,0.30);
+    font-family: ui-monospace, SF Mono, Menlo, monospace; }
+  .q-badge.awaits-user { background: rgba(255,207,122,0.10);
+    color: #ffcf7a; border-color: rgba(255,207,122,0.30); }
+
+  /* Review checklist (modal tab). Mirrors the questions card shape but with
+     a soft-teal accent — a distinct "review agenda" affordance. Open items
+     render first; resolved (checked or dismissed) render below in a dimmer
+     collapsed form. */
+  .r-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .r-empty { color: var(--muted); font-style: italic; padding: 12px 0; }
+  .r-card { background: var(--pre-bg); border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden; }
+  .r-card.open { border-color: rgba(122,220,214,0.35); }
+  .r-header { display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; background: rgba(122,220,214,0.08);
+    border-bottom: 1px solid var(--border); color: var(--muted); font-size: 11px;
+    font-family: ui-monospace, SF Mono, Menlo, monospace;
+    cursor: pointer; user-select: none; }
+  .r-header:hover { filter: brightness(1.15); }
+  .r-header .collapse-arrow { font-size: 9px; color: var(--muted);
+    width: 10px; display: inline-block; transition: transform 0.1s ease-in-out; }
+  .r-card.collapsed .r-body,
+  .r-card.collapsed .r-ref,
+  .r-card.collapsed .r-actions,
+  .r-card.collapsed .r-edit-form { display: none; }
+  .r-card.collapsed .r-header { border-bottom: 0; }
+  .r-card.collapsed .collapse-arrow { transform: rotate(-90deg); }
+  .r-card.resolved .r-header { background: var(--code-bg); }
+  .r-card.dismissed .r-header { background: var(--code-bg); }
+  .r-header .r-id { color: var(--fg-strong); font-weight: 600; }
+  .r-header .r-chip { color: var(--fg); background: var(--pre-bg);
+    border: 1px solid var(--border); border-radius: 3px; padding: 0 6px; }
+  .r-header .r-status { margin-left: auto; text-transform: uppercase;
+    letter-spacing: 0.04em; font-weight: 600; }
+  .r-card.open .r-status { color: #7adcd6; }
+  .r-card.resolved .r-status { color: var(--ok); opacity: 0.75; }
+  .r-card.dismissed .r-status { color: var(--muted); opacity: 0.85; }
+  .r-body { padding: 10px 12px; color: var(--fg-strong); }
+  .r-ref { padding: 0 12px 10px; color: var(--muted); font-size: 11px;
+    font-family: ui-monospace, SF Mono, Menlo, monospace; word-break: break-all; }
+  .r-ref .r-ref-label { color: var(--muted); opacity: 0.7; text-transform: uppercase;
+    letter-spacing: 0.04em; margin-right: 6px; font-size: 10px; }
+  .r-actions { display: flex; gap: 6px; align-items: center; padding: 8px 12px;
+    border-top: 1px solid var(--border); background: var(--code-bg); }
+  .r-actions .spacer { flex: 1; }
+  .r-actions .icon-btn { font-size: 11px; }
+  .r-actions .icon-btn.primary { color: #7adcd6; border-color: rgba(122,220,214,0.35); }
+  .r-actions .icon-btn.primary:hover { background: rgba(122,220,214,0.10); }
+  .r-edit-form { display: none; padding: 10px 12px; border-top: 1px solid var(--border);
+    background: var(--code-bg); gap: 6px; flex-direction: column; }
+  .r-edit-form.open { display: flex; }
+  .r-edit-form textarea { background: var(--pre-bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px;
+    font: inherit; resize: vertical; min-height: 60px; }
+  .r-edit-form input[type=text] { background: var(--pre-bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font: inherit; }
+  .r-edit-form .r-edit-actions { display: flex; gap: 6px; justify-content: flex-end;
+    align-items: center; }
+  .r-form { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--pre-bg); margin-top: 10px; }
+  .r-form textarea { background: var(--code-bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px;
+    font: inherit; resize: vertical; min-height: 44px; }
+  .r-form-row { display: flex; gap: 6px; align-items: center; }
+  .r-form-row input {
+    background: var(--code-bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 4px 6px; font: inherit; font-size: 12px; }
+  .r-form-row input[name="ref"] { flex: 1; min-width: 0; }
+  .r-form-row .spacer { flex: 1; }
+  .r-form-row label { color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.04em; }
+  .r-form-row button { background: var(--link); color: #0b0d10; border: 0;
+    border-radius: 4px; padding: 5px 12px; font: inherit; font-weight: 600;
+    cursor: pointer; font-size: 12px; }
+  .r-resolved-header { margin: 14px 0 6px; color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
+    padding-bottom: 3px; border-bottom: 1px solid var(--border); }
+
+  /* Task-row review-progress badge (main list): "✓2/5" for tasks with a
+     review checklist. Colour softens as the checklist nears complete;
+     fully-resolved lists don't render (the row's review-check ✓ does that job). */
+  .r-badge { display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 11px; font-weight: 600; background: rgba(122,220,214,0.10);
+    color: #7adcd6; border: 1px solid rgba(122,220,214,0.30);
+    font-family: ui-monospace, SF Mono, Menlo, monospace; }
+  .r-badge.complete { background: rgba(156,255,192,0.10);
+    color: var(--ok); border-color: rgba(156,255,192,0.30); opacity: 0.85; }
+
+  /* Changelog detail modal — reuses .modal-* base styles */
+  .cl-detail { display: grid; grid-template-columns: 90px 1fr; gap: 8px 12px; }
+  .cl-detail .label { color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.04em; padding-top: 2px; }
+  .cl-detail .value { color: var(--fg); }
+  .cl-detail .value.mono { font-family: ui-monospace, SF Mono, Menlo, monospace; font-size: 12px; }
+  .cl-detail .value .task-link { color: var(--link); cursor: pointer; text-decoration: none;
+    font-family: ui-monospace, SF Mono, Menlo, monospace; }
+  .cl-detail .value .task-link:hover { text-decoration: underline; }
+  .cl-detail .value .summary-full { white-space: pre-wrap; color: var(--fg-strong); }
+
+  /* Relations tab. Four sections (Parent / Subtasks / Depends on / Blocks),
+     each a compact table of task-row-level details. Rows click through to
+     the other task's modal. Missing ids (dangling refs) render as an
+     "unknown" row so authors can spot the broken link. */
+  .deps-section { margin-bottom: 18px; }
+  .deps-section:last-child { margin-bottom: 0; }
+  .deps-section h4 { margin: 0 0 6px; color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .deps-section h4 .count { color: var(--fg); font-weight: 500;
+    font-family: ui-monospace, SF Mono, Menlo, monospace; margin-left: 6px; }
+  .deps-table { width: 100%; border-collapse: collapse; }
+  .deps-table th, .deps-table td { padding: 6px 8px; text-align: left;
+    border-bottom: 1px solid var(--border); vertical-align: middle;
+    font-size: 12px; }
+  .deps-table th { color: var(--muted); font-weight: 500; font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: 0.05em; }
+  .deps-table tbody tr { cursor: pointer; }
+  .deps-table tbody tr:hover { background: var(--row-hover); }
+  .deps-table td.id { font-family: ui-monospace, SF Mono, Menlo, monospace;
+    color: var(--muted); white-space: nowrap; }
+  .deps-table td.title { color: var(--fg-strong); }
+  .deps-table .status-pill, .deps-table .priority-pill {
+    display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em;
+    font-weight: 600; background: var(--code-bg); border: 1px solid var(--border); }
+  .deps-table .status-pill.open        { color: #9ecbff; }
+  .deps-table .status-pill.in_progress { color: #ffcf7a; }
+  .deps-table .status-pill.blocked     { color: #ff9c9c; }
+  .deps-table .status-pill.on_hold     { color: #c8a2ff; }
+  .deps-table .status-pill.done        { color: #9cffc0; }
+  .deps-table .status-pill.cancelled   { color: #9ba3ad; }
+  .deps-table .status-pill.wont_do     { color: #7a828c; font-style: italic; }
+  .deps-table .priority-pill.P0 { color: #ff9c9c; }
+  .deps-table .priority-pill.P1 { color: #ffcf7a; }
+  .deps-table .priority-pill.P2 { color: var(--fg); }
+  .deps-table .priority-pill.P3 { color: var(--muted); }
+  .deps-table tr.unknown td { color: var(--danger); font-style: italic; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>Project Manager · Made Of</h1>
+    <nav class="app-nav">
+      <a href="/index.html" class="active">Tasks</a>
+      <a href="/changelog.html">Changelog</a>
+    </nav>
+  </div>
+  <div class="header-actions">
+    <button type="button" id="btn-needs-review" class="review-chip zero"
+            title="Tasks flagged for your review — click to filter">
+      needs review <span class="chip-count" id="needs-review-count">0</span>
+    </button>
+    <button type="button" id="btn-pinned" class="pinned-chip zero"
+            title="Your pinned tasks (personal shortlist) — click to filter">
+      ★ pinned <span class="chip-count" id="pinned-count">0</span>
+    </button>
+    <button type="button" id="btn-help" class="secondary" title="Quick reference (press ?)">?</button>
+    <button type="button" id="btn-new-task">+ Task</button>
+  </div>
+</header>
+
+<main>
+  <div id="error" class="error" style="display:none"></div>
+
+  <section>
+    <h2>Tasks</h2>
+    <div class="tasks-layout" id="tasks-layout">
+      <aside class="sidebar" id="tasks-sidebar">
+        <div class="sidebar-header">
+          <span class="title">Filters</span>
+          <button type="button" class="sidebar-toggle" id="sidebar-toggle" title="Collapse filters">‹</button>
+        </div>
+        <div class="filter-group">
+          <label class="group-label">Status</label>
+          <div id="f-status" class="tri-list" tabindex="0"></div>
+          <div class="hint">click cycles: off → include → exclude</div>
+        </div>
+        <div class="filter-group">
+          <label class="group-label">Priority</label>
+          <div id="f-priority" class="tri-list" tabindex="0"></div>
+        </div>
+        <div class="filter-group">
+          <label class="group-label">Review</label>
+          <div id="f-review" class="tri-list" tabindex="0"></div>
+        </div>
+        <div class="filter-group">
+          <label class="group-label">Pinned</label>
+          <div id="f-pinned" class="tri-list" tabindex="0"></div>
+        </div>
+        <div class="filter-group">
+          <label class="group-label">Age</label>
+          <div id="f-age" class="tri-list" tabindex="0"></div>
+        </div>
+        <div class="filter-group">
+          <label class="group-label">Group</label>
+          <div id="f-group" class="tri-list" tabindex="0"></div>
+        </div>
+        <div class="filter-group">
+          <label class="group-label">Tag</label>
+          <div id="f-tag" class="tri-list" tabindex="0"></div>
+        </div>
+        <div class="sidebar-footer">
+          <span class="match-count" id="sidebar-match-count">—</span>
+          <button type="button" id="sidebar-clear" disabled>Clear all filters</button>
+        </div>
+      </aside>
+      <div class="tasks-main">
+        <div class="search-row">
+          <input type="text" id="search-input" placeholder="Search id, title, body, tags, group, assignee, comments…" autocomplete="off" />
+          <span class="search-count" id="search-count"></span>
+        </div>
+        <div id="tasks"></div>
+        <div class="pager" id="tasks-pager"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="modal-backdrop" id="task-modal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-header">
+      <div>
+        <h3 id="modal-title">Task</h3>
+        <span class="modal-id" id="modal-id"></span>
+      </div>
+      <button class="modal-close" type="button" aria-label="Close" id="modal-close">×</button>
+    </div>
+    <div class="modal-tabs" role="tablist">
+      <button class="modal-tab active" type="button" data-tab="details" role="tab">Details</button>
+      <button class="modal-tab" type="button" data-tab="relations" role="tab">
+        Relations <span id="modal-deps-count" class="dep"></span>
+      </button>
+      <button class="modal-tab" type="button" data-tab="questions" role="tab">
+        Questions <span id="modal-questions-count" class="dep"></span>
+      </button>
+      <button class="modal-tab" type="button" data-tab="review" role="tab">
+        Review <span id="modal-review-count" class="dep"></span>
+      </button>
+      <button class="modal-tab" type="button" data-tab="comments" role="tab">
+        Comments <span id="modal-comments-count" class="dep"></span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-panel active" data-panel="details">
+        <form id="modal-edit-form">
+          <div class="field">
+            <label>Title</label>
+            <input type="text" name="title" required />
+          </div>
+          <div class="modal-split">
+            <div>
+              <div class="field">
+                <label>Status</label>
+                <select name="status"></select>
+              </div>
+              <div class="field">
+                <label>Priority</label>
+                <select name="priority">
+                  <option value="P0">P0 · critical</option>
+                  <option value="P1">P1 · high</option>
+                  <option value="P2">P2 · normal</option>
+                  <option value="P3">P3 · low</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Group</label>
+                <input type="text" name="group" placeholder="(none)" />
+              </div>
+              <div class="field">
+                <label>Tags</label>
+                <input type="text" name="tags" placeholder="comma-separated" />
+              </div>
+              <div class="field">
+                <label>Assignee</label>
+                <input type="text" name="assignee" />
+              </div>
+              <div class="field">
+                <label>Depends on</label>
+                <input type="text" name="depends_on" placeholder="comma-separated" />
+              </div>
+              <div class="field">
+                <label>Parent</label>
+                <input type="text" name="parent_task_id" placeholder="(none)" />
+              </div>
+            </div>
+            <div class="field field-wide">
+              <div class="body-toggle">
+                <label class="flex">Body</label>
+                <button type="button" class="icon-btn" id="modal-body-edit">Edit</button>
+              </div>
+              <div class="body-view md-body" id="modal-body-view"></div>
+              <textarea name="body" placeholder="markdown ok" style="display:none"></textarea>
+            </div>
+          </div>
+          <div class="modal-meta" id="modal-meta"></div>
+          <div class="modal-footer">
+            <button type="button" class="danger" id="modal-delete">Delete</button>
+            <div class="footer-right">
+              <button type="button" class="secondary" id="modal-mark-reviewed" style="display:none"></button>
+              <span class="save-flash" id="modal-save-flash"></span>
+              <button type="submit" class="primary">Save</button>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-panel" data-panel="relations">
+        <div id="modal-dependencies"></div>
+      </div>
+      <div class="modal-panel" data-panel="questions">
+        <div id="modal-questions"></div>
+        <form class="q-form" id="modal-question-form">
+          <textarea name="question" placeholder="Ask a question about this task…" required></textarea>
+          <div class="q-form-row">
+            <label for="q-asked-of">Ask of</label>
+            <select name="asked_of" id="q-asked-of">
+              <option value="claude">claude</option>
+              <option value="user">user</option>
+              <option value="">(anyone)</option>
+            </select>
+            <label for="q-asked-by">from</label>
+            <input type="text" name="asked_by" id="q-asked-by" placeholder="user" value="user" />
+            <span class="spacer"></span>
+            <button type="submit">Ask</button>
+          </div>
+        </form>
+      </div>
+      <div class="modal-panel" data-panel="review">
+        <div id="modal-review-items"></div>
+        <form class="r-form" id="modal-review-item-form">
+          <textarea name="body" placeholder="Add a review checklist item — what should the reviewer verify?" required></textarea>
+          <div class="r-form-row">
+            <label for="r-ref">Ref</label>
+            <input type="text" name="ref" id="r-ref" placeholder="file:line, scenario, test — optional" />
+            <label for="r-author">from</label>
+            <input type="text" name="author" id="r-author" placeholder="claude" value="claude" />
+            <span class="spacer"></span>
+            <button type="submit">Add item</button>
+          </div>
+        </form>
+      </div>
+      <div class="modal-panel" data-panel="comments">
+        <div id="modal-comments"></div>
+        <form class="comment-form" id="modal-comment-form">
+          <input type="text" name="body" placeholder="Add a comment…" required />
+          <button type="submit">Post</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+// Help modal is mounted from a shared vendored module so pm/index.html
+// and pm/changelog.html can't drift on section bodies. Extra sections
+// (e.g. the changelog page's Changelog block) are passed in per page.
+// Accessors are attached to `window` so the classic script below (which
+// owns the page's Esc chain over its sibling modals) can consult them.
+import { installHelpModal, isHelpModalOpen, closeHelpModal } from "./vendor/help-modal.js";
+installHelpModal();
+window.helpIsOpen = isHelpModalOpen;
+window.helpClose = closeHelpModal;
+</script>
+
+<script type="module">
+// Markdown rendering: `marked` for CommonMark + GFM, DOMPurify to strip any
+// raw HTML the source contains. Comments and task bodies are user-authored
+// strings written by both humans and Claude; treat them as untrusted even
+// though the pm UI is local-only. The `inline: true` form parses without
+// wrapping in <p> — used for changelog summaries where a paragraph tag
+// would break the modal's grid layout.
+import { marked } from "./vendor/marked.esm.js";
+import createDOMPurify from "./vendor/purify.es.mjs";
+
+// DOMPurify's ESM default is a factory in non-browser contexts and a
+// ready instance in the browser; handle both so this doesn't break if
+// upstream ever ships the factory-only build.
+const purify = (typeof createDOMPurify.sanitize === "function")
+  ? createDOMPurify
+  : createDOMPurify(window);
+
+marked.setOptions({ gfm: true, breaks: true });
+
+window.renderMarkdown = function(src, opts = {}) {
+  const s = src == null ? "" : String(src);
+  const html = opts.inline ? marked.parseInline(s) : marked.parse(s);
+  return purify.sanitize(html);
+};
+</script>
+<script>
+// Fallback for the tiny window before the ESM module block installs the
+// real `renderMarkdown` — plain HTML-escape so nothing renders as raw
+// HTML. The module overrides this synchronously on load; only stray
+// synchronous calls during initial parse would ever hit the shim.
+window.renderMarkdown = function(src) {
+  const s = src == null ? "" : String(src);
+  return s.replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+};
+
+const STATUSES = ["all", "ready", "open", "in_progress", "blocked", "on_hold", "done", "cancelled", "wont_do"];
+const TASK_STATUS_OPTIONS = ["open", "in_progress", "blocked", "on_hold", "done", "cancelled", "wont_do"];
+const PRIORITY_OPTIONS = ["P0", "P1", "P2", "P3"];
+const PRIORITY_LABELS = {P0: "critical", P1: "high", P2: "normal", P3: "low"};
+const REVIEW_OPTIONS = ["needs", "reviewed", "unreviewed"];
+const REVIEW_LABELS = {needs: "needs review", reviewed: "reviewed", unreviewed: "unreviewed"};
+const PINNED_OPTIONS = ["pinned", "unpinned"];
+const PINNED_LABELS = {pinned: "pinned", unpinned: "unpinned"};
+const PAGE_SIZE = 20;
+let allTasks = [];
+// Filter axes are tri-state. Each axis carries two disjoint sets: `inc`
+// (values that must match — OR'd across the set) and `exc` (values that
+// must NOT match — any hit disqualifies the task). Empty inc + empty exc =
+// no filter on that axis. A given value is only ever in one set at a time;
+// the click cycle is unapplied → include → exclude → unapplied. Values are
+// chip keys (e.g. "open", "P1", "__ungrouped__", "__untagged__").
+//
+// NEVER reassign one of these tri objects — mutate in place. The click
+// handlers wired in `wireTriFilter` close over the object identity; a
+// reassignment (e.g. from `parseUrl`) would leave those closures pointing
+// at an abandoned tri and clicks would silently update the wrong state
+// (see T-0288). All state resets go through `clearTri` / `resetTriFromCsv`.
+function newTri() { return {inc: new Set(), exc: new Set()}; }
+let activeStatus = newTri();
+let activePriority = newTri();
+let activeGroup = newTri();
+let activeTag = newTri();
+let activeAge = newTri();
+// Review filter is tri-state over three overlapping predicates. `reviewed`
+// and `unreviewed` partition the task set; `needs` overlaps `unreviewed`
+// (a flagged task with reviewed_at=null matches both). Same include/exclude
+// cycle as the other tri axes — see the tri comment above.
+let activeReview = newTri();
+// Pinned filter is tri-state (pinned / unpinned partition the task set).
+// Mutated in place — see the tri comment above.
+let activePinned = newTri();
+// Sidebar collapse persisted per-machine (filters are per-URL).
+let sidebarCollapsed = false;
+
+const AGE_BUCKETS = [
+  {key: "today", label: "today (< 24h)", maxHours: 24},
+  {key: "week",  label: "this week (< 7d)", maxHours: 24 * 7},
+  {key: "month", label: "this month (< 30d)", maxHours: 24 * 30},
+  {key: "older", label: "older (30d+)", maxHours: Infinity},
+];
+
+function ageBucketFor(ts) {
+  if (!ts) return "older";
+  const then = Date.parse(ts);
+  if (isNaN(then)) return "older";
+  const hours = (Date.now() - then) / 3600000;
+  for (const b of AGE_BUCKETS) if (hours < b.maxHours) return b.key;
+  return "older";
+}
+
+// Cycle a value through a tri-state axis: unapplied → include → exclude → unapplied.
+function cycleTri(tri, value) {
+  if (tri.inc.has(value)) { tri.inc.delete(value); tri.exc.add(value); }
+  else if (tri.exc.has(value)) { tri.exc.delete(value); }
+  else { tri.inc.add(value); }
+}
+function triActive(tri) { return tri.inc.size > 0 || tri.exc.size > 0; }
+function triState(tri, value) {
+  if (tri.inc.has(value)) return "include";
+  if (tri.exc.has(value)) return "exclude";
+  return "";
+}
+let searchQuery = "";
+let tasksPage = 1;
+let taskSort = {key: "updated_at", dir: "desc"};
+let openTaskId = null;
+let activeTab = "details";
+let modalMode = "edit"; // "edit" | "create"
+let draftRestored = false; // true when the current create modal was hydrated from a saved draft
+
+// ── new-task draft persistence ──
+// Accidental modal close (Escape, backdrop click) and full-page refresh both
+// used to wipe an in-progress new-task form. Draft is snapshotted to
+// localStorage on every input while the create modal is open, restored on
+// next open, and cleared only on successful create or explicit Discard.
+const NEWTASK_DRAFT_KEY = "pm.newtask.draft";
+
+function saveNewTaskDraft() {
+  if (modalMode !== "create") return;
+  const f = document.getElementById("modal-edit-form");
+  if (!f) return;
+  const draft = {
+    title: f.title.value,
+    status: f.status.value,
+    priority: f.priority.value,
+    group: f.group.value,
+    tags: f.tags.value,
+    assignee: f.assignee.value,
+    depends_on: f.depends_on.value,
+    parent_task_id: f.parent_task_id.value,
+    body: f.body.value,
+  };
+  // Don't persist an empty shell — nothing to recover.
+  const meaningful = draft.title.trim() || draft.body.trim() ||
+    draft.group.trim() || draft.tags.trim() || draft.depends_on.trim() ||
+    draft.parent_task_id.trim();
+  try {
+    if (meaningful) localStorage.setItem(NEWTASK_DRAFT_KEY, JSON.stringify(draft));
+    else localStorage.removeItem(NEWTASK_DRAFT_KEY);
+  } catch {}
+}
+
+function loadNewTaskDraft() {
+  try {
+    const raw = localStorage.getItem(NEWTASK_DRAFT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+function clearNewTaskDraft() {
+  try { localStorage.removeItem(NEWTASK_DRAFT_KEY); } catch {}
+  draftRestored = false;
+  renderDraftBanner();
+}
+
+function renderDraftBanner() {
+  const meta = document.getElementById("modal-meta");
+  if (!meta) return;
+  if (modalMode === "create" && draftRestored) {
+    meta.innerHTML = `<span class="draft-restored">Draft restored</span> ` +
+      `<button type="button" id="modal-discard-draft" class="linklike">Discard</button>`;
+    const btn = document.getElementById("modal-discard-draft");
+    if (btn) btn.addEventListener("click", () => {
+      const f = document.getElementById("modal-edit-form");
+      if (f) {
+        f.title.value = "";
+        f.status.value = "open";
+        f.priority.value = "P2";
+        f.group.value = "";
+        f.tags.value = "";
+        f.assignee.value = "claude";
+        f.depends_on.value = "";
+        f.parent_task_id.value = "";
+        f.body.value = "";
+        setBodyMode("edit");
+      }
+      clearNewTaskDraft();
+    });
+  } else if (modalMode === "create") {
+    meta.textContent = "";
+  }
+}
+
+// ── api ──
+async function apiGet(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(`GET ${path}: ${r.status}`);
+  return r.json();
+}
+async function apiSend(method, path, body) {
+  const r = await fetch(path, {
+    method,
+    headers: {"Content-Type": "application/json"},
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await r.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!r.ok) throw new Error((data && data.error) || `${method} ${path}: ${r.status}`);
+  return data;
+}
+
+function showError(msg) {
+  const el = document.getElementById("error");
+  el.textContent = msg;
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 5000);
+}
+
+// ── tasks ──
+function isReady(task, byId) {
+  if (task.status !== "open") return false;
+  const deps = task.depends_on || [];
+  return deps.every(id => byId[id] && byId[id].status === "done");
+}
+
+function knownGroups() {
+  const s = new Set();
+  for (const t of allTasks) if (t.group) s.add(t.group);
+  return [...s].sort();
+}
+
+function knownTags() {
+  const s = new Set();
+  for (const t of allTasks) for (const tag of (t.tags || [])) s.add(tag);
+  return [...s].sort();
+}
+
+// Predicates for each task filter axis. Kept separate so chip counts
+// can hold one axis "open" while applying the others.
+// Tri-state semantics: a task passes if none of the axis's `exc` values
+// match AND (the axis's `inc` is empty OR at least one `inc` value matches).
+// For multi-valued fields (tags), a single overlap with `exc` disqualifies
+// even if another tag would satisfy `inc` — "exclude" is the strong signal.
+function statusMatchesValue(t, v, byId) {
+  return v === "ready" ? isReady(t, byId) : t.status === v;
+}
+function taskMatchesStatus(t, tri, byId) {
+  for (const s of tri.exc) if (statusMatchesValue(t, s, byId)) return false;
+  if (!tri.inc.size) return true;
+  for (const s of tri.inc) if (statusMatchesValue(t, s, byId)) return true;
+  return false;
+}
+function priorityValueOf(t) { return t.priority || "P2"; }
+function taskMatchesPriority(t, tri) {
+  const p = priorityValueOf(t);
+  if (tri.exc.has(p)) return false;
+  if (!tri.inc.size) return true;
+  return tri.inc.has(p);
+}
+function groupMatchesValue(t, v) {
+  if (v === "__ungrouped__") return !t.group;
+  return t.group === v;
+}
+function taskMatchesGroup(t, tri) {
+  for (const v of tri.exc) if (groupMatchesValue(t, v)) return false;
+  if (!tri.inc.size) return true;
+  for (const v of tri.inc) if (groupMatchesValue(t, v)) return true;
+  return false;
+}
+function tagMatchesValue(t, v) {
+  const tags = t.tags || [];
+  if (v === "__untagged__") return !tags.length;
+  return tags.includes(v);
+}
+function taskMatchesTag(t, tri) {
+  for (const v of tri.exc) if (tagMatchesValue(t, v)) return false;
+  if (!tri.inc.size) return true;
+  for (const v of tri.inc) if (tagMatchesValue(t, v)) return true;
+  return false;
+}
+function reviewMatchesValue(t, v) {
+  if (v === "needs") return !!t.needs_review;
+  if (v === "reviewed") return t.reviewed_at != null;
+  if (v === "unreviewed") return t.reviewed_at == null;
+  return false;
+}
+function taskMatchesReview(t, tri) {
+  for (const v of tri.exc) if (reviewMatchesValue(t, v)) return false;
+  if (!tri.inc.size) return true;
+  for (const v of tri.inc) if (reviewMatchesValue(t, v)) return true;
+  return false;
+}
+function pinnedMatchesValue(t, v) {
+  if (v === "pinned") return !!t.pinned;
+  if (v === "unpinned") return !t.pinned;
+  return false;
+}
+function taskMatchesPinned(t, tri) {
+  for (const v of tri.exc) if (pinnedMatchesValue(t, v)) return false;
+  if (!tri.inc.size) return true;
+  for (const v of tri.inc) if (pinnedMatchesValue(t, v)) return true;
+  return false;
+}
+function taskMatchesAge(t, tri) {
+  const b = ageBucketFor(t.created_at);
+  if (tri.exc.has(b)) return false;
+  if (!tri.inc.size) return true;
+  return tri.inc.has(b);
+}
+
+function appendCount(chip, n) {
+  const c = document.createElement("span");
+  c.className = "chip-count";
+  c.textContent = n;
+  chip.appendChild(c);
+  if (n === 0) chip.classList.add("zero");
+}
+
+// Render the whole filter sidebar: tri-state listboxes for each axis
+// (Status/Priority/Review/Pinned/Age/Group/Tag), a match-count summary,
+// and a "clear all" button.
+// Option counts are per-value totals across allTasks (not cross-filtered
+// against the other active axes). The footer match-count is the
+// authoritative "what will I get" preview.
+function renderSidebar() {
+  const byId = Object.fromEntries(allTasks.map(t => [t.id, t]));
+
+  // Status includes the "ready" pseudo-value.
+  const statusValues = STATUSES.filter(s => s !== "all");
+  populateTri("f-status", statusValues, activeStatus, {
+    label: v => v.replace("_", " "),
+    count: v => allTasks.filter(t => statusMatchesValue(t, v, byId)).length,
+  });
+
+  populateTri("f-priority", PRIORITY_OPTIONS, activePriority, {
+    label: v => `${v} · ${PRIORITY_LABELS[v]}`,
+    count: v => allTasks.filter(t => priorityValueOf(t) === v).length,
+  });
+
+  populateTri("f-review", REVIEW_OPTIONS, activeReview, {
+    label: v => REVIEW_LABELS[v] || v,
+    count: v => allTasks.filter(t => reviewMatchesValue(t, v)).length,
+  });
+
+  populateTri("f-age", AGE_BUCKETS.map(b => b.key), activeAge, {
+    label: v => (AGE_BUCKETS.find(b => b.key === v) || {label: v}).label,
+    count: v => allTasks.filter(t => ageBucketFor(t.created_at) === v).length,
+  });
+
+  const groups = knownGroups();
+  const groupValues = [...groups];
+  if (groups.length) groupValues.push("__ungrouped__");
+  populateTri("f-group", groupValues, activeGroup, {
+    label: v => v === "__ungrouped__" ? "(ungrouped)" : v,
+    count: v => allTasks.filter(t => groupMatchesValue(t, v)).length,
+  });
+
+  const tags = knownTags();
+  const tagValues = [...tags];
+  if (tags.length) tagValues.push("__untagged__");
+  populateTri("f-tag", tagValues, activeTag, {
+    label: v => v === "__untagged__" ? "(untagged)" : v,
+    count: v => allTasks.filter(t => tagMatchesValue(t, v)).length,
+  });
+
+  populateTri("f-pinned", PINNED_OPTIONS, activePinned, {
+    label: v => PINNED_LABELS[v] || v,
+    count: v => allTasks.filter(t => pinnedMatchesValue(t, v)).length,
+  });
+
+  updateSidebarFooter();
+  updateNeedsReviewChip();
+  updatePinnedChip();
+}
+
+// Header "needs review" chip: reflects total count of flagged tasks (global,
+// not filtered) and mirrors whether the Review=needs filter is engaged.
+function updateNeedsReviewChip() {
+  const el = document.getElementById("btn-needs-review");
+  if (!el) return;
+  const n = allTasks.reduce((acc, t) => acc + (t.needs_review ? 1 : 0), 0);
+  el.querySelector("#needs-review-count").textContent = String(n);
+  el.classList.toggle("zero", n === 0);
+  el.classList.toggle("active", activeReview.inc.has("needs"));
+}
+
+// Header "pinned" chip: same shape as the needs-review chip but for the
+// pinned shortlist. Count is global; active reflects Pinned=pinned filter.
+function updatePinnedChip() {
+  const el = document.getElementById("btn-pinned");
+  if (!el) return;
+  const n = allTasks.reduce((acc, t) => acc + (t.pinned ? 1 : 0), 0);
+  el.querySelector("#pinned-count").textContent = String(n);
+  el.classList.toggle("zero", n === 0);
+  el.classList.toggle("active", activePinned.inc.has("pinned"));
+}
+
+// (Re)populate a tri-state listbox from the backing {inc, exc} tri.
+// Each row renders as a click target that cycles through the three states
+// via `cycleTri` — wiring is set up once in `wireTriFilter`.
+function populateTri(elId, values, tri, {label, count}) {
+  const el = document.getElementById(elId);
+  el.innerHTML = "";
+  for (const v of values) {
+    const state = triState(tri, v);
+    const row = document.createElement("div");
+    row.className = "tri-row" + (state ? ` ${state}` : "");
+    row.dataset.value = v;
+    row.setAttribute("role", "option");
+    row.setAttribute("aria-selected", state === "include" ? "true" : "false");
+    if (state === "exclude") row.setAttribute("aria-label", `${label(v)} (excluded)`);
+    const mark = document.createElement("span");
+    mark.className = "tri-mark";
+    const lab = document.createElement("span");
+    lab.className = "tri-label";
+    lab.textContent = label(v);
+    const cnt = document.createElement("span");
+    cnt.className = "tri-count";
+    cnt.textContent = count(v);
+    row.append(mark, lab, cnt);
+    el.appendChild(row);
+  }
+}
+
+// Sidebar footer: N-of-M matched count + Clear button state.
+function updateSidebarFooter() {
+  const byId = Object.fromEntries(allTasks.map(t => [t.id, t]));
+  const needle = searchQuery.trim().toLowerCase();
+  const matched = allTasks.filter(t =>
+    taskMatchesStatus(t, activeStatus, byId) &&
+    taskMatchesPriority(t, activePriority) &&
+    taskMatchesGroup(t, activeGroup) &&
+    taskMatchesTag(t, activeTag) &&
+    taskMatchesReview(t, activeReview) &&
+    taskMatchesPinned(t, activePinned) &&
+    taskMatchesAge(t, activeAge) &&
+    (!needle || taskMatchesSearch(t, needle))
+  );
+  document.getElementById("sidebar-match-count").textContent =
+    `${matched.length} of ${allTasks.length} tasks`;
+  const anyActive = triActive(activeStatus) || triActive(activePriority) ||
+    triActive(activeGroup) || triActive(activeTag) || triActive(activeAge) ||
+    triActive(activeReview) || triActive(activePinned) || searchQuery.trim();
+  const btn = document.getElementById("sidebar-clear");
+  btn.disabled = !anyActive;
+  btn.classList.toggle("active-clear", !!anyActive);
+}
+
+function applySidebarCollapsed() {
+  const layout = document.getElementById("tasks-layout");
+  const btn = document.getElementById("sidebar-toggle");
+  layout.classList.toggle("collapsed", sidebarCollapsed);
+  btn.textContent = sidebarCollapsed ? "›" : "‹";
+  btn.title = sidebarCollapsed ? "Expand filters" : "Collapse filters";
+}
+
+function taskSortValue(t, key) {
+  switch (key) {
+    case "id": return t.id || "";
+    case "priority": return t.priority || "P2";
+    case "status": return t.status || "";
+    case "title": return (t.title || "").toLowerCase();
+    case "group": return (t.group || "").toLowerCase();
+    case "comments": return (t.comments || []).length;
+    case "questions": return openQuestionCount(t);
+    case "review_items": return openReviewItemCount(t);
+    case "deps": return (t.depends_on || []).length;
+    case "subtasks": return subtaskCountFor(t.id);
+    case "assignee": return (t.assignee || "").toLowerCase();
+    case "updated_at": return t.updated_at || "";
+    // Review states: needs_review (2) > reviewed (1) > nothing (0). Sort desc → inbox first.
+    case "review": return t.needs_review ? 2 : (t.reviewed_at != null ? 1 : 0);
+    case "pinned": return t.pinned ? 1 : 0;
+    default: return "";
+  }
+}
+
+// Subtask counts are computed on-demand from the current allTasks snapshot
+// so sort comparators can call this without a per-render precompute.
+// Sort involves O(N log N) comparisons; each is O(1) via the cache.
+let _subtaskCountCache = null;
+let _subtaskCountCacheStamp = null;
+function subtaskCountFor(id) {
+  if (_subtaskCountCacheStamp !== allTasks) {
+    _subtaskCountCache = {};
+    for (const t of allTasks) {
+      const p = t.parent_task_id;
+      if (p) _subtaskCountCache[p] = (_subtaskCountCache[p] || 0) + 1;
+    }
+    _subtaskCountCacheStamp = allTasks;
+  }
+  return _subtaskCountCache[id] || 0;
+}
+
+function compareTasks(a, b, key, dir) {
+  const av = taskSortValue(a, key);
+  const bv = taskSortValue(b, key);
+  let cmp;
+  if (typeof av === "number" && typeof bv === "number") {
+    cmp = av - bv;
+  } else if (key === "id") {
+    cmp = String(av).localeCompare(String(bv), undefined, {numeric: true});
+  } else {
+    cmp = String(av).localeCompare(String(bv));
+  }
+  if (cmp === 0) cmp = String(a.id).localeCompare(String(b.id), undefined, {numeric: true});
+  return dir === "desc" ? -cmp : cmp;
+}
+
+function taskMatchesSearch(t, needle) {
+  if (!needle) return true;
+  const parts = [
+    t.id, t.title, t.body, t.group, t.assignee,
+    ...(t.tags || []),
+    ...((t.comments || []).map(c => c.body)),
+    ...((t.comments || []).map(c => c.author)),
+    ...((t.questions || []).map(q => q.question)),
+    ...((t.questions || []).map(q => q.answer)),
+    ...((t.review_items || []).map(it => it.body)),
+    ...((t.review_items || []).map(it => it.ref)),
+  ];
+  const hay = parts.filter(Boolean).join(" ").toLowerCase();
+  return hay.includes(needle);
+}
+
+// Question-count helpers. Kept here (not on the task object) so they stay in
+// sync with a single definition — the row badge, sort comparator, tab badge,
+// and modal count all agree on "open" == unresolved.
+function openQuestionCount(t) {
+  let n = 0;
+  for (const q of t.questions || []) if (!q.resolved) n++;
+  return n;
+}
+function anyOpenQuestionAskedOfUser(t) {
+  for (const q of t.questions || []) {
+    if (!q.resolved && q.asked_of === "user") return true;
+  }
+  return false;
+}
+
+// Review-item helpers. Same shape as the question helpers so sort/badge/tab
+// counts stay consistent across the UI.
+function openReviewItemCount(t) {
+  let n = 0;
+  for (const it of t.review_items || []) if ((it.status || "open") === "open") n++;
+  return n;
+}
+function totalReviewItemCount(t) {
+  return (t.review_items || []).length;
+}
+
+function renderPager(pagerId, total, page, onChange) {
+  const el = document.getElementById(pagerId);
+  el.innerHTML = "";
+  if (total <= PAGE_SIZE) return; // no pager needed
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const clamped = Math.min(Math.max(1, page), pages);
+  const start = (clamped - 1) * PAGE_SIZE + 1;
+  const end = Math.min(clamped * PAGE_SIZE, total);
+  const prev = document.createElement("button");
+  prev.type = "button"; prev.textContent = "‹ prev";
+  prev.disabled = clamped <= 1;
+  prev.onclick = () => onChange(clamped - 1);
+  const next = document.createElement("button");
+  next.type = "button"; next.textContent = "next ›";
+  next.disabled = clamped >= pages;
+  next.onclick = () => onChange(clamped + 1);
+  const count = document.createElement("span");
+  count.className = "pager-count";
+  count.textContent = `${start}–${end} of ${total} · page ${clamped}/${pages}`;
+  el.append(count, prev, next);
+}
+
+function renderTasks() {
+  const container = document.getElementById("tasks");
+  const countEl = document.getElementById("search-count");
+  const byId = Object.fromEntries(allTasks.map(t => [t.id, t]));
+  let rows = allTasks.filter(t =>
+    taskMatchesStatus(t, activeStatus, byId) &&
+    taskMatchesPriority(t, activePriority) &&
+    taskMatchesGroup(t, activeGroup) &&
+    taskMatchesTag(t, activeTag) &&
+    taskMatchesReview(t, activeReview) &&
+    taskMatchesPinned(t, activePinned) &&
+    taskMatchesAge(t, activeAge));
+  const needle = searchQuery.trim().toLowerCase();
+  if (needle) rows = rows.filter(t => taskMatchesSearch(t, needle));
+
+  countEl.textContent = `${rows.length} of ${allTasks.length}`;
+
+  rows = rows.slice().sort((a, b) => compareTasks(a, b, taskSort.key, taskSort.dir));
+
+  const total = rows.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (tasksPage > pages) tasksPage = pages;
+  const start = (tasksPage - 1) * PAGE_SIZE;
+  const pageRows = rows.slice(start, start + PAGE_SIZE);
+
+  if (!total) {
+    container.innerHTML = '<div class="empty">No tasks match.</div>';
+    renderPager("tasks-pager", 0, 1, () => {});
+    return;
+  }
+
+  const cols = [
+    {key: "review", label: "", cls: "review", title: "Review state · click to sort inbox-first"},
+    {key: "pinned", label: "", cls: "pin-cell", title: "Pinned · click to sort pinned-first"},
+    {key: "id", label: "ID"},
+    {key: "priority", label: "Pri"},
+    {key: "status", label: "Status"},
+    {key: "title", label: "Title"},
+    {key: "group", label: "Group"},
+    {key: null, label: "Tags"},
+    {key: "deps", label: "Deps", title: "Depends-on count · details in modal"},
+    {key: "subtasks", label: "Subs", title: "Subtask count · details in modal"},
+    {key: "comments", label: "💬"},
+    {key: "questions", label: "?", title: "Open questions · unresolved count"},
+    {key: "review_items", label: "✓", title: "Review checklist · open/total"},
+    {key: "assignee", label: "Assignee"},
+    {key: "updated_at", label: "Updated"},
+  ];
+  const headHtml = cols.map(c => {
+    const cls = c.cls ? ` ${c.cls}` : "";
+    const titleAttr = c.title ? ` title="${escapeHtml(c.title)}"` : "";
+    if (!c.key) return `<th class="${cls.trim()}"${titleAttr}>${c.label}</th>`;
+    const active = taskSort.key === c.key;
+    const arrow = active ? `<span class="sort-arrow">${taskSort.dir === "asc" ? "▲" : "▼"}</span>` : "";
+    return `<th class="sortable${cls}" data-sort-key="${c.key}"${titleAttr}>${c.label}${arrow}</th>`;
+  }).join("");
+  const table = document.createElement("table");
+  table.innerHTML = `<thead><tr>${headHtml}</tr></thead>`;
+  const tbody = document.createElement("tbody");
+
+  for (const t of pageRows) {
+    const tr = document.createElement("tr");
+    tr.className = "clickable";
+    tr.dataset.id = t.id;
+    const depsCount = (t.depends_on || []).length;
+    const deps = depsCount ? `<span class="dep">${depsCount}</span>` : "<span class='dep'>—</span>";
+    const subsCount = subtaskCountFor(t.id);
+    const subs = subsCount ? `<span class="dep">${subsCount}</span>` : "<span class='dep'>—</span>";
+    const tags = (t.tags || []).map(x => `<span class="tag">${escapeHtml(x)}</span>`).join("") || "—";
+    const priority = t.priority || "P2";
+    const statusOptions = TASK_STATUS_OPTIONS.map(s =>
+      `<option value="${s}" ${s === t.status ? "selected" : ""}>${s.replace("_", " ")}</option>`
+    ).join("");
+    const priorityOptions = PRIORITY_OPTIONS.map(p =>
+      `<option value="${p}" ${p === priority ? "selected" : ""}>${p}</option>`
+    ).join("");
+    const commentCount = (t.comments || []).length;
+    const titleHtml = escapeHtml(t.title || "");
+    const commentsHtml = commentCount
+      ? `<span class="dep">${commentCount}</span>`
+      : "<span class='dep'>—</span>";
+    const openQ = openQuestionCount(t);
+    const questionsHtml = openQ
+      ? `<span class="q-badge ${anyOpenQuestionAskedOfUser(t) ? "awaits-user" : ""}" title="${openQ} unresolved question${openQ === 1 ? "" : "s"}">?${openQ}</span>`
+      : "<span class='dep'>—</span>";
+    const totalR = totalReviewItemCount(t);
+    const openR = openReviewItemCount(t);
+    const reviewItemsHtml = totalR
+      ? `<span class="r-badge ${openR === 0 ? "complete" : ""}" title="${openR} of ${totalR} review item${totalR === 1 ? "" : "s"} still open">✓${totalR - openR}/${totalR}</span>`
+      : "<span class='dep'>—</span>";
+    const groupHtml = t.group
+      ? `<span class="group-pill">${escapeHtml(t.group)}</span>`
+      : "<span class='dep'>—</span>";
+    const reviewHtml = renderReviewCell(t);
+    const isPinned = !!t.pinned;
+    if (isPinned) tr.classList.add("pinned-row");
+    const pinStar = isPinned ? "★" : "☆";
+    const pinTitle = isPinned ? "Unpin" : "Pin for later";
+
+    tr.innerHTML = `
+      <td class="review">${reviewHtml}</td>
+      <td class="pin-cell"><button type="button" class="pin-btn ${isPinned ? "pinned" : ""}" data-id="${t.id}" data-pinned="${isPinned ? "1" : "0"}" title="${pinTitle}" aria-label="${pinTitle}">${pinStar}</button></td>
+      <td class="id">${copyIdHtml(t.id)}</td>
+      <td><select class="priority-select ${priority}" data-id="${t.id}" data-field="priority">${priorityOptions}</select></td>
+      <td><select class="status-select ${t.status}" data-id="${t.id}" data-field="status">${statusOptions}</select></td>
+      <td class="title">${titleHtml}</td>
+      <td>${groupHtml}</td>
+      <td>${tags}</td>
+      <td>${deps}</td>
+      <td>${subs}</td>
+      <td>${commentsHtml}</td>
+      <td>${questionsHtml}</td>
+      <td>${reviewItemsHtml}</td>
+      <td>${t.assignee ? escapeHtml(t.assignee) : "<span class='dep'>—</span>"}</td>
+      <td class="dep" title="${escapeHtml(formatAbs(t.updated_at))}">${escapeHtml(formatRelTime(t.updated_at))}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  container.innerHTML = "";
+  container.appendChild(table);
+
+  // Wire sortable headers.
+  container.querySelectorAll("th.sortable").forEach(th => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sortKey;
+      if (taskSort.key === key) {
+        taskSort.dir = taskSort.dir === "asc" ? "desc" : "asc";
+      } else {
+        // Numeric / recency-style keys default desc (highest first); text keys default asc.
+        const descFirst = new Set(["updated_at", "review", "pinned", "comments", "questions", "review_items", "deps", "subtasks"]);
+        taskSort = {key, dir: descFirst.has(key) ? "desc" : "asc"};
+      }
+      tasksPage = 1;
+      renderTasks();
+    });
+  });
+
+  // Wire inline dropdowns (stop click propagation so they don't open the modal).
+  container.querySelectorAll("select.status-select, select.priority-select").forEach(sel => {
+    sel.addEventListener("click", (e) => e.stopPropagation());
+    sel.addEventListener("change", async (e) => {
+      e.stopPropagation();
+      const id = e.target.dataset.id;
+      const field = e.target.dataset.field;
+      try {
+        await apiSend("PATCH", `/api/tasks/${id}`, {[field]: e.target.value});
+        await refresh();
+      } catch (err) {
+        showError(err.message);
+        await refresh();
+      }
+    });
+  });
+
+  // Row-level pin toggle. Stop propagation so it doesn't open the modal.
+  container.querySelectorAll("button.pin-btn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      const nextPinned = btn.dataset.pinned !== "1";
+      try {
+        await apiSend("PATCH", `/api/tasks/${id}`, {pinned: nextPinned});
+        await refresh();
+      } catch (err) {
+        showError(err.message);
+        await refresh();
+      }
+    });
+  });
+
+  // Row click → open modal. Skip when the click originated on a copy-id
+  // chip — that handler is delegated on the container, so it fires *after*
+  // this per-row listener and its stopPropagation can't rescue us.
+  container.querySelectorAll("tr.clickable").forEach(tr => {
+    tr.addEventListener("click", (e) => {
+      if (e.target.closest(".copy-id")) return;
+      openTaskModal(tr.dataset.id);
+    });
+  });
+
+  wireCopyIds(container);
+
+  renderPager("tasks-pager", total, tasksPage, (p) => {
+    tasksPage = p;
+    renderTasks();
+    document.getElementById("tasks").scrollIntoView({block: "start", behavior: "instant"});
+  });
+
+  syncUrl();
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function copyIdHtml(id) {
+  const safe = escapeHtml(id);
+  return `<span class="copy-id" role="button" tabindex="0" data-copy="${safe}" `
+    + `title="Copy ${safe}" aria-label="Copy ${safe}"><span class="copy-id-text">${safe}</span></span>`;
+}
+
+async function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); return true; } catch {}
+  }
+  // Fallback for http:// (localhost dev): temporary textarea + execCommand.
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.top = "-1000px";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch {}
+  document.body.removeChild(ta);
+  return ok;
+}
+
+// Delegated wiring for .copy-id elements. Safe to call multiple times on the
+// same container — we mark the container so we only bind once.
+function wireCopyIds(container) {
+  if (!container || container.dataset.copyIdsBound === "1") return;
+  container.dataset.copyIdsBound = "1";
+  const handle = async (el) => {
+    const text = el.dataset.copy;
+    if (!text) return;
+    const ok = await copyToClipboard(text);
+    if (!ok) return;
+    const label = el.querySelector(".copy-id-text");
+    const original = label ? label.textContent : null;
+    el.classList.add("copied");
+    if (label) label.textContent = "Copied";
+    clearTimeout(el._copyTimer);
+    el._copyTimer = setTimeout(() => {
+      el.classList.remove("copied");
+      if (label && original != null) label.textContent = original;
+    }, 1200);
+  };
+  container.addEventListener("click", (e) => {
+    const el = e.target.closest(".copy-id");
+    if (!el || !container.contains(el)) return;
+    e.stopPropagation();
+    e.preventDefault();
+    handle(el);
+  });
+  container.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const el = e.target.closest(".copy-id");
+    if (!el || !container.contains(el)) return;
+    e.stopPropagation();
+    e.preventDefault();
+    handle(el);
+  });
+}
+
+function renderReviewCell(t) {
+  if (t.needs_review) {
+    return `<span class="review-dot" title="Needs review"></span>`;
+  }
+  if (t.reviewed_at != null) {
+    const abs = formatAbs(t.reviewed_at);
+    const rel = formatRelTime(t.reviewed_at);
+    return `<span class="review-check" title="Reviewed ${escapeHtml(rel)} (${escapeHtml(abs)})">✓</span>`;
+  }
+  return `<span class="review-none">·</span>`;
+}
+
+function formatAbs(ts) {
+  return (ts || "").replace("T", " ").replace("Z", "");
+}
+
+function formatAbsShort(ts) {
+  // "2026-08-29T01:04:22Z" → "2026-08-29 01:04". Drops seconds + `Z` for
+  // header-slot readability; use formatAbs when full precision matters.
+  const s = formatAbs(ts);
+  if (!s) return "";
+  return s.length >= 16 ? s.slice(0, 16) : s;
+}
+
+function formatRelTime(ts) {
+  if (!ts) return "";
+  const then = Date.parse(ts);
+  if (isNaN(then)) return "";
+  let secs = Math.round((Date.now() - then) / 1000);
+  const future = secs < 0;
+  secs = Math.abs(secs);
+  let out;
+  if (secs < 5) out = "just now";
+  else if (secs < 60) out = `${secs}s`;
+  else if (secs < 3600) out = `${Math.floor(secs / 60)}m`;
+  else if (secs < 86400) out = `${Math.floor(secs / 3600)}h`;
+  else if (secs < 2592000) out = `${Math.floor(secs / 86400)}d`;
+  else if (secs < 31536000) out = `${Math.floor(secs / 2592000)}mo`;
+  else out = `${Math.floor(secs / 31536000)}y`;
+  if (out === "just now") return out;
+  return future ? `in ${out}` : `${out} ago`;
+}
+
+// ── modal ──
+function currentTask() {
+  return allTasks.find(t => t.id === openTaskId);
+}
+
+// Task body view/edit toggle. Modal always mounts an edit form, but for
+// existing tasks we default to a rendered-markdown view so the body reads
+// cleanly. The "Edit" button flips to the textarea; "Preview" flips back
+// (re-rendering from the textarea's current contents so users see their
+// in-progress markdown).
+function setBodyMode(mode) {
+  const view = document.getElementById("modal-body-view");
+  const ta = document.querySelector('#modal-edit-form [name="body"]');
+  const btn = document.getElementById("modal-body-edit");
+  if (mode === "edit") {
+    view.style.display = "none";
+    ta.style.display = "";
+    btn.textContent = "Preview";
+    setTimeout(() => ta.focus(), 0);
+  } else {
+    const src = ta.value || "";
+    if (src.trim()) {
+      view.classList.remove("empty");
+      view.innerHTML = window.renderMarkdown(src);
+    } else {
+      view.classList.add("empty");
+      view.textContent = "No body.";
+    }
+    view.style.display = "";
+    ta.style.display = "none";
+    btn.textContent = "Edit";
+  }
+}
+
+function populateStatusSelect() {
+  const statusSel = document.querySelector('#modal-edit-form [name="status"]');
+  statusSel.innerHTML = TASK_STATUS_OPTIONS.map(s =>
+    `<option value="${s}">${s.replace("_", " ")}</option>`
+  ).join("");
+}
+
+function openTaskModal(id) {
+  modalMode = "edit";
+  openTaskId = id;
+  activeTab = "details";
+  const t = currentTask();
+  if (!t) {
+    // Stale ?task= param pointing at an unknown id — drop it.
+    openTaskId = null;
+    syncUrl();
+    return;
+  }
+
+  document.getElementById("modal-title").textContent = t.title || "(untitled)";
+  const modalIdEl = document.getElementById("modal-id");
+  modalIdEl.innerHTML = copyIdHtml(t.id);
+  wireCopyIds(modalIdEl);
+
+  populateStatusSelect();
+
+  const f = document.getElementById("modal-edit-form");
+  f.title.value = t.title || "";
+  f.status.value = t.status || "open";
+  f.priority.value = t.priority || "P2";
+  f.group.value = t.group || "";
+  f.tags.value = (t.tags || []).join(", ");
+  f.assignee.value = t.assignee || "";
+  f.depends_on.value = (t.depends_on || []).join(", ");
+  f.parent_task_id.value = t.parent_task_id || "";
+  f.body.value = t.body || "";
+
+  document.getElementById("modal-meta").innerHTML =
+    `created <span title="${escapeHtml(formatAbs(t.created_at))}">${escapeHtml(formatRelTime(t.created_at))}</span>` +
+    ` · updated <span title="${escapeHtml(formatAbs(t.updated_at))}">${escapeHtml(formatRelTime(t.updated_at))}</span>`;
+
+  // Edit mode: show Delete, show Comments + Questions + Review tabs, submit label = Save.
+  document.getElementById("modal-delete").style.display = "";
+  document.querySelector('.modal-tab[data-tab="comments"]').style.display = "";
+  document.querySelector('.modal-tab[data-tab="questions"]').style.display = "";
+  document.querySelector('.modal-tab[data-tab="review"]').style.display = "";
+  document.querySelector('#modal-edit-form button[type="submit"]').textContent = "Save";
+  updateReviewButton(t);
+  setBodyMode("view");
+
+  updateRelationsTabVisibility();
+  renderModalTabs();
+  renderComments();
+  renderQuestions();
+  renderReviewItems();
+  renderRelations();
+  document.getElementById("task-modal").classList.add("open");
+  document.getElementById("task-modal").setAttribute("aria-hidden", "false");
+  syncUrl();
+}
+
+function openTaskCreateModal() {
+  modalMode = "create";
+  openTaskId = null;
+  activeTab = "details";
+
+  document.getElementById("modal-title").textContent = "New task";
+  document.getElementById("modal-id").textContent = "";
+
+  populateStatusSelect();
+
+  const f = document.getElementById("modal-edit-form");
+  const draft = loadNewTaskDraft();
+  draftRestored = !!draft;
+  f.title.value = draft?.title ?? "";
+  f.status.value = draft?.status ?? "open";
+  f.priority.value = draft?.priority ?? "P2";
+  f.group.value = draft?.group ?? "";
+  f.tags.value = draft?.tags ?? "";
+  f.assignee.value = draft?.assignee ?? "claude";
+  f.depends_on.value = draft?.depends_on ?? "";
+  f.parent_task_id.value = draft?.parent_task_id ?? "";
+  f.body.value = draft?.body ?? "";
+
+  renderDraftBanner();
+
+  // Create mode: hide Delete, hide Comments/Questions/Relations tabs (nothing
+  // to attach to a task that doesn't exist yet), submit label = Create.
+  document.getElementById("modal-delete").style.display = "none";
+  document.querySelector('.modal-tab[data-tab="comments"]').style.display = "none";
+  document.querySelector('.modal-tab[data-tab="questions"]').style.display = "none";
+  document.querySelector('.modal-tab[data-tab="review"]').style.display = "none";
+  document.querySelector('.modal-tab[data-tab="relations"]').style.display = "none";
+  document.querySelector('#modal-edit-form button[type="submit"]').textContent = "Create";
+  document.getElementById("modal-mark-reviewed").style.display = "none";
+  setBodyMode("edit");
+
+  renderModalTabs();
+  document.getElementById("task-modal").classList.add("open");
+  document.getElementById("task-modal").setAttribute("aria-hidden", "false");
+  syncUrl();
+  setTimeout(() => f.title.focus(), 0);
+}
+
+function closeTaskModal() {
+  openTaskId = null;
+  modalMode = "edit";
+  draftRestored = false;
+  document.getElementById("task-modal").classList.remove("open");
+  document.getElementById("task-modal").setAttribute("aria-hidden", "true");
+  syncUrl();
+}
+
+function renderModalTabs() {
+  document.querySelectorAll(".modal-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === activeTab);
+  });
+  document.querySelectorAll(".modal-panel").forEach(p => {
+    p.classList.toggle("active", p.dataset.panel === activeTab);
+  });
+  const t = currentTask();
+  const commentCount = t ? (t.comments || []).length : 0;
+  document.getElementById("modal-comments-count").textContent = commentCount ? `(${commentCount})` : "";
+  // Questions tab badge: unresolved count, or total if none open. Chosen so
+  // an all-resolved task still shows a count (some history to browse) but
+  // the open count is the primary signal.
+  if (t) {
+    const openQ = openQuestionCount(t);
+    const totalQ = (t.questions || []).length;
+    const qEl = document.getElementById("modal-questions-count");
+    if (openQ > 0) qEl.textContent = `(${openQ})`;
+    else if (totalQ > 0) qEl.textContent = `(${totalQ})`;
+    else qEl.textContent = "";
+    // Review tab: "open/total" so the reviewer sees progress at a glance.
+    const openR = openReviewItemCount(t);
+    const totalR = totalReviewItemCount(t);
+    const rEl = document.getElementById("modal-review-count");
+    if (totalR > 0) rEl.textContent = `(${totalR - openR}/${totalR})`;
+    else rEl.textContent = "";
+  } else {
+    document.getElementById("modal-questions-count").textContent = "";
+    document.getElementById("modal-review-count").textContent = "";
+  }
+  // Relations tab badge: forward deps + subtask count (relations rooted at this task).
+  // Tab visibility is handled by updateRelationsTabVisibility.
+  const depsCount = t ? (t.depends_on || []).length : 0;
+  const subtaskCount = t ? allTasks.filter(x => x.parent_task_id === t.id).length : 0;
+  const badge = depsCount + subtaskCount;
+  document.getElementById("modal-deps-count").textContent = badge ? `(${badge})` : "";
+}
+
+// Relations tab. Renders sections:
+//   Parent     — this task's parent (from t.parent_task_id), if any
+//   Subtasks   — tasks whose parent_task_id is this one
+//   Depends on — this task's forward deps (from t.depends_on)
+//   Blocks     — tasks whose depends_on references this one
+// Parent/Subtasks are scope containment (a tracking wrapper and its work items);
+// Depends on/Blocks are ordering (one must finish before another can start).
+// Each row mirrors the main task list's essentials (id · pri · status ·
+// title · group · updated). Clicking a row swaps the modal to that task,
+// so users can walk the relation graph without closing.
+function renderRelations() {
+  const t = currentTask();
+  const container = document.getElementById("modal-dependencies");
+  if (!t) { container.innerHTML = ""; return; }
+  const byId = Object.fromEntries(allTasks.map(x => [x.id, x]));
+  const forwardIds = t.depends_on || [];
+  const forward = forwardIds.map(id => ({id, task: byId[id] || null}));
+  const reverse = allTasks
+    .filter(x => (x.depends_on || []).includes(t.id))
+    .map(x => ({id: x.id, task: x}));
+  const parentId = t.parent_task_id || null;
+  const parent = parentId ? [{id: parentId, task: byId[parentId] || null}] : [];
+  const subtasks = allTasks
+    .filter(x => x.parent_task_id === t.id)
+    .map(x => ({id: x.id, task: x}));
+
+  const sections = [
+    {title: "Parent",     rows: parent,   empty: "No parent (top-level task)."},
+    {title: "Subtasks",   rows: subtasks, empty: "No subtasks."},
+    {title: "Depends on", rows: forward,  empty: "No forward dependencies."},
+    {title: "Blocks",     rows: reverse,  empty: "No tasks depend on this one."},
+  ];
+  container.innerHTML = sections.map(s => renderDepSection(s)).join("");
+
+  container.querySelectorAll("tr[data-id]").forEach(tr => {
+    tr.addEventListener("click", (e) => {
+      if (e.target.closest(".copy-id")) return;
+      openTaskModal(tr.dataset.id);
+    });
+  });
+
+  wireCopyIds(container);
+}
+
+function renderDepSection({title, rows, empty}) {
+  const head = `<h4>${escapeHtml(title)} <span class="count">${rows.length}</span></h4>`;
+  if (!rows.length) {
+    return `<div class="deps-section">${head}<div class="empty">${escapeHtml(empty)}</div></div>`;
+  }
+  const body = rows.map(({id, task}) => {
+    if (!task) {
+      return `<tr class="unknown"><td class="id">${copyIdHtml(id)}</td>` +
+             `<td colspan="5">unknown — task not found</td></tr>`;
+    }
+    const pri = task.priority || "P2";
+    const status = task.status || "open";
+    const groupHtml = task.group
+      ? `<span class="group-pill">${escapeHtml(task.group)}</span>`
+      : `<span class="dep">—</span>`;
+    const updatedAbs = formatAbs(task.updated_at);
+    const updatedRel = formatRelTime(task.updated_at);
+    return `<tr data-id="${escapeHtml(task.id)}">` +
+      `<td class="id">${copyIdHtml(task.id)}</td>` +
+      `<td><span class="priority-pill ${pri}">${pri}</span></td>` +
+      `<td><span class="status-pill ${status}">${status.replace("_", " ")}</span></td>` +
+      `<td class="title">${escapeHtml(task.title || "")}</td>` +
+      `<td>${groupHtml}</td>` +
+      `<td class="dep" title="${escapeHtml(updatedAbs)}">${escapeHtml(updatedRel)}</td>` +
+    `</tr>`;
+  }).join("");
+  return `<div class="deps-section">${head}` +
+    `<table class="deps-table"><thead><tr>` +
+    `<th>ID</th><th>Pri</th><th>Status</th><th>Title</th><th>Group</th><th>Updated</th>` +
+    `</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+// Show/hide the Relations tab based on whether the open task has any
+// forward/reverse deps or parent/subtask relations. Isolated leaf tasks don't
+// need the tab. Also flips activeTab off "relations" if the tab is hidden.
+function updateRelationsTabVisibility() {
+  const t = currentTask();
+  const tab = document.querySelector('.modal-tab[data-tab="relations"]');
+  if (!tab) return;
+  if (!t) { tab.style.display = "none"; return; }
+  const forwardCount = (t.depends_on || []).length;
+  const reverseCount = allTasks.filter(x => (x.depends_on || []).includes(t.id)).length;
+  const hasParent = !!t.parent_task_id;
+  const subtaskCount = allTasks.filter(x => x.parent_task_id === t.id).length;
+  const visible = forwardCount + reverseCount > 0 || hasParent || subtaskCount > 0;
+  tab.style.display = visible ? "" : "none";
+  if (!visible && activeTab === "relations") activeTab = "details";
+}
+
+// Render the modal Questions panel. Unresolved questions first (as bordered
+// cards with per-card Answer / Resolve / Delete actions), then a "Resolved"
+// header and the rest, dimmed. Answer editor is inline per card — toggled
+// open by the Answer button so the panel isn't cluttered by empty forms.
+function renderQuestions() {
+  const t = currentTask();
+  const container = document.getElementById("modal-questions");
+  const questions = (t && t.questions) || [];
+  if (!questions.length) {
+    container.innerHTML = '<div class="q-empty">No questions on this task yet.</div>';
+    return;
+  }
+  const open = questions.filter(q => !q.resolved);
+  const resolved = questions.filter(q => q.resolved);
+  const parts = [];
+  parts.push('<div class="q-list">');
+  for (const q of open) parts.push(renderQuestionCard(q));
+  parts.push('</div>');
+  if (resolved.length) {
+    parts.push(`<div class="q-resolved-header">Resolved (${resolved.length})</div>`);
+    parts.push('<div class="q-list">');
+    for (const q of resolved) parts.push(renderQuestionCard(q));
+    parts.push('</div>');
+  }
+  container.innerHTML = parts.join("");
+  wireQuestionActions(container);
+}
+
+function renderQuestionCard(q) {
+  const isResolved = !!q.resolved;
+  const askedOf = q.asked_of || null;
+  const askedBy = q.asked_by || null;
+  // "self" styling when it's a question the current user (asked_of: user)
+  // owes an answer to — draws the eye more than the default purple.
+  const chipCls = askedOf === "user" ? "q-chip asked-of self" : "q-chip asked-of";
+  const askedOfHtml = askedOf
+    ? `<span class="${chipCls}" title="asked of ${escapeHtml(askedOf)}">→ ${escapeHtml(askedOf)}</span>`
+    : "";
+  const askedByHtml = askedBy
+    ? `<span class="q-chip" title="asked by ${escapeHtml(askedBy)}">${escapeHtml(askedBy)}</span>`
+    : "";
+  const tsAbs = formatAbs(q.asked_at);
+  const tsAbsShort = formatAbsShort(q.asked_at);
+  const tsRel = formatRelTime(q.asked_at);
+  const statusLabel = isResolved ? "Resolved" : "Open";
+  const answerHtml = q.answer
+    ? `<div class="q-answer">
+         <div class="q-answer-label">answer${q.answered_by ? ` · ${escapeHtml(q.answered_by)}` : ""}${q.answered_at ? ` · <span title="${escapeHtml(formatAbs(q.answered_at))}">${escapeHtml(formatRelTime(q.answered_at))}<span class="ts-abs">${escapeHtml(formatAbsShort(q.answered_at))}</span></span>` : ""}<button type="button" class="card-copy" data-copy="answer" title="Copy answer markdown" aria-label="Copy answer markdown">copy</button></div>
+         <div class="md-body">${window.renderMarkdown(q.answer)}</div>
+       </div>`
+    : "";
+  const resolveLabel = isResolved ? "Reopen" : "Resolve";
+  const answerBtn = isResolved
+    ? ""  // Don't tempt editing an answer on a closed question; reopen first.
+    : `<button type="button" class="icon-btn" data-q-action="answer" data-qid="${escapeHtml(q.id)}">${q.answer ? "Edit answer" : "Answer"}</button>`;
+  return `
+    <div class="q-card ${isResolved ? "resolved" : "open"}" data-qid="${escapeHtml(q.id)}">
+      <div class="q-header" title="Click to collapse/expand">
+        <span class="collapse-arrow">▼</span>
+        <span class="q-id">${escapeHtml(q.id)}</span>
+        ${askedByHtml}
+        ${askedOfHtml}
+        <span class="q-ts" title="${escapeHtml(tsAbs)}">${escapeHtml(tsRel)}<span class="ts-abs">${escapeHtml(tsAbsShort)}</span></span>
+        <span class="q-status">${statusLabel}</span>
+        <button type="button" class="card-copy" data-copy="question" title="Copy question markdown" aria-label="Copy question markdown">copy</button>
+      </div>
+      <div class="q-body md-body">${window.renderMarkdown(q.question || "")}</div>
+      ${answerHtml}
+      <form class="q-answer-form" data-qid="${escapeHtml(q.id)}">
+        <textarea name="answer" placeholder="Write an answer…" required>${escapeHtml(q.answer || "")}</textarea>
+        <div class="q-form-row">
+          <label>as</label>
+          <input type="text" name="answered_by" placeholder="claude" value="claude" />
+          <span class="spacer"></span>
+          <button type="button" class="icon-btn" data-q-action="answer-cancel" data-qid="${escapeHtml(q.id)}">Cancel</button>
+          <button type="submit">Save answer</button>
+        </div>
+      </form>
+      <div class="q-actions">
+        ${answerBtn}
+        <span class="spacer"></span>
+        <button type="button" class="icon-btn" data-q-action="resolve" data-qid="${escapeHtml(q.id)}">${resolveLabel}</button>
+        <button type="button" class="icon-btn danger" data-q-action="delete" data-qid="${escapeHtml(q.id)}">Delete</button>
+      </div>
+    </div>`;
+}
+
+function wireQuestionActions(container) {
+  // Header click toggles the card's collapsed state. Cards default expanded.
+  // Skip when the click is on the header's copy button — otherwise the flash
+  // would race the collapse.
+  container.querySelectorAll(".q-card > .q-header").forEach(hdr => {
+    hdr.addEventListener("click", (e) => {
+      if (e.target.closest(".card-copy")) return;
+      hdr.parentElement.classList.toggle("collapsed");
+    });
+  });
+  bindCopyButtons(container);
+  container.querySelectorAll("[data-q-action]").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const qid = btn.dataset.qid;
+      const action = btn.dataset.qAction;
+      if (!openTaskId || !qid) return;
+      if (action === "answer") {
+        const form = container.querySelector(`form.q-answer-form[data-qid="${qid}"]`);
+        if (form) {
+          form.classList.add("open");
+          const ta = form.querySelector('textarea[name="answer"]');
+          if (ta) setTimeout(() => ta.focus(), 0);
+        }
+        return;
+      }
+      if (action === "answer-cancel") {
+        const form = container.querySelector(`form.q-answer-form[data-qid="${qid}"]`);
+        if (form) form.classList.remove("open");
+        return;
+      }
+      if (action === "resolve") {
+        const card = container.querySelector(`.q-card[data-qid="${qid}"]`);
+        const isResolved = card && card.classList.contains("resolved");
+        try {
+          await apiSend("PATCH", `/api/tasks/${openTaskId}/questions/${qid}`, {resolved: !isResolved});
+          await refresh();
+          renderQuestions();
+          renderModalTabs();
+        } catch (err) { showError(err.message); }
+        return;
+      }
+      if (action === "delete") {
+        if (!confirm(`Delete question ${qid}?`)) return;
+        try {
+          await apiSend("DELETE", `/api/tasks/${openTaskId}/questions/${qid}`);
+          await refresh();
+          renderQuestions();
+          renderModalTabs();
+        } catch (err) { showError(err.message); }
+        return;
+      }
+    });
+  });
+  container.querySelectorAll("form.q-answer-form").forEach(form => {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const qid = form.dataset.qid;
+      if (!openTaskId || !qid) return;
+      const answer = form.answer.value.trim();
+      const answered_by = form.answered_by.value.trim() || null;
+      if (!answer) return;
+      try {
+        const body = {answer};
+        if (answered_by) body.answered_by = answered_by;
+        await apiSend("PATCH", `/api/tasks/${openTaskId}/questions/${qid}`, body);
+        await refresh();
+        renderQuestions();
+        renderModalTabs();
+      } catch (err) { showError(err.message); }
+    });
+  });
+}
+
+// Render the modal Review panel. Open items render first (bordered card with
+// per-card Check / Dismiss / Edit / Delete actions), then a "Resolved" header
+// and the rest, dimmed. Editor is inline per card — toggled by the Edit button.
+function renderReviewItems() {
+  const t = currentTask();
+  const container = document.getElementById("modal-review-items");
+  const items = (t && t.review_items) || [];
+  if (!items.length) {
+    container.innerHTML = '<div class="r-empty">No review items on this task yet. Add one to seed the checklist.</div>';
+    return;
+  }
+  const open = items.filter(it => (it.status || "open") === "open");
+  const resolved = items.filter(it => (it.status || "open") !== "open");
+  const parts = [];
+  parts.push('<div class="r-list">');
+  for (const it of open) parts.push(renderReviewItemCard(it));
+  parts.push('</div>');
+  if (resolved.length) {
+    parts.push(`<div class="r-resolved-header">Resolved (${resolved.length})</div>`);
+    parts.push('<div class="r-list">');
+    for (const it of resolved) parts.push(renderReviewItemCard(it));
+    parts.push('</div>');
+  }
+  container.innerHTML = parts.join("");
+  wireReviewItemActions(container);
+}
+
+function renderReviewItemCard(it) {
+  const status = it.status || "open";
+  const isOpen = status === "open";
+  const cardCls = isOpen ? "open" : (status === "dismissed" ? "dismissed resolved" : "resolved");
+  const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+  const author = it.author || null;
+  const authorHtml = author
+    ? `<span class="r-chip" title="added by ${escapeHtml(author)}">${escapeHtml(author)}</span>`
+    : "";
+  const tsAbs = formatAbs(it.created_at);
+  const tsAbsShort = formatAbsShort(it.created_at);
+  const tsRel = formatRelTime(it.created_at);
+  const refHtml = it.ref
+    ? `<div class="r-ref"><span class="r-ref-label">ref</span>${escapeHtml(it.ref)}</div>`
+    : "";
+  const resolvedMeta = !isOpen && (it.resolved_at || it.resolved_by)
+    ? ` · ${status} ${it.resolved_by ? escapeHtml(it.resolved_by) + " " : ""}<span title="${escapeHtml(formatAbs(it.resolved_at))}">${escapeHtml(formatRelTime(it.resolved_at))}<span class="ts-abs">${escapeHtml(formatAbsShort(it.resolved_at))}</span></span>`
+    : "";
+  // Primary action depends on state. Open → Check (verified) is the common path;
+  // Dismiss is secondary. Resolved → Reopen so the reviewer can un-check.
+  const primaryBtn = isOpen
+    ? `<button type="button" class="icon-btn primary" data-r-action="check" data-rid="${escapeHtml(it.id)}" title="Mark verified">Check</button>
+       <button type="button" class="icon-btn" data-r-action="dismiss" data-rid="${escapeHtml(it.id)}" title="Skip — not worth checking">Dismiss</button>`
+    : `<button type="button" class="icon-btn" data-r-action="reopen" data-rid="${escapeHtml(it.id)}" title="Reopen">Reopen</button>`;
+  return `
+    <div class="r-card ${cardCls}" data-rid="${escapeHtml(it.id)}">
+      <div class="r-header" title="Click to collapse/expand">
+        <span class="collapse-arrow">▼</span>
+        <span class="r-id">${escapeHtml(it.id)}</span>
+        ${authorHtml}
+        <span class="r-ts" title="${escapeHtml(tsAbs)}">${escapeHtml(tsRel)}<span class="ts-abs">${escapeHtml(tsAbsShort)}</span>${resolvedMeta}</span>
+        <span class="r-status">${statusLabel}</span>
+        <button type="button" class="card-copy" data-copy="review" title="Copy markdown" aria-label="Copy review item markdown">copy</button>
+      </div>
+      <div class="r-body md-body">${window.renderMarkdown(it.body || "")}</div>
+      ${refHtml}
+      <form class="r-edit-form" data-rid="${escapeHtml(it.id)}">
+        <textarea name="body" required>${escapeHtml(it.body || "")}</textarea>
+        <input type="text" name="ref" placeholder="ref — file:line, scenario, test" value="${escapeHtml(it.ref || "")}" />
+        <div class="r-edit-actions">
+          <button type="button" class="icon-btn" data-r-action="edit-cancel" data-rid="${escapeHtml(it.id)}">Cancel</button>
+          <button type="submit">Save</button>
+        </div>
+      </form>
+      <div class="r-actions">
+        ${primaryBtn}
+        <span class="spacer"></span>
+        <button type="button" class="icon-btn" data-r-action="edit" data-rid="${escapeHtml(it.id)}">Edit</button>
+        <button type="button" class="icon-btn danger" data-r-action="delete" data-rid="${escapeHtml(it.id)}">Delete</button>
+      </div>
+    </div>`;
+}
+
+function wireReviewItemActions(container) {
+  container.querySelectorAll(".r-card > .r-header").forEach(hdr => {
+    hdr.addEventListener("click", (e) => {
+      if (e.target.closest(".card-copy")) return;
+      hdr.parentElement.classList.toggle("collapsed");
+    });
+  });
+  bindCopyButtons(container);
+  container.querySelectorAll("[data-r-action]").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const rid = btn.dataset.rid;
+      const action = btn.dataset.rAction;
+      if (!openTaskId || !rid) return;
+      if (action === "edit") {
+        const form = container.querySelector(`form.r-edit-form[data-rid="${rid}"]`);
+        if (form) {
+          form.classList.add("open");
+          const ta = form.querySelector('textarea[name="body"]');
+          if (ta) setTimeout(() => ta.focus(), 0);
+        }
+        return;
+      }
+      if (action === "edit-cancel") {
+        const form = container.querySelector(`form.r-edit-form[data-rid="${rid}"]`);
+        if (form) form.classList.remove("open");
+        return;
+      }
+      if (action === "check" || action === "dismiss" || action === "reopen") {
+        const status = action === "check" ? "checked"
+          : action === "dismiss" ? "dismissed"
+          : "open";
+        try {
+          const body = {status};
+          if (status !== "open") body.resolved_by = "user";
+          await apiSend("PATCH", `/api/tasks/${openTaskId}/review_items/${rid}`, body);
+          await refresh();
+          renderReviewItems();
+          renderModalTabs();
+          const t = currentTask();
+          if (t) updateReviewButton(t);
+        } catch (err) { showError(err.message); }
+        return;
+      }
+      if (action === "delete") {
+        if (!confirm(`Delete review item ${rid}?`)) return;
+        try {
+          await apiSend("DELETE", `/api/tasks/${openTaskId}/review_items/${rid}`);
+          await refresh();
+          renderReviewItems();
+          renderModalTabs();
+          const t = currentTask();
+          if (t) updateReviewButton(t);
+        } catch (err) { showError(err.message); }
+        return;
+      }
+    });
+  });
+  container.querySelectorAll("form.r-edit-form").forEach(form => {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const rid = form.dataset.rid;
+      if (!openTaskId || !rid) return;
+      const body = form.body.value.trim();
+      const ref = form.ref.value.trim();
+      if (!body) return;
+      try {
+        await apiSend("PATCH", `/api/tasks/${openTaskId}/review_items/${rid}`, {
+          body, ref: ref || null,
+        });
+        await refresh();
+        renderReviewItems();
+        renderModalTabs();
+      } catch (err) { showError(err.message); }
+    });
+  });
+}
+
+// Wire up every `.card-copy[data-copy]` button under `container`. The button's
+// `data-copy` value ("comment" | "question" | "answer" | "review") plus the
+// closest card's `data-idx` / `data-qid` / `data-rid` are enough to look up
+// the raw body from the current task. We resolve at click time (not render
+// time) so the payload always reflects the latest task state.
+function bindCopyButtons(container) {
+  container.querySelectorAll(".card-copy[data-copy]").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const body = resolveCopyPayload(btn);
+      if (body == null) return;
+      try {
+        await navigator.clipboard.writeText(body);
+        const original = btn.textContent;
+        btn.textContent = "copied";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.classList.remove("copied");
+        }, 1000);
+      } catch (err) {
+        showError("Copy failed: " + err.message);
+      }
+    });
+  });
+}
+
+function resolveCopyPayload(btn) {
+  const kind = btn.dataset.copy;
+  const t = currentTask();
+  if (!t) return "";
+  if (kind === "comment") {
+    const card = btn.closest(".comment");
+    const idx = card && Number(card.dataset.idx);
+    return (t.comments && t.comments[idx] && t.comments[idx].body) || "";
+  }
+  if (kind === "question" || kind === "answer") {
+    const card = btn.closest(".q-card");
+    const qid = card && card.dataset.qid;
+    const q = (t.questions || []).find(x => x.id === qid);
+    if (!q) return "";
+    return kind === "answer" ? (q.answer || "") : (q.question || "");
+  }
+  if (kind === "review") {
+    const card = btn.closest(".r-card");
+    const rid = card && card.dataset.rid;
+    const it = (t.review_items || []).find(x => x.id === rid);
+    return (it && it.body) || "";
+  }
+  return "";
+}
+
+function renderComments() {
+  const t = currentTask();
+  const container = document.getElementById("modal-comments");
+  const comments = (t && t.comments) || [];
+  if (!comments.length) {
+    container.innerHTML = '<div class="empty">No comments yet.</div>';
+    return;
+  }
+  container.innerHTML = comments.map((c, i) => `
+    <div class="comment" data-idx="${i}" data-ts="${escapeHtml(c.ts || "")}">
+      <div class="comment-header" title="Click to collapse/expand">
+        <span class="collapse-arrow">▼</span>
+        <span class="comment-index">#${i + 1}</span>
+        ${c.author ? `<span class="comment-author">${escapeHtml(c.author)}</span>` : ""}
+        <span class="comment-ts" title="${escapeHtml(formatAbs(c.ts))}">${escapeHtml(formatRelTime(c.ts))}<span class="ts-abs">${escapeHtml(formatAbsShort(c.ts))}</span></span>
+        <button type="button" class="card-copy" data-copy="comment" title="Copy markdown" aria-label="Copy comment markdown">copy</button>
+        <button type="button" class="comment-delete" title="Delete comment" aria-label="Delete comment">×</button>
+      </div>
+      <div class="comment-body md-body">${window.renderMarkdown(c.body || "")}</div>
+    </div>
+  `).join("");
+  container.querySelectorAll(".comment-header").forEach(hdr => {
+    hdr.addEventListener("click", (e) => {
+      // Clicking the delete × or copy button shouldn't also toggle the collapse.
+      if (e.target.closest(".comment-delete")) return;
+      if (e.target.closest(".card-copy")) return;
+      hdr.parentElement.classList.toggle("collapsed");
+    });
+  });
+  bindCopyButtons(container);
+  container.querySelectorAll(".comment-delete").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const card = btn.closest(".comment");
+      const ts = card && card.dataset.ts;
+      const idx = card && card.dataset.idx;
+      if (!openTaskId || !ts) return;
+      if (!confirm(`Delete comment #${(Number(idx) || 0) + 1}? This can't be undone.`)) return;
+      try {
+        await apiSend("DELETE", `/api/tasks/${openTaskId}/comments/${encodeURIComponent(ts)}`);
+        await refresh();
+        renderComments();
+        renderModalTabs();
+      } catch (err) { showError(err.message); }
+    });
+  });
+}
+
+// Toggle the "Mark reviewed" footer button based on the current task's
+// review state. Reviewed → button becomes "Mark unreviewed"; unreviewed
+// or flagged → "Mark reviewed".
+function updateReviewButton(t) {
+  const btn = document.getElementById("modal-mark-reviewed");
+  if (!t) { btn.style.display = "none"; return; }
+  btn.style.display = "";
+  if (t.reviewed_at != null) {
+    btn.textContent = "Mark unreviewed";
+    btn.dataset.action = "unmark";
+    btn.title = `Reviewed ${formatRelTime(t.reviewed_at)} (${formatAbs(t.reviewed_at)})`;
+  } else {
+    btn.textContent = t.needs_review ? "Mark reviewed ●" : "Mark reviewed";
+    btn.dataset.action = "mark";
+    btn.title = t.needs_review ? "Clear the review flag and record 'reviewed just now'" : "Record 'reviewed just now'";
+  }
+}
+
+// Search input.
+document.getElementById("search-input").addEventListener("input", (e) => {
+  searchQuery = e.target.value;
+  tasksPage = 1;
+  updateSidebarFooter();
+  renderTasks();
+});
+
+// Sidebar filter widgets. Each tri-state axis is a custom listbox: click a
+// row to cycle its state (unapplied → include → exclude → unapplied). We
+// re-render the whole axis on each click rather than mutating one row so
+// the state ↔ visual mapping stays in one place (`populateTri`).
+function wireTriFilter(elId, tri, valuesFn, labelCountFns) {
+  const el = document.getElementById(elId);
+  el.addEventListener("click", (e) => {
+    const row = e.target.closest(".tri-row");
+    if (!row || !el.contains(row)) return;
+    cycleTri(tri, row.dataset.value);
+    tasksPage = 1;
+    populateTri(elId, valuesFn(), tri, labelCountFns());
+    updateSidebarFooter();
+    renderTasks();
+  });
+}
+// Value/label/count resolvers mirror renderSidebar so a per-row re-render
+// stays consistent with the initial paint. Kept as thunks so counts pick
+// up the current allTasks / byId snapshot on each click.
+function _statusValues() { return STATUSES.filter(s => s !== "all"); }
+function _statusFns() {
+  const byId = Object.fromEntries(allTasks.map(t => [t.id, t]));
+  return {
+    label: v => v.replace("_", " "),
+    count: v => allTasks.filter(t => statusMatchesValue(t, v, byId)).length,
+  };
+}
+function _priorityValues() { return PRIORITY_OPTIONS; }
+function _priorityFns() {
+  return {
+    label: v => `${v} · ${PRIORITY_LABELS[v]}`,
+    count: v => allTasks.filter(t => priorityValueOf(t) === v).length,
+  };
+}
+function _ageValues() { return AGE_BUCKETS.map(b => b.key); }
+function _ageFns() {
+  return {
+    label: v => (AGE_BUCKETS.find(b => b.key === v) || {label: v}).label,
+    count: v => allTasks.filter(t => ageBucketFor(t.created_at) === v).length,
+  };
+}
+function _groupValues() {
+  const g = knownGroups();
+  return g.length ? [...g, "__ungrouped__"] : g;
+}
+function _groupFns() {
+  return {
+    label: v => v === "__ungrouped__" ? "(ungrouped)" : v,
+    count: v => allTasks.filter(t => groupMatchesValue(t, v)).length,
+  };
+}
+function _tagValues() {
+  const g = knownTags();
+  return g.length ? [...g, "__untagged__"] : g;
+}
+function _tagFns() {
+  return {
+    label: v => v === "__untagged__" ? "(untagged)" : v,
+    count: v => allTasks.filter(t => tagMatchesValue(t, v)).length,
+  };
+}
+function _reviewValues() { return REVIEW_OPTIONS; }
+function _reviewFns() {
+  return {
+    label: v => REVIEW_LABELS[v] || v,
+    count: v => allTasks.filter(t => reviewMatchesValue(t, v)).length,
+  };
+}
+function _pinnedValues() { return PINNED_OPTIONS; }
+function _pinnedFns() {
+  return {
+    label: v => PINNED_LABELS[v] || v,
+    count: v => allTasks.filter(t => pinnedMatchesValue(t, v)).length,
+  };
+}
+wireTriFilter("f-status",   activeStatus,   _statusValues,   _statusFns);
+wireTriFilter("f-priority", activePriority, _priorityValues, _priorityFns);
+wireTriFilter("f-review",   activeReview,   _reviewValues,   _reviewFns);
+wireTriFilter("f-pinned",   activePinned,   _pinnedValues,   _pinnedFns);
+wireTriFilter("f-age",      activeAge,      _ageValues,      _ageFns);
+wireTriFilter("f-group",    activeGroup,    _groupValues,    _groupFns);
+wireTriFilter("f-tag",      activeTag,      _tagValues,      _tagFns);
+
+// Header needs-review chip: click toggles include-`needs` in the Review
+// tri. Only touches the `needs` value — any include/exclude choices on
+// `reviewed`/`unreviewed` are preserved.
+document.getElementById("btn-needs-review").addEventListener("click", () => {
+  if (activeReview.inc.has("needs")) activeReview.inc.delete("needs");
+  else { activeReview.exc.delete("needs"); activeReview.inc.add("needs"); }
+  tasksPage = 1;
+  renderSidebar();
+  renderTasks();
+});
+
+// Header pinned chip: click toggles include-`pinned` in the Pinned tri.
+// Preserves any exclude selection on `unpinned`.
+document.getElementById("btn-pinned").addEventListener("click", () => {
+  if (activePinned.inc.has("pinned")) activePinned.inc.delete("pinned");
+  else { activePinned.exc.delete("pinned"); activePinned.inc.add("pinned"); }
+  tasksPage = 1;
+  renderSidebar();
+  renderTasks();
+});
+
+// Sidebar toggle + persistence.
+document.getElementById("sidebar-toggle").addEventListener("click", () => {
+  sidebarCollapsed = !sidebarCollapsed;
+  try { localStorage.setItem("pm.sidebar.collapsed", sidebarCollapsed ? "1" : "0"); } catch {}
+  applySidebarCollapsed();
+});
+
+// Clear all filters.
+function clearTri(tri) { tri.inc.clear(); tri.exc.clear(); }
+document.getElementById("sidebar-clear").addEventListener("click", () => {
+  clearTri(activeStatus);
+  clearTri(activePriority);
+  clearTri(activeGroup);
+  clearTri(activeTag);
+  clearTri(activeAge);
+  clearTri(activeReview);
+  clearTri(activePinned);
+  searchQuery = "";
+  const searchInput = document.getElementById("search-input");
+  if (searchInput) searchInput.value = "";
+  tasksPage = 1;
+  renderSidebar();
+  renderTasks();
+});
+
+// Tab switching.
+document.querySelectorAll(".modal-tab").forEach(btn => {
+  btn.addEventListener("click", () => { activeTab = btn.dataset.tab; renderModalTabs(); });
+});
+
+// Body view/edit toggle.
+document.getElementById("modal-body-edit").addEventListener("click", () => {
+  const ta = document.querySelector('#modal-edit-form [name="body"]');
+  const editing = ta.style.display !== "none";
+  setBodyMode(editing ? "view" : "edit");
+});
+
+// Close handlers.
+document.getElementById("modal-close").addEventListener("click", closeTaskModal);
+document.getElementById("task-modal").addEventListener("click", (e) => {
+  if (e.target.id === "task-modal") closeTaskModal();
+});
+document.addEventListener("keydown", (e) => {
+  // "?" is handled by the shared help-modal module. Here we only own the
+  // Esc chain for our own sibling modals.
+  if (e.key !== "Escape") return;
+  // Topmost first: help modal wins if open, then the task modal.
+  if (window.helpIsOpen && window.helpIsOpen()) window.helpClose();
+  else if (document.getElementById("task-modal").classList.contains("open")) closeTaskModal();
+});
+
+function flashSave(msg, isError = false) {
+  const el = document.getElementById("modal-save-flash");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.toggle("error", !!isError);
+  el.classList.add("show");
+  clearTimeout(flashSave._t);
+  flashSave._t = setTimeout(() => el.classList.remove("show"), 1800);
+}
+
+// Save handler — dual mode. Edit: PATCH and keep modal open with Saved ✓ flash.
+// Create: POST, then close modal (so user sees the new row in the list).
+// Persist draft on every keystroke / change while the create modal is open.
+// No-op in edit mode (edits PATCH straight to the server).
+document.getElementById("modal-edit-form").addEventListener("input", saveNewTaskDraft);
+document.getElementById("modal-edit-form").addEventListener("change", saveNewTaskDraft);
+
+document.getElementById("modal-edit-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const payload = {
+    title: f.title.value.trim(),
+    priority: f.priority.value,
+    group: f.group.value.trim() || null,
+    tags: parseCsv(f.tags.value),
+    assignee: f.assignee.value.trim() || null,
+    depends_on: parseCsv(f.depends_on.value),
+    parent_task_id: f.parent_task_id.value.trim() || null,
+    body: f.body.value,
+  };
+  const btn = f.querySelector('button[type="submit"]');
+  if (btn) btn.disabled = true;
+  try {
+    if (modalMode === "create") {
+      // status is not accepted by POST (server defaults to open); strip it.
+      const post = {...payload};
+      // POST expects `assignee` as string|undefined (not null) to leave unassigned.
+      if (post.assignee === null) delete post.assignee;
+      if (post.group === null) delete post.group;
+      if (post.parent_task_id === null) delete post.parent_task_id;
+      const created = await apiSend("POST", "/api/tasks", post);
+      // If the user chose a non-default status in the create form, patch it now.
+      if (f.status.value && f.status.value !== "open") {
+        await apiSend("PATCH", `/api/tasks/${created.id}`, {status: f.status.value});
+      }
+      clearNewTaskDraft();
+      await refresh();
+      closeTaskModal();
+    } else {
+      if (!openTaskId) return;
+      const patch = {...payload, status: f.status.value};
+      await apiSend("PATCH", `/api/tasks/${openTaskId}`, patch);
+      await refresh();
+      flashSave("Saved ✓");
+      setBodyMode("view");
+    }
+  } catch (err) {
+    console.error("modal submit failed:", err, "mode:", modalMode, "payload:", payload);
+    flashSave(`${modalMode === "create" ? "Create" : "Save"} failed: ${err.message}`, true);
+    showError(err.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+});
+
+// Mark reviewed / unreviewed.
+document.getElementById("modal-mark-reviewed").addEventListener("click", async () => {
+  if (!openTaskId) return;
+  const btn = document.getElementById("modal-mark-reviewed");
+  const action = btn.dataset.action;
+  btn.disabled = true;
+  try {
+    const patch = action === "unmark" ? {reviewed_at: null} : {reviewed_at: "now"};
+    await apiSend("PATCH", `/api/tasks/${openTaskId}`, patch);
+    await refresh();
+    const t = currentTask();
+    if (t) updateReviewButton(t);
+    flashSave(action === "unmark" ? "Cleared review" : "Reviewed ✓");
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Delete handler.
+document.getElementById("modal-delete").addEventListener("click", async () => {
+  if (!openTaskId) return;
+  const t = currentTask();
+  if (!confirm(`Delete ${t.id} · "${t.title}"? This cannot be undone.`)) return;
+  try {
+    await apiSend("DELETE", `/api/tasks/${openTaskId}`);
+    await refresh();
+    closeTaskModal();
+  } catch (err) {
+    showError(err.message);
+  }
+});
+
+// Ask question.
+document.getElementById("modal-question-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!openTaskId) return;
+  const f = e.target;
+  const question = f.question.value.trim();
+  if (!question) return;
+  const asked_of = f.asked_of.value || null;
+  const asked_by = f.asked_by.value.trim() || null;
+  try {
+    const body = {question};
+    if (asked_of !== null) body.asked_of = asked_of;
+    if (asked_by !== null) body.asked_by = asked_by;
+    await apiSend("POST", `/api/tasks/${openTaskId}/questions`, body);
+    f.question.value = "";
+    await refresh();
+    renderQuestions();
+    renderModalTabs();
+  } catch (err) {
+    showError(err.message);
+  }
+});
+
+// Add review item.
+document.getElementById("modal-review-item-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!openTaskId) return;
+  const f = e.target;
+  const body = f.body.value.trim();
+  if (!body) return;
+  const ref = f.ref.value.trim() || null;
+  const author = f.author.value.trim() || null;
+  try {
+    const payload = {body};
+    if (ref !== null) payload.ref = ref;
+    if (author !== null) payload.author = author;
+    await apiSend("POST", `/api/tasks/${openTaskId}/review_items`, payload);
+    f.body.value = "";
+    f.ref.value = "";
+    await refresh();
+    renderReviewItems();
+    renderModalTabs();
+    const t = currentTask();
+    if (t) updateReviewButton(t);
+  } catch (err) {
+    showError(err.message);
+  }
+});
+
+// Comment post.
+document.getElementById("modal-comment-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!openTaskId) return;
+  const f = e.target;
+  const body = f.body.value.trim();
+  if (!body) return;
+  try {
+    await apiSend("POST", `/api/tasks/${openTaskId}/comments`, {body});
+    f.reset();
+    await refresh();
+    // Re-render comments on the still-open modal.
+    renderComments();
+    renderModalTabs();
+  } catch (err) {
+    showError(err.message);
+  }
+});
+
+function parseCsv(s) {
+  return (s || "").split(",").map(x => x.trim()).filter(Boolean);
+}
+
+// Header button opens the create modal.
+document.getElementById("btn-new-task").addEventListener("click", openTaskCreateModal);
+
+// ── URL state sync ──
+// State that survives page reloads is written to location.search. Only
+// non-default values are serialized so a clean view yields a clean URL.
+// Tri-state axes serialize as CSV with an optional `-` prefix marking
+// exclude entries (e.g. `status=open,-done`). Order within the CSV is
+// insignificant. Populate an existing tri (never allocate a new one —
+// see the tri comment above for why).
+function resetTriFromCsv(tri, s, filterFn) {
+  tri.inc.clear();
+  tri.exc.clear();
+  for (const raw of (s || "").split(",")) {
+    const t = raw.trim();
+    if (!t) continue;
+    const excl = t.startsWith("-");
+    const v = excl ? t.slice(1) : t;
+    if (!v) continue;
+    if (filterFn && !filterFn(v)) continue;
+    (excl ? tri.exc : tri.inc).add(v);
+  }
+}
+function csvFromTri(tri) {
+  const parts = [];
+  for (const v of tri.inc) parts.push(v);
+  for (const v of tri.exc) parts.push(`-${v}`);
+  return parts.join(",");
+}
+function parseUrl() {
+  const p = new URLSearchParams(location.search);
+  if (p.has("status")) resetTriFromCsv(activeStatus, p.get("status"));
+  if (p.has("pri")) resetTriFromCsv(activePriority, p.get("pri"));
+  if (p.has("group")) resetTriFromCsv(activeGroup, p.get("group"));
+  if (p.has("tag")) resetTriFromCsv(activeTag, p.get("tag"));
+  if (p.has("age")) {
+    const valid = new Set(AGE_BUCKETS.map(b => b.key));
+    resetTriFromCsv(activeAge, p.get("age"), v => valid.has(v));
+  }
+  if (p.has("review")) {
+    const valid = new Set(REVIEW_OPTIONS);
+    resetTriFromCsv(activeReview, p.get("review"), v => valid.has(v));
+  }
+  if (p.has("pinned")) {
+    const valid = new Set(PINNED_OPTIONS);
+    resetTriFromCsv(activePinned, p.get("pinned"), v => valid.has(v));
+  }
+  if (p.has("q")) searchQuery = p.get("q");
+  if (p.has("sort")) {
+    const [key, dir] = p.get("sort").split(":");
+    if (key) taskSort = {key, dir: dir === "asc" ? "asc" : "desc"};
+  }
+  if (p.has("page")) {
+    const n = parseInt(p.get("page"), 10);
+    if (n >= 1) tasksPage = n;
+  }
+  if (p.has("task")) openTaskId = p.get("task");
+  if (p.get("new") === "1") modalMode = "create";
+  // Reflect the parsed search into the input immediately.
+  const searchInput = document.getElementById("search-input");
+  if (searchInput) searchInput.value = searchQuery;
+}
+
+function syncUrl() {
+  const p = new URLSearchParams();
+  if (triActive(activeStatus)) p.set("status", csvFromTri(activeStatus));
+  if (triActive(activePriority)) p.set("pri", csvFromTri(activePriority));
+  if (triActive(activeGroup)) p.set("group", csvFromTri(activeGroup));
+  if (triActive(activeTag)) p.set("tag", csvFromTri(activeTag));
+  if (triActive(activeAge)) p.set("age", csvFromTri(activeAge));
+  if (triActive(activeReview)) p.set("review", csvFromTri(activeReview));
+  if (triActive(activePinned)) p.set("pinned", csvFromTri(activePinned));
+  if (searchQuery) p.set("q", searchQuery);
+  if (taskSort.key !== "updated_at" || taskSort.dir !== "desc") {
+    p.set("sort", `${taskSort.key}:${taskSort.dir}`);
+  }
+  if (tasksPage > 1) p.set("page", String(tasksPage));
+  if (openTaskId) p.set("task", openTaskId);
+  if (modalMode === "create" && !openTaskId) p.set("new", "1");
+  const qs = p.toString();
+  const next = location.pathname + (qs ? "?" + qs : "");
+  if (next !== location.pathname + location.search) {
+    history.replaceState(null, "", next);
+  }
+}
+
+window.addEventListener("popstate", () => {
+  parseUrl();
+  renderSidebar();
+  renderTasks();
+  if (openTaskId) openTaskModal(openTaskId);
+  else if (modalMode === "create") openTaskCreateModal();
+  else closeTaskModal();
+});
+
+// ── boot ──
+async function refresh() {
+  try {
+    const tasks = await apiGet("/api/tasks");
+    allTasks = tasks;
+    renderSidebar();
+    renderTasks();
+    // Restore an open modal from the URL after initial data load.
+    if (openTaskId && !document.getElementById("task-modal").classList.contains("open")) {
+      openTaskModal(openTaskId);
+    } else if (modalMode === "create" && !openTaskId &&
+               !document.getElementById("task-modal").classList.contains("open")) {
+      openTaskCreateModal();
+    }
+    // Refresh the open task modal's data too.
+    if (openTaskId) {
+      const t = currentTask();
+      if (!t) closeTaskModal();
+      else {
+        document.getElementById("modal-title").textContent = t.title || "(untitled)";
+        document.getElementById("modal-meta").innerHTML =
+          `created <span title="${escapeHtml(formatAbs(t.created_at))}">${escapeHtml(formatRelTime(t.created_at))}</span>` +
+          ` · updated <span title="${escapeHtml(formatAbs(t.updated_at))}">${escapeHtml(formatRelTime(t.updated_at))}</span>`;
+        renderComments();
+        renderQuestions();
+        renderReviewItems();
+        updateRelationsTabVisibility();
+        renderModalTabs();
+        renderRelations();
+        updateReviewButton(t);
+      }
+    }
+  } catch (e) {
+    showError(`Failed to load: ${e.message}`);
+  }
+}
+
+try { sidebarCollapsed = localStorage.getItem("pm.sidebar.collapsed") === "1"; } catch {}
+applySidebarCollapsed();
+parseUrl();
+refresh();
+</script>
+</body>
+</html>

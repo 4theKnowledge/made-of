@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Changelog · Project Manager · Made Of</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='6' y='6' width='20' height='20' transform='rotate(45 16 16)' fill='%236aa9ff'/></svg>" />
+<style>
+  :root {
+    --bg: #0b0d10;
+    --fg: #d7dbe0;
+    --fg-strong: #eee;
+    --muted: #9ba3ad;
+    --border: #2a2f36;
+    --code-bg: #1a1e23;
+    --pre-bg: #14181d;
+    --link: #6aa9ff;
+    --row-hover: rgba(255,255,255,0.04);
+    --danger: #ff9c9c;
+    --ok: #9cffc0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header { display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; border-bottom: 1px solid var(--border); gap: 12px; }
+  header h1 { margin: 0; font-size: 16px; font-weight: 600; color: var(--fg-strong); }
+  header .brand { display: flex; align-items: baseline; gap: 20px; }
+  header nav.app-nav { display: flex; gap: 14px; }
+  header nav.app-nav a { color: var(--muted); font-size: 13px; font-weight: 500;
+    text-decoration: none; padding: 4px 2px; border-bottom: 2px solid transparent; }
+  header nav.app-nav a:hover { color: var(--fg); }
+  header nav.app-nav a.active { color: var(--fg-strong); border-bottom-color: var(--link); }
+  header .header-actions { display: flex; gap: 8px; }
+  header .header-actions button { background: var(--link); color: #0b0d10; border: 0;
+    border-radius: 4px; padding: 6px 12px; font: inherit; font-weight: 600; cursor: pointer;
+    font-size: 12px; }
+  header .header-actions button:hover { filter: brightness(1.1); }
+  header .header-actions button.secondary { background: var(--code-bg); color: var(--fg);
+    border: 1px solid var(--border); }
+  header .header-actions button.secondary:hover { background: var(--row-hover); }
+  main { padding: 16px 24px 40px; }
+  section { margin-top: 24px; }
+  section:first-child { margin-top: 0; }
+
+  .filters { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: nowrap;
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: thin;
+    padding: 2px 4px 6px 0; }
+  .filters::-webkit-scrollbar { height: 6px; }
+  .filters::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .filters::-webkit-scrollbar-track { background: transparent; }
+  .chip { padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--code-bg); color: var(--fg); cursor: pointer; font-size: 12px; user-select: none;
+    flex: 0 0 auto; white-space: nowrap; }
+  .chip.active { background: var(--link); border-color: var(--link); color: #0b0d10;
+    font-weight: 600; }
+  .chip .chip-count { margin-left: 5px; opacity: 0.65; font-variant-numeric: tabular-nums; }
+  .chip.active .chip-count { opacity: 0.9; color: #0b0d10; }
+  .chip.zero:not(.active) { color: var(--muted); }
+  .chip.zero:not(.active) .chip-count { opacity: 0.55; }
+  .chip.sticky { position: sticky; left: 0; z-index: 1;
+    background: #2a1414; color: #ffb3b3; border-color: var(--danger);
+    font-weight: 600; box-shadow: 8px 0 8px -6px var(--bg); }
+  .chip.sticky:hover { background: #3a1818; color: #ffd0d0; }
+  .chip.sticky.disabled { background: var(--pre-bg); color: var(--muted);
+    border-color: var(--border); border-style: dashed; cursor: not-allowed;
+    font-weight: 400; }
+  .chip.sticky.disabled:hover { background: var(--pre-bg); color: var(--muted); }
+
+  .pager { display: flex; align-items: center; justify-content: flex-end;
+    gap: 10px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .pager button { background: var(--code-bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  .pager button:hover:not(:disabled) { border-color: var(--fg-strong); color: var(--fg-strong); }
+  .pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .pager .pager-count { font-family: ui-monospace, SF Mono, Menlo, monospace; }
+
+  .dep { font-family: ui-monospace, SF Mono, Menlo, monospace; font-size: 11px; color: var(--muted); }
+  .empty { color: var(--muted); font-style: italic; padding: 16px 0; }
+  .error { color: var(--danger); padding: 8px 12px; border: 1px solid #5a1e1e; border-radius: 4px;
+    background: #2a1414; margin: 8px 0; font-size: 12px; }
+
+  .kind { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;
+    background: var(--code-bg); color: var(--muted); margin-right: 8px; }
+  .kind.feature  { color: #9ecbff; }
+  .kind.fix      { color: #ff9c9c; }
+  .kind.refactor { color: #ffcf7a; }
+  .kind.decision { color: #c8a2ff; }
+  .kind.note     { color: var(--muted); }
+
+  .cl-day { color: var(--muted); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; margin: 14px 0 4px; padding-bottom: 3px;
+    border-bottom: 1px solid var(--border); font-family: ui-monospace, SF Mono, Menlo, monospace; }
+  .cl-day:first-child { margin-top: 0; }
+  .cl-row { display: grid; grid-template-columns: 80px minmax(0, 1fr) minmax(0, 200px) auto;
+    gap: 12px; align-items: center; padding: 7px 8px; border-bottom: 1px solid var(--border);
+    cursor: pointer; font-size: 13px; }
+  .cl-row:last-child { border-bottom: none; }
+  .cl-row:hover { background: var(--row-hover); }
+  .cl-row .cl-summary { color: var(--fg-strong); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .cl-row .cl-refs { color: var(--muted); font-size: 11px;
+    font-family: ui-monospace, SF Mono, Menlo, monospace; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .cl-row .cl-ts { color: var(--muted); font-size: 11px;
+    font-family: ui-monospace, SF Mono, Menlo, monospace; white-space: nowrap; }
+  .cl-row .kind { margin-right: 0; }
+
+  /* Modal */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    display: none; align-items: flex-start; justify-content: center;
+    z-index: 100; padding: 60px 16px 16px; overflow-y: auto; }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    width: 100%; max-width: 960px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+  .modal-header { display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .modal-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--fg-strong); }
+  .modal-header .modal-id { color: var(--muted); font-family: ui-monospace, SF Mono, Menlo, monospace;
+    font-size: 12px; margin-left: 10px; }
+  .modal-close { background: transparent; border: 0; color: var(--muted); cursor: pointer;
+    font-size: 20px; line-height: 1; padding: 0 4px; }
+  .modal-close:hover { color: var(--fg-strong); }
+  .modal-body { padding: 16px 18px 18px; }
+  .field { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: start;
+    margin-bottom: 10px; }
+  .field label { color: var(--muted); font-size: 12px; padding-top: 6px;
+    text-transform: uppercase; letter-spacing: 0.04em; }
+  .field input[type=text], .field select {
+    background: var(--code-bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 6px 8px; font: inherit; width: 100%; }
+  .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .modal-footer .footer-right { display: flex; align-items: center; gap: 10px; }
+  .save-flash { color: var(--ok); font-size: 12px; opacity: 0; transition: opacity 0.15s ease-in-out; }
+  .save-flash.show { opacity: 1; }
+  .save-flash.error { color: var(--danger); }
+  .modal-footer .primary { background: var(--link); color: #0b0d10; border: 0;
+    border-radius: 4px; padding: 6px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  .modal-footer .primary:hover { filter: brightness(1.1); }
+  .modal-footer .danger { background: transparent; color: var(--danger); border: 1px solid #5a1e1e;
+    border-radius: 4px; padding: 6px 14px; font: inherit; cursor: pointer; }
+  .modal-footer .danger:hover { background: #2a1414; }
+
+  /* Rendered markdown (changelog summary is inline; render without wrapping <p>). */
+  .md-inline code { background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: 1px 4px; font-family: ui-monospace, SF Mono, Menlo, monospace;
+    font-size: 12px; }
+  .md-inline a { color: var(--link); }
+
+  /* Block-level markdown body — used by the help modal here. */
+  .md-body > *:first-child { margin-top: 0; }
+  .md-body > *:last-child { margin-bottom: 0; }
+  .md-body p { margin: 0 0 8px; line-height: 1.5; }
+  .md-body h4 { color: var(--fg-strong); margin: 14px 0 6px; font-weight: 600;
+    line-height: 1.3; font-size: 13px; }
+  .md-body ul { margin: 0 0 8px; padding-left: 22px; }
+  .md-body li { margin: 2px 0; line-height: 1.5; }
+  .md-body code { background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: 1px 4px; font-family: ui-monospace, SF Mono, Menlo, monospace;
+    font-size: 12px; }
+  .md-body a { color: var(--link); }
+
+  /* Changelog detail modal */
+  .cl-detail { display: grid; grid-template-columns: 90px 1fr; gap: 8px 12px; }
+  .cl-detail .label { color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.04em; padding-top: 2px; }
+  .cl-detail .value { color: var(--fg); }
+  .cl-detail .value.mono { font-family: ui-monospace, SF Mono, Menlo, monospace; font-size: 12px; }
+  .cl-detail .value .task-link { color: var(--link);
+    font-family: ui-monospace, SF Mono, Menlo, monospace; }
+  .cl-detail .value .task-link:hover { text-decoration: underline; }
+  .cl-detail .value .summary-full { white-space: pre-wrap; color: var(--fg-strong); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>Project Manager · Made Of</h1>
+    <nav class="app-nav">
+      <a href="/index.html">Tasks</a>
+      <a href="/changelog.html" class="active">Changelog</a>
+    </nav>
+  </div>
+  <div class="header-actions">
+    <button type="button" id="btn-help" class="secondary" title="Quick reference (press ?)">?</button>
+    <button type="button" id="btn-new-cl">+ Changelog</button>
+  </div>
+</header>
+
+<main>
+  <div id="error" class="error" style="display:none"></div>
+
+  <section>
+    <h2>Changelog</h2>
+    <div class="filters" id="kind-filters"></div>
+    <div id="changelog"></div>
+    <div class="pager" id="cl-pager"></div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="cl-modal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cl-modal-title">
+    <div class="modal-header">
+      <div>
+        <h3 id="cl-modal-title">Changelog entry</h3>
+        <span class="modal-id" id="cl-modal-id"></span>
+      </div>
+      <button class="modal-close" type="button" aria-label="Close" id="cl-modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="cl-detail">
+        <div class="label">Kind</div>
+        <div class="value"><span id="cl-modal-kind" class="kind"></span></div>
+        <div class="label">Timestamp</div>
+        <div class="value mono" id="cl-modal-ts"></div>
+        <div class="label">Summary</div>
+        <div class="value"><div class="summary-full" id="cl-modal-summary"></div></div>
+        <div class="label">Refs</div>
+        <div class="value" id="cl-modal-refs"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="danger" id="cl-modal-delete">Delete</button>
+        <div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="cl-new-modal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cl-new-title">
+    <div class="modal-header">
+      <div><h3 id="cl-new-title">Log change</h3></div>
+      <button class="modal-close" type="button" aria-label="Close" id="cl-new-close">×</button>
+    </div>
+    <div class="modal-body">
+      <form id="cl-new-form">
+        <div class="field">
+          <label>Kind</label>
+          <select name="kind">
+            <option value="feature">feature</option>
+            <option value="fix">fix</option>
+            <option value="refactor">refactor</option>
+            <option value="decision">decision</option>
+            <option value="note">note</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Summary</label>
+          <input type="text" name="summary" placeholder="one-line description" required />
+        </div>
+        <div class="field">
+          <label>refs.task</label>
+          <input type="text" name="task" placeholder="T-0001 (or T-0001,T-0002)" />
+        </div>
+        <div class="field">
+          <label>refs.commit</label>
+          <input type="text" name="commit" placeholder="abc1234" />
+        </div>
+        <div class="field">
+          <label>refs.pr</label>
+          <input type="text" name="pr" placeholder="42" />
+        </div>
+        <div class="modal-footer">
+          <div></div>
+          <div class="footer-right">
+            <span class="save-flash" id="cl-new-flash"></span>
+            <button type="submit" class="primary">Log</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+// Help modal mounted from the shared vendored module. Pass the
+// changelog-specific "Changelog" section as an extra so the six shared
+// sections stay identical across pm/index.html and pm/changelog.html.
+// Accessors are attached to `window` so the classic script below (which
+// owns this page's Esc chain over its sibling modals) can consult them.
+import { installHelpModal, isHelpModalOpen, closeHelpModal } from "./vendor/help-modal.js";
+installHelpModal({
+  extraSections: [
+    {
+      heading: "Changelog",
+      html: `<ul>
+        <li>Entries are append-only in spirit. Delete only accidental noise (typos, smoke rows). For "changed my mind" cases, append a correction entry instead.</li>
+        <li>Kinds: <code>feature</code>, <code>fix</code>, <code>refactor</code>, <code>decision</code>, <code>note</code>.</li>
+        <li>Task refs (T-XXXX) link back to the Tasks page.</li>
+      </ul>`,
+    },
+  ],
+});
+window.helpIsOpen = isHelpModalOpen;
+window.helpClose = closeHelpModal;
+</script>
+
+<script type="module">
+// See index.html for the same block — kept per-page to avoid a shared
+// asset extraction in this pass.
+import { marked } from "./vendor/marked.esm.js";
+import createDOMPurify from "./vendor/purify.es.mjs";
+const purify = (typeof createDOMPurify.sanitize === "function")
+  ? createDOMPurify
+  : createDOMPurify(window);
+marked.setOptions({ gfm: true, breaks: true });
+window.renderMarkdown = function(src, opts = {}) {
+  const s = src == null ? "" : String(src);
+  const html = opts.inline ? marked.parseInline(s) : marked.parse(s);
+  return purify.sanitize(html);
+};
+</script>
+<script>
+// Fallback shim before the ESM block installs the real renderMarkdown.
+window.renderMarkdown = function(src) {
+  const s = src == null ? "" : String(src);
+  return s.replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+};
+
+const CHANGELOG_KINDS = ["feature", "fix", "refactor", "decision", "note"];
+const PAGE_SIZE = 20;
+let allChangelog = [];
+let activeKind = new Set();
+let clPage = 1;
+let openClId = null;
+
+function toggleFilter(set, value) {
+  if (set.has(value)) set.delete(value); else set.add(value);
+}
+
+// ── api ── (duplicated with index.html; extract to a shared asset later)
+async function apiGet(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(`GET ${path}: ${r.status}`);
+  return r.json();
+}
+async function apiSend(method, path, body) {
+  const r = await fetch(path, {
+    method,
+    headers: {"Content-Type": "application/json"},
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await r.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!r.ok) throw new Error((data && data.error) || `${method} ${path}: ${r.status}`);
+  return data;
+}
+
+function showError(msg) {
+  const el = document.getElementById("error");
+  el.textContent = msg;
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 5000);
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+function formatAbs(ts) { return (ts || "").replace("T", " ").replace("Z", ""); }
+function formatRelTime(ts) {
+  if (!ts) return "";
+  const then = Date.parse(ts);
+  if (isNaN(then)) return "";
+  let secs = Math.round((Date.now() - then) / 1000);
+  const future = secs < 0;
+  secs = Math.abs(secs);
+  let out;
+  if (secs < 5) out = "just now";
+  else if (secs < 60) out = `${secs}s`;
+  else if (secs < 3600) out = `${Math.floor(secs / 60)}m`;
+  else if (secs < 86400) out = `${Math.floor(secs / 3600)}h`;
+  else if (secs < 2592000) out = `${Math.floor(secs / 86400)}d`;
+  else if (secs < 31536000) out = `${Math.floor(secs / 2592000)}mo`;
+  else out = `${Math.floor(secs / 31536000)}y`;
+  if (out === "just now") return out;
+  return future ? `in ${out}` : `${out} ago`;
+}
+
+// ── kind filter chips ──
+function appendCount(chip, n) {
+  const c = document.createElement("span");
+  c.className = "chip-count";
+  c.textContent = n;
+  chip.appendChild(c);
+  if (n === 0) chip.classList.add("zero");
+}
+function renderKindFilters() {
+  const el = document.getElementById("kind-filters");
+  el.innerHTML = "";
+  const clearChip = document.createElement("span");
+  const empty = activeKind.size === 0;
+  clearChip.className = "chip sticky" + (empty ? " disabled" : "");
+  clearChip.textContent = "clear";
+  if (!empty) {
+    clearChip.onclick = () => { activeKind.clear(); clPage = 1; renderKindFilters(); renderChangelog(); };
+  }
+  el.appendChild(clearChip);
+  for (const k of CHANGELOG_KINDS) {
+    const chip = document.createElement("span");
+    chip.className = "chip" + (activeKind.has(k) ? " active" : "");
+    chip.textContent = k;
+    appendCount(chip, allChangelog.filter(e => e.kind === k).length);
+    chip.onclick = () => { toggleFilter(activeKind, k); clPage = 1; renderKindFilters(); renderChangelog(); };
+    el.appendChild(chip);
+  }
+}
+
+// ── list render ──
+function refsSummary(refs) {
+  if (!refs) return "";
+  return Object.entries(refs)
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k}:${v}`)
+    .join(" ");
+}
+function renderPager(pagerId, total, page, onChange) {
+  const el = document.getElementById(pagerId);
+  el.innerHTML = "";
+  if (total <= PAGE_SIZE) return;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const clamped = Math.min(Math.max(1, page), pages);
+  const start = (clamped - 1) * PAGE_SIZE + 1;
+  const end = Math.min(clamped * PAGE_SIZE, total);
+  const prev = document.createElement("button");
+  prev.type = "button"; prev.textContent = "‹ prev";
+  prev.disabled = clamped <= 1;
+  prev.onclick = () => onChange(clamped - 1);
+  const next = document.createElement("button");
+  next.type = "button"; next.textContent = "next ›";
+  next.disabled = clamped >= pages;
+  next.onclick = () => onChange(clamped + 1);
+  const count = document.createElement("span");
+  count.className = "pager-count";
+  count.textContent = `${start}–${end} of ${total} · page ${clamped}/${pages}`;
+  el.append(count, prev, next);
+}
+function renderChangelog() {
+  const container = document.getElementById("changelog");
+  const rows = activeKind.size === 0
+    ? allChangelog
+    : allChangelog.filter(e => activeKind.has(e.kind));
+
+  const total = rows.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (clPage > pages) clPage = pages;
+  const start = (clPage - 1) * PAGE_SIZE;
+  const pageRows = rows.slice(start, start + PAGE_SIZE);
+
+  if (!total) {
+    container.innerHTML = '<div class="empty">No changelog entries match.</div>';
+    renderPager("cl-pager", 0, 1, () => {});
+    return;
+  }
+
+  container.innerHTML = "";
+  let lastDay = null;
+  for (const e of pageRows) {
+    const ts = e.ts || "";
+    const day = ts.slice(0, 10);
+    if (day !== lastDay) {
+      const sep = document.createElement("div");
+      sep.className = "cl-day";
+      sep.textContent = day || "unknown date";
+      container.appendChild(sep);
+      lastDay = day;
+    }
+    const row = document.createElement("div");
+    row.className = "cl-row";
+    row.dataset.id = e.id;
+    const rel = formatRelTime(ts);
+    const abs = formatAbs(ts);
+    const refs = refsSummary(e.refs);
+    const summary = e.summary || "";
+    row.innerHTML = `
+      <span class="kind ${e.kind}">${e.kind}</span>
+      <span class="cl-summary" title="${escapeHtml(summary)}">${escapeHtml(summary)}</span>
+      <span class="cl-refs" title="${refs ? escapeHtml(refs) : ""}">${refs ? escapeHtml(refs) : ""}</span>
+      <span class="cl-ts" title="${escapeHtml(abs)}">${escapeHtml(rel)} · ${e.id || ""}</span>
+    `;
+    row.addEventListener("click", () => openChangelogModal(e.id));
+    container.appendChild(row);
+  }
+
+  renderPager("cl-pager", total, clPage, (p) => {
+    clPage = p;
+    renderChangelog();
+    document.getElementById("changelog").scrollIntoView({block: "start", behavior: "instant"});
+  });
+
+  syncUrl();
+}
+
+// ── detail modal ──
+function currentChangelog() {
+  return allChangelog.find(e => e.id === openClId);
+}
+function renderClRefs(refs) {
+  const container = document.getElementById("cl-modal-refs");
+  container.innerHTML = "";
+  if (!refs || !Object.keys(refs).length) {
+    container.innerHTML = '<span class="dep">—</span>';
+    return;
+  }
+  for (const [k, v] of Object.entries(refs)) {
+    if (v === null || v === undefined || v === "") continue;
+    const row = document.createElement("div");
+    // task refs can be a single "T-0001" or comma-separated ids.
+    // Link cross-page to the Tasks view — the ?task= param opens the modal on load.
+    if (k === "task" || k === "tasks") {
+      const ids = String(v).split(",").map(s => s.trim()).filter(Boolean);
+      const links = ids.map(id => {
+        const href = `/index.html?task=${encodeURIComponent(id)}`;
+        return `<a class="task-link" href="${href}">${escapeHtml(id)}</a>`;
+      }).join(" ");
+      row.innerHTML = `<span class="label" style="text-transform:none;letter-spacing:0;padding-right:6px;">${escapeHtml(k)}:</span>${links}`;
+    } else {
+      row.innerHTML = `<span class="label" style="text-transform:none;letter-spacing:0;padding-right:6px;">${escapeHtml(k)}:</span><span class="mono">${escapeHtml(String(v))}</span>`;
+    }
+    container.appendChild(row);
+  }
+}
+function openChangelogModal(id) {
+  openClId = id;
+  const e = currentChangelog();
+  if (!e) return;
+  document.getElementById("cl-modal-title").textContent = e.summary || "(no summary)";
+  document.getElementById("cl-modal-id").textContent = e.id || "";
+  const kindEl = document.getElementById("cl-modal-kind");
+  kindEl.className = `kind ${e.kind || "note"}`;
+  kindEl.textContent = e.kind || "";
+  document.getElementById("cl-modal-ts").innerHTML =
+    `<span title="${escapeHtml(formatAbs(e.ts))}">${escapeHtml(formatRelTime(e.ts))}</span>` +
+    ` <span class="dep">(${escapeHtml(formatAbs(e.ts))})</span>`;
+  const summaryEl = document.getElementById("cl-modal-summary");
+  summaryEl.classList.add("md-inline");
+  summaryEl.innerHTML = window.renderMarkdown(e.summary || "", {inline: true});
+  renderClRefs(e.refs);
+  const m = document.getElementById("cl-modal");
+  m.classList.add("open");
+  m.setAttribute("aria-hidden", "false");
+  syncUrl();
+}
+function closeChangelogModal() {
+  openClId = null;
+  const m = document.getElementById("cl-modal");
+  m.classList.remove("open");
+  m.setAttribute("aria-hidden", "true");
+  syncUrl();
+}
+document.getElementById("cl-modal-close").addEventListener("click", closeChangelogModal);
+document.getElementById("cl-modal").addEventListener("click", (e) => {
+  if (e.target.id === "cl-modal") closeChangelogModal();
+});
+document.addEventListener("keydown", (e) => {
+  // "?" is handled by the shared help-modal module. Here we only own the
+  // Esc chain for our own sibling modals.
+  if (e.key !== "Escape") return;
+  // Topmost first: help > create > detail.
+  if (window.helpIsOpen && window.helpIsOpen()) window.helpClose();
+  else if (document.getElementById("cl-new-modal").classList.contains("open")) closeChangelogCreateModal();
+  else if (openClId) closeChangelogModal();
+});
+document.getElementById("cl-modal-delete").addEventListener("click", async () => {
+  if (!openClId) return;
+  const e = currentChangelog();
+  if (!confirm(`Delete ${e.id}? Only do this for accidental noise (typos, smoke rows) — for "changed my mind" cases, append a correction entry instead.`)) return;
+  try {
+    await apiSend("DELETE", `/api/changelog/${openClId}`);
+    await refresh();
+    closeChangelogModal();
+  } catch (err) {
+    showError(err.message);
+  }
+});
+
+// ── create modal ──
+document.getElementById("btn-new-cl").addEventListener("click", openChangelogCreateModal);
+function openChangelogCreateModal() {
+  const f = document.getElementById("cl-new-form");
+  f.reset();
+  f.kind.value = "feature";
+  const m = document.getElementById("cl-new-modal");
+  m.classList.add("open");
+  m.setAttribute("aria-hidden", "false");
+  setTimeout(() => f.summary.focus(), 0);
+}
+function closeChangelogCreateModal() {
+  const m = document.getElementById("cl-new-modal");
+  m.classList.remove("open");
+  m.setAttribute("aria-hidden", "true");
+}
+document.getElementById("cl-new-close").addEventListener("click", closeChangelogCreateModal);
+document.getElementById("cl-new-modal").addEventListener("click", (e) => {
+  if (e.target.id === "cl-new-modal") closeChangelogCreateModal();
+});
+document.getElementById("cl-new-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const refs = {};
+  if (f.task.value.trim()) refs.task = f.task.value.trim();
+  if (f.commit.value.trim()) refs.commit = f.commit.value.trim();
+  if (f.pr.value.trim()) refs.pr = f.pr.value.trim();
+  const payload = {
+    kind: f.kind.value,
+    summary: f.summary.value.trim(),
+    refs: Object.keys(refs).length ? refs : undefined,
+  };
+  const btn = f.querySelector('button[type="submit"]');
+  if (btn) btn.disabled = true;
+  try {
+    await apiSend("POST", "/api/changelog", payload);
+    await refresh();
+    closeChangelogCreateModal();
+  } catch (err) {
+    console.error("changelog create failed:", err, "payload:", payload);
+    const flash = document.getElementById("cl-new-flash");
+    flash.textContent = `Failed: ${err.message}`;
+    flash.classList.add("show", "error");
+    setTimeout(() => flash.classList.remove("show"), 1800);
+    showError(err.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+});
+
+// ── URL state ──
+function setFromCsv(s) {
+  return new Set((s || "").split(",").map(x => x.trim()).filter(Boolean));
+}
+function csvFromSet(set) { return [...set].join(","); }
+function parseUrl() {
+  const p = new URLSearchParams(location.search);
+  if (p.has("kind")) activeKind = setFromCsv(p.get("kind"));
+  if (p.has("clpage")) {
+    const n = parseInt(p.get("clpage"), 10);
+    if (n >= 1) clPage = n;
+  }
+  if (p.has("cl")) openClId = p.get("cl");
+}
+function syncUrl() {
+  const p = new URLSearchParams();
+  if (activeKind.size) p.set("kind", csvFromSet(activeKind));
+  if (clPage > 1) p.set("clpage", String(clPage));
+  if (openClId) p.set("cl", openClId);
+  const qs = p.toString();
+  const next = location.pathname + (qs ? "?" + qs : "");
+  if (next !== location.pathname + location.search) {
+    history.replaceState(null, "", next);
+  }
+}
+window.addEventListener("popstate", () => {
+  parseUrl();
+  renderKindFilters();
+  renderChangelog();
+  if (openClId) openChangelogModal(openClId); else closeChangelogModal();
+});
+
+// ── boot ──
+async function refresh() {
+  try {
+    allChangelog = await apiGet("/api/changelog");
+    renderKindFilters();
+    renderChangelog();
+    if (openClId) {
+      const e = currentChangelog();
+      if (!e) closeChangelogModal();
+      else openChangelogModal(openClId);
+    }
+  } catch (e) {
+    showError(`Failed to load: ${e.message}`);
+  }
+}
+
+parseUrl();
+refresh();
+</script>
+</body>
+</html>
