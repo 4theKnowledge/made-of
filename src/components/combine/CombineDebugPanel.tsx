@@ -26,6 +26,12 @@ interface Props {
   /** Current value of the derived predicate, surfaced for at-a-glance
    *  debugging regardless of the preview toggle. */
   lastChance: boolean;
+  /** Force the end-of-run results dialog open with the current state,
+   *  locking the board first if needed. Admin-only preview of the
+   *  completed-game UI without having to play through a run. */
+  onShowGameOver: () => void;
+  /** Whether the results dialog is currently rendered. */
+  gameOverOpen: boolean;
 }
 
 export function CombineDebugPanel({
@@ -36,6 +42,8 @@ export function CombineDebugPanel({
   previewLastChance,
   onPreviewLastChanceToggle,
   lastChance,
+  onShowGameOver,
+  gameOverOpen,
 }: Props) {
   const [query, setQuery] = useState("");
   const [slot, setSlot] = useState(0);
@@ -102,6 +110,16 @@ export function CombineDebugPanel({
             onClick={() => dispatch({ type: "debug-toggle-over" })}
           >
             {state.over ? "unlock board" : "lock board (game over)"}
+          </button>
+          <button
+            type="button"
+            className={
+              "cbdebug-btn" + (gameOverOpen ? " cbdebug-btn-on" : "")
+            }
+            disabled={!state.debug}
+            onClick={onShowGameOver}
+          >
+            {gameOverOpen ? "results open" : "show results dialog"}
           </button>
         </div>
       </section>

@@ -1933,6 +1933,11 @@ export function CombineBoard({
                 setPreviewLastChance((v) => !v)
               }
               lastChance={lastChance}
+              gameOverOpen={state.over && overCardOpen}
+              onShowGameOver={() => {
+                if (!state.over) act({ type: "debug-toggle-over" });
+                setOverCardOpen(true);
+              }}
             />
           )}
         </>
