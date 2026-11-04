@@ -19,7 +19,7 @@ import type { ThemeBundle, ThemeKey } from "./types";
  *  ages + sparse-band merge changed the band layout and age count. A
  *  pre-v5 save at age=4 under 9 ages can't be hydrated into a 6-age
  *  bundle without warping to "Final age" nonsense. */
-const SAVE_VERSION = 5;
+const SAVE_VERSION = 6;
 
 /** Bump to force every player who has already finished today's daily to
  *  be able to play it again. Stamped into DailyResult + the review save
@@ -68,6 +68,7 @@ export interface StoredGame {
   hints: number;
   mv: number;
   shore: number;
+  pluck: number;
   over: boolean;
   newBest: boolean;
   moves: number;
@@ -128,6 +129,7 @@ function toStored(state: GameState): StoredGame {
     hints: state.hints,
     mv: state.mv,
     shore: state.shore,
+    pluck: state.pluck,
     over: state.over,
     newBest: state.newBest,
     moves: state.moves,
@@ -250,6 +252,7 @@ export function hydrateGame(s: StoredGame): GameState {
     hints: s.hints,
     mv: s.mv,
     shore: s.shore,
+    pluck: s.pluck ?? 0,
     over: s.over,
     newBest: s.newBest,
     moves: s.moves,

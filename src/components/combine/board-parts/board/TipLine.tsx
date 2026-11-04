@@ -10,6 +10,7 @@ export function TipLine({
   clearMode,
   moveMode,
   shoreMode,
+  pluckMode,
 }: {
   state: GameState;
   hasSelection: boolean;
@@ -17,12 +18,14 @@ export function TipLine({
   clearMode: boolean;
   moveMode: { from: number | null } | null;
   shoreMode: boolean;
+  pluckMode: boolean;
 }) {
   let tip: string;
   if (state.over) tip = "Game over.";
   else if (state.choosing) tip = "These make more than one thing. Pick one.";
   else if (clearMode) tip = "Tap a tile to clear it.";
   else if (shoreMode) tip = "Tap a crumbling tile to steady it.";
+  else if (pluckMode) tip = "Tap a tile to pull it into hold.";
   else if (moveMode) {
     if (moveMode.from == null) tip = "Tap the tile you want to move.";
     else {

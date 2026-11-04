@@ -1,8 +1,18 @@
 import React from "react";
-import type { GameState } from "@/combine/engine";
+import { WIPE_UNLOCK_AGE, type GameState } from "@/combine/engine";
 import type { Fx } from "@/components/combine/board-parts/types";
 import { formatDailyLabel } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
+
+export type HelperKey =
+  | "hint"
+  | "swap"
+  | "clear"
+  | "move"
+  | "shore"
+  | "pluck"
+  | "wipe"
+  | "undo";
 
 export function TopBar({
   state,
@@ -13,6 +23,7 @@ export function TopBar({
   clearMode,
   moveMode,
   shoreMode,
+  pluckMode,
   soundOn,
   onToggleHelpers,
   onToggleMore,
@@ -31,10 +42,11 @@ export function TopBar({
   clearMode: boolean;
   moveMode: boolean;
   shoreMode: boolean;
+  pluckMode: boolean;
   soundOn: boolean;
   onToggleHelpers: () => void;
   onToggleMore: () => void;
-  onHelper: (which: "hint" | "swap" | "clear" | "move" | "shore" | "undo") => void;
+  onHelper: (which: HelperKey) => void;
   onTheme: () => void;
   onBook: () => void;
   onSound: () => void;
@@ -42,17 +54,22 @@ export function TopBar({
   onIntro: () => void;
 }) {
   const canUndo = state.undos > 0 && state.lastSnapshot != null;
+  const wipeUnlocked = state.age >= WIPE_UNLOCK_AGE;
+  const holdFull = !state.hold.some((v) => v == null);
+  const boardEmpty = !state.board.some((v) => v != null);
   const helpersLeft =
     state.swaps +
     state.clears +
     state.hints +
     state.mv +
     state.shore +
+    state.pluck +
+    (wipeUnlocked ? 1 : 0) +
     (canUndo ? 1 : 0);
   const themeName = state.daily ? "Daily" : "Endless";
   const dailyLabel = state.daily ? formatDailyLabel(state.daily) : null;
   const bestDisplay = Math.max(best, state.over ? state.score : 0);
-  const modeActive = clearMode || moveMode || shoreMode;
+  const modeActive = clearMode || moveMode || shoreMode || pluckMode;
   return (
     <div className={`cbtop${state.daily ? " cbtop-daily" : ""}`}>
       <div className="cbscore">
@@ -203,6 +220,53 @@ export function TopBar({
                 </em>
               </span>
               <b className="c">{state.shore}</b>
+            </button>
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("pluck")}
+              disabled={state.pluck === 0 || holdFull || boardEmpty}
+              aria-label={
+                state.pluck === 0
+                  ? "Pluck used"
+                  : holdFull
+                    ? "Pluck unavailable — hold is full"
+                    : boardEmpty
+                      ? "Pluck unavailable — board is empty"
+                      : `Pluck a tile into hold, ${state.pluck} left`
+              }
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v10M9 10l3 3 3-3M5 15v5h14v-5" />
+              </svg>
+              <span className="nm">
+                <b className="t">Pluck</b>
+                <em>Pull a tile off the board into hold. Not a turn.</em>
+              </span>
+              <b className="c">{state.pluck}</b>
+            </button>
+            <button
+              type="button"
+              className="cbhm"
+              onClick={() => onHelper("wipe")}
+              disabled={!wipeUnlocked}
+              aria-label={
+                wipeUnlocked
+                  ? "Wipe the board, costs one age"
+                  : `Wipe unlocks at age ${WIPE_UNLOCK_AGE + 1}`
+              }
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5" />
+              </svg>
+              <span className="nm">
+                <b className="t">Wipe</b>
+                <em>
+                  {wipeUnlocked
+                    ? "Clear the board and hold. Costs one age."
+                    : `Unlocks at age ${WIPE_UNLOCK_AGE + 1}.`}
+                </em>
+              </span>
             </button>
             <button
               type="button"

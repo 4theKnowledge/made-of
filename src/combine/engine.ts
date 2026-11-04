@@ -107,6 +107,10 @@ export interface GameState {
   hints: number;
   mv: number;
   shore: number;
+  /** Pluck-to-hold charges. Each use lifts one on-board tile into the
+   *  first empty hold slot. Scales like the other helpers via
+   *  `helperGrants`. */
+  pluck: number;
   over: boolean;
   newBest: boolean;
   moves: number;
@@ -174,6 +178,7 @@ export type Event =
   | { type: "hold-crumble"; slots: number[]; tiles: string[] }
   | { type: "discovery"; out: string; recipe: string[] }
   | { type: "dealt" }
+  | { type: "wipe"; age: number }
   | { type: "over" };
 
 /** Tile source for placement actions. */
@@ -190,6 +195,8 @@ export type Action =
   | { type: "move"; from: number; to: number }
   | { type: "shore"; cell: number }
   | { type: "hold"; slot: number }
+  | { type: "pluck-hold"; cell: number }
+  | { type: "wipe-board" }
   | { type: "undo" }
   // Debug actions (admin-only). The toggle flips `state.debug`; the others
   // are no-ops unless `state.debug` is already true. UI mounting is gated
@@ -293,11 +300,24 @@ export function ageNeed(age: number, bundle: ThemeBundle): number {
  *  (e.g. Everything's band 4/5 at ~95/107 outputs) get proportionally
  *  more help without flooding the player; the caps keep late-game
  *  crumble pressure meaningful. */
-export const HELPER_PER_ITEMS = { mv: 10, swap: 15, clear: 20, hint: 20, shore: 15 } as const;
-export const HELPER_MIN = { mv: 2, swap: 1, clear: 1, hint: 1, shore: 1 } as const;
-export const HELPER_MAX = { mv: 8, swap: 5, clear: 3, hint: 4, shore: 4 } as const;
+export const HELPER_PER_ITEMS = { mv: 10, swap: 15, clear: 20, hint: 20, shore: 15, pluck: 20 } as const;
+export const HELPER_MIN = { mv: 2, swap: 1, clear: 1, hint: 1, shore: 1, pluck: 1 } as const;
+export const HELPER_MAX = { mv: 8, swap: 5, clear: 3, hint: 4, shore: 4, pluck: 3 } as const;
 
-export type HelperGrants = { mv: number; swap: number; clear: number; hint: number; shore: number };
+/** 0-based age at which the wipe-board helper unlocks. The player must be
+ *  at this age (or higher) to use it, and each wipe costs one age — so
+ *  using it at exactly this age drops them below the threshold and
+ *  re-locks it until they climb back up. */
+export const WIPE_UNLOCK_AGE = 2;
+
+export type HelperGrants = {
+  mv: number;
+  swap: number;
+  clear: number;
+  hint: number;
+  shore: number;
+  pluck: number;
+};
 
 export function helperGrants(age: number, bundle: ThemeBundle): HelperGrants {
   const n = bandSize(age, bundle);
@@ -309,6 +329,7 @@ export function helperGrants(age: number, bundle: ThemeBundle): HelperGrants {
     clear: grant("clear"),
     hint: grant("hint"),
     shore: grant("shore"),
+    pluck: grant("pluck"),
   };
 }
 
@@ -318,6 +339,7 @@ function applyHelperGrants(state: GameState, g: HelperGrants): void {
   state.clears += g.clear;
   state.hints += g.hint;
   state.shore += g.shore;
+  state.pluck += g.pluck;
 }
 
 /** Tier value for scoring. Falls back to M=2 for unknown tiers. */
@@ -663,6 +685,13 @@ export function hasAnyLegalAction(state: GameState, bundle: ThemeBundle): boolea
   // clear: removes a tile from the board.
   if (state.clears > 0 && anyOccupied) return true;
 
+  // pluck-to-hold: lifts a board tile into a free hold slot.
+  if (state.pluck > 0 && anyOccupied && holdSlots.some((v) => v == null)) return true;
+
+  // wipe-board: clears everything at the cost of one age. Unlocked once
+  // the player reaches WIPE_UNLOCK_AGE. Always opens a path forward.
+  if (state.age >= WIPE_UNLOCK_AGE) return true;
+
   return false;
 }
 
@@ -698,6 +727,7 @@ export function newGame(
     hints: 0,
     mv: 0,
     shore: 0,
+    pluck: 0,
     over: false,
     newBest: false,
     moves: 0,
@@ -1006,6 +1036,60 @@ export function reduce(
       if (!state.debug) state.shore--;
       state.crumb[action.cell] = null;
       state.shored[action.cell] = true;
+      return { state, events };
+    }
+
+    case "pluck-hold": {
+      // Lift a board tile into the first empty hold slot. Not a turn:
+      // skips afterMove (no crumble tick, no re-deal), symmetric with
+      // the move helper. Crumble counter and shore flag on the source
+      // cell clear with the tile.
+      if (!state.debug && state.pluck <= 0) return { state: prev, events: [] };
+      const tile = state.board[action.cell];
+      if (!tile) return { state: prev, events: [] };
+      const target = state.hold.findIndex((v) => v == null);
+      if (target === -1) return { state: prev, events: [] };
+      if (!state.debug) state.pluck--;
+      state.board[action.cell] = null;
+      state.crumb[action.cell] = null;
+      state.shored[action.cell] = false;
+      state.hold[target] = tile;
+      return { state, events };
+    }
+
+    case "wipe-board": {
+      // Clear everything on the play surface and spend one age for the
+      // privilege. Preserves score, discoveries, shelf, and run history —
+      // only the board + hold go. Requires the player to have reached
+      // `WIPE_UNLOCK_AGE`; dropping below the threshold re-locks the
+      // helper (UI-side), so repeat use costs an age each time.
+      if (state.age < WIPE_UNLOCK_AGE) return { state: prev, events: [] };
+      state.board.fill(null);
+      state.crumb.fill(null);
+      state.shored.fill(false);
+      state.hold.fill(null);
+      state.tray.fill(null);
+      state.lastSnapshot = null;
+      state.age--;
+      state.ageMade = 0;
+      // Resize hold to the new (lower) age's capacity. We just zeroed
+      // every slot, so a straight length reset is safe.
+      const cap = holdCapacity(state.age);
+      state.hold.length = 0;
+      for (let i = 0; i < cap; i++) state.hold.push(null);
+      events.push({ type: "wipe", age: state.age });
+      // Re-deal a fresh tray from the current age's pool so the player
+      // has something to act on after confirming the wipe.
+      dealTray({
+        bundle,
+        board: state.board,
+        tray: state.tray,
+        size: state.n,
+        age: state.age,
+        rng: state.rng,
+        recentTrays: state.recentTrays,
+      });
+      events.push({ type: "dealt" });
       return { state, events };
     }
 

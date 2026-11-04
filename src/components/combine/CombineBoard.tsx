@@ -7,7 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { newGame, reduce } from "@/combine/engine";
+import { newGame, reduce, WIPE_UNLOCK_AGE } from "@/combine/engine";
 import type { Action, Event, GameState } from "@/combine/engine";
 import { matchOn } from "@/combine/match";
 import { findHint as pureFindHint, type HintResult } from "@/combine/hint";
@@ -40,6 +40,7 @@ import {
   shareText,
 } from "@/combine/share";
 import type { ThemeBundle, ThemeKey } from "@/combine/types";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { HowToPlay } from "@/components/common/HowToPlay";
 import { CombineDebugPanel } from "@/components/combine/CombineDebugPanel";
 import {
@@ -195,6 +196,10 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
   );
   // Shore-mode: next tap on a crumbling tile resets its counter.
   const [shoreMode, setShoreMode] = useState(false);
+  // Pluck-mode: next tap on a board tile lifts it into hold.
+  const [pluckMode, setPluckMode] = useState(false);
+  // Wipe-board confirmation dialog.
+  const [wipeConfirm, setWipeConfirm] = useState(false);
   // Hint toast — a card with a recipe to try when nothing fits.
   const [hintToast, setHintToast] = useState<HintResult | null>(null);
   const [fx, setFx] = useState<Fx>({});
@@ -206,7 +211,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
   const [ageToast, setAgeToast] = useState<{
     age: number;
     sample: string[];
-    grants: { mv: number; swap: number; clear: number; hint: number; shore: number };
+    grants: { mv: number; swap: number; clear: number; hint: number; shore: number; pluck: number };
   } | null>(null);
   // Admin-only debug panel visibility. Only ever flipped from the FAB
   // button below the board, which itself only renders when the server
@@ -371,7 +376,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
       let latestAgeUp: {
         age: number;
         sample: string[];
-        grants: { mv: number; swap: number; clear: number; hint: number; shore: number };
+        grants: { mv: number; swap: number; clear: number; hint: number; shore: number; pluck: number };
       } | null = null;
 
       // Outputs discovered in this batch — used to flash the forming cell
@@ -882,6 +887,14 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         setShoreMode(false);
         return;
       }
+      // Pluck mode: tap a board tile to lift it into hold.
+      if (pluckMode) {
+        if (state.board[cell] == null) return;
+        if (!state.hold.some((v) => v == null)) return;
+        act({ type: "pluck-hold", cell });
+        setPluckMode(false);
+        return;
+      }
       // Move mode: first tap picks the source, second tap drops it.
       if (moveMode) {
         if (moveMode.from == null) {
@@ -923,7 +936,18 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         });
       }
     },
-    [act, selectedSlot, state.board, state.crumb, state.over, clearMode, moveMode, shoreMode],
+    [
+      act,
+      selectedSlot,
+      state.board,
+      state.crumb,
+      state.hold,
+      state.over,
+      clearMode,
+      moveMode,
+      shoreMode,
+      pluckMode,
+    ],
   );
 
   // When a drag completed via drop or a long-press fired, we don't want
@@ -1000,6 +1024,14 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         setShoreMode(false);
         return;
       }
+      if (pluckMode) {
+        setPluckMode(false);
+        return;
+      }
+      if (wipeConfirm) {
+        setWipeConfirm(false);
+        return;
+      }
       if (selectedSlot != null) {
         setSelectedSlot(null);
       }
@@ -1019,6 +1051,8 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
     clearMode,
     moveMode,
     shoreMode,
+    pluckMode,
+    wipeConfirm,
     selectedSlot,
   ]);
 
@@ -1225,7 +1259,17 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
   ]);
 
   const onHelper = useCallback(
-    (which: "hint" | "swap" | "clear" | "move" | "shore" | "undo") => {
+    (
+      which:
+        | "hint"
+        | "swap"
+        | "clear"
+        | "move"
+        | "shore"
+        | "pluck"
+        | "wipe"
+        | "undo",
+    ) => {
       setHelpersOpen(false);
       // Undo rewinds the last placement/drop/move. Blocked by the
       // engine when the last turn produced a discovery (so daily
@@ -1235,15 +1279,18 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         setClearMode(false);
         setMoveMode(null);
         setShoreMode(false);
+        setPluckMode(false);
         setSelectedSlot(null);
         act({ type: "undo" });
         return;
       }
-      // Entering move/clear/shore cancels selection and any opposing mode.
+      // Entering move/clear/shore/pluck cancels selection and any opposing
+      // mode.
       if (which === "clear") {
         if (state.clears <= 0 || state.over) return;
         setMoveMode(null);
         setShoreMode(false);
+        setPluckMode(false);
         setSelectedSlot(null);
         setClearMode((m) => !m);
         return;
@@ -1252,6 +1299,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         if (state.mv <= 0 || state.over) return;
         setClearMode(false);
         setShoreMode(false);
+        setPluckMode(false);
         setSelectedSlot(null);
         setMoveMode((m) => (m ? null : { from: null }));
         return;
@@ -1260,8 +1308,34 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         if (state.shore <= 0 || state.over) return;
         setClearMode(false);
         setMoveMode(null);
+        setPluckMode(false);
         setSelectedSlot(null);
         setShoreMode((m) => !m);
+        return;
+      }
+      if (which === "pluck") {
+        if (state.pluck <= 0 || state.over) return;
+        // No point entering pluck mode with no room to stash a tile or
+        // nothing to lift.
+        if (!state.hold.some((v) => v == null)) return;
+        if (!state.board.some((v) => v != null)) return;
+        setClearMode(false);
+        setMoveMode(null);
+        setShoreMode(false);
+        setSelectedSlot(null);
+        setPluckMode((m) => !m);
+        return;
+      }
+      if (which === "wipe") {
+        if (state.age < WIPE_UNLOCK_AGE || state.over) return;
+        // Wipe is destructive — clears board, hold, and spends an age.
+        // Confirm first so a stray tap can't drop a player back a tier.
+        setClearMode(false);
+        setMoveMode(null);
+        setShoreMode(false);
+        setPluckMode(false);
+        setSelectedSlot(null);
+        setWipeConfirm(true);
         return;
       }
       if (which === "swap") {
@@ -1269,6 +1343,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         setClearMode(false);
         setMoveMode(null);
         setShoreMode(false);
+        setPluckMode(false);
         act({ type: "swap" });
         return;
       }
@@ -1287,6 +1362,10 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
       state.swaps,
       state.hints,
       state.shore,
+      state.pluck,
+      state.age,
+      state.hold,
+      state.board,
       state.undos,
       state.lastSnapshot,
       state.over,
@@ -1345,6 +1424,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
           clearMode={clearMode}
           moveMode={moveMode != null}
           shoreMode={shoreMode}
+          pluckMode={pluckMode}
           soundOn={sound.music !== "off" || sound.sfx}
           onToggleHelpers={() => {
             // If a mode is active, the button is Cancel: exit the mode.
@@ -1358,6 +1438,10 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
             }
             if (shoreMode) {
               setShoreMode(false);
+              return;
+            }
+            if (pluckMode) {
+              setPluckMode(false);
               return;
             }
             setHelpersOpen((o) => !o);
@@ -1390,6 +1474,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
           clearMode={clearMode}
           moveMode={moveMode}
           shoreMode={shoreMode}
+          pluckMode={pluckMode}
         />
         <AgeBar
           state={state}
@@ -1421,6 +1506,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
           clearMode={clearMode}
           moveMode={moveMode}
           shoreMode={shoreMode}
+          pluckMode={pluckMode}
           onCellTap={onCellTap}
         />
         <Hold
@@ -1639,6 +1725,19 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         {onboardOpen && (
           <OnboardingDemo onDismiss={() => setOnboardOpen(false)} />
         )}
+        <ConfirmDialog
+          open={wipeConfirm}
+          title="Wipe the board?"
+          body="Clears every tile on the board and in hold, and drops you back one age. Your score, discoveries and shelf stay. This can't be undone."
+          confirmLabel="Wipe"
+          cancelLabel="Keep playing"
+          destructive
+          onConfirm={() => {
+            setWipeConfirm(false);
+            act({ type: "wipe-board" });
+          }}
+          onDismiss={() => setWipeConfirm(false)}
+        />
       </div>
       {drag &&
         drag.slot != null &&

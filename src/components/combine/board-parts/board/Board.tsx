@@ -16,6 +16,7 @@ export function Board({
   clearMode,
   moveMode,
   shoreMode,
+  pluckMode,
   onCellTap,
 }: {
   state: GameState;
@@ -26,6 +27,7 @@ export function Board({
   clearMode: boolean;
   moveMode: { from: number | null } | null;
   shoreMode: boolean;
+  pluckMode: boolean;
   onCellTap: (cell: number) => void;
 }) {
   const size = state.n;
@@ -51,6 +53,10 @@ export function Board({
         const isMoving = moveMode != null && moveMode.from === i;
         const isShored = state.shored[i] === true;
         const isShoreable = shoreMode && crumbleTick > 0 && !isShored;
+        // Pluck targets any tile on the board — cosmetically reuse the
+        // "clearable" affordance since both modes want "any full tile is
+        // tappable". The onCellTap handler enforces capacity.
+        const isPluckable = pluckMode && v != null;
         return (
           <Cell
             key={i}
@@ -61,7 +67,7 @@ export function Board({
             fx={fx}
             preview={preview.get(i)}
             over={over}
-            clearable={isClearable}
+            clearable={isClearable || isPluckable}
             movable={isMovable}
             moving={isMoving}
             shoreable={isShoreable}

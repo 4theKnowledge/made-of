@@ -1084,3 +1084,177 @@ describe("debug mode", () => {
     expect(state).toBe(s0);
   });
 });
+
+describe("pluck-to-hold", () => {
+  const bundle = fakeBundle({
+    recipes: [R("dough", ["flour", "water"])],
+  });
+
+  function state0() {
+    const s = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s.board = Array(9).fill(null);
+    return s;
+  }
+
+  it("lifts a board tile into the first empty hold slot and spends a charge", () => {
+    const s0 = state0();
+    s0.board[4] = "flour";
+    s0.hold = [null, null];
+    s0.pluck = 2;
+    const { state } = reduce(s0, bundle, { type: "pluck-hold", cell: 4 });
+    expect(state.board[4]).toBeNull();
+    expect(state.hold[0]).toBe("flour");
+    expect(state.pluck).toBe(1);
+  });
+
+  it("is a no-op when the target cell is empty", () => {
+    const s0 = state0();
+    s0.pluck = 1;
+    s0.hold = [null];
+    const { state, events } = reduce(s0, bundle, { type: "pluck-hold", cell: 0 });
+    expect(state).toBe(s0);
+    expect(events).toEqual([]);
+  });
+
+  it("is a no-op when hold has no free slot", () => {
+    const s0 = state0();
+    s0.board[4] = "flour";
+    s0.pluck = 1;
+    s0.hold = ["water"]; // capacity 1 at age 0, full
+    const { state, events } = reduce(s0, bundle, { type: "pluck-hold", cell: 4 });
+    expect(state).toBe(s0);
+    expect(events).toEqual([]);
+  });
+
+  it("is a no-op when the player has no pluck charges", () => {
+    const s0 = state0();
+    s0.board[4] = "flour";
+    s0.hold = [null];
+    s0.pluck = 0;
+    const { state, events } = reduce(s0, bundle, { type: "pluck-hold", cell: 4 });
+    expect(state).toBe(s0);
+    expect(events).toEqual([]);
+  });
+
+  it("clears the shore flag on the source cell", () => {
+    const s0 = state0();
+    s0.board[4] = "flour";
+    s0.shored[4] = true;
+    s0.hold = [null];
+    s0.pluck = 1;
+    const { state } = reduce(s0, bundle, { type: "pluck-hold", cell: 4 });
+    expect(state.shored[4]).toBe(false);
+  });
+});
+
+describe("wipe-board", () => {
+  // A longer-reach bundle so we can get to age 2 for the unlock tests.
+  const bundle = fakeBundle({
+    recipes: [
+      R("dough", ["flour", "water"]),
+      { out: "bread", from: ["dough", "fire"], with: [], needs: [], evolved: [], all: ["dough", "fire"], lvl: 2, band: 2 },
+      { out: "feast", from: ["bread", "spice"], with: [], needs: [], evolved: [], all: ["bread", "spice"], lvl: 3, band: 3 },
+    ],
+  });
+
+  function state0() {
+    const s = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s.board = Array(9).fill(null);
+    return s;
+  }
+
+  it("is a no-op below the unlock age", () => {
+    const s0 = state0();
+    s0.age = 1;
+    s0.board[0] = "flour";
+    const { state, events } = reduce(s0, bundle, { type: "wipe-board" });
+    expect(state).toBe(s0);
+    expect(events).toEqual([]);
+  });
+
+  it("clears the board, hold, crumb, and shored flags when unlocked", () => {
+    const s0 = state0();
+    s0.age = 2;
+    s0.ageMade = 5;
+    s0.board[0] = "flour";
+    s0.board[4] = "water";
+    s0.hold = [null, null, "dough"];
+    s0.shored[0] = true;
+    s0.crumb[4] = { id: "water", n: 2 };
+    const { state } = reduce(s0, bundle, { type: "wipe-board" });
+    expect(state.board.every((c) => c == null)).toBe(true);
+    // Hold resizes to the new (lower) age's capacity and is empty.
+    expect(state.hold.every((v) => v == null)).toBe(true);
+    expect(state.shored.every((v) => !v)).toBe(true);
+    expect(state.crumb.every((c) => c == null)).toBe(true);
+  });
+
+  it("drops the player back one age and resets ageMade", () => {
+    const s0 = state0();
+    s0.age = 2;
+    s0.ageMade = 5;
+    const { state } = reduce(s0, bundle, { type: "wipe-board" });
+    expect(state.age).toBe(1);
+    expect(state.ageMade).toBe(0);
+  });
+
+  it("preserves score, discoveries, shelf, and run history", () => {
+    const s0 = state0();
+    s0.age = 2;
+    s0.score = 1234;
+    s0.made = 7;
+    s0.longest = 3;
+    s0.found = ["dough", "bread"];
+    s0.shelf = ["bread"];
+    s0.madeCounts = { dough: 4, bread: 2 };
+    s0.howMade = { bread: ["dough", "fire"] };
+    s0.madeAtBand = { bread: 2 };
+    const { state } = reduce(s0, bundle, { type: "wipe-board" });
+    expect(state.score).toBe(1234);
+    expect(state.made).toBe(7);
+    expect(state.longest).toBe(3);
+    expect(state.found).toEqual(["dough", "bread"]);
+    expect(state.shelf).toEqual(["bread"]);
+    expect(state.madeCounts.dough).toBe(4);
+    expect(state.howMade.bread).toEqual(["dough", "fire"]);
+  });
+
+  it("deals a fresh tray after wiping", () => {
+    const s0 = state0();
+    s0.age = 2;
+    s0.tray = ["flour", "water", "spice"];
+    const { state, events } = reduce(s0, bundle, { type: "wipe-board" });
+    expect(state.tray.some((t) => t != null)).toBe(true);
+    expect(events.some((e) => e.type === "wipe")).toBe(true);
+    expect(events.some((e) => e.type === "dealt")).toBe(true);
+  });
+
+  it("re-locks itself when the age cost drops the player below the unlock threshold", () => {
+    // At the unlock age exactly, one wipe drops you below it. A second
+    // wipe should be a no-op without climbing back up.
+    const s0 = state0();
+    s0.age = 2;
+    const { state: afterOne } = reduce(s0, bundle, { type: "wipe-board" });
+    expect(afterOne.age).toBe(1);
+    const { state: afterTwo, events } = reduce(afterOne, bundle, {
+      type: "wipe-board",
+    });
+    expect(afterTwo).toBe(afterOne);
+    expect(events).toEqual([]);
+  });
+
+  it("clears the lastSnapshot so a run can't be undone back across a wipe", () => {
+    const s0 = state0();
+    s0.age = 2;
+    s0.lastSnapshot = cloneForTest(s0);
+    const { state } = reduce(s0, bundle, { type: "wipe-board" });
+    expect(state.lastSnapshot).toBeNull();
+  });
+});
+
+// Shallow clone utility used by the wipe tests — the engine's internal
+// `cloneState` isn't exported, and these tests only need a distinct
+// object to confirm `lastSnapshot` is cleared.
+function cloneForTest(s: GameState): GameState {
+  return { ...s };
+}

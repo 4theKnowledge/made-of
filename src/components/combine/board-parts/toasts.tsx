@@ -13,7 +13,7 @@ export function AgeToast({
   toast: {
     age: number;
     sample: string[];
-    grants: { mv: number; swap: number; clear: number; hint: number; shore: number };
+    grants: { mv: number; swap: number; clear: number; hint: number; shore: number; pluck: number };
   };
   bundle: ThemeBundle;
   onDismiss: () => void;
@@ -25,6 +25,7 @@ export function AgeToast({
     toast.grants.clear > 0 ? `${toast.grants.clear} clear` : null,
     toast.grants.hint > 0 ? `${toast.grants.hint} hint` : null,
     toast.grants.shore > 0 ? `${toast.grants.shore} shore` : null,
+    toast.grants.pluck > 0 ? `${toast.grants.pluck} pluck` : null,
   ].filter(Boolean) as string[];
   return (
     <div
