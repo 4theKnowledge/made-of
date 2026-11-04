@@ -106,20 +106,18 @@ export function GameOverCard({
             <p className="sub" style={{ marginTop: 4 }}>
               New discoveries
             </p>
-            <div className="cbfound">
+            <div className="cbchip cbfound">
               {state.found.slice(0, 10).map((id) => {
                 const it = bundle.items.get(id);
                 if (!it) return null;
                 return (
-                  <span key={id}>
-                    <span className="cbfound-ic" style={fillVar(it)}>
-                      <Pictogram
-                        name={it.name}
-                        tier={it.tier}
-                        kind={it.kind}
-                        symbol={it.symbol}
-                      />
-                    </span>
+                  <span key={id} style={fillVar(it)}>
+                    <Pictogram
+                      name={it.name}
+                      tier={it.tier}
+                      kind={it.kind}
+                      symbol={it.symbol}
+                    />
                     <em>{cap(it.name)}</em>
                   </span>
                 );

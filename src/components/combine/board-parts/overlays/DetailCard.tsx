@@ -70,7 +70,7 @@ export function DetailCard({
         </div>
         <div className="nm">{cap(item.name)}</div>
         {madeFrom ? (
-          <div className="cbrcp" aria-label="Made from">
+          <div className="cbchip" aria-label="Made from">
             {madeFrom.all.map((pid, k) => {
               const p = bundle.items.get(pid);
               if (!p) return null;
@@ -100,7 +100,7 @@ export function DetailCard({
         {item.fact && <p className="fact">{item.fact}</p>}
         {goesIntoOuts.length > 0 && (
           <div
-            className="cbrcp"
+            className="cbchip"
             aria-label="Goes into"
             style={{ marginTop: 4 }}
           >

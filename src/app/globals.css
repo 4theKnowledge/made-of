@@ -1327,10 +1327,7 @@ a.btn.primary{color:var(--bg)}
 .cbdisc .k{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
 .cbdisc b{display:block;font-size:20px;line-height:1.1}
 .cbdisc p{margin:4px 0 0;font-size:13px;line-height:1.35}
-.cbdisc .cbrcp{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:6px;font-size:12.5px;font-weight:700}
-.cbdisc .cbrcp span{display:inline-flex;align-items:center;gap:3px;padding:2px 6px 2px 3px;border:1.5px solid #111417;border-radius:3px;background:rgba(255,255,255,.55)}
-.cbdisc .cbrcp .ic{width:18px;height:18px;border:0;background:transparent}
-.cbdisc .cbrcp i{font-style:normal;font-weight:800}
+.cbdisc .cbchip{margin-top:6px}
 
 /* Ghost preview + preview badges */
 .cbc .ghost2{opacity:.38;width:62%;display:grid;place-items:center}
@@ -1398,13 +1395,8 @@ a.btn.primary{color:var(--bg)}
 .cbkey .k2{background:var(--fM)}
 .cbkey .k3{background:var(--good);border-radius:50%}
 
-/* DetailCard recipe chips + row2 button pair — prototype lines 1075–1082 */
-.cbinfo .cbrcp{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:5px 6px;font-size:12.5px;font-weight:700}
-.cbinfo .cbrcp span{display:inline-flex;align-items:center;gap:3px;padding:2px 7px 2px 3px;border:1.5px solid var(--ink);border-radius:3px;background:var(--surface)}
-.cbinfo .cbrcp .ic{width:18px;height:18px;border:1.5px solid var(--pk);background:var(--fill,#fff)}
-.cbinfo .cbrcp .ic svg{width:100%;height:100%}
-.cbinfo .cbrcp i{font-style:normal;font-weight:800}
-.cbinfo .cbrcp .q{border-style:dashed;color:var(--muted);padding:2px 7px}
+/* DetailCard uses the shared .cbchip primitive; its row2 button pair sits below. */
+.cbinfo .cbchip{justify-content:center}
 .cbover .row2,.cbinfo .row2{display:flex;gap:12px;width:100%;margin-top:4px}
 .cbover .row2 .cbh,.cbinfo .row2 .cbh{flex:1;justify-content:center;height:44px;font-size:14px;text-decoration:none}
 /* Full-width primary dismiss used by overlays with a single bottom action
@@ -1413,10 +1405,7 @@ a.btn.primary{color:var(--bg)}
 
 /* New-age toast — prototype line 1056–1059 */
 .cbdisc.cbagetoast{background:var(--fN)}
-.cbdisc.cbagetoast .cbrcp{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;font-size:12px;font-weight:700}
-.cbdisc.cbagetoast .cbrcp span{display:inline-flex;align-items:center;gap:3px;padding:2px 6px 2px 3px;border:1.5px solid #111417;border-radius:3px;background:rgba(255,255,255,.55)}
-.cbdisc.cbagetoast .cbrcp .ic{width:18px;height:18px;border:0;background:transparent}
-.cbdisc.cbagetoast .cbrcp .ic svg{width:100%;height:100%}
+.cbdisc.cbagetoast .cbchip{margin-top:6px}
 
 /* Age-up: level-up feel. Bigger frame, thicker border, a bright colour ribbon
    that sweeps across once on open, and sample tiles that pop in staggered. */
@@ -1438,12 +1427,34 @@ a.btn.primary{color:var(--bg)}
 .cb3 div{padding:8px 4px;border:1.5px solid var(--ink);border-radius:3px;background:var(--surface)}
 .cb3 b{display:block;font-family:var(--mono);font-size:20px}
 .cb3 span{font-size:11.5px}
-.cbfound{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
-.cbfound span{display:inline-flex;align-items:center;gap:6px;padding:3px 9px 3px 3px;border:1.5px solid var(--ink);border-radius:4px;background:var(--surface);font-size:12px;font-weight:700;line-height:1}
-.cbfound .cbfound-ic{display:inline-grid;place-items:center;width:28px;height:28px;border:1.5px solid var(--pk);border-radius:3px;background:var(--fill);box-shadow:1.5px 1.5px 0 var(--pk);color:#111417;flex:none}
-.cbfound .cbfound-ic .ic{width:20px;height:20px}
-.cbfound em{font-style:normal}
-.cbfound .more{flex-basis:100%;text-align:center;font-size:12px;color:var(--muted);font-weight:600;border:0;background:transparent;padding:4px 0 0}
+/* Mini-tile chip primitive — one source of truth for the
+   pictogram-plus-inline-label pill used across DetailCard,
+   toasts, CollectionBook rows, and the end-of-run discoveries
+   list. Size is tuned via the --chip-* vars on a modifier;
+   flavor (solid vs. translucent) is tuned via --chip-flavor. */
+.cbchip{--chip-ic:22px;--chip-pad-y:2px;--chip-pad-x:7px;--chip-pad-l:3px;--chip-font:12.5px;--chip-gap:5px 6px;--chip-chipgap:3px;--chip-bg:var(--surface);--chip-border:var(--ink);--chip-ic-border:1.5px solid var(--pk);--chip-ic-bg:var(--fill,#fff);display:flex;flex-wrap:wrap;align-items:center;gap:var(--chip-gap);font-size:var(--chip-font);font-weight:700;color:var(--ink)}
+.cbchip > span{display:inline-flex;align-items:center;gap:var(--chip-chipgap);padding:var(--chip-pad-y) var(--chip-pad-x) var(--chip-pad-y) var(--chip-pad-l);border:1.5px solid var(--chip-border);border-radius:3px;background:var(--chip-bg);line-height:1}
+.cbchip .ic{display:inline-grid;place-items:center;width:var(--chip-ic);height:var(--chip-ic);border:var(--chip-ic-border);background:var(--chip-ic-bg);border-radius:3px;flex:none;box-sizing:border-box;padding:0;overflow:hidden}
+.cbchip .ic svg{display:block;width:84%;height:84%}
+.cbchip .ic.el b{font-size:calc(var(--chip-ic) * 0.55);line-height:1}
+.cbchip i{font-style:normal;font-weight:800}
+.cbchip em{font-style:normal;line-height:1}
+.cbchip .q{border-style:dashed;color:var(--muted);padding:var(--chip-pad-y) var(--chip-pad-x)}
+/* Size variants */
+.cbchip-sm{--chip-ic:18px;--chip-pad-x:6px;--chip-pad-l:3px;--chip-font:12px;--chip-gap:4px 6px}
+.cbchip-xs{--chip-ic:16px;--chip-pad-x:6px;--chip-pad-l:3px;--chip-font:12px;--chip-gap:4px 6px;--chip-chipgap:4px}
+/* Flavor: borderless, translucent icon cell — used by toasts and age-sweep */
+.cbchip-ghost{--chip-ic-border:0;--chip-ic-bg:transparent;--chip-border:#111417;--chip-bg:rgba(255,255,255,.55)}
+.cbchip-ghost .ic svg{width:100%;height:100%}
+/* Flavor: muted border on page background — used by CollectionBook rows */
+.cbchip-muted{--chip-ic-border:0;--chip-ic-bg:transparent;--chip-border:color-mix(in srgb, var(--ink) 50%, transparent);--chip-bg:var(--bg)}
+.cbchip-muted .ic svg{width:100%;height:100%}
+.cbchip-muted i{color:var(--muted);padding:0 2px}
+
+/* End-of-run "New discoveries" list wraps the shared chip and adds
+   a full-width "+N more" tagline underneath. */
+.cbfound{justify-content:center}
+.cbfound > .more{flex-basis:100%;text-align:center;font-size:11px;color:var(--muted);font-weight:600;border:0;background:transparent;padding:4px 0 0}
 
 /* Latent cell states — port the CSS now so the Move/Clear/Hint helpers
    (Phase 4) only need the behavioural wiring, not more CSS. Prototype
@@ -1541,11 +1552,7 @@ a.btn.primary{color:var(--bg)}
 .cbbookrow-text b{font-size:14px;line-height:1.1}
 .cbbookrow-text small{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.02em}
 .cbbookrow-recipes{display:flex;flex-direction:column;gap:4px;width:100%}
-.cbbookrow-recipes .cbrcp{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:12px;font-weight:600;color:var(--ink)}
-.cbbookrow-recipes .cbrcp > span{display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 3px;border:1.5px solid color-mix(in srgb, var(--ink) 50%, transparent);border-radius:3px;background:var(--bg)}
-.cbbookrow-recipes .cbrcp .ic{width:16px;height:16px;border:0;background:transparent}
-.cbbookrow-recipes .cbrcp .ic svg{width:100%;height:100%}
-.cbbookrow-recipes .cbrcp i{font-style:normal;font-weight:800;color:var(--muted);padding:0 2px}
+.cbbookrow-recipes .cbchip{font-weight:600}
 .cbbookrow-none{font-style:italic;font-size:12px;color:var(--muted)}
 .cbcta{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:14px;row-gap:3px;width:calc(100% - 4px);margin:8px 2px;padding:12px 14px;border:1.5px dashed var(--ink);border-radius:6px;background:color-mix(in srgb, var(--ink) 4%, var(--surface));text-align:left;box-sizing:border-box}
 .cbcta b{grid-column:1;font-size:13px}

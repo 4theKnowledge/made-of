@@ -208,7 +208,7 @@ export function CollectionBook({
                         <em className="cbbookrow-none">base ingredient</em>
                       ) : (
                         recipes.map((r, i) => (
-                          <span key={i} className="cbrcp">
+                          <span key={i} className="cbchip cbchip-xs cbchip-muted">
                             {r.all.map((ing, k) => {
                               const ingIt = bundle.items.get(ing);
                               const name = ingIt ? cap(ingIt.name) : ing;
@@ -217,17 +217,12 @@ export function CollectionBook({
                                   {k > 0 && <i>+</i>}
                                   <span>
                                     {ingIt && (
-                                      <span
-                                        className="ic"
-                                        aria-hidden="true"
-                                      >
-                                        <Pictogram
-                                          name={ingIt.name}
-                                          tier={ingIt.tier}
-                                          kind={ingIt.kind}
-                                          symbol={ingIt.symbol}
-                                        />
-                                      </span>
+                                      <Pictogram
+                                        name={ingIt.name}
+                                        tier={ingIt.tier}
+                                        kind={ingIt.kind}
+                                        symbol={ingIt.symbol}
+                                      />
                                     )}
                                     {name}
                                   </span>

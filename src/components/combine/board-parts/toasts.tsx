@@ -45,7 +45,7 @@ export function AgeToast({
           <p className="cbagegrants">Replenished: +{grantBits.join(", +")}.</p>
         )}
         {toast.sample.length > 0 && (
-          <div className="cbrcp cbagesample">
+          <div className="cbchip cbchip-sm cbchip-ghost cbagesample">
             {toast.sample.map((id, i) => {
               const it = bundle.items.get(id);
               if (!it) return null;
@@ -108,7 +108,7 @@ export function HintToast({
       <div>
         <span className="k">Hint · tap to close</span>
         <b>{headline}</b>
-        <div className="cbrcp">
+        <div className="cbchip cbchip-sm cbchip-ghost">
           {hint.recipe.map((pid, k) => {
             const p = bundle.items.get(pid);
             if (!p) return null;
@@ -167,7 +167,7 @@ export function DiscoveryToast({
             : "New discovery · tap to close"}
         </span>
         <b>{cap(item.name)}</b>
-        <div className="cbrcp">
+        <div className="cbchip cbchip-sm cbchip-ghost">
           {discovery.recipe.map((pid, k) => {
             const p = bundle.items.get(pid);
             if (!p) return null;
