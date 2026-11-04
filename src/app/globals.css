@@ -505,6 +505,8 @@ a.btn.primary{color:var(--bg)}
    mobile rules still apply; this only sets a floor on height. */
 @media (max-width: 600px){
   .btn,.cbh,.seg button,.pkseg button{min-height:44px}
+  .cbtop .cbh,.cbtop .cbsnd{min-height:36px}
+  .cbtop .cbsnd{min-width:36px}
 }
 
 @media (max-width: 600px){
@@ -747,7 +749,7 @@ a.btn.primary{color:var(--bg)}
 .cbhelp{display:flex;gap:6px}
 .cbtop > .cbtheme{margin-left:auto}
 
-.cbh{display:inline-flex;align-items:center;gap:5px;height:38px;padding:0 11px;border:1.5px solid var(--ink);border-radius:99px;background:var(--surface);font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);box-sizing:border-box;line-height:1}
+.cbh{display:inline-flex;align-items:center;gap:5px;height:38px;padding:0 11px;border:1.5px solid var(--ink);border-radius:6px;background:var(--surface);font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);box-sizing:border-box;line-height:1}
 .cbh svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .cbh b{font-family:var(--mono)}
 .cbh.on{background:var(--ink);color:var(--bg)}
@@ -1268,7 +1270,7 @@ a.btn.primary{color:var(--bg)}
 /* Helpers dropdown. */
 .cbhelpwrap,.cbmorewrap{position:relative}
 #cbHelp{gap:5px}
-#cbHelp b{min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:var(--ink);color:var(--bg);font-size:11px;line-height:18px;text-align:center}
+#cbHelp b{min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:4px;background:var(--ink);color:var(--bg);font-size:11px;line-height:18px;text-align:center}
 #cbHelp.on b{background:var(--bg);color:var(--ink)}
 #cbHelp.open{background:var(--soft)}
 /* Centered modal on all viewports — matches Combine's other overlays
@@ -1355,7 +1357,7 @@ a.btn.primary{color:var(--bg)}
 @keyframes rsheet-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
 
 /* Age-row icon buttons (book, sound) — prototype lines 1042–1044 */
-.cbsnd{flex:none;width:38px;height:38px;display:grid;place-items:center;border:1.5px solid var(--ink);border-radius:99px;background:var(--surface);color:var(--ink);cursor:pointer;padding:0;box-sizing:border-box;line-height:1}
+.cbsnd{flex:none;width:38px;height:38px;display:grid;place-items:center;border:1.5px solid var(--ink);border-radius:6px;background:var(--surface);color:var(--ink);cursor:pointer;padding:0;box-sizing:border-box;line-height:1}
 .cbsnd svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .cbsnd.on{background:var(--ink);color:var(--bg)}
 .cbsnd:disabled{opacity:.5;cursor:default}
