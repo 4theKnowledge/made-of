@@ -6,14 +6,19 @@ Runs over stdio — the transport Claude Code and other MCP clients speak.
 Install:
     uv sync --group pm
 
-Run standalone (rare — usually launched by an MCP client):
-    uv run --group pm pm/server.py
+Run standalone (rare — usually launched by an MCP client). Run from the repo
+root, or pass an absolute path to this file:
+    uv run --group pm --project pm pm/server.py
 
-Wire into Claude Code (~/.claude.json → mcpServers):
+Wire into Claude Code (~/.claude.json → mcpServers). Pass the script as an
+absolute path — `uv run` only treats arg as a script when it looks like a path,
+otherwise it searches PATH for an executable named `server.py` and fails with
+ENOENT. Likewise prefer an absolute `command` so the subprocess doesn't depend
+on Claude Code's launch PATH.
     "pm": {
-        "command": "uv",
+        "command": "/abs/path/to/uv",
         "args": ["run", "--group", "pm", "--project", "/abs/path/to/made-of/pm",
-                 "server.py"]
+                 "/abs/path/to/made-of/pm/server.py"]
     }
 """
 

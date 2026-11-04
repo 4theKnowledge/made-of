@@ -101,14 +101,17 @@ Tools exposed (identical semantics to the HTTP API):
 
 Task fields: `status` ∈ {open, in_progress, blocked, on_hold, done, cancelled, wont_do}; `priority` ∈ {P0, P1, P2, P3} (default P2); `group` is an optional string. See `schema.md`.
 
-Wire into Claude Code (`~/.claude.json` → `mcpServers`):
-
-
+Wire into Claude Code (`~/.claude.json` → `mcpServers`). Pass the script as an
+absolute path — `uv run` only treats the arg as a script when it looks like a
+path; otherwise it searches `PATH` for an executable named `server.py` and
+fails with ENOENT when launched from a CWD outside `pm/`. Use absolute paths
+for `command` too so the subprocess doesn't depend on Claude Code's launch
+`PATH` (GUI launches often don't inherit the shell `PATH`).
 
 ```json
 "pm": {
-  "command": "uv",
-  "args": ["run", "--group", "pm", "--project", "/abs/path/to/made-of/pm", "server.py"]
+  "command": "/abs/path/to/uv",
+  "args": ["run", "--group", "pm", "--project", "/abs/path/to/made-of/pm", "/abs/path/to/made-of/pm/server.py"]
 }
 ```
 
@@ -130,5 +133,5 @@ Claude `.claude/settings.json`:
 
 Add MCP server to Claude
 ```bash
-claude mcp add pm --scope local -- uv run --group pm --project /Users/tylerbikaun/Repos/made-of/pm server.py
+claude mcp add pm --scope local -- "$(command -v uv)" run --group pm --project /Users/tylerbikaun/Repos/made-of/pm /Users/tylerbikaun/Repos/made-of/pm/server.py
 ```
