@@ -126,7 +126,15 @@ export function HintToast({
             );
           })}
           <i>=</i>
-          <span>{cap(item.name)}</span>
+          <span>
+            <Pictogram
+              name={item.name}
+              tier={item.tier}
+              kind={item.kind}
+              symbol={item.symbol}
+            />
+            {cap(item.name)}
+          </span>
         </div>
         <p>{footer}</p>
       </div>
@@ -185,7 +193,15 @@ export function DiscoveryToast({
             );
           })}
           <i>=</i>
-          <span>{cap(item.name)}</span>
+          <span>
+            <Pictogram
+              name={item.name}
+              tier={item.tier}
+              kind={item.kind}
+              symbol={item.symbol}
+            />
+            {cap(item.name)}
+          </span>
         </div>
         {item.fact && <p>{item.fact}</p>}
       </div>
