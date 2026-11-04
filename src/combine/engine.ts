@@ -49,7 +49,7 @@ export const CRUMBLE_TTL = 3;
  *  one slot per age. Flatten to all-1s to turn the growth off during
  *  playtesting. The array extends to cover more ages than any theme
  *  actually ships. */
-export const HOLD_CAPACITY_BY_AGE: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8];
+export const HOLD_CAPACITY_BY_AGE: readonly number[] = [2, 4, 6, 8, 10, 12, 14, 16];
 
 export function holdCapacity(age: number): number {
   return HOLD_CAPACITY_BY_AGE[Math.min(age, HOLD_CAPACITY_BY_AGE.length - 1)] ?? 1;

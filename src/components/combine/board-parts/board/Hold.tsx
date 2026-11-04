@@ -60,7 +60,6 @@ export function Hold({
       <span className="cbshelf-slots">
         {state.hold.map((id, slot) => {
           if (id == null) {
-            if (!empty) return null;
             return (
               <span
                 key={`ph-${slot}`}
