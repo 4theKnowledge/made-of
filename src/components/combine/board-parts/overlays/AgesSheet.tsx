@@ -117,14 +117,14 @@ export function AgesSheet({
             const isNow = i === current;
             const isPast = i < current;
             const metaNeed = ageNeed(i, bundle);
+            const finds = foundByBand.get(i + 1) ?? [];
             const meta = isNow
               ? last
                 ? "Final"
                 : `${state.ageMade}/${metaNeed}`
               : isPast
-                ? "Done"
+                ? `Done (${finds.length}/${metaNeed})`
                 : `Needs ${metaNeed}`;
-            const finds = foundByBand.get(i + 1) ?? [];
             return (
               <li
                 key={name}
