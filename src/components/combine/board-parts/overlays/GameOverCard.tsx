@@ -112,12 +112,14 @@ export function GameOverCard({
                 if (!it) return null;
                 return (
                   <span key={id}>
-                    <Pictogram
-                      name={it.name}
-                      tier={it.tier}
-                      kind={it.kind}
-                      symbol={it.symbol}
-                    />
+                    <span className="cbfound-ic" style={fillVar(it)}>
+                      <Pictogram
+                        name={it.name}
+                        tier={it.tier}
+                        kind={it.kind}
+                        symbol={it.symbol}
+                      />
+                    </span>
                     <em>{cap(it.name)}</em>
                   </span>
                 );

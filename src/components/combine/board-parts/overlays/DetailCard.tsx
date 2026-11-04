@@ -75,16 +75,18 @@ export function DetailCard({
               const p = bundle.items.get(pid);
               if (!p) return null;
               return (
-                <span key={pid}>
-                  <Pictogram
-                    name={p.name}
-                    tier={p.tier}
-                    kind={p.kind}
-                    symbol={p.symbol}
-                  />
-                  {cap(p.name)}
+                <React.Fragment key={pid}>
+                  <span>
+                    <Pictogram
+                      name={p.name}
+                      tier={p.tier}
+                      kind={p.kind}
+                      symbol={p.symbol}
+                    />
+                    {cap(p.name)}
+                  </span>
                   {k < madeFrom.all.length - 1 && <i>+</i>}
-                </span>
+                </React.Fragment>
               );
             })}
             <i>=</i>
