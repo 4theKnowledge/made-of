@@ -123,8 +123,8 @@ export function DetailCard({
             )}
           </div>
         )}
-        <div className="row2">
-          {canExplore && (
+        {canExplore ? (
+          <div className="row2">
             <a
               className="cbh"
               href={`/explore/${item.slug}`}
@@ -133,11 +133,15 @@ export function DetailCard({
             >
               Full story in Explore
             </a>
-          )}
-          <button type="button" className="cbh" onClick={onDismiss}>
+            <button type="button" className="cbh" onClick={onDismiss}>
+              Back to the game
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="cbh cbback" onClick={onDismiss}>
             Back to the game
           </button>
-        </div>
+        )}
     </ResponsiveSheet>
   );
 }

@@ -166,9 +166,8 @@ export function AgesSheet({
         </ol>
       <button
         type="button"
-        className="cbh"
+        className="cbh cbback"
         onClick={onDismiss}
-        style={{ width: "100%", justifyContent: "center" }}
       >
         Done
       </button>

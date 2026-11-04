@@ -1392,7 +1392,7 @@ a.btn.primary{color:var(--bg)}
 .cbover .row2 .cbh,.cbinfo .row2 .cbh{flex:1;justify-content:center;height:44px;font-size:14px;text-decoration:none}
 /* Full-width primary dismiss used by overlays with a single bottom action
    (e.g. the collection book). Matches the thumb-friendly height of row2. */
-.cbover .cbh.cbback{width:100%;justify-content:center;height:48px;font-size:14px;flex:none}
+.cbh.cbback{width:100%;justify-content:center;height:48px;font-size:14px;flex:none}
 
 /* New-age toast — prototype line 1056–1059 */
 .cbdisc.cbagetoast{background:var(--fN)}
@@ -1441,6 +1441,15 @@ a.btn.primary{color:var(--bg)}
 .cbc.mystery{border:2px dashed var(--accent);background:color-mix(in srgb, var(--accent) 16%, var(--surface));animation:cbq 1.1s ease-in-out infinite alternate}
 .cbc .q{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent)}
 @keyframes cbq{to{box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent)}}
+
+/* Game-over lock: tiles mute, cursors reset, hover/lift kill. Visual cue
+   for the frozen board; interactions are gated in CombineBoard handlers. */
+#cb.cbdone .cbc.full,
+#cb.cbdone .cbp:not(.empty),
+#cb.cbdone .cbslot.cbheld{opacity:.55;filter:grayscale(.65);cursor:default;transform:none;box-shadow:1px 1px 0 var(--pk)}
+#cb.cbdone .cbp:not(.empty):hover,
+#cb.cbdone .cbslot.cbheld:hover{transform:none}
+#cb.cbdone .cbp.sel{outline:none;transform:none}
 
 /* GameOverCard mini-shelf — prototype line 965 */
 .cbshelf.sum{border:0;justify-content:center;gap:8px;flex-wrap:wrap!important;overflow:visible!important;min-height:0}

@@ -196,7 +196,8 @@ export type Action =
   // on an admin session check so these never surface to normal players.
   | { type: "debug-toggle" }
   | { type: "debug-deal"; slot: number; tile: string }
-  | { type: "debug-set-age"; age: number };
+  | { type: "debug-set-age"; age: number }
+  | { type: "debug-toggle-over" };
 
 export interface ReduceResult {
   state: GameState;
@@ -772,7 +773,7 @@ export function reduce(
   bundle: ThemeBundle,
   action: Action,
 ): ReduceResult {
-  if (prev.over && action.type !== "new-game") {
+  if (prev.over && action.type !== "new-game" && !action.type.startsWith("debug-")) {
     return { state: prev, events: [] };
   }
   const state = cloneState(prev);
@@ -1080,6 +1081,13 @@ export function reduce(
       applyHelperGrants(state, grants);
       events.push({ type: "age-up", age: target, sample, grants });
       events.push({ type: "dealt" });
+      return { state, events };
+    }
+
+    case "debug-toggle-over": {
+      if (!state.debug) return { state: prev, events: [] };
+      state.over = !state.over;
+      if (state.over) events.push({ type: "over" });
       return { state, events };
     }
   }

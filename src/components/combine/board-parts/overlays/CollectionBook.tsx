@@ -181,7 +181,6 @@ export function CollectionBook({
                     className="cbbookrow"
                     onClick={() => {
                       onInfo(id);
-                      onDismiss();
                     }}
                   >
                     <span className="cbbookrow-head">
@@ -287,7 +286,6 @@ export function CollectionBook({
                         style={fillVar(it)}
                         onClick={() => {
                           onInfo(id);
-                          onDismiss();
                         }}
                         title={cap(it.name)}
                       >

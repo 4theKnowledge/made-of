@@ -334,9 +334,11 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
   const [overCardOpen, setOverCardOpen] = useState(false);
   const prevOverRef = useRef(false);
   useEffect(() => {
-    if (state.over && !prevOverRef.current) setOverCardOpen(true);
+    if (state.over && !prevOverRef.current && !state.debug) {
+      setOverCardOpen(true);
+    }
     prevOverRef.current = state.over;
-  }, [state.over]);
+  }, [state.over, state.debug]);
   // Pending clears so overlapping actions don't orphan timers.
   const timers = useRef<number[]>([]);
   useEffect(() => () => {
@@ -935,11 +937,12 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         suppressClick.current = false;
         return;
       }
+      if (state.over) return;
       setSelectedSlot((s) =>
         s && s.source === source && s.slot === slot ? null : { source, slot },
       );
     },
-    [],
+    [state.over],
   );
 
   // Escape closes the top overlay in prototype order: info card, discovery
@@ -1042,6 +1045,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
     setDrag(null);
     if (!d.moved) return; // tap: handled on click
     suppressClick.current = true;
+    if (state.over) return;
     // Drop onto the hold zone: tray → hold stashes; hold → hold is a no-op.
     if (snapshot?.overHold) {
       if (d.source === "tray") {
@@ -1060,7 +1064,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
     } else {
       setSelectedSlot(null);
     }
-  }, [act, drag, state.board]);
+  }, [act, drag, state.board, state.over]);
 
   // Capture the drop target under the pointer and whether a drop there is
   // valid. Returns the board cell (and whether a combine would form) OR a
@@ -1153,6 +1157,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
       const rect = target.getBoundingClientRect();
       const tile = (source === "hold" ? state.hold : state.tray)[slot];
       if (tile == null) return;
+      if (state.over) return;
       suppressClick.current = false;
       dragRef.current = {
         slot,
@@ -1187,7 +1192,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
       }, 450);
       dragRef.current.holdTimer = holdId;
     },
-    [state.hold, state.tray],
+    [state.hold, state.tray, state.over],
   );
 
   const onChoose = useCallback(
@@ -1331,7 +1336,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
           </button>
         </div>
       )}
-      <div id="cb">
+      <div id="cb" className={state.over ? "cbdone" : undefined}>
         <TopBar
           state={state}
           fx={fx}
@@ -1483,7 +1488,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
             }}
           />
         )}
-        {state.over && !overCardOpen && (
+        {state.over && !overCardOpen && !state.debug && (
           <div className="cbresultsrow">
             <button
               type="button"
@@ -1527,15 +1532,6 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
             onDismiss={() => setHintToast(null)}
           />
         )}
-        {infoTile && (
-          <DetailCard
-            tileId={infoTile}
-            bundle={bundle}
-            known={knownIds}
-            howMade={state.howMade}
-            onDismiss={() => setInfoTile(null)}
-          />
-        )}
         {themeOpen && (
           <ThemeMenu
             bundles={bundles}
@@ -1577,6 +1573,15 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
             bundle={bundle}
             onInfo={(id) => setInfoTile(id)}
             onDismiss={() => setAgesOpen(false)}
+          />
+        )}
+        {infoTile && (
+          <DetailCard
+            tileId={infoTile}
+            bundle={bundle}
+            known={knownIds}
+            howMade={state.howMade}
+            onDismiss={() => setInfoTile(null)}
           />
         )}
         {soundOpen && (

@@ -75,6 +75,22 @@ export function CombineDebugPanel({ state, bundle, dispatch, onClose }: Props) {
       )}
 
       <section className="cbdebug-sec">
+        <h4>Board state</h4>
+        <div className="cbdebug-ages">
+          <button
+            type="button"
+            className={
+              "cbdebug-btn" + (state.over ? " cbdebug-btn-on" : "")
+            }
+            disabled={!state.debug}
+            onClick={() => dispatch({ type: "debug-toggle-over" })}
+          >
+            {state.over ? "unlock board" : "lock board (game over)"}
+          </button>
+        </div>
+      </section>
+
+      <section className="cbdebug-sec">
         <h4>Jump to age</h4>
         <div className="cbdebug-ages">
           {ages.map((label, i) => (
