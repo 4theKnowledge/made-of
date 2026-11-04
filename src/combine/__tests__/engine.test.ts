@@ -177,6 +177,66 @@ describe("place (unique output recipe)", () => {
   });
 });
 
+describe("ageMade counts only unique on-band first-finds (T-0051)", () => {
+  // Two-recipe bundle so we can distinguish "same item twice" from
+  // "two different items". Both are band-1 so they count toward age 0.
+  const bundle = fakeBundle({
+    recipes: [R("dough", ["flour", "water"]), R("rope", ["fibre", "tar"])],
+  });
+
+  it("re-making the same on-band item does NOT bump ageMade", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    s0.board[0] = "water";
+    s0.tray = ["flour", null, null];
+    const after1 = reduce(s0, bundle, { type: "place", slot: 0, cell: 1 }).state;
+    expect(after1.ageMade).toBe(1);
+    expect(after1.found).toContain("dough");
+
+    // Re-craft the same item: ageMade must stay at 1.
+    after1.board = Array(9).fill(null);
+    after1.board[0] = "water";
+    after1.tray = ["flour", null, null];
+    const after2 = reduce(after1, bundle, { type: "place", slot: 0, cell: 1 }).state;
+    expect(after2.ageMade).toBe(1);
+    expect(after2.madeCounts["dough"]).toBe(2);
+  });
+
+  it("two different on-band items each bump ageMade", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    s0.board[0] = "water";
+    s0.tray = ["flour", null, null];
+    const after1 = reduce(s0, bundle, { type: "place", slot: 0, cell: 1 }).state;
+    expect(after1.ageMade).toBe(1);
+
+    after1.board = Array(9).fill(null);
+    after1.board[0] = "tar";
+    after1.tray = ["fibre", null, null];
+    const after2 = reduce(after1, bundle, { type: "place", slot: 0, cell: 1 }).state;
+    expect(after2.ageMade).toBe(2);
+  });
+
+  it("fast mode keeps counting repeats toward the stop condition", () => {
+    // Fast mode has no bands/ages; ageMade is just a termination signal, so
+    // every on-band craft (= every craft) still counts. See engine.ts comment.
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3, mode: "fast" }).state;
+    s0.board = Array(9).fill(null);
+    s0.board[0] = "water";
+    s0.tray = ["flour", null, null];
+    const after1 = reduce(s0, bundle, { type: "place", slot: 0, cell: 1 }).state;
+    expect(after1.ageMade).toBe(1);
+    // `found` stays empty in fast mode — the collection isn't touched.
+    expect(after1.found).toEqual([]);
+
+    after1.board = Array(9).fill(null);
+    after1.board[0] = "water";
+    after1.tray = ["flour", null, null];
+    const after2 = reduce(after1, bundle, { type: "place", slot: 0, cell: 1 }).state;
+    expect(after2.ageMade).toBe(2);
+  });
+});
+
 describe("place with alternatives → choosing state", () => {
   // steel + wood could make a saw OR a wheel.
   const bundle = fakeBundle({

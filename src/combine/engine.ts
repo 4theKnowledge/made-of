@@ -463,7 +463,8 @@ function finishResolve(
   // Fast mode is score-only: no first-find tracking, no discovery events.
   // Players still score and chain, but the collection stays untouched so
   // classic progression is never shortcutted by combo-dense fast runs.
-  const first = state.mode !== "fast" && !state.found.includes(recipe.out);
+  const uniqueFind = !state.found.includes(recipe.out);
+  const first = state.mode !== "fast" && uniqueFind;
   if (first) {
     state.found.push(recipe.out);
     state.howMade[recipe.out] = recipe.all.slice();
@@ -471,14 +472,16 @@ function finishResolve(
     events.push({ type: "discovery", out: recipe.out, recipe: recipe.all });
   }
   state.madeCounts[recipe.out] = (state.madeCounts[recipe.out] ?? 0) + 1;
-  // Age progression: count makes against the age they fire in, not the
-  // output's canonical min-band. The player's mental model is "I did Age-II
-  // work → my Age-II counter moves", not "I made a thing that happens to
-  // also be makeable at Age I → nothing happens." Only the initial player
-  // move counts (mult === 1); chain steps are already their own reward.
-  // Repeat makes at the current age count too — doing more Age-II work is
-  // Age-II work, even if the item isn't new to you.
-  if (recipe.band === state.age + 1 && mult === 1) state.ageMade++;
+  // Age progression: count unique first-time makes at the current age's band.
+  // `ageNeed` is documented as "unique discoveries at the current age's band
+  // needed to leave each age" — duplicates at the same band don't count, so
+  // the player can't grind one item to age up. Only the initial player move
+  // counts (mult === 1); chain steps are already their own reward.
+  // Fast mode has no real ages — `ageMade` is just a stopping condition — so
+  // it keeps counting every on-band craft.
+  if (recipe.band === state.age + 1 && mult === 1) {
+    if (state.mode === "fast" || uniqueFind) state.ageMade++;
+  }
   events.push({
     type: "combine",
     cells: cells.slice(),
