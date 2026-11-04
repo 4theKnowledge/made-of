@@ -1,7 +1,7 @@
 import React from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import type { ThemeBundle } from "@/combine/types";
-import { cap } from "@/lib/taxonomy";
+import { cap, KIND } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 
@@ -67,6 +67,7 @@ export function DetailCard({
             kind={item.kind}
             symbol={item.symbol}
           />
+          <span className="pill cbinfo-kind">{KIND[item.kind]}</span>
         </div>
         <div className="nm">{cap(item.name)}</div>
         {madeFrom ? (

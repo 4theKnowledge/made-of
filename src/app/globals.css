@@ -1340,10 +1340,11 @@ a.btn.primary{color:var(--bg)}
 /* Detail card for long-press on a tray tile. Ported from prototype lines
    1069–1082 but trimmed — Phase 3D shows only name + fact + close. */
 .cbinfo{gap:7px}
-.cbinfohd{width:64px;height:64px;display:grid;place-items:center;border:2px solid var(--pk);border-radius:4px;background:var(--fill);box-shadow:3px 3px 0 var(--pk);color:#111417}
+.cbinfohd{position:relative;width:64px;height:64px;display:grid;place-items:center;border:2px solid var(--pk);border-radius:4px;background:var(--fill);box-shadow:3px 3px 0 var(--pk);color:#111417;overflow:visible}
 .cbinfohd .ic{width:46px;height:46px;border:0;background:transparent}
 .cbinfohd .ic svg{width:100%;height:100%}
 .cbinfo .nm{font-family:var(--display);font-size:24px;font-weight:800;line-height:1.1}
+.cbinfo-kind{position:absolute;top:-6px;right:-8px;padding:1px 5px;font-size:8.5px;letter-spacing:.06em;border-width:1px;background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:700;box-shadow:1px 1px 0 var(--pk);white-space:nowrap}
 .cbinfo .fact{margin:2px 0 0;font-size:13.5px;line-height:1.4}
 
 /* Centred modal shell — reused by DetailCard and (later) book, theme menu */
