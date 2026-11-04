@@ -211,6 +211,11 @@ export function loadGame(
   if (opts.daily && s.daily !== opts.daily) return null;
   // Endless: a finished game is nothing to resume.
   if (!opts.daily && s.over) return null;
+  // A finished daily save is a frozen review board — stale tile ids and
+  // out-of-range ages are inert because nothing runs through the reducer.
+  // Skip the content-drift guards so content edits between the finish and
+  // the review tap don't nuke the player's result.
+  if (opts.daily && s.over) return s;
   // All referenced tiles must still exist (the knowledge base may have
   // shifted between runs).
   for (const v of s.board) if (v && !bundle.items.has(v)) return null;
