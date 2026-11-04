@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import type { Fx } from "@/components/combine/board-parts/types";
-import { fillVar } from "@/components/combine/board-parts/util";
+import { CombineTile } from "@/components/combine/board-parts/CombineTile";
 
 export function Shelf({
   state,
@@ -63,23 +62,17 @@ export function Shelf({
           const n = state.madeCounts[id] ?? 1;
           const isNew = id === freshlyMade;
           return (
-            <button
+            <CombineTile
               key={id}
-              type="button"
-              className={`cbslot${isNew ? " new" : ""}`}
-              style={fillVar(item)}
+              variant="slot"
+              item={item}
+              className={isNew ? "new" : undefined}
               aria-label={`${cap(item.name)}${n > 1 ? `, ×${n}` : ""}. Show how it's made`}
               title={cap(item.name)}
               onClick={() => onInfo(id)}
             >
-              <Pictogram
-                name={item.name}
-                tier={item.tier}
-                kind={item.kind}
-                symbol={item.symbol}
-              />
               {n > 1 && <b>{n}</b>}
-            </button>
+            </CombineTile>
           );
         })}
         {!empty && <span className="cbslot cbslot-next" aria-hidden="true" />}

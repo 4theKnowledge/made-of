@@ -16,3 +16,5 @@
 {"id": "C-0016", "ts": "2026-11-04T22:26:10Z", "kind": "fix", "summary": "Feedback dialog no longer shows raw ids / context block to the user (payload still carries them for admin)", "refs": {"task": "T-0061"}}
 {"id": "C-0017", "ts": "2026-11-04T22:26:50Z", "kind": "fix", "summary": "Combine recipe toast: output chip shows pictogram; chip text readable in dark mode (T-0060)", "refs": {"task": "T-0060"}}
 {"id": "C-0018", "ts": "2026-11-04T22:29:46Z", "kind": "feature", "summary": "Combine: feedback entry in More menu, DetailCard Report grouped with Back, human-readable \"Reporting …\" line in dialog", "refs": {"tasks": "T-0062,T-0063"}}
+{"id": "C-0019", "ts": "2026-11-04T22:48:30Z", "kind": "refactor", "summary": "Combine: shared CombineTile primitive replaces duplicated tile JSX in Tray/Hold/Shelf/CollectionBook (T-0006)", "refs": {"task": "T-0006"}}
+{"id": "C-0020", "ts": "2026-11-04T22:48:43Z", "kind": "fix", "summary": "CI: stub DATABASE_URL for `next build` prerender", "refs": {"task": "T-0064", "commit": "01d4f60"}}

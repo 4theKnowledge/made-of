@@ -30,6 +30,8 @@ export function DragGhost({
     height: `${size}px`,
     ...fillVar(item),
   };
+  // Drag ghost renders label-above-pictogram (unlike tray/board tiles) to
+  // keep the item name visible while the finger hovers over the icon.
   const words = tileId.split("-");
   const longest = Math.max(0, ...words.map((w) => w.length));
   const lenClass = longest >= 10 ? " l2" : longest >= 7 ? " l1" : "";

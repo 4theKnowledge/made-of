@@ -5,7 +5,7 @@ import { catalogue, catalogueByKind } from "@/combine/data";
 import type { GameState } from "@/combine/engine";
 import type { CombineRecipe, ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
-import { fillVar } from "@/components/combine/board-parts/util";
+import { CombineTile } from "@/components/combine/board-parts/CombineTile";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 
 export function CollectionBook({
@@ -184,18 +184,12 @@ export function CollectionBook({
                     }}
                   >
                     <span className="cbbookrow-head">
-                      <span
-                        className="cbslot"
-                        style={fillVar(it)}
+                      <CombineTile
+                        as="span"
+                        variant="slot"
+                        item={it}
                         aria-hidden="true"
-                      >
-                        <Pictogram
-                          name={it.name}
-                          tier={it.tier}
-                          kind={it.kind}
-                          symbol={it.symbol}
-                        />
-                      </span>
+                      />
                       <span className="cbbookrow-text">
                         <b>{cap(it.name)}</b>
                         <small>
@@ -274,25 +268,18 @@ export function CollectionBook({
                       );
                     }
                     return (
-                      <button
+                      <CombineTile
                         key={id}
-                        type="button"
-                        className="bk"
-                        style={fillVar(it)}
+                        variant="book"
+                        item={it}
+                        label
                         onClick={() => {
                           onInfo(id);
                         }}
                         title={cap(it.name)}
                       >
-                        <Pictogram
-                          name={it.name}
-                          tier={it.tier}
-                          kind={it.kind}
-                          symbol={it.symbol}
-                        />
-                        <span>{cap(it.name)}</span>
                         <small>{relativeTime(foundAt)}</small>
-                      </button>
+                      </CombineTile>
                     );
                   })}
                 </div>

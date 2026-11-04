@@ -1,9 +1,8 @@
 import React from "react";
-import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
-import { fillVar } from "@/components/combine/board-parts/util";
+import { CombineTile } from "@/components/combine/board-parts/CombineTile";
 
 export function Tray({
   state,
@@ -34,31 +33,24 @@ export function Tray({
         }
         const item = bundle.items.get(id);
         if (!item) return <div key={slot} className="cbp empty" />;
-        const classes = ["cbp"];
-        if (isSel(slot)) classes.push("sel");
+        const sel = isSel(slot);
         const isTool = bundle.tools.has(id);
         return (
-          <button
+          <CombineTile
             key={slot}
-            type="button"
-            className={classes.join(" ")}
+            variant="tray"
+            item={item}
+            label
+            className={sel ? "sel" : undefined}
             data-cbp={slot}
-            style={fillVar(item)}
             onPointerDown={(e) => onSlotPointerDown(slot, "tray", e)}
             onClick={() => onSlotTap("tray", slot)}
             onContextMenu={(e) => e.preventDefault()}
-            aria-label={`Tray slot ${slot + 1}: ${cap(item.name)}${isSel(slot) ? ", selected" : ""}`}
-            aria-pressed={isSel(slot)}
+            aria-label={`Tray slot ${slot + 1}: ${cap(item.name)}${sel ? ", selected" : ""}`}
+            aria-pressed={sel}
           >
             {isTool && <span className="tool">tool</span>}
-            <Pictogram
-              name={item.name}
-              tier={item.tier}
-              kind={item.kind}
-              symbol={item.symbol}
-            />
-            <span className="cbn">{cap(item.name)}</span>
-          </button>
+          </CombineTile>
         );
       })}
     </div>

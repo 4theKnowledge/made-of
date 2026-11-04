@@ -1,9 +1,8 @@
 import React from "react";
-import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
-import { fillVar } from "@/components/combine/board-parts/util";
+import { CombineTile } from "@/components/combine/board-parts/CombineTile";
 
 export function Hold({
   state,
@@ -70,27 +69,20 @@ export function Hold({
           }
           const item = bundle.items.get(id);
           if (!item) return null;
-          const slotClasses = ["cbslot", "cbheld"];
-          if (isSel(slot)) slotClasses.push("sel");
+          const sel = isSel(slot);
+          const extra = sel ? "cbheld sel" : "cbheld";
           return (
-            <button
+            <CombineTile
               key={slot}
-              type="button"
-              className={slotClasses.join(" ")}
-              style={fillVar(item)}
+              variant="slot"
+              item={item}
+              className={extra}
               onPointerDown={(e) => onSlotPointerDown(slot, "hold", e)}
               onClick={() => onSlotTap("hold", slot)}
               onContextMenu={(e) => e.preventDefault()}
-              aria-label={`Held: ${cap(item.name)}${isSel(slot) ? ", selected" : ""}`}
-              aria-pressed={isSel(slot)}
-            >
-              <Pictogram
-                name={item.name}
-                tier={item.tier}
-                kind={item.kind}
-                symbol={item.symbol}
-              />
-            </button>
+              aria-label={`Held: ${cap(item.name)}${sel ? ", selected" : ""}`}
+              aria-pressed={sel}
+            />
           );
         })}
       </span>
