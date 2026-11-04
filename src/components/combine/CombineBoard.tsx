@@ -315,31 +315,37 @@ export function CombineBoard({
   // Pause music when the tab is hidden, and silence it before the page is
   // torn down. Both paths fade the music bus first so already-scheduled
   // oscillators don't get cut off mid-cycle (which clicks on close).
+  //
+  // The pending-suspend timer lives in a ref so an effect re-run (triggered
+  // by `sound` or `state.age` changing while the tab is hidden) can't
+  // orphan it — otherwise the new onVis closure wouldn't cancel the
+  // old setTimeout and the context would get re-suspended right after we
+  // resume on return, leaving the scheduler ticking into silence.
+  const suspendTimerRef = useRef<number | null>(null);
   useEffect(() => {
-    let suspendTimer: number | null = null;
-    const silence = () => {
-      if (suspendTimer != null) {
-        window.clearTimeout(suspendTimer);
-        suspendTimer = null;
+    const clearSuspendTimer = () => {
+      if (suspendTimerRef.current != null) {
+        window.clearTimeout(suspendTimerRef.current);
+        suspendTimerRef.current = null;
       }
+    };
+    const silence = () => {
+      clearSuspendTimer();
       const fade = fadeOutMusic();
       const core = hasContext()
         ? ensureContext({ ...sound, vol: sound.vol / 100 })
         : null;
       if (!core) return;
-      suspendTimer = window.setTimeout(() => {
+      suspendTimerRef.current = window.setTimeout(() => {
         suspendAudio(core);
-        suspendTimer = null;
+        suspendTimerRef.current = null;
       }, Math.ceil(fade * 1000) + 20);
     };
     const onVis = () => {
       if (document.hidden) {
         silence();
       } else if (sound.music !== "off" && hasContext()) {
-        if (suspendTimer != null) {
-          window.clearTimeout(suspendTimer);
-          suspendTimer = null;
-        }
+        clearSuspendTimer();
         startMusic({ busyGetter: () => state.age });
       }
     };
@@ -349,7 +355,6 @@ export function CombineBoard({
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("pagehide", onHide);
-      if (suspendTimer != null) window.clearTimeout(suspendTimer);
     };
   }, [sound, state.age]);
   const [bookOpen, setBookOpen] = useState(false);

@@ -45,7 +45,7 @@ export interface SoundSettings {
   vol: number; // 0..100
 }
 
-const SOUND_DEFAULT: SoundSettings = { music: "off", sfx: false, vol: 80 };
+const SOUND_DEFAULT: SoundSettings = { music: "piano", sfx: true, vol: 80 };
 
 export interface StoredGame {
   v: number;
