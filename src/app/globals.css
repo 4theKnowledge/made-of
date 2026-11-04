@@ -808,9 +808,12 @@ a.btn.primary{color:var(--bg)}
 .cbshelf{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:5px;min-height:34px;padding:4px 6px;border:1.5px dashed color-mix(in srgb, var(--ink) 30%, transparent);border-radius:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;--fade-l:#000;--fade-r:#000;-webkit-mask-image:linear-gradient(to right, var(--fade-l), #000 18px, #000 calc(100% - 18px), var(--fade-r));mask-image:linear-gradient(to right, var(--fade-l), #000 18px, #000 calc(100% - 18px), var(--fade-r))}
 .cbshelf.ov-l{--fade-l:transparent}
 .cbshelf.ov-r{--fade-r:transparent}
-.cbhold{min-height:50px}
 .cbshelf.none{background:color-mix(in srgb, var(--ink) 3%, transparent);border-color:color-mix(in srgb, var(--ink) 20%, transparent);overflow:hidden}
 .cbshelf-slots{display:inline-flex;align-items:center;gap:5px;flex-wrap:nowrap;min-width:0;flex:1 1 auto}
+.cbhold{-webkit-mask-image:none;mask-image:none;overflow:hidden}
+.cbhold .cbshelf-slots{flex:0 0 auto}
+.cbhold .cbshelf-empty{display:flex;flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;justify-content:flex-end;align-items:center;gap:7px;padding-right:4px;margin-left:auto}
+.cbhold .cbshelf-empty em{overflow:hidden;text-overflow:ellipsis}
 .cbslot{position:relative;width:30px;height:30px;box-sizing:border-box;border:1.5px solid var(--pk);border-radius:3px;background:var(--fill);box-shadow:1.5px 1.5px 0 var(--pk);display:grid;place-items:center;color:#111417;cursor:pointer;padding:0;font:inherit}
 .cbslot .ic{width:22px;height:22px;border:0;background:transparent}
 .cbslot .ic svg{width:100%;height:100%}
@@ -826,9 +829,8 @@ a.btn.primary{color:var(--bg)}
 .cbhold{touch-action:none}
 .cbhold.over{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 10%, transparent)}
 .cbhold.over-bad{border-color:var(--bad);background:color-mix(in srgb, var(--bad) 10%, transparent)}
-.cbslot.cbheld{cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:auto;min-width:36px;max-width:72px;height:auto;min-height:44px;padding:2px 4px}
+.cbslot.cbheld{cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;width:30px;height:30px;padding:0}
 .cbslot.cbheld .ic{width:22px;height:22px;flex:none}
-.cbslot.cbheld .cbheld-n{font-size:7.5px;line-height:1;font-weight:700;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 .cbboard{position:relative;display:grid;grid-template-columns:repeat(var(--cbn,6),minmax(0,1fr));grid-auto-rows:auto;gap:4px;padding:6px;border:2px solid var(--ink);border-radius:4px;background:var(--soft);touch-action:none}
 .cbchainfx{position:absolute;inset:6px;pointer-events:none;z-index:5;overflow:visible}
@@ -1251,7 +1253,6 @@ a.btn.primary{color:var(--bg)}
   .cbscore span{font-size:11px}
   .cbtip{display:none}
   .cbshelf{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;min-height:28px;padding:3px 8px 3px 5px}
-  .cbshelf.cbhold{min-height:46px}
   .cbboard{margin:0 auto;width:100%;box-sizing:border-box}
   .cbtray{gap:10px;padding-top:2px}
   .cbp{max-width:min(84px, var(--cbtile, 84px))}

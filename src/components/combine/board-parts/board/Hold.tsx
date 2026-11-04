@@ -60,6 +60,7 @@ export function Hold({
       <span className="cbshelf-slots">
         {state.hold.map((id, slot) => {
           if (id == null) {
+            if (!empty) return null;
             return (
               <span
                 key={`ph-${slot}`}
@@ -90,19 +91,16 @@ export function Hold({
                 kind={item.kind}
                 symbol={item.symbol}
               />
-              <span className="cbheld-n">{cap(item.name)}</span>
             </button>
           );
         })}
       </span>
-      {empty && (
-        <span className="cbshelf-empty" aria-hidden="true">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M6 3h12v18l-6-4-6 4z" />
-          </svg>
-          <em>Hold zone</em>
-        </span>
-      )}
+      <span className="cbshelf-empty" aria-hidden="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 3h12v18l-6-4-6 4z" />
+        </svg>
+        <em>Hold zone</em>
+      </span>
     </div>
   );
 }
