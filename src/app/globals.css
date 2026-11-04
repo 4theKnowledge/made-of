@@ -1388,8 +1388,8 @@ a.btn.primary{color:var(--bg)}
 .cbinfo .cbrcp .ic svg{width:100%;height:100%}
 .cbinfo .cbrcp i{font-style:normal;font-weight:800}
 .cbinfo .cbrcp .q{border-style:dashed;color:var(--muted);padding:2px 7px}
-.cbover .row2{display:flex;gap:8px;width:100%;margin-top:4px}
-.cbover .row2 .cbh{flex:1;justify-content:center;height:44px;font-size:14px;text-decoration:none}
+.cbover .row2,.cbinfo .row2{display:flex;gap:12px;width:100%;margin-top:4px}
+.cbover .row2 .cbh,.cbinfo .row2 .cbh{flex:1;justify-content:center;height:44px;font-size:14px;text-decoration:none}
 /* Full-width primary dismiss used by overlays with a single bottom action
    (e.g. the collection book). Matches the thumb-friendly height of row2. */
 .cbover .cbh.cbback{width:100%;justify-content:center;height:48px;font-size:14px;flex:none}

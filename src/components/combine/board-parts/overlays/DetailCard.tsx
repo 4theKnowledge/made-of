@@ -42,8 +42,17 @@ export function DetailCard({
   const goesInto = (bundle.byIngredient.get(tileId) ?? []).filter(
     (r) => r.out !== tileId,
   );
-  const foundGoesInto = goesInto.filter((r) => known.has(r.out));
-  const unfoundCount = goesInto.length - foundGoesInto.length;
+  const goesIntoOuts = Array.from(new Set(goesInto.map((r) => r.out)));
+  const foundGoesIntoOuts = goesIntoOuts.filter((out) => known.has(out));
+  const unfoundCount = goesIntoOuts.length - foundGoesIntoOuts.length;
+  // Only link out to Explore once every neighbour the card could reveal is
+  // already in the player's collection — the recipe's ingredients and every
+  // downstream `goes into` output. Anything less lets Explore spoil the next
+  // discovery.
+  const ingredientsKnown =
+    !!madeFrom && madeFrom.all.every((id) => known.has(id));
+  const canExplore =
+    isKnown && !!madeFrom && ingredientsKnown && unfoundCount === 0;
   return (
     <ResponsiveSheet
       open
@@ -87,18 +96,18 @@ export function DetailCard({
           <p className="fact">You haven&rsquo;t made this yet.</p>
         )}
         {item.fact && <p className="fact">{item.fact}</p>}
-        {goesInto.length > 0 && (
+        {goesIntoOuts.length > 0 && (
           <div
             className="cbrcp"
             aria-label="Goes into"
             style={{ marginTop: 4 }}
           >
             <b style={{ marginRight: 6 }}>Goes into:</b>
-            {foundGoesInto.slice(0, 6).map((r) => {
-              const o = bundle.items.get(r.out);
+            {foundGoesIntoOuts.slice(0, 6).map((out) => {
+              const o = bundle.items.get(out);
               if (!o) return null;
               return (
-                <span key={r.out}>
+                <span key={out}>
                   <Pictogram
                     name={o.name}
                     tier={o.tier}
@@ -115,14 +124,16 @@ export function DetailCard({
           </div>
         )}
         <div className="row2">
-          <a
-            className="cbh"
-            href={`/explore/${item.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Full story in Explore
-          </a>
+          {canExplore && (
+            <a
+              className="cbh"
+              href={`/explore/${item.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Full story in Explore
+            </a>
+          )}
           <button type="button" className="cbh" onClick={onDismiss}>
             Back to the game
           </button>
