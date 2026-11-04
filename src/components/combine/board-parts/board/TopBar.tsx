@@ -33,6 +33,7 @@ export function TopBar({
   onSound,
   onHelp,
   onIntro,
+  onFeedback,
 }: {
   state: GameState;
   fx: Fx;
@@ -52,6 +53,7 @@ export function TopBar({
   onSound: () => void;
   onHelp: () => void;
   onIntro: () => void;
+  onFeedback: () => void;
 }) {
   const canUndo = state.undos > 0 && state.lastSnapshot != null;
   const wipeUnlocked = state.age >= WIPE_UNLOCK_AGE;
@@ -415,6 +417,20 @@ export function TopBar({
                 <span className="nm">
                   <b className="t">Show intro</b>
                   <em>Replay the welcome demo</em>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="cbhm"
+                onClick={onFeedback}
+                aria-label="Send feedback"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 5h16v11H8l-4 4z" />
+                </svg>
+                <span className="nm">
+                  <b className="t">Send feedback</b>
+                  <em>Suggest items, recipes, or flag issues</em>
                 </span>
               </button>
         </ResponsiveSheet>

@@ -12,6 +12,7 @@ export function DetailCard({
   known,
   howMade,
   onDismiss,
+  onReport,
 }: {
   tileId: string;
   bundle: ThemeBundle;
@@ -22,6 +23,8 @@ export function DetailCard({
    *  so items with multiple valid recipes show the one the player made. */
   howMade: Record<string, string[]>;
   onDismiss: () => void;
+  /** Open the feedback sheet pre-seeded for this item. Omitted = no button. */
+  onReport?: () => void;
 }) {
   const item = bundle.items.get(tileId);
   if (!item) return null;
@@ -127,25 +130,31 @@ export function DetailCard({
             )}
           </div>
         )}
-        {canExplore ? (
-          <ButtonGroup>
-            <a
+        {canExplore && (
+          <a
+            className="cbh"
+            href={`/explore/${item.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Full story in Explore
+          </a>
+        )}
+        <ButtonGroup>
+          {onReport && (
+            <button
+              type="button"
               className="cbh"
-              href={`/explore/${item.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
+              onClick={onReport}
+              aria-label="Report this item"
             >
-              Full story in Explore
-            </a>
-            <button type="button" className="cbh" onClick={onDismiss}>
-              Back to the game
+              Report
             </button>
-          </ButtonGroup>
-        ) : (
-          <button type="button" className="cbh cbback" onClick={onDismiss}>
+          )}
+          <button type="button" className="cbh" onClick={onDismiss}>
             Back to the game
           </button>
-        )}
+        </ButtonGroup>
     </ResponsiveSheet>
   );
 }

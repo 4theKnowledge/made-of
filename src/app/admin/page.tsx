@@ -51,6 +51,7 @@ export default async function AdminHome() {
           <Link href="/admin/bulk" className="btn">Bulk upload</Link>
           <Link href="/admin/codes" className="btn">Invite codes</Link>
           <Link href="/admin/changelog" className="btn">Changelog</Link>
+          <Link href="/admin/feedback" className="btn">Feedback</Link>
           <a href="/api/admin/export" className="btn" download>Download export</a>
         </div>
       </section>

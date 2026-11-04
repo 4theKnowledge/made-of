@@ -1350,6 +1350,8 @@ a.btn.primary{color:var(--bg)}
 .cbdisc b{display:block;font-size:20px;line-height:1.1}
 .cbdisc p{margin:4px 0 0;font-size:13px;line-height:1.35}
 .cbdisc .cbchip{margin-top:6px;color:#111417}
+.cbdisc-report{margin-top:8px;padding:2px 8px;background:transparent;border:1px solid currentColor;border-radius:3px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:inherit;cursor:pointer;opacity:.6}
+.cbdisc-report:hover{opacity:1}
 
 /* Ghost preview + preview badges */
 .cbc .ghost2{opacity:.38;width:62%;display:grid;place-items:center}

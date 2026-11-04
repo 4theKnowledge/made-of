@@ -71,6 +71,10 @@ import {
   DiscoveryToast,
   HintToast,
 } from "@/components/combine/board-parts/toasts";
+import {
+  FeedbackSheet,
+  type FeedbackPrefill,
+} from "@/components/common/FeedbackSheet";
 import { AgesSheet } from "@/components/combine/board-parts/overlays/AgesSheet";
 import { ChoicePicker } from "@/components/combine/board-parts/overlays/ChoicePicker";
 import { CollectionBook } from "@/components/combine/board-parts/overlays/CollectionBook";
@@ -101,6 +105,9 @@ interface Props {
    *  The reducer trusts the flag UI-side; real security is at the admin
    *  session check that produced this. */
   admin?: boolean;
+  /** Is the current visitor signed in? Gates "suggest recipe" in the
+   *  feedback sheet; the server still enforces, this just shapes the UI. */
+  signedIn?: boolean;
 }
 
 /** The top-level client component that owns engine state. */
@@ -108,6 +115,7 @@ export function CombineBoard({
   bundles: serialised,
   fastBundles: fastSerialised,
   admin = false,
+  signedIn = false,
 }: Props) {
   const bundles = useMemo<Record<ThemeKey, ThemeBundle>>(
     () => ({
@@ -251,6 +259,8 @@ export function CombineBoard({
   // button below the board, which itself only renders when the server
   // said this session is admin.
   const [debugOpen, setDebugOpen] = useState(false);
+  // Feedback sheet (summoned from "Report this recipe" on DiscoveryToast).
+  const [feedback, setFeedback] = useState<FeedbackPrefill | null>(null);
   // Admin-only forced "last chance" state. Session-only; when true, the
   // dialog fires and the board border adopts its last-chance styling as if
   // the live predicate had flipped.
@@ -1630,6 +1640,10 @@ export function CombineBoard({
             setMoreOpen(false);
             setOnboardOpen(true);
           }}
+          onFeedback={() => {
+            setMoreOpen(false);
+            setFeedback({ type: "suggest_item", payload: {} });
+          }}
         />
         <TipLine
           state={state}
@@ -1853,6 +1867,19 @@ export function CombineBoard({
             known={knownIds}
             howMade={state.howMade}
             onDismiss={() => setInfoTile(null)}
+            onReport={() => {
+              const id = infoTile;
+              setInfoTile(null);
+              const it = bundle.items.get(id);
+              setFeedback({
+                type: "report",
+                payload: {
+                  category: "item_wrong",
+                  itemId: id,
+                  ...(it ? { recipeInputs: [it.name] } : {}),
+                },
+              });
+            }}
           />
         )}
         {soundOpen && (
@@ -1910,6 +1937,12 @@ export function CombineBoard({
         {onboardOpen && (
           <OnboardingDemo onDismiss={() => setOnboardOpen(false)} />
         )}
+        <FeedbackSheet
+          open={feedback !== null}
+          onDismiss={() => setFeedback(null)}
+          initial={feedback ?? undefined}
+          signedIn={signedIn}
+        />
         <ResponsiveSheet
           open={lastChanceOpen}
           onDismiss={() => setLastChanceOpen(false)}

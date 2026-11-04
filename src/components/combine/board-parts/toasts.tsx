@@ -146,10 +146,13 @@ export function DiscoveryToast({
   discovery,
   bundle,
   onDismiss,
+  onReport,
 }: {
   discovery: { out: string; recipe: string[]; firstLifetime: boolean };
   bundle: ThemeBundle;
   onDismiss: () => void;
+  /** Open feedback sheet seeded with this recipe. Hidden when absent. */
+  onReport?: () => void;
 }) {
   const item = bundle.items.get(discovery.out);
   if (!item) return null;
@@ -204,6 +207,20 @@ export function DiscoveryToast({
           </span>
         </div>
         {item.fact && <p>{item.fact}</p>}
+        {onReport && (
+          <button
+            type="button"
+            className="cbdisc-report"
+            onClick={(e) => {
+              e.stopPropagation();
+              onReport();
+            }}
+            aria-label="Report this recipe"
+            title="Report this recipe"
+          >
+            Report this recipe
+          </button>
+        )}
       </div>
     </div>
   );

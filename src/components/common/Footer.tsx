@@ -1,13 +1,21 @@
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { FeedbackLauncher } from "./FeedbackLauncher";
+
 
 /**
- * Shared footer with legal links (Privacy, Terms, Method).
+ * Shared footer with legal links (Privacy, Terms, Method) and a global
+ * "Feedback" entry point.
  *
  * `compactOnMobile` collapses to a single row on mobile for game pages
  * (Combine, Explore, Scratch) so the board isn't pushed down by a tall
  * stacked footer. Desktop is unchanged.
  */
-export function Footer({ compactOnMobile = false }: { compactOnMobile?: boolean } = {}) {
+export async function Footer({
+  compactOnMobile = false,
+}: { compactOnMobile?: boolean } = {}) {
+  const session = await getSession();
+  const signedIn = !!session?.user?.id;
   return (
     <footer className="foot" data-compact-on-mobile={compactOnMobile ? "" : undefined}>
       <div className="footBrand">
@@ -26,6 +34,7 @@ export function Footer({ compactOnMobile = false }: { compactOnMobile?: boolean 
         <Link href="/changelog">Changelog</Link>
         <Link href="/privacy">Privacy</Link>
         <Link href="/terms">Terms</Link>
+        <FeedbackLauncher signedIn={signedIn} />
       </nav>
     </footer>
   );

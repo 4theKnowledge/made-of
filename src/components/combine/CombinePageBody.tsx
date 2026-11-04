@@ -5,7 +5,7 @@ import { buildAllBundles, buildAllFastBundles } from "@/combine/data";
 import { serialiseBundle } from "@/combine/serialise";
 import { loadAllSeasons, promoteSeason } from "@/combine/season";
 import { CombineBoard } from "@/components/combine/CombineBoard";
-import { isAdmin } from "@/lib/session";
+import { getSession, isAdmin } from "@/lib/session";
 
 export async function CombinePageBody() {
   const live = await getLiveSnapshot();
@@ -27,6 +27,8 @@ export async function CombinePageBody() {
     everything: serialiseBundle(fastBundles.everything),
   };
   const admin = await isAdmin();
+  const session = await getSession();
+  const signedIn = !!session?.user?.id;
 
   return (
     <main className="wrap">
@@ -35,6 +37,7 @@ export async function CombinePageBody() {
         bundles={serialised}
         fastBundles={fastSerialised}
         admin={admin}
+        signedIn={signedIn}
       />
       <Footer compactOnMobile />
     </main>

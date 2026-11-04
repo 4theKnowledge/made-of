@@ -66,6 +66,23 @@ export const changelogTypeEnum = pgEnum("changelog_type", [
   "note",
 ]);
 
+// User-feedback taxonomy. `suggest_item` and `suggest_recipe` grow the KB;
+// `report` is "something broken" (may carry a recipe id or item id in the
+// payload); `other` is the catch-all. Statuses are a light workflow for the
+// admin triage page, not a full state machine.
+export const feedbackTypeEnum = pgEnum("feedback_type", [
+  "suggest_item",
+  "suggest_recipe",
+  "report",
+  "other",
+]);
+export const feedbackStatusEnum = pgEnum("feedback_status", [
+  "open",
+  "triaged",
+  "dismissed",
+  "resolved",
+]);
+
 // Access codes. `invite` gates sign-up during soft-launch; `promo` is left
 // open for future use (e.g. upgrade coupons, event drops). Both share the
 // same table so admin tooling and redemption bookkeeping stay in one place.
@@ -637,6 +654,48 @@ export const changelogEntries = pgTable(
 );
 
 /* ========================================================================
+ * Feedback.
+ *
+ * User-submitted feedback routed to /admin/feedback for triage. One row per
+ * submission; the shape of `payload` depends on `type`:
+ *   - suggest_item:   { name, context? }
+ *   - suggest_recipe: { output?: itemId | string, inputs: Array<itemId | string>, note? }
+ *   - report:         { category?: string, note?: string, recipeId?, itemId?, recipeInputs?: string[] }
+ *   - other:          { note }
+ *
+ * `url` captures the page the user was on when they hit submit. `userId` is
+ * null for anonymous submissions (anon is rate-limited; recipe suggestions
+ * require auth, enforced in the route handler). `status` drives the admin
+ * triage column.
+ * ====================================================================== */
+
+export const feedback = pgTable(
+  "feedback",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    type: feedbackTypeEnum("type").notNull(),
+    payload: jsonb("payload").notNull().default(sql`'{}'::jsonb`),
+    userId: text("user_id").references(() => authUser.id, {
+      onDelete: "set null",
+    }),
+    url: text("url"),
+    status: feedbackStatusEnum("status").notNull().default("open"),
+    adminNote: text("admin_note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("feedback_status_idx").on(t.status),
+    index("feedback_type_idx").on(t.type),
+    index("feedback_created_idx").on(t.createdAt),
+  ],
+);
+
+/* ========================================================================
  * Relations.
  * ====================================================================== */
 
@@ -712,6 +771,10 @@ export type ChangelogStatus = (typeof changelogStatusEnum.enumValues)[number];
 export type ChangelogType = (typeof changelogTypeEnum.enumValues)[number];
 export type ChangelogEntry = typeof changelogEntries.$inferSelect;
 export type NewChangelogEntry = typeof changelogEntries.$inferInsert;
+export type FeedbackType = (typeof feedbackTypeEnum.enumValues)[number];
+export type FeedbackStatus = (typeof feedbackStatusEnum.enumValues)[number];
+export type Feedback = typeof feedback.$inferSelect;
+export type NewFeedback = typeof feedback.$inferInsert;
 
 export type Item = typeof items.$inferSelect;
 export type NewItem = typeof items.$inferInsert;
