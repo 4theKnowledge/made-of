@@ -37,5 +37,7 @@ jobs:
         run: npm run build
         env:
           # Build does not need a live Postgres; drizzle.config.ts is only
-          # read by drizzle-kit, not by `next build`.
+          # read by drizzle-kit, not by `next build`. The stub DATABASE_URL
+          # just satisfies the DB client's module-load check during prerender.
           NODE_ENV: production
+          DATABASE_URL: postgres://stub:stub@localhost:5432/stub
