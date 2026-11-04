@@ -742,6 +742,10 @@ a.btn.primary{color:var(--bg)}
 .cbagebanner-x:hover{color:var(--ink)}
 
 .cblastchance-sheet{border-color:var(--bad);box-shadow:5px 5px 0 var(--bad)}
+.cblastchance-sheet .row2{display:flex;gap:10px;width:100%;margin-top:8px}
+.cblastchance-sheet .row2 .cbh{flex:1;justify-content:center}
+.cblastchance-finish{align-self:center;padding:6px 14px;border:1.5px dashed var(--bad);border-radius:4px;background:var(--bg);color:var(--bad);font-family:inherit;font-size:13px;font-weight:600;letter-spacing:0.01em;cursor:pointer}
+.cblastchance-finish:hover{background:var(--bad);color:var(--bg)}
 
 .cbtop{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .cbscore b{display:block;font-family:var(--mono);font-size:30px;font-weight:600;line-height:1}

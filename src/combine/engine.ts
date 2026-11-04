@@ -197,6 +197,7 @@ export type Action =
   | { type: "hold"; slot: number }
   | { type: "pluck-hold"; cell: number }
   | { type: "wipe-board" }
+  | { type: "finish" }
   | { type: "undo" }
   // Debug actions (admin-only). The toggle flips `state.debug`; the others
   // are no-ops unless `state.debug` is already true. UI mounting is gated
@@ -1107,6 +1108,20 @@ export function reduce(
         recentTrays: state.recentTrays,
       });
       events.push({ type: "dealt" });
+      return { state, events };
+    }
+
+    case "finish": {
+      // Player-chosen end-of-run. Only legal when the player can't finish
+      // a combine organically but still has helper spends available — i.e.
+      // the "last chance" state. Lets them bank the score instead of being
+      // forced to burn helpers on a run they'd rather end cleanly.
+      //
+      // Guarded here so the UI can dispatch freely without re-checking.
+      if (hasOrganicFinishingMove(state, bundle)) return { state: prev, events: [] };
+      if (!hasHelperMove(state, bundle)) return { state: prev, events: [] };
+      state.over = true;
+      events.push({ type: "over" });
       return { state, events };
     }
 

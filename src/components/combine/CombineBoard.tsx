@@ -1544,6 +1544,15 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
           lastChance={lastChance}
           onCellTap={onCellTap}
         />
+        {lastChance && !state.over && (
+          <button
+            type="button"
+            className="cblastchance-finish"
+            onClick={() => act({ type: "finish" })}
+          >
+            Finish now
+          </button>
+        )}
         <Hold
           state={state}
           bundle={bundle}
@@ -1770,10 +1779,18 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
             Last chance
           </h3>
           <p style={{ margin: 0, color: "var(--muted)", fontSize: 14 }}>
-            No tray or hold tile can finish a combine from here. You can still
-            spend a helper — move, swap, clear, pluck, or wipe — to keep going.
+            No tray or hold tile can finish a combine from here. You can spend
+            a helper — move, swap, clear, pluck, or wipe — to keep going, or
+            finish now and bank your score.
           </p>
           <div className="row2">
+            <button
+              type="button"
+              className="cbh"
+              onClick={() => setLastChanceOpen(false)}
+            >
+              Keep playing
+            </button>
             <button
               type="button"
               className="cbh"
@@ -1782,9 +1799,12 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
                 borderColor: "var(--bad)",
                 color: "var(--bg)",
               }}
-              onClick={() => setLastChanceOpen(false)}
+              onClick={() => {
+                setLastChanceOpen(false);
+                act({ type: "finish" });
+              }}
             >
-              Got it
+              Finish now
             </button>
           </div>
         </ResponsiveSheet>
