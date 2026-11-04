@@ -17,6 +17,7 @@ export function Board({
   moveMode,
   shoreMode,
   pluckMode,
+  lastChance,
   onCellTap,
 }: {
   state: GameState;
@@ -28,12 +29,13 @@ export function Board({
   moveMode: { from: number | null } | null;
   shoreMode: boolean;
   pluckMode: boolean;
+  lastChance: boolean;
   onCellTap: (cell: number) => void;
 }) {
   const size = state.n;
   return (
     <div
-      className="cbboard"
+      className={"cbboard" + (lastChance ? " cbboard-lastchance" : "")}
       style={{ "--cbn": size } as React.CSSProperties}
       role="grid"
       aria-label="Board"

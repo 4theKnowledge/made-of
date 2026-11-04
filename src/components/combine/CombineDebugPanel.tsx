@@ -18,9 +18,25 @@ interface Props {
   bundle: ThemeBundle;
   dispatch: (action: Action) => void;
   onClose: () => void;
+  /** Forces the "last chance" preview on regardless of the live predicate —
+   *  dialog fires on toggle, board border adopts the dashed-red treatment.
+   *  Admin-only; lets us demo the end-to-end UX in context. */
+  previewLastChance: boolean;
+  onPreviewLastChanceToggle: () => void;
+  /** Current value of the derived predicate, surfaced for at-a-glance
+   *  debugging regardless of the preview toggle. */
+  lastChance: boolean;
 }
 
-export function CombineDebugPanel({ state, bundle, dispatch, onClose }: Props) {
+export function CombineDebugPanel({
+  state,
+  bundle,
+  dispatch,
+  onClose,
+  previewLastChance,
+  onPreviewLastChanceToggle,
+  lastChance,
+}: Props) {
   const [query, setQuery] = useState("");
   const [slot, setSlot] = useState(0);
   const cat = useMemo(() => catalogueByKind(bundle), [bundle]);
@@ -86,6 +102,24 @@ export function CombineDebugPanel({ state, bundle, dispatch, onClose }: Props) {
             onClick={() => dispatch({ type: "debug-toggle-over" })}
           >
             {state.over ? "unlock board" : "lock board (game over)"}
+          </button>
+        </div>
+      </section>
+
+      <section className="cbdebug-sec">
+        <h4>Last chance preview</h4>
+        <div className="cbdebug-ages">
+          <span className={lastChance ? "cbdebug-on" : "cbdebug-off"}>
+            live: {lastChance ? "active" : "inactive"}
+          </span>
+          <button
+            type="button"
+            className={
+              "cbdebug-btn" + (previewLastChance ? " cbdebug-btn-on" : "")
+            }
+            onClick={onPreviewLastChanceToggle}
+          >
+            {previewLastChance ? "turn off" : "force on"}
           </button>
         </div>
       </section>

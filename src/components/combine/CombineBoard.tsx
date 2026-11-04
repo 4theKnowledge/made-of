@@ -7,7 +7,13 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { newGame, reduce, WIPE_UNLOCK_AGE } from "@/combine/engine";
+import {
+  hasHelperMove,
+  hasOrganicFinishingMove,
+  newGame,
+  reduce,
+  WIPE_UNLOCK_AGE,
+} from "@/combine/engine";
 import type { Action, Event, GameState } from "@/combine/engine";
 import { matchOn } from "@/combine/match";
 import { findHint as pureFindHint, type HintResult } from "@/combine/hint";
@@ -41,6 +47,7 @@ import {
 } from "@/combine/share";
 import type { ThemeBundle, ThemeKey } from "@/combine/types";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 import { HowToPlay } from "@/components/common/HowToPlay";
 import { CombineDebugPanel } from "@/components/combine/CombineDebugPanel";
 import {
@@ -217,6 +224,10 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
   // button below the board, which itself only renders when the server
   // said this session is admin.
   const [debugOpen, setDebugOpen] = useState(false);
+  // Admin-only forced "last chance" state. Session-only; when true, the
+  // dialog fires and the board border adopts its last-chance styling as if
+  // the live predicate had flipped.
+  const [previewLastChance, setPreviewLastChance] = useState(false);
   // The tile pressed and currently being held / dragged. Mirrors the
   // prototype's cbDrag record. Ghost x/y are in viewport coords.
   const [drag, setDrag] = useState<{
@@ -1387,6 +1398,29 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
     return s;
   }, [state.found, collection]);
 
+  // "Last chance": the player can't finish a combine organically this turn,
+  // but a helper spend (mv/swap/clear/pluck/wipe) could still produce one.
+  // Runs on every state change; both predicates are O(board × tray+hold) at
+  // worst, which is small enough to not need extra guarding.
+  const lastChanceLive = useMemo(() => {
+    if (state.over) return false;
+    if (hasOrganicFinishingMove(state, bundle)) return false;
+    return hasHelperMove(state, bundle);
+  }, [state, bundle]);
+  // Admin preview overrides the live state, so the toggle demos the full
+  // end-to-end experience (dialog + board styling) regardless of position.
+  const lastChance = lastChanceLive || (admin && previewLastChance);
+
+  // Fire the dialog on every transition into `lastChance`. Edge-triggered:
+  // we only open on the false → true flip, so leaving and re-entering the
+  // state (e.g. swap into a new dead end) gives a fresh alert.
+  const [lastChanceOpen, setLastChanceOpen] = useState(false);
+  const prevLastChanceRef = useRef(false);
+  useEffect(() => {
+    if (lastChance && !prevLastChanceRef.current) setLastChanceOpen(true);
+    prevLastChanceRef.current = lastChance;
+  }, [lastChance]);
+
   const activeAgeBanner = newAgeBanner[state.theme];
   const dismissAgeBanner = () => {
     const curr = bundles[state.theme].theme.ages.length;
@@ -1507,6 +1541,7 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
           moveMode={moveMode}
           shoreMode={shoreMode}
           pluckMode={pluckMode}
+          lastChance={lastChance}
           onCellTap={onCellTap}
         />
         <Hold
@@ -1725,6 +1760,34 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
         {onboardOpen && (
           <OnboardingDemo onDismiss={() => setOnboardOpen(false)} />
         )}
+        <ResponsiveSheet
+          open={lastChanceOpen}
+          onDismiss={() => setLastChanceOpen(false)}
+          ariaLabel="Last chance"
+          className="cblastchance-sheet"
+        >
+          <h3 style={{ margin: "4px 0 0 0", fontSize: 18, color: "var(--bad)" }}>
+            Last chance
+          </h3>
+          <p style={{ margin: 0, color: "var(--muted)", fontSize: 14 }}>
+            No tray or hold tile can finish a combine from here. You can still
+            spend a helper — move, swap, clear, pluck, or wipe — to keep going.
+          </p>
+          <div className="row2">
+            <button
+              type="button"
+              className="cbh"
+              style={{
+                background: "var(--bad)",
+                borderColor: "var(--bad)",
+                color: "var(--bg)",
+              }}
+              onClick={() => setLastChanceOpen(false)}
+            >
+              Got it
+            </button>
+          </div>
+        </ResponsiveSheet>
         <ConfirmDialog
           open={wipeConfirm}
           title="Wipe the board?"
@@ -1774,6 +1837,11 @@ export function CombineBoard({ bundles: serialised, admin = false }: Props) {
               bundle={bundle}
               dispatch={act}
               onClose={() => setDebugOpen(false)}
+              previewLastChance={previewLastChance}
+              onPreviewLastChanceToggle={() =>
+                setPreviewLastChance((v) => !v)
+              }
+              lastChance={lastChance}
             />
           )}
         </>

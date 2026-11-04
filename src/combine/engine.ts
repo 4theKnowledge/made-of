@@ -631,6 +631,72 @@ function afterMove(
   }
 }
 
+/** True if the player can *finish a combine* this turn using only organic
+ *  actions — tray/hold → board, no helper spend. Covers `drop-on` that
+ *  completes a group and `place`-on-empty that completes a group with its
+ *  neighbours. Pure placement on an empty cell that doesn't combine, or
+ *  stashing a tray tile into hold, is organic but non-finishing and lives in
+ *  `hasOrganicNonFinishingMove`.
+ *
+ *  Used (with `hasHelperMove`) to detect the "last chance" state: no organic
+ *  path finishes, but a helper could still produce one. */
+export function hasOrganicFinishingMove(state: GameState, bundle: ThemeBundle): boolean {
+  const size = state.n;
+  const sources: Array<string | null> = [...state.tray, ...state.hold];
+  for (const t of sources) {
+    if (t == null) continue;
+    for (let j = 0; j < state.board.length; j++) {
+      const cell = state.board[j];
+      if (cell == null) {
+        if (matchAt(bundle, state.board, j, t, size)) return true;
+      } else {
+        if (matchOn(bundle, state.board, j, t, size)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Organic actions that keep the game alive but can't score on their own:
+ *  placing a tray/hold tile on an empty cell with no combine, or stashing a
+ *  tray tile into a free hold slot. Separated from `hasOrganicFinishingMove`
+ *  so the "last chance" check can key on *finishing* specifically. */
+export function hasOrganicNonFinishingMove(state: GameState): boolean {
+  const anyEmpty = state.board.some((v) => v == null);
+  const trayHasTile = state.tray.some((t) => t != null);
+  const holdHasTile = state.hold.some((t) => t != null);
+  if (anyEmpty && (trayHasTile || holdHasTile)) return true;
+  if (trayHasTile && state.hold.some((v) => v == null)) return true;
+  return false;
+}
+
+/** True if the player has at least one helper spend available that opens a
+ *  path forward: `mv` (relocate or on-board combine), `swap` (new tray),
+ *  `clear` (remove any tile), `pluck` (lift to hold), or `wipe-board` once
+ *  `WIPE_UNLOCK_AGE` is reached. Mirrors the helper branches in
+ *  `hasAnyLegalAction` — keep in sync if that predicate grows. */
+export function hasHelperMove(state: GameState, bundle: ThemeBundle): boolean {
+  const size = state.n;
+  const anyOccupied = state.board.some((v) => v != null);
+  const freeHoldSlot = state.hold.some((v) => v == null);
+
+  if (state.mv > 0 && anyOccupied) {
+    for (let i = 0; i < state.board.length; i++) {
+      const t = state.board[i];
+      if (!t) continue;
+      for (const j of edgeNeighbours(i, size)) {
+        if (state.board[j] == null) return true;
+        if (matchOn(bundle, state.board, j, t, size)) return true;
+      }
+    }
+  }
+  if (state.swaps > 0) return true;
+  if (state.clears > 0 && anyOccupied) return true;
+  if (state.pluck > 0 && anyOccupied && freeHoldSlot) return true;
+  if (state.age >= WIPE_UNLOCK_AGE) return true;
+  return false;
+}
+
 /** True if the player has at least one action available that changes state.
  *  Used to decide game-over: a full board is not game-over as long as a
  *  tray/hold tile can `drop-on`, a `move` is available, or the player has
@@ -639,60 +705,11 @@ function afterMove(
  *  Does not consider `undo` (reverts rather than progresses) or `shore`
  *  (doesn't open new placements on its own). */
 export function hasAnyLegalAction(state: GameState, bundle: ThemeBundle): boolean {
-  const size = state.n;
-  const anyEmpty = state.board.some((v) => v == null);
-  const anyOccupied = state.board.some((v) => v != null);
-  const traySlots: Array<string | null> = state.tray;
-  const holdSlots: Array<string | null> = state.hold;
-  const trayHasTile = traySlots.some((t) => t != null);
-  const holdHasTile = holdSlots.some((t) => t != null);
-
-  // place: any tray/hold tile + any empty cell is a legal action.
-  if (anyEmpty && (trayHasTile || holdHasTile)) return true;
-
-  // drop-on: any tray/hold tile that combines onto some occupied cell.
-  if (anyOccupied) {
-    for (const sources of [traySlots, holdSlots]) {
-      for (const t of sources) {
-        if (t == null) continue;
-        for (let j = 0; j < state.board.length; j++) {
-          if (state.board[j] == null) continue;
-          if (matchOn(bundle, state.board, j, t, size)) return true;
-        }
-      }
-    }
-  }
-
-  // move: with `mv > 0` the player can relocate any on-board tile to an
-  // adjacent empty cell OR trigger a combine on an adjacent occupied cell.
-  if (state.mv > 0 && anyOccupied) {
-    for (let i = 0; i < state.board.length; i++) {
-      const t = state.board[i];
-      if (!t) continue;
-      for (const j of edgeNeighbours(i, size)) {
-        if (state.board[j] == null) return true; // relocate
-        if (matchOn(bundle, state.board, j, t, size)) return true; // combine
-      }
-    }
-  }
-
-  // hold: a tray tile can move into a free hold slot.
-  if (trayHasTile && holdSlots.some((v) => v == null)) return true;
-
-  // swap: rerolls the tray. Counts as a legal action.
-  if (state.swaps > 0) return true;
-
-  // clear: removes a tile from the board.
-  if (state.clears > 0 && anyOccupied) return true;
-
-  // pluck-to-hold: lifts a board tile into a free hold slot.
-  if (state.pluck > 0 && anyOccupied && holdSlots.some((v) => v == null)) return true;
-
-  // wipe-board: clears everything at the cost of one age. Unlocked once
-  // the player reaches WIPE_UNLOCK_AGE. Always opens a path forward.
-  if (state.age >= WIPE_UNLOCK_AGE) return true;
-
-  return false;
+  return (
+    hasOrganicNonFinishingMove(state) ||
+    hasOrganicFinishingMove(state, bundle) ||
+    hasHelperMove(state, bundle)
+  );
 }
 
 /* ========================================================================
