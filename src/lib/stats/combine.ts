@@ -22,6 +22,10 @@ export type CombineRunResult = {
   season?: number;
   /** Day key for daily runs. */
   daily?: string;
+  /** Play mode at run-end. Absent in rows written before Fast launched —
+   *  treat missing as `"classic"`. Used to split stats so Fast and Endless
+   *  don't share a best-score bucket. */
+  mode?: "classic" | "fast";
 };
 
 export type CombineRun = {
@@ -51,8 +55,13 @@ export type CombineStats = {
   byScope: Record<CombineScope, CombineScopeDiscovery>;
   firstEver: Date | null;
   latest: Date | null;
-  // Finished-run stats, keyed by theme. Empty object if no runs on record.
+  // Finished-run stats for classic (endless + daily), keyed by theme.
+  // Empty object if no classic runs on record.
   bestByTheme: Record<string, CombineThemeBest>;
+  // Finished-run stats for Fast runs, keyed by theme. Split from classic
+  // because Fast is a different game — pair-dense scoring — and bundling
+  // them hides the Fast surface entirely.
+  bestByFastTheme: Record<string, CombineThemeBest>;
   totalRuns: number;
   bestScoreEver: number;
   // Combine is a high-score game — the collection is a progression aid
@@ -91,6 +100,7 @@ export function computeCombineStats(
   }
 
   const bestByTheme: Record<string, CombineThemeBest> = {};
+  const bestByFastTheme: Record<string, CombineThemeBest> = {};
   let bestScoreEver = 0;
   let totalScoreEver = 0;
 
@@ -98,9 +108,10 @@ export function computeCombineStats(
     const { score } = run.result;
     totalScoreEver += score;
     if (score > bestScoreEver) bestScoreEver = score;
-    const prev = bestByTheme[run.ref];
+    const bucket = run.result.mode === "fast" ? bestByFastTheme : bestByTheme;
+    const prev = bucket[run.ref];
     if (!prev) {
-      bestByTheme[run.ref] = { bestScore: score, totalRuns: 1, totalScore: score };
+      bucket[run.ref] = { bestScore: score, totalRuns: 1, totalScore: score };
     } else {
       prev.bestScore = Math.max(prev.bestScore, score);
       prev.totalRuns += 1;
@@ -115,6 +126,7 @@ export function computeCombineStats(
     firstEver,
     latest,
     bestByTheme,
+    bestByFastTheme,
     totalRuns: runs.length,
     bestScoreEver,
     totalScoreEver,

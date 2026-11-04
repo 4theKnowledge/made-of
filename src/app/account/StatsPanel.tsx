@@ -52,6 +52,9 @@ export function StatsPanel({ stats }: { stats: AccountStats }) {
   const themeEntries = Object.entries(combine.bestByTheme).sort(
     (a, b) => b[1].bestScore - a[1].bestScore,
   );
+  const fastThemeEntries = Object.entries(combine.bestByFastTheme).sort(
+    (a, b) => b[1].bestScore - a[1].bestScore,
+  );
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
@@ -100,6 +103,14 @@ export function StatsPanel({ stats }: { stats: AccountStats }) {
               key={theme}
               label={`Best — ${titleCase(theme)}`}
               value={best.bestScore.toLocaleString()}
+            />
+          ))}
+          {fastThemeEntries.map(([theme, best]) => (
+            <Stat
+              key={`fast-${theme}`}
+              label={`Best — ${titleCase(theme)} · Fast`}
+              value={best.bestScore.toLocaleString()}
+              hint={`${best.totalRuns} fast run${best.totalRuns === 1 ? "" : "s"}`}
             />
           ))}
         </div>

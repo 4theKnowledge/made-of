@@ -763,17 +763,24 @@ export function CombineBoard({
       // ingredients you've used in a combo (combine event inputs that aren't
       // outputs anywhere in the theme). Base tiles that only ever sit in the
       // tray — never consumed — stay uncollected on purpose.
-      const found: string[] = [];
-      for (const e of r.events) {
-        if (e.type === "discovery") {
-          found.push(e.out);
-        } else if (e.type === "combine") {
-          for (const id of e.inputs) {
-            if (!bundle.outputs.has(id)) found.push(id);
+      //
+      // Fast mode is score-only — the engine suppresses `discovery` events,
+      // but `combine` event inputs would still leak base ingredients into
+      // the lifetime collection without this gate. Classic progression must
+      // never be shortcutted by combo-dense fast runs.
+      if (r.state.mode !== "fast") {
+        const found: string[] = [];
+        for (const e of r.events) {
+          if (e.type === "discovery") {
+            found.push(e.out);
+          } else if (e.type === "combine") {
+            for (const id of e.inputs) {
+              if (!bundle.outputs.has(id)) found.push(id);
+            }
           }
         }
+        if (found.length) recordDiscoveries(found);
       }
-      if (found.length) recordDiscoveries(found);
     },
     [state, bundle, applyEvents, best, fastBest, bundles, recordDiscoveries],
   );

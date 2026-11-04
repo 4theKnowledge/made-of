@@ -114,10 +114,10 @@ export function ThemeMenu({
             >
               <b>{b.theme.name} · Fast</b>
               <span>
-                Pair-only combos. Clear the board fast, chain hard, score high.
+                Short combos. Clear the board fast, chain hard, score high.
                 No unlocks — leaderboards only.
               </span>
-              <em>{b.recipes.length} pair recipes</em>
+              <em>{b.recipes.length} short recipes</em>
             </button>
           );
         })}

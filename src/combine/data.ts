@@ -356,9 +356,11 @@ export function buildThemeBundle(
   const base_meta = THEMES[theme];
   let recipes = recipesForTheme(snapshot, theme);
   if (mode === "fast") {
-    // Fast mode: 2-ingredient recipes only. Rapid-fire combos on a dense
-    // board; no age progression, so every recipe lives in a single band.
-    recipes = recipes.filter((r) => r.all.length === 2);
+    // Fast mode: short recipes only (≤ 3 ingredients). Pair-only was too
+    // easy — a 3-part combo adds real board-reading without stretching into
+    // the long chains that make classic feel slow. No age progression, so
+    // every recipe lives in a single band.
+    recipes = recipes.filter((r) => r.all.length <= 3);
   }
 
   const outputs = new Set<string>(recipes.map((r) => r.out));

@@ -66,9 +66,10 @@ describe("computeCombineStats", () => {
     expect(s.totalRuns).toBe(0);
     expect(s.bestScoreEver).toBe(0);
     expect(s.bestByTheme).toEqual({});
+    expect(s.bestByFastTheme).toEqual({});
   });
 
-  it("aggregates run bests per theme and overall", () => {
+  it("aggregates run bests per theme and overall (classic only)", () => {
     const s = computeCombineStats(
       [],
       [
@@ -91,6 +92,41 @@ describe("computeCombineStats", () => {
       totalRuns: 1,
       totalScore: 300,
     });
+    expect(s.bestByFastTheme).toEqual({});
+  });
+
+  it("splits Fast runs into bestByFastTheme and keeps classic separate", () => {
+    const s = computeCombineStats(
+      [],
+      [
+        run("everything", 300),
+        run("everything", 500, { mode: "fast" }),
+        run("everything", 700, { mode: "fast" }),
+        run("everyday", 120, { mode: "classic" }),
+      ],
+    );
+    // Classic bucket keeps only classic runs.
+    expect(s.bestByTheme.everything).toEqual({
+      bestScore: 300,
+      totalRuns: 1,
+      totalScore: 300,
+    });
+    expect(s.bestByTheme.everyday).toEqual({
+      bestScore: 120,
+      totalRuns: 1,
+      totalScore: 120,
+    });
+    // Fast bucket keeps only Fast runs.
+    expect(s.bestByFastTheme.everything).toEqual({
+      bestScore: 700,
+      totalRuns: 2,
+      totalScore: 1200,
+    });
+    expect(s.bestByFastTheme.everyday).toBeUndefined();
+    // Overall totals still include everyone.
+    expect(s.totalRuns).toBe(4);
+    expect(s.bestScoreEver).toBe(700);
+    expect(s.totalScoreEver).toBe(1620);
   });
 
   it("splits discoveries by scope", () => {
