@@ -19,6 +19,7 @@ export function Board({
   pluckMode,
   lastChance,
   onCellTap,
+  onCellPointerDown,
 }: {
   state: GameState;
   bundle: ThemeBundle;
@@ -31,6 +32,7 @@ export function Board({
   pluckMode: boolean;
   lastChance: boolean;
   onCellTap: (cell: number) => void;
+  onCellPointerDown: (cell: number, e: React.PointerEvent<HTMLButtonElement>) => void;
 }) {
   const size = state.n;
   return (
@@ -75,6 +77,7 @@ export function Board({
             shoreable={isShoreable}
             shored={isShored}
             onTap={() => onCellTap(i)}
+            onPointerDown={(e) => onCellPointerDown(i, e)}
           />
         );
       })}
@@ -99,6 +102,7 @@ function Cell({
   shoreable,
   shored,
   onTap,
+  onPointerDown,
 }: {
   cell: number;
   id: string | null;
@@ -113,6 +117,7 @@ function Cell({
   shoreable: boolean;
   shored: boolean;
   onTap: () => void;
+  onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => void;
 }) {
   // Visual-only overlays: the engine has already mutated state (consumed
   // ingredients, placed/removed outputs) by the time the UI applies fx, so
@@ -192,6 +197,7 @@ function Cell({
           : {}),
       }}
       onClick={onTap}
+      onPointerDown={onPointerDown}
       aria-label={ariaLabel}
     >
       {item && (

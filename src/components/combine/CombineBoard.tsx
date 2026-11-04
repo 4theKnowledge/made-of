@@ -259,7 +259,7 @@ export function CombineBoard({
   // prototype's cbDrag record. Ghost x/y are in viewport coords.
   const [drag, setDrag] = useState<{
     slot: number;
-    source: "tray" | "hold";
+    source: "tray" | "hold" | "board";
     x: number;
     y: number;
     tileWidth: number;
@@ -278,7 +278,7 @@ export function CombineBoard({
     music: MusicTrack;
     sfx: boolean;
     vol: number;
-  }>({ music: "off", sfx: false, vol: 80 });
+  }>({ music: "piano", sfx: true, vol: 80 });
   useEffect(() => {
     setSound(loadSound());
   }, []);
@@ -937,6 +937,12 @@ export function CombineBoard({
 
   const onCellTap = useCallback(
     (cell: number) => {
+      // A trailing click from a completed board drag (move helper) must
+      // not re-enter the tap paths below. endDrag sets this flag.
+      if (suppressClick.current) {
+        suppressClick.current = false;
+        return;
+      }
       // In a finished run (e.g. reviewing today's completed daily), the
       // board is inert except for tapping a tile to open its info card.
       if (state.over) {
@@ -968,19 +974,10 @@ export function CombineBoard({
         setPluckMode(false);
         return;
       }
-      // Move mode: first tap picks the source, second tap drops it.
+      // Move mode uses the drag gesture (see onCellPointerDown). A bare
+      // tap on a cell — i.e. a press without a drag — exits the helper so
+      // the board becomes inert again instead of going "nothing happened".
       if (moveMode) {
-        if (moveMode.from == null) {
-          if (state.board[cell] == null) return;
-          setMoveMode({ from: cell });
-          return;
-        }
-        if (moveMode.from === cell) {
-          // Tap the picked tile again to cancel.
-          setMoveMode({ from: null });
-          return;
-        }
-        act({ type: "move", from: moveMode.from, to: cell });
         setMoveMode(null);
         return;
       }
@@ -1133,7 +1130,7 @@ export function CombineBoard({
   // to React state only when the over-cell changes so cells can light up.
   const dragRef = useRef<{
     slot: number;
-    source: "tray" | "hold";
+    source: "tray" | "hold" | "board";
     x0: number;
     y0: number;
     moved: boolean;
@@ -1153,6 +1150,15 @@ export function CombineBoard({
     if (!d.moved) return; // tap: handled on click
     suppressClick.current = true;
     if (state.over) return;
+    // Board-sourced drag = move helper. Drop on a valid destination fires
+    // the `move` action; anything else is a snap-back (no state change).
+    if (d.source === "board") {
+      if (snapshot?.overCell != null && snapshot.overOk) {
+        act({ type: "move", from: d.slot, to: snapshot.overCell });
+      }
+      setMoveMode(null);
+      return;
+    }
     // Drop onto the hold zone: tray → hold stashes; hold → hold is a no-op.
     if (snapshot?.overHold) {
       if (d.source === "tray") {
@@ -1190,9 +1196,15 @@ export function CombineBoard({
       const cellEl = el?.closest("[data-cb]") as HTMLElement | null;
       if (!cellEl) return { cell: null, ok: false, hold: false };
       const cell = Number(cellEl.dataset.cb);
-      const src = d.source === "hold" ? state.hold : state.tray;
-      const tile = src[d.slot];
+      const tile =
+        d.source === "board"
+          ? state.board[d.slot]
+          : (d.source === "hold" ? state.hold : state.tray)[d.slot];
       if (tile == null) return { cell, ok: false, hold: false };
+      // Board-sourced drag: the source cell is never a drop target.
+      if (d.source === "board" && cell === d.slot) {
+        return { cell, ok: false, hold: false };
+      }
       const target = state.board[cell];
       const ok =
         target == null
@@ -1219,7 +1231,9 @@ export function CombineBoard({
           window.clearTimeout(d.holdTimer);
           d.holdTimer = null;
         }
-        setSelectedSlot({ source: d.source, slot: d.slot });
+        if (d.source !== "board") {
+          setSelectedSlot({ source: d.source, slot: d.slot });
+        }
       }
       const over = captureOver(e.clientX, e.clientY);
       d.overCell = over.cell;
@@ -1300,6 +1314,44 @@ export function CombineBoard({
       dragRef.current.holdTimer = holdId;
     },
     [state.hold, state.tray, state.over],
+  );
+
+  // Starts a board-sourced drag when the move helper is active. The tile at
+  // `cell` becomes the drag source; the `move` action fires on pointerup
+  // over a valid destination (empty cell, or a tile that matchOn accepts).
+  // No long-press detail card here — the player is mid-helper.
+  const onCellPointerDown = useCallback(
+    (cell: number, e: React.PointerEvent<HTMLButtonElement>) => {
+      if (!moveMode) return;
+      if (state.over) return;
+      const tile = state.board[cell];
+      if (tile == null) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      suppressClick.current = false;
+      dragRef.current = {
+        slot: cell,
+        source: "board",
+        x0: e.clientX,
+        y0: e.clientY,
+        moved: false,
+        tileWidth: rect.width,
+        holdTimer: null,
+        overCell: null,
+        overHold: false,
+      };
+      setDrag({
+        slot: cell,
+        source: "board",
+        x: e.clientX,
+        y: e.clientY,
+        tileWidth: rect.width,
+        overCell: null,
+        overOk: false,
+        overHold: false,
+      });
+      setMoveMode({ from: cell });
+    },
+    [moveMode, state.board, state.over],
   );
 
   const onChoose = useCallback(
@@ -1609,6 +1661,7 @@ export function CombineBoard({
           pluckMode={pluckMode}
           lastChance={lastChance}
           onCellTap={onCellTap}
+          onCellPointerDown={onCellPointerDown}
         />
         {lastChance && !state.over && (
           <button
@@ -1900,9 +1953,19 @@ export function CombineBoard({
       </div>
       {drag &&
         drag.slot != null &&
-        (drag.source === "hold" ? state.hold : state.tray)[drag.slot] != null && (
+        (drag.source === "board"
+          ? state.board
+          : drag.source === "hold"
+            ? state.hold
+            : state.tray)[drag.slot] != null && (
           <DragGhost
-            tileId={(drag.source === "hold" ? state.hold : state.tray)[drag.slot]!}
+            tileId={
+              (drag.source === "board"
+                ? state.board
+                : drag.source === "hold"
+                  ? state.hold
+                  : state.tray)[drag.slot]!
+            }
             bundle={bundle}
             x={drag.x}
             y={drag.y}
