@@ -28,10 +28,10 @@ export function TipLine({
   else if (pluckMode) tip = "Tap a tile to pull it into hold.";
   else if (moveMode) {
     if (moveMode.from == null) {
-      tip = "Drag a tile to where it should go. Moving isn't a turn.";
+      tip = "Tap or drag a tile to where it should go. Moving isn't a turn.";
     } else {
       const name = state.board[moveMode.from];
-      tip = `Drop the ${name ? cap(name).toLowerCase() : "tile"} on a square. Moving isn't a turn.`;
+      tip = `Tap a square to place the ${name ? cap(name).toLowerCase() : "tile"}. Moving isn't a turn.`;
     }
   } else if (hasSelection) {
     if (preview.size > 0) {

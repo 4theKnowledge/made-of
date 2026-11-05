@@ -33,13 +33,33 @@ export interface Preview {
 export function computePreview(
   bundle: ThemeBundle,
   state: GameState,
-  selected: { source: "tray" | "hold"; slot: number } | null,
+  selected:
+    | { source: "tray" | "hold"; slot: number }
+    | { source: "board"; cell: number }
+    | null,
   extraKnown: Iterable<string>,
 ): Map<number, Preview> {
   const out = new Map<number, Preview>();
   if (selected == null) return out;
-  const src = selected.source === "hold" ? state.hold : state.tray;
-  const x = src[selected.slot];
+  let x: string | null = null;
+  // When the selected tile sits on the board (move helper tap-select), we
+  // need to look at matches as if the source cell were already empty — the
+  // engine vacates it before testing combines. Otherwise adjacency through
+  // the source cell is both missed (the vacated-neighbour case) and the
+  // source cell itself would spuriously appear as a destination.
+  let board = state.board;
+  let skipCell: number | null = null;
+  if (selected.source === "board") {
+    const tile = state.board[selected.cell];
+    if (tile == null) return out;
+    x = tile;
+    board = state.board.slice();
+    board[selected.cell] = null;
+    skipCell = selected.cell;
+  } else {
+    const src = selected.source === "hold" ? state.hold : state.tray;
+    x = src[selected.slot];
+  }
   if (x == null) return out;
   // "Known" = anything found this game or anywhere in the player's lifetime
   // collection. Signed-out players will see the latter as empty.
@@ -53,18 +73,20 @@ export function computePreview(
     const alts = altsOf(r);
     return alts.find((q) => found.has(q.out)) ?? null;
   };
-  for (let i = 0; i < state.board.length; i++) {
-    const v = state.board[i];
+  for (let i = 0; i < board.length; i++) {
+    if (i === skipCell) continue;
+    const v = board[i];
     if (v) {
-      const m = matchOn(bundle, state.board, i, x, state.n);
+      const m = matchOn(bundle, board, i, x, state.n);
       if (!m) continue;
       const k = knownAlt(m.recipe);
       if (k) out.set(i, { out: k.out, on: true, n: altsOf(m.recipe).length });
     }
   }
-  for (let i = 0; i < state.board.length; i++) {
-    if (state.board[i]) continue;
-    const m = matchAt(bundle, state.board, i, x, state.n);
+  for (let i = 0; i < board.length; i++) {
+    if (i === skipCell) continue;
+    if (board[i]) continue;
+    const m = matchAt(bundle, board, i, x, state.n);
     if (!m) continue;
     const k = knownAlt(m.recipe);
     if (k) out.set(i, { out: k.out, n: altsOf(m.recipe).length });

@@ -996,10 +996,46 @@ export function CombineBoard({
         setPluckMode(false);
         return;
       }
-      // Move mode uses the drag gesture (see onCellPointerDown). A bare
-      // tap on a cell — i.e. a press without a drag — exits the helper so
-      // the board becomes inert again instead of going "nothing happened".
+      // Move mode: tap-to-select / tap-target in addition to drag. Mirrors
+      // the tray's two-tap flow so touch users who don't drag can still use
+      // the helper.
+      //   - from == null, full cell  → select it
+      //   - from == cell             → deselect (stay in mode)
+      //   - from != null, any cell   → attempt move; engine rejects illegal
+      //                                targets with a `nope` event. Stay in
+      //                                mode on nope so the player can pick
+      //                                another target; exit on success.
+      //   - from == null, empty cell → exit mode (unchanged behavior)
       if (moveMode) {
+        if (moveMode.from == null) {
+          if (state.board[cell] == null) {
+            setMoveMode(null);
+            return;
+          }
+          setMoveMode({ from: cell });
+          return;
+        }
+        if (moveMode.from === cell) {
+          setMoveMode({ from: null });
+          return;
+        }
+        const from = moveMode.from;
+        const target = state.board[cell];
+        const tile = state.board[from];
+        if (tile == null) {
+          setMoveMode(null);
+          return;
+        }
+        const legal =
+          target == null
+            ? true
+            : Boolean(matchOn(bundle, state.board, cell, tile, state.n));
+        if (!legal) {
+          // Keep the source selected so the player can try another cell.
+          // The engine would emit `nope` if we dispatched; skip the trip.
+          return;
+        }
+        act({ type: "move", from, to: cell });
         setMoveMode(null);
         return;
       }
@@ -1030,10 +1066,12 @@ export function CombineBoard({
     },
     [
       act,
+      bundle,
       selectedSlot,
       state.board,
       state.crumb,
       state.hold,
+      state.n,
       state.over,
       clearMode,
       moveMode,
@@ -1109,7 +1147,10 @@ export function CombineBoard({
         return;
       }
       if (moveMode) {
-        setMoveMode(null);
+        // First Escape drops the tap-selected source (if any); second
+        // Escape exits the mode. Mirrors tray selection → mode exit.
+        if (moveMode.from != null) setMoveMode({ from: null });
+        else setMoveMode(null);
         return;
       }
       if (shoreMode) {
@@ -1253,7 +1294,11 @@ export function CombineBoard({
           window.clearTimeout(d.holdTimer);
           d.holdTimer = null;
         }
-        if (d.source !== "board") {
+        if (d.source === "board") {
+          // Promote: mark the source cell as moving so the Board styles it
+          // like the tray's "selected" slot (dashed outline / lift).
+          setMoveMode({ from: d.slot });
+        } else {
           setSelectedSlot({ source: d.source, slot: d.slot });
         }
       }
@@ -1338,13 +1383,19 @@ export function CombineBoard({
     [state.hold, state.tray, state.over],
   );
 
-  // Starts a board-sourced drag when the move helper is active. The tile at
-  // `cell` becomes the drag source; the `move` action fires on pointerup
-  // over a valid destination (empty cell, or a tile that matchOn accepts).
+  // Arms a tentative board drag when the move helper is active. The
+  // gesture promotes to a real drag once the pointer moves past threshold
+  // (see useEffect pointermove at `d.moved`). A bare tap falls through to
+  // `onCellTap`, which handles tap-select / tap-target.
+  //
+  // We only arm when `moveMode.from == null`; after tap-select, further
+  // taps go through `onCellTap` as targets, with no drag path.
+  //
   // No long-press detail card here — the player is mid-helper.
   const onCellPointerDown = useCallback(
     (cell: number, e: React.PointerEvent<HTMLButtonElement>) => {
       if (!moveMode) return;
+      if (moveMode.from != null) return;
       if (state.over) return;
       const tile = state.board[cell];
       if (tile == null) return;
@@ -1371,7 +1422,6 @@ export function CombineBoard({
         overOk: false,
         overHold: false,
       });
-      setMoveMode({ from: cell });
     },
     [moveMode, state.board, state.over],
   );
@@ -1520,10 +1570,19 @@ export function CombineBoard({
     ],
   );
 
-  const preview = useMemo(
-    () => computePreview(bundle, state, selectedSlot, collection.keys()),
-    [bundle, state, selectedSlot, collection],
-  );
+  const preview = useMemo(() => {
+    // Move helper tap-select: once a board source is picked, feed it to the
+    // preview so destinations light up like tray/hold selection does.
+    if (moveMode && moveMode.from != null && !drag) {
+      return computePreview(
+        bundle,
+        state,
+        { source: "board", cell: moveMode.from },
+        collection.keys(),
+      );
+    }
+    return computePreview(bundle, state, selectedSlot, collection.keys());
+  }, [bundle, state, selectedSlot, collection, moveMode, drag]);
 
   // Merged "known" set for UI affordances (preview glow, info card goes-into
   // list, choice picker ordering). Signed-in players carry their lifetime

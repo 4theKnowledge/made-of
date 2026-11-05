@@ -174,7 +174,7 @@ function Cell({
   const lenClass = longest >= 10 ? " l2" : longest >= 7 ? " l1" : "";
 
   const ariaLabel = item
-    ? `${cap(item.name)}${
+    ? `${cap(item.name)}${moving ? ", selected to move" : ""}${
         shored
           ? ", shored: won't crumble"
           : crumbleTick > 0
@@ -199,6 +199,7 @@ function Cell({
       onClick={onTap}
       onPointerDown={onPointerDown}
       aria-label={ariaLabel}
+      {...(moving ? { "aria-pressed": true } : {})}
     >
       {item && (
         <>
