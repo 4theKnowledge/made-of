@@ -87,6 +87,38 @@ hitting the Railway `*.up.railway.app` URL directly.
 3. Phase 6 adds a Remotion render job that runs in GitHub Actions on manual
    dispatch and uploads MP4s to the Railway bucket.
 
+### Combine daily schedule cron (Railway)
+
+The Combine daily puzzle precomputes a 30-day schedule per theme (see
+`combine_dailies` table + `src/combine/daily-schedule.ts`). A tiny Railway
+service hits `POST /api/internal/combine-dailies/extend` once a day to
+ensure there are always ~30 days of schedule ahead. Admins can also click
+"Regenerate" on `/admin/combine/themes/[code]` to wipe days ≥ today and
+reroll — same endpoint logic.
+
+Env vars required on **both** the web service and the cron service:
+
+- `CRON_SECRET` — any random 32+ char string. The web service checks the
+  `x-cron-secret` header; the cron service sends it. Rotate by updating
+  both at the same time.
+
+Cron service shape (Railway):
+
+- One tiny service with a schedule. Command:
+  ```sh
+  curl -fsS -X POST \
+    -H "x-cron-secret: $CRON_SECRET" \
+    "$WEB_URL/api/internal/combine-dailies/extend"
+  ```
+- Schedule: `0 18 * * *` (18:00 UTC = 02:00 AWST / 03:00 AEST / 11:00 PST).
+- Variables: `CRON_SECRET`, `WEB_URL` (e.g. `https://madeof.app`).
+
+**Local development:** the cron doesn't fire locally. The admin
+"Regenerate schedule" button on each theme page calls the same scheduler
+and writes rows into your dev DB — one click gives you a month of
+schedule. The runtime falls back to zero guests when a row is missing, so
+daily play keeps working even before the first regenerate.
+
 ## Phase 3 — nothing new
 
 The frontend port uses only Railway and Cloudflare. The Open Graph image per

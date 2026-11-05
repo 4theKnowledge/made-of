@@ -501,6 +501,41 @@ export const itemCombineThemes = pgTable(
 );
 
 /* ========================================================================
+ * Combine dailies (precomputed per-day payload per theme).
+ *
+ * One row per (themeCode, day). `payload` freezes everything the game and
+ * admin need to render that day's daily — the dailyConfig as it was at
+ * generation time, the resolved guest output ids, and the RNG seed. A
+ * Railway cron (POST /api/internal/combine-dailies/extend) keeps ~30 days
+ * ahead; the per-theme admin page exposes a manual regenerate for days ≥
+ * today. Past rows are immutable (historical record of what was served).
+ *
+ * Payload shape (v1): see `DailyPayload` in src/combine/daily-schedule.ts.
+ * ====================================================================== */
+
+export const combineDailies = pgTable(
+  "combine_dailies",
+  {
+    themeCode: text("theme_code")
+      .notNull()
+      .references(() => combineThemes.code, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    // yyyy-mm-dd (same format `todayKey()` produces).
+    day: text("day").notNull(),
+    payload: jsonb("payload").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.themeCode, t.day] }),
+    index("combine_dailies_day_idx").on(t.day),
+  ],
+);
+
+/* ========================================================================
  * Combine season.
  *
  * One row per theme tracking the highest `numAges` value ever promoted. The

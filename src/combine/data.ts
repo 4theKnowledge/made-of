@@ -382,12 +382,22 @@ function makeItemView(node: GraphNode): CombineItem {
   };
 }
 
+/** Guest recipes to splice into a daily bundle after capping. Each one
+ *  comes from the full (uncapped) theme recipe set via the scheduler and
+ *  is placed in the final band so the dealer treats it like a current-age
+ *  recipe. Pass `null` for non-daily or guest-less builds. */
+export interface GuestRecipeExtension {
+  /** The recipe row to splice in. Its `band` is overwritten to the cap. */
+  recipe: CombineRecipe;
+}
+
 export function buildThemeBundle(
   snapshot: Snapshot,
   theme: ThemeKey,
   prevNumAges: number = 0,
   mode: Mode = "classic",
   dailyConfig: DailyConfig | null = null,
+  guestRecipes: GuestRecipeExtension[] | null = null,
 ): ThemeBundle {
   const base_meta = THEMES[theme];
   let recipes = recipesForTheme(snapshot, theme);
@@ -451,6 +461,21 @@ export function buildThemeBundle(
     // guest-pool capture so above-cap outputs are still reachable as guests.
     if (dailyConfig?.maxAges != null) {
       recipes = recipes.filter((r) => r.band <= dailyConfig.maxAges!);
+    }
+
+    // Splice in today's guest recipes. They live at the final band so the
+    // dealer surfaces them as "current-age" combines; first-finds on them
+    // count toward the daily collection (scope=daily) via the normal
+    // discovery path. If maxAges is null (no cap), guests are a no-op —
+    // the player already sees every recipe.
+    if (guestRecipes && guestRecipes.length > 0 && dailyConfig?.maxAges != null) {
+      const finalBand = dailyConfig.maxAges;
+      for (const g of guestRecipes) {
+        // Clone so we don't mutate the shared recipe object held by the
+        // full-theme bundle. Overwrite band so age gating treats it as
+        // current-age playable.
+        recipes.push({ ...g.recipe, band: finalBand });
+      }
     }
   }
 
@@ -647,14 +672,17 @@ export function buildAllBundles(
 /** Build the per-theme daily bundles. A theme without a `dailyConfig` just
  *  gets its endless bundle back (the daily plays the full-run shape). A
  *  theme with a config gets a bundle with capped ages, filtered recipes,
- *  optional ageNeedScale, and a guest-ingredient pool.
+ *  optional ageNeedScale, and (if `guestRecipes` is supplied) today's
+ *  guest items spliced in as current-age recipes.
  *
- *  `dailyConfigs` is injected rather than loaded here so callers in server
- *  components stay cacheable and tests can supply synthetic values. */
+ *  Both `dailyConfigs` and `guestRecipes` are injected rather than loaded
+ *  here so callers in server components stay cacheable and tests can
+ *  supply synthetic values. */
 export function buildAllDailyBundles(
   snapshot: Snapshot,
   prevNumAges: Partial<Record<ThemeKey, number>> = {},
   dailyConfigs: Partial<Record<ThemeKey, DailyConfig | null>> = {},
+  guestRecipes: Partial<Record<ThemeKey, GuestRecipeExtension[] | null>> = {},
 ): Record<ThemeKey, ThemeBundle> {
   return {
     everything: buildThemeBundle(
@@ -663,6 +691,7 @@ export function buildAllDailyBundles(
       prevNumAges.everything ?? 0,
       "classic",
       dailyConfigs.everything ?? null,
+      guestRecipes.everything ?? null,
     ),
   };
 }

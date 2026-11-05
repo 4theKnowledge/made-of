@@ -8,9 +8,11 @@ import { getLiveSnapshot } from "@/graph/live";
 import { buildThemeBundle } from "@/combine/data";
 import type { DailyConfig } from "@/combine/daily-config";
 import type { ThemeKey } from "@/combine/types";
+import { readSchedule } from "@/combine/daily-schedule-db";
 import { Breadcrumb } from "../../../Breadcrumb";
 import { validateTheme, type ValidatorInput } from "../validator";
 import { DailyConfigEditor } from "./DailyConfigEditor";
+import { DailySchedule } from "./DailySchedule";
 
 export const dynamic = "force-dynamic";
 
@@ -103,6 +105,16 @@ export default async function AdminCombineThemeDetailPage({
     // keep null
   }
   const initialDaily = (theme.dailyConfig ?? null) as DailyConfig | null;
+
+  // 30-day daily schedule preview (precomputed guest picks). Empty rows
+  // when nothing is scheduled yet; admin clicks Regenerate to fill.
+  const initialSchedule = initialDaily?.guestIngredient
+    ? await readSchedule(themeCode, 30)
+    : [];
+  // Build a quick id → name map so the schedule table can render human
+  // names instead of uuids. Covers every item just to be safe.
+  const itemNamesById: Record<string, string> = {};
+  for (const it of items) itemNamesById[it.id] = it.name;
 
   return (
     <main className="wrap">
@@ -216,6 +228,21 @@ export default async function AdminCombineThemeDetailPage({
             Endless and fast modes are unaffected.
           </p>
           <DailyConfigEditor themeCode={themeCode} initial={initialDaily} totalAges={totalAges} />
+        </section>
+      )}
+
+      {initialDaily?.guestIngredient && (
+        <section className="feat">
+          <h3 style={{ marginTop: 0, fontSize: 16 }}>Daily schedule (next 30 days)</h3>
+          <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
+            Precomputed daily payloads. A Railway cron extends this by one day each night;
+            use Regenerate to wipe days ≥ today and reroll with the current config.
+          </p>
+          <DailySchedule
+            themeCode={themeCode}
+            initial={initialSchedule}
+            itemNamesById={itemNamesById}
+          />
         </section>
       )}
 

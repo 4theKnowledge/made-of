@@ -6,6 +6,8 @@ import {
   buildAllBundles,
   buildAllDailyBundles,
   buildAllFastBundles,
+  buildThemeBundle,
+  type GuestRecipeExtension,
 } from "@/combine/data";
 import type { DailyConfig } from "@/combine/daily-config";
 import type { ThemeKey } from "@/combine/types";
@@ -13,6 +15,8 @@ import { serialiseBundle } from "@/combine/serialise";
 import { loadAllSeasons, promoteSeason } from "@/combine/season";
 import { CombineBoard } from "@/components/combine/CombineBoard";
 import { getDb, schema } from "@/db/client";
+import { getDailyPayload, resolveGuestRecipes } from "@/combine/daily-schedule-db";
+import { todayKey } from "@/combine/rng";
 import { getSession, isAdmin } from "@/lib/session";
 
 export async function CombinePageBody() {
@@ -40,7 +44,38 @@ export async function CombinePageBody() {
   const dailyConfigs: Partial<Record<ThemeKey, DailyConfig | null>> = {
     everything: (everythingRow[0]?.dailyConfig ?? null) as DailyConfig | null,
   };
-  const dailyBundles = buildAllDailyBundles(live.snapshot, prev, dailyConfigs);
+
+  // Resolve today's guest recipes from the precomputed schedule. A missing
+  // row (first-time setup, cron hasn't run yet) falls back to zero guests —
+  // the daily still plays, just without rare-item drip.
+  const today = todayKey();
+  const guestRecipes: Partial<Record<ThemeKey, GuestRecipeExtension[] | null>> = {};
+  if (dailyConfigs.everything) {
+    const payload = await getDailyPayload("everything", today);
+    if (payload && payload.guestOutputIds.length > 0) {
+      // We need both the full and capped bundles to resolve guest recipes.
+      const fullEverything = buildThemeBundle(live.snapshot, "everything", prev.everything ?? 0);
+      const cappedEverything = buildThemeBundle(
+        live.snapshot,
+        "everything",
+        prev.everything ?? 0,
+        "classic",
+        dailyConfigs.everything,
+      );
+      const { extensions } = resolveGuestRecipes(
+        fullEverything,
+        cappedEverything,
+        payload.guestOutputIds,
+      );
+      guestRecipes.everything = extensions;
+    }
+  }
+  const dailyBundles = buildAllDailyBundles(
+    live.snapshot,
+    prev,
+    dailyConfigs,
+    guestRecipes,
+  );
 
   const serialised = {
     everything: serialiseBundle(bundles.everything),
