@@ -6,7 +6,7 @@
  */
 
 import { dailySeed } from "./rng";
-import type { DailyConfig } from "./daily-config";
+import { resolveDailyTarget, type DailyConfig } from "./daily-config";
 import type { CombineRecipe, ThemeBundle, ThemeKey } from "./types";
 
 /** Frozen snapshot of what today's daily looks like for one theme. */
@@ -22,6 +22,12 @@ export interface DailyPayload {
    *  is just `dailySeed(day)`; keeping it in the payload lets us change
    *  the seed policy later without rewriting history. */
   seed: number;
+  /** Discovery target that ends the run (win). Resolved from
+   *  `config.targetByDow[dow] ?? config.targetDiscoveries ?? DEFAULT`
+   *  at build time and frozen here so mid-week admin edits never shift
+   *  a scheduled day. Optional for backwards-compat with rows written
+   *  before the target-list feature shipped. */
+  targetDiscoveries?: number;
   /** When this payload was produced. Informational only. */
   generatedAt: string;
 }
@@ -183,6 +189,7 @@ export function buildDailyPayload(
     config: input.dailyConfig,
     guestOutputIds: guests,
     seed: dailySeed(day),
+    targetDiscoveries: resolveDailyTarget(input.dailyConfig, day),
     generatedAt: new Date().toISOString(),
   };
 }

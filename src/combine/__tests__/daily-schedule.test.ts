@@ -228,4 +228,38 @@ describe("buildDailyPayload", () => {
     );
     expect(p.guestOutputIds).toEqual([]);
   });
+
+  it("stamps targetDiscoveries resolved from the per-DOW override", () => {
+    // 2026-11-08 is Sunday (UTC) → key "0" → should take 15.
+    // 2026-11-09 is Monday → no override → base 10.
+    const sun = buildDailyPayload(
+      {
+        theme: "everything",
+        fullBundle: full,
+        dailyConfig: { targetDiscoveries: 10, targetByDow: { "0": 15 } },
+      },
+      "2026-11-08",
+      new Map(),
+    );
+    const mon = buildDailyPayload(
+      {
+        theme: "everything",
+        fullBundle: full,
+        dailyConfig: { targetDiscoveries: 10, targetByDow: { "0": 15 } },
+      },
+      "2026-11-09",
+      new Map(),
+    );
+    expect(sun.targetDiscoveries).toBe(15);
+    expect(mon.targetDiscoveries).toBe(10);
+  });
+
+  it("falls back to DEFAULT_TARGET_DISCOVERIES when neither field is set", () => {
+    const p = buildDailyPayload(
+      { theme: "everything", fullBundle: full, dailyConfig: {} },
+      "2026-11-09",
+      new Map(),
+    );
+    expect(p.targetDiscoveries).toBe(8);
+  });
 });

@@ -163,6 +163,11 @@ export interface GameState {
    *  Gated UI-side: the panel only mounts when the server says the user
    *  is admin, so the reducer trusting this flag is fine. */
   debug: boolean;
+  /** Daily discovery target. The run ends (win) when
+   *  `found.length >= target`. Null for endless/fast and for legacy daily
+   *  payloads that predate the target-list feature — in that case the
+   *  pre-existing final-age victory still fires. */
+  target: number | null;
 }
 
 /* Events — fire-and-forget notifications for the UI/audio layer. */
@@ -201,7 +206,7 @@ export type Event =
 export type TileSource = "tray" | "hold";
 
 export type Action =
-  | { type: "new-game"; theme: ThemeKey; mode: Mode; daily: string | null; size: number; seed?: number }
+  | { type: "new-game"; theme: ThemeKey; mode: Mode; daily: string | null; size: number; seed?: number; target?: number | null }
   | { type: "place"; slot: number; cell: number; source?: TileSource }
   | { type: "drop-on"; slot: number; cell: number; source?: TileSource }
   | { type: "choose"; outputIndex: number }
@@ -580,6 +585,19 @@ function afterMove(
   bundle: ThemeBundle,
   events: Event[],
 ): void {
+  // 0. Daily target-list win: end as soon as the player hits N discoveries.
+  //    Gated on daily + a resolved target so endless/fast and legacy daily
+  //    rows (no target) are untouched.
+  if (
+    state.mode === "daily" &&
+    state.target != null &&
+    state.found.length >= state.target
+  ) {
+    state.over = true;
+    events.push({ type: "over" });
+    return;
+  }
+
   // 1. Age up?
   const totalAges = bundle.theme.ages.length;
   if (state.age < totalAges - 1 && state.ageMade >= ageNeed(state.age, bundle)) {
@@ -595,6 +613,7 @@ function afterMove(
     // feeling like a transition instead of just a label swap.
     state.tray.fill(null);
   } else if (
+    state.mode !== "daily" &&
     state.age === totalAges - 1 &&
     state.ageMade >= ageNeed(state.age, bundle)
   ) {
@@ -602,6 +621,7 @@ function afterMove(
     // the last era, end the run with a flourish rather than letting the
     // board clog. Playtests showed the final age soaking 70% of total
     // moves with diminishing returns — this gives a satisfying stop.
+    // Disabled for daily: target-list runs end only on N-found or board-full.
     state.over = true;
     events.push({ type: "over" });
     return;
@@ -783,7 +803,7 @@ export function hasAnyLegalAction(state: GameState, bundle: ThemeBundle): boolea
 export function newGame(
   theme: ThemeKey,
   bundle: ThemeBundle,
-  opts: { mode?: Mode; daily?: string | null; size?: number; seed?: number } = {},
+  opts: { mode?: Mode; daily?: string | null; size?: number; seed?: number; target?: number | null } = {},
 ): ReduceResult {
   const daily = opts.daily ?? null;
   // Default mode from presence of a day key: daily → "daily", else
@@ -793,6 +813,10 @@ export function newGame(
   const size = opts.size ?? 6;
   const seed =
     opts.seed ?? (daily ? dailySeed(daily) : freshEndlessSeed());
+  // Only daily can have a target. Caller is expected to pass the resolved
+  // `DailyPayload.targetDiscoveries` here; legacy payloads omit the field
+  // and the engine falls through to the pre-existing age-progression end.
+  const target = mode === "daily" ? opts.target ?? null : null;
   const state: GameState = {
     theme,
     mode,
@@ -829,6 +853,7 @@ export function newGame(
     undos: 1,
     lastSnapshot: null,
     debug: false,
+    target,
   };
 
   // Initial helpers scale to age-0's band population — see HELPER_PER_ITEMS.
@@ -902,6 +927,7 @@ export function reduce(
         daily: action.daily,
         size: action.size,
         seed: action.seed,
+        target: action.target ?? null,
       });
 
     case "choose": {

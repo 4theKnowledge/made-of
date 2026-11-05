@@ -27,6 +27,10 @@ export function GameOverCard({
   const ages = bundle.theme.ages;
   const ageName = ages[state.age];
   const newBest = state.newBest;
+  const isDailyTargetRun =
+    state.mode === "daily" && state.target != null;
+  const won =
+    isDailyTargetRun && state.found.length >= (state.target ?? 0);
   // Mini-shelf: group by output.
   const shelfCounts = new Map<string, number>();
   for (const id of state.shelf) {
@@ -59,14 +63,26 @@ export function GameOverCard({
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
         </button>
-        <span className="k">{state.daily ? `Daily game · ${state.daily}` : "Board full"}</span>
+        <span className="k">
+          {isDailyTargetRun
+            ? won
+              ? `Daily complete · ${state.daily}`
+              : `Daily stopped · ${state.daily}`
+            : state.daily
+              ? `Daily game · ${state.daily}`
+              : "Board full"}
+        </span>
         <b className="big">{state.score.toLocaleString("en")}</b>
         <span className="sub">
-          {newBest
-            ? "A new best!"
-            : best > state.score
-              ? `Your best is ${best.toLocaleString("en")}. ${(best - state.score).toLocaleString("en")} to go.`
-              : `You reached Age ${ageName}.`}
+          {isDailyTargetRun
+            ? won
+              ? `All ${state.target} discovered in ${state.moves} turns.`
+              : `${state.found.length} / ${state.target} discovered in ${state.moves} turns. The board ran out.`
+            : newBest
+              ? "A new best!"
+              : best > state.score
+                ? `Your best is ${best.toLocaleString("en")}. ${(best - state.score).toLocaleString("en")} to go.`
+                : `You reached Age ${ageName}.`}
         </span>
         <div className="cb3">
           <div>

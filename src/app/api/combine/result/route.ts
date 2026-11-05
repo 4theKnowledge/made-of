@@ -37,6 +37,9 @@ export async function POST(req: Request) {
     daily?: unknown;
     season?: unknown;
     mode?: unknown;
+    turns?: unknown;
+    found?: unknown;
+    target?: unknown;
   };
   try {
     body = await req.json();
@@ -85,6 +88,16 @@ export async function POST(req: Request) {
           : "endless";
   const base = { score, made, age, season, mode };
 
+  // Target-list daily fields. Written only on daily rows so the
+  // leaderboard query can sort `(found DESC, turns ASC, score DESC)`
+  // without caring about endless/fast rows.
+  const turns = clampInt(body.turns, 0, 10_000);
+  const foundCount = clampInt(body.found, 0, 100);
+  const target = clampInt(body.target, 0, 100);
+  const dailyResult = daily
+    ? { ...base, daily, turns, found: foundCount, target }
+    : base;
+
   await getDb()
     .insert(schema.progress)
     .values({
@@ -92,7 +105,7 @@ export async function POST(req: Request) {
       userId: session.user.id,
       kind: "combine",
       ref: theme,
-      result: daily ? { ...base, daily } : base,
+      result: dailyResult,
     });
 
   return NextResponse.json({ ok: true });

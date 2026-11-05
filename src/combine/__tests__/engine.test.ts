@@ -1565,3 +1565,95 @@ describe("1-input recipes don't auto-fire on placement (matchAt guard)", () => {
 function cloneForTest(s: GameState): GameState {
   return { ...s };
 }
+
+describe("daily target-list end conditions", () => {
+  const bundle = fakeBundle({
+    recipes: [
+      R("dough", ["flour", "water"]),
+      R("cake", ["dough", "sugar"]),
+      R("bread", ["dough", "heat"]),
+    ],
+  });
+
+  it("daily run ends with a win when found.length hits target", () => {
+    const s0 = newGame("everything", bundle, {
+      mode: "daily",
+      daily: "2026-11-08",
+      size: 3,
+      seed: 1,
+      target: 2,
+    }).state;
+    // Hand-arrange: make `dough` twice shouldn't count (unique only). Make
+    // dough, then cake → 2 unique discoveries → win.
+    s0.board = Array(9).fill(null);
+    s0.tray = ["flour", "water", "sugar"];
+    const s1 = reduce(s0, bundle, { type: "place", slot: 0, cell: 0 });
+    // flour on empty — placed only. We need both adjacent.
+    expect(s1.state.board[0]).toBe("flour");
+    const s2 = reduce(s1.state, bundle, { type: "place", slot: 1, cell: 1 });
+    // flour + water adjacent → dough produced. One discovery.
+    expect(s2.state.found).toContain("dough");
+    expect(s2.state.over).toBe(false);
+    // Now combine dough + sugar → cake (second discovery). Target hit.
+    const doughCell = s2.state.board.indexOf("dough");
+    // Put sugar adjacent to dough. Find a free adjacent cell.
+    const n = s2.state.n;
+    const neighbours = [doughCell - 1, doughCell + 1, doughCell - n, doughCell + n]
+      .filter((c) => c >= 0 && c < n * n)
+      .filter((c) => s2.state.board[c] == null);
+    expect(neighbours.length).toBeGreaterThan(0);
+    const sugarCell = neighbours[0];
+    // tray slot 2 still holds sugar (we never consumed it).
+    const s3 = reduce(s2.state, bundle, { type: "place", slot: 2, cell: sugarCell });
+    expect(s3.state.found).toContain("cake");
+    expect(s3.state.over).toBe(true);
+    expect(s3.events.some((e) => e.type === "over")).toBe(true);
+  });
+
+  it("daily age-progression victory is disabled", () => {
+    // Build a daily with only 1 age (the "final age") and a tiny ageNeed.
+    // Normally this would fire the final-age victory; for daily it must not.
+    const singleAgeBundle: ThemeBundle = {
+      ...bundle,
+      theme: { ...bundle.theme, ages: ["only"] },
+    };
+    const s0 = newGame("everything", singleAgeBundle, {
+      mode: "daily",
+      daily: "2026-11-08",
+      size: 3,
+      seed: 1,
+      target: 10, // unreachable with this tiny recipe set
+    }).state;
+    s0.board = Array(9).fill(null);
+    s0.tray = ["flour", "water", null];
+    // Trigger a make → ageMade increments; with a 1-age theme the
+    // final-age check would fire for endless. Daily must skip it.
+    const s1 = reduce(s0, bundle, { type: "place", slot: 0, cell: 0 });
+    const s2 = reduce(s1.state, bundle, { type: "place", slot: 1, cell: 1 });
+    expect(s2.state.made).toBeGreaterThan(0);
+    expect(s2.state.over).toBe(false);
+  });
+
+  it("endless mode ignores target even if set (defensive)", () => {
+    const s0 = newGame("everything", bundle, {
+      mode: "endless",
+      size: 3,
+      seed: 1,
+      // target passed but mode is endless — newGame should null it out.
+      target: 1,
+    }).state;
+    expect(s0.target).toBeNull();
+  });
+
+  it("legacy daily (no target) still runs — target stays null, engine falls through", () => {
+    const s = newGame("everything", bundle, {
+      mode: "daily",
+      daily: "2026-11-08",
+      size: 3,
+      seed: 1,
+      // no target in opts
+    }).state;
+    expect(s.target).toBeNull();
+    expect(s.over).toBe(false);
+  });
+});

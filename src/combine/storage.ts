@@ -257,8 +257,14 @@ export function loadGame(
   return s;
 }
 
-/** Rebuild a full GameState from the stored projection. */
-export function hydrateGame(s: StoredGame): GameState {
+/** Rebuild a full GameState from the stored projection.
+ *
+ *  `target` is session-only (not persisted — daily payloads drift day to
+ *  day, and only today's payload is authoritative). Callers resuming a
+ *  daily within the same day should pass the current payload's resolved
+ *  `targetDiscoveries` here. Omitting it falls back to the legacy
+ *  age-progression end condition for that one resume. */
+export function hydrateGame(s: StoredGame, opts: { target?: number | null } = {}): GameState {
   return {
     theme: s.theme,
     mode: s.mode,
@@ -307,6 +313,7 @@ export function hydrateGame(s: StoredGame): GameState {
     // Debug mode is session-only and never persisted — any save we
     // hydrate from is a real player save, so start clean.
     debug: false,
+    target: s.mode === "daily" ? opts.target ?? null : null,
   };
 }
 

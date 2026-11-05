@@ -1,8 +1,11 @@
 "use client";
 
 import { Fragment, useCallback, useState } from "react";
-import type { DailyConfig } from "@/combine/daily-config";
+import { DEFAULT_TARGET_DISCOVERIES, type DailyConfig } from "@/combine/daily-config";
 import type { DailyPayload } from "@/combine/daily-schedule";
+
+const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const DOW_KEYS = ["0", "1", "2", "3", "4", "5", "6"] as const;
 
 export interface ThemeOption {
   code: string;
@@ -54,6 +57,13 @@ export function DailyAdmin({
   const [guestMinBand, setGuestMinBand] = useState<string>(
     initialActive?.config.guestIngredient?.minBand?.toString() ?? "",
   );
+  const [targetDiscoveries, setTargetDiscoveries] = useState<string>(
+    initialActive?.config.targetDiscoveries?.toString() ?? "",
+  );
+  const [targetByDow, setTargetByDow] = useState<Record<string, string>>(() => {
+    const src = initialActive?.config.targetByDow ?? {};
+    return Object.fromEntries(DOW_KEYS.map((k) => [k, src[k]?.toString() ?? ""]));
+  });
   const [schedule, setSchedule] = useState<ScheduleRow[]>(initialSchedule);
   const [busy, setBusy] = useState<"save" | "regen" | "clear" | null>(null);
   const [msg, setMsg] = useState<{ text: string; kind: "ok" | "err" } | null>(null);
@@ -69,8 +79,15 @@ export function DailyAdmin({
         minBand: Number(guestMinBand || "1"),
       };
     }
+    if (targetDiscoveries.trim()) cfg.targetDiscoveries = Number(targetDiscoveries);
+    const dow: Record<string, number> = {};
+    for (const k of DOW_KEYS) {
+      const v = targetByDow[k]?.trim();
+      if (v) dow[k] = Number(v);
+    }
+    if (Object.keys(dow).length) cfg.targetByDow = dow;
     return cfg;
-  }, [maxAges, ageNeedScale, guestPerRun, guestMinBand]);
+  }, [maxAges, ageNeedScale, guestPerRun, guestMinBand, targetDiscoveries, targetByDow]);
 
   const refreshSchedule = useCallback(async () => {
     const res = await fetch("/api/admin/combine/daily");
@@ -139,6 +156,8 @@ export function DailyAdmin({
       setAgeNeedScale("");
       setGuestPerRun("");
       setGuestMinBand("");
+      setTargetDiscoveries("");
+      setTargetByDow(Object.fromEntries(DOW_KEYS.map((k) => [k, ""])));
       setMsg({ text: "Cleared.", kind: "ok" });
       await refreshSchedule();
     } catch (e) {
@@ -297,6 +316,75 @@ export function DailyAdmin({
               </Field>
             </div>
           </fieldset>
+        </div>
+      </section>
+
+      <section className="feat">
+        <h3 style={{ marginTop: 0, fontSize: 16 }}>Daily length</h3>
+        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
+          Daily ends when the player hits N unique discoveries (win) or the
+          board runs out of moves (loss). Leaderboard sorts completions first,
+          then by turn count. Per-weekday overrides let you make weekdays
+          shorter or weekends longer. Admin must click <em>Regenerate schedule</em>{" "}
+          to apply changes to future days; today&apos;s row is protected.
+        </p>
+        <div style={{ display: "grid", gap: 10, maxWidth: 520 }}>
+          <Field
+            label="Target discoveries"
+            hint={
+              <>
+                How many unique first-finds end the run with a win. Range 3–50.
+                <br />
+                <strong>6–8</strong> = ~5–10 min for a median player. <strong>10–12</strong> =
+                closer to a full session. <em>Default {DEFAULT_TARGET_DISCOVERIES} when blank.</em>
+              </>
+            }
+          >
+            <input
+              type="number"
+              min={3}
+              max={50}
+              value={targetDiscoveries}
+              onChange={(e) => setTargetDiscoveries(e.target.value)}
+              style={input}
+              placeholder={DEFAULT_TARGET_DISCOVERIES.toString()}
+            />
+          </Field>
+          <details style={{ fontSize: 12 }}>
+            <summary style={{ cursor: "pointer", color: "var(--muted)" }}>
+              Per-weekday overrides (optional)
+            </summary>
+            <div style={{ marginTop: 10, color: "var(--muted)", marginBottom: 8 }}>
+              Leave a cell blank to fall back to the base target. Useful for
+              shorter weekday dailies or longer weekend ones.
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                gap: 6,
+              }}
+            >
+              {DOW_KEYS.map((k, i) => (
+                <label key={k} style={{ display: "grid", gap: 4, fontSize: 11 }}>
+                  <span style={{ color: "var(--muted)", textAlign: "center" }}>
+                    {DOW_LABELS[i]}
+                  </span>
+                  <input
+                    type="number"
+                    min={3}
+                    max={50}
+                    value={targetByDow[k] ?? ""}
+                    onChange={(e) =>
+                      setTargetByDow((cur) => ({ ...cur, [k]: e.target.value }))
+                    }
+                    style={{ ...input, padding: "6px 8px", textAlign: "center" }}
+                    placeholder="—"
+                  />
+                </label>
+              ))}
+            </div>
+          </details>
           <div className="cb-daily-actions">
             <button
               type="button"

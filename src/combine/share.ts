@@ -25,12 +25,24 @@ export function dailyShareText(
   bundle: ThemeBundle,
 ): SharePayload {
   const ages = bundle.theme.ages;
-  const squares = ages
-    .map((_, k) => (k <= state.age ? "🟩" : "⬜"))
-    .join("");
   const ageName = ages[state.age] ?? "";
   const top = bestShelfItem(state, bundle);
-  const foundLine = state.found.length
+  // Target-list daily: squares show progress toward `target`, headline reads
+  // `${found}/${target} in ${turns} turns`. Legacy daily (no target) keeps
+  // the old age-progression line so old rows still render sensibly.
+  const hasTarget = state.target != null && state.target > 0;
+  const target = state.target ?? 0;
+  const found = state.found.length;
+  const squaresLen = hasTarget ? Math.min(10, target) : ages.length;
+  const squares = hasTarget
+    ? Array.from({ length: squaresLen }, (_, k) =>
+        k < Math.min(found, squaresLen) ? "🟩" : "⬜",
+      ).join("")
+    : ages.map((_, k) => (k <= state.age ? "🟩" : "⬜")).join("");
+  const headline = hasTarget
+    ? `${squares} ${found}/${target} in ${state.moves} turn${state.moves === 1 ? "" : "s"}`
+    : `${squares} reached ${ageName}`;
+  const foundLine = !hasTarget && state.found.length
     ? ` · ${state.found.length} new discover${state.found.length > 1 ? "ies" : "y"}`
     : "";
   const chainLine = state.longest > 1 ? ` · longest chain ×${state.longest}` : "";
@@ -39,7 +51,7 @@ export function dailyShareText(
     : "";
   const text =
     `Made Of · Daily Combine ${dayKey}\n` +
-    `${squares} reached ${ageName}\n` +
+    `${headline}\n` +
     `${state.score.toLocaleString("en")} points · ${state.made} made${
       top ? ` · best: ${top}` : ""
     }${foundLine}${chainLine}${shelfLine}`;
@@ -56,6 +68,8 @@ export function dailyShareText(
       found: state.found.length,
       longest: state.longest,
       shelf: state.shelf.length,
+      turns: state.moves,
+      target: state.target ?? 0,
     })}`,
   };
 }
@@ -75,6 +89,8 @@ export function dailyShareQuery(
     found?: number;
     longest?: number;
     shelf?: number;
+    turns?: number;
+    target?: number;
   },
 ): string {
   const q = new URLSearchParams({
@@ -89,6 +105,8 @@ export function dailyShareQuery(
   if (r.found && r.found > 0) q.set("f", String(r.found));
   if (r.longest && r.longest > 1) q.set("lc", String(r.longest));
   if (r.shelf && r.shelf > 0) q.set("sh", String(r.shelf));
+  if (r.turns && r.turns > 0) q.set("t", String(r.turns));
+  if (r.target && r.target > 0) q.set("tg", String(r.target));
   return q.toString();
 }
 

@@ -46,8 +46,14 @@ export async function CombinePageBody() {
   // the daily still plays, just without rare-item drip.
   const today = todayKey();
   const guestRecipes: Partial<Record<ThemeKey, GuestRecipeExtension[] | null>> = {};
+  // Daily discovery target, read from the day's payload. Null means
+  // legacy row (pre-feature) → engine falls back to age-progression end.
+  let dailyTarget: number | null = null;
   if (activeDaily) {
     const payload = await getDailyPayload(activeDaily.themeCode, today);
+    if (payload) {
+      dailyTarget = payload.targetDiscoveries ?? null;
+    }
     if (payload && payload.guestOutputIds.length > 0) {
       const fullThemeBundle = buildThemeBundle(
         live.snapshot,
@@ -96,6 +102,7 @@ export async function CombinePageBody() {
         bundles={serialised}
         fastBundles={fastSerialised}
         dailyBundles={dailySerialised}
+        dailyTarget={dailyTarget}
         admin={admin}
         signedIn={signedIn}
       />

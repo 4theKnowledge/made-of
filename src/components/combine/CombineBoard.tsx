@@ -115,6 +115,11 @@ interface Props {
   dailyBundles: {
     everything: SerialisedBundle;
   };
+  /** Today's daily discovery target, resolved from the day's payload.
+   *  Null if no daily is scheduled or the row predates the target-list
+   *  feature — in either case the engine falls back to the legacy
+   *  age-progression end. */
+  dailyTarget?: number | null;
   /** Server-provided admin flag. Only mounts the debug panel entry point.
    *  The reducer trusts the flag UI-side; real security is at the admin
    *  session check that produced this. */
@@ -133,6 +138,7 @@ export function CombineBoard({
   bundles: serialised,
   fastBundles: fastSerialised,
   dailyBundles: dailySerialised,
+  dailyTarget = null,
   admin = false,
   signedIn = false,
 }: Props) {
@@ -247,11 +253,12 @@ export function CombineBoard({
       const saved = loadGame(dailyBundle, { daily: day });
       setState(
         saved
-          ? hydrateGame(saved)
+          ? hydrateGame(saved, { target: dailyTarget })
           : newGame("everything", dailyBundle, {
               daily: day,
               size: 6,
               seed: dailySeed(day),
+              target: dailyTarget,
             }).state,
       );
       return;
@@ -280,15 +287,16 @@ export function CombineBoard({
       const saved = loadGame(dailyBundle, { daily: today });
       setState(
         saved
-          ? hydrateGame(saved)
+          ? hydrateGame(saved, { target: dailyTarget })
           : newGame("everything", dailyBundle, {
               daily: today,
               size: 6,
               seed: dailySeed(today),
+              target: dailyTarget,
             }).state,
       );
     }
-  }, [bundles.everything, dailyBundles.everything, fastBundles.everything]);
+  }, [bundles.everything, dailyBundles.everything, fastBundles.everything, dailyTarget]);
   const [selectedSlot, setSelectedSlot] = useState<{
     source: "tray" | "hold";
     slot: number;
@@ -859,6 +867,9 @@ export function CombineBoard({
             daily: r.state.daily,
             mode: r.state.mode,
             season: pickBundle(r.state.theme, r.state.mode, r.state.daily).theme.ages.length,
+            turns: r.state.moves,
+            found: r.state.found.length,
+            target: r.state.target ?? 0,
           }),
         }).catch(() => {});
         if (r.state.daily) {
@@ -1024,7 +1035,7 @@ export function CombineBoard({
     const saved = loadGame(dailyBundle, { daily: day });
     if (saved) {
       saveGame(state);
-      setState(hydrateGame(saved));
+      setState(hydrateGame(saved, { target: dailyTarget }));
     } else if (done) {
       // Done, but the final state is no longer in storage (older save or
       // storage got cleared). Nothing to resume into; keep the current
@@ -1037,11 +1048,12 @@ export function CombineBoard({
           daily: day,
           size: 6,
           seed: dailySeed(day),
+          target: dailyTarget,
         }).state,
       );
     }
     resetTransient();
-  }, [bundles, dailyBundles, state, resetTransient]);
+  }, [bundles, dailyBundles, state, resetTransient, dailyTarget]);
 
   const shareDaily = useCallback(async () => {
     const dr = dailyDone;

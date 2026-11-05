@@ -3,7 +3,11 @@ import { loadKnowledgeBase } from "../../data/load";
 import { toRows } from "../../data/rows";
 import { buildSnapshot } from "../../graph/snapshot";
 import { buildAllDailyBundles, buildThemeBundle } from "../data";
-import { normaliseDailyConfig } from "../daily-config";
+import {
+  DEFAULT_TARGET_DISCOVERIES,
+  normaliseDailyConfig,
+  resolveDailyTarget,
+} from "../daily-config";
 import { ageNeed, newGame } from "../engine";
 import { serialiseBundle, hydrateBundle } from "../serialise";
 
@@ -41,6 +45,46 @@ describe("normaliseDailyConfig", () => {
   it("rejects malformed guestIngredient", () => {
     expect(() => normaliseDailyConfig({ guestIngredient: { perRun: -1, minBand: 1 } })).toThrow();
     expect(() => normaliseDailyConfig({ guestIngredient: { perRun: 1, minBand: 0 } })).toThrow();
+  });
+
+  it("accepts a valid targetDiscoveries", () => {
+    expect(normaliseDailyConfig({ targetDiscoveries: 10 })).toEqual({
+      targetDiscoveries: 10,
+    });
+  });
+
+  it("rejects out-of-range targetDiscoveries", () => {
+    expect(() => normaliseDailyConfig({ targetDiscoveries: 2 })).toThrow();
+    expect(() => normaliseDailyConfig({ targetDiscoveries: 51 })).toThrow();
+    expect(() => normaliseDailyConfig({ targetDiscoveries: 5.5 })).toThrow();
+  });
+
+  it("accepts valid targetByDow and rejects bad keys / values", () => {
+    expect(
+      normaliseDailyConfig({ targetByDow: { "0": 10, "6": 12 } }),
+    ).toEqual({ targetByDow: { "0": 10, "6": 12 } });
+    expect(() => normaliseDailyConfig({ targetByDow: { "7": 10 } })).toThrow();
+    expect(() => normaliseDailyConfig({ targetByDow: { mon: 10 } })).toThrow();
+    expect(() => normaliseDailyConfig({ targetByDow: { "0": 2 } })).toThrow();
+  });
+});
+
+describe("resolveDailyTarget", () => {
+  // 2026-11-08 is a Sunday → getUTCDay() === 0 → key "0".
+  // 2026-11-09 is a Monday → key "1".
+  it("per-weekday override takes precedence over base", () => {
+    expect(
+      resolveDailyTarget({ targetDiscoveries: 8, targetByDow: { "0": 12 } }, "2026-11-08"),
+    ).toBe(12);
+  });
+  it("falls back to base when no DOW override matches", () => {
+    expect(
+      resolveDailyTarget({ targetDiscoveries: 8, targetByDow: { "0": 12 } }, "2026-11-09"),
+    ).toBe(8);
+  });
+  it("falls back to DEFAULT_TARGET_DISCOVERIES when neither set", () => {
+    expect(resolveDailyTarget({}, "2026-11-09")).toBe(DEFAULT_TARGET_DISCOVERIES);
+    expect(resolveDailyTarget(null, "2026-11-09")).toBe(DEFAULT_TARGET_DISCOVERIES);
   });
 });
 

@@ -30,11 +30,26 @@ export interface DailyConfig {
      *  wouldn't normally meet in a capped daily. */
     minBand: number;
   };
+  /** Target discovery count that ends a daily run (win). `null`/missing falls
+   *  back to the per-DOW map, then to `DEFAULT_TARGET_DISCOVERIES`. The run
+   *  ends either when `found.length >= target` (win) or the board runs out
+   *  of legal moves (loss). */
+  targetDiscoveries?: number;
+  /** Per-weekday overrides for `targetDiscoveries`. Keys are `"0"`–`"6"`
+   *  where `"0"` = Sunday (matches `Date#getUTCDay()`). Resolved at schedule-
+   *  build time and frozen onto the `DailyPayload`, so admin edits never
+   *  retroactively change a day that's already been scheduled. */
+  targetByDow?: Record<string, number>;
 }
 
 /** Admin-surface default when creating a theme without daily tuning.
  *  Deliberately empty — a theme opts in by setting fields. */
 export const DEFAULT_DAILY_CONFIG: DailyConfig = {};
+
+/** Default discovery target when neither `targetByDow[dow]` nor
+ *  `targetDiscoveries` is set. Single source of truth for the resolver,
+ *  the admin placeholder, and defensive engine fallbacks. */
+export const DEFAULT_TARGET_DISCOVERIES = 8;
 
 /** Validate a candidate dailyConfig payload (admin API or seed). Returns a
  *  normalised shape or null if the payload is empty / falsy. Throws on
@@ -70,5 +85,47 @@ export function normaliseDailyConfig(raw: unknown): DailyConfig | null {
     }
     out.guestIngredient = { perRun, minBand };
   }
+  if (r.targetDiscoveries != null) {
+    const n = Number(r.targetDiscoveries);
+    if (!Number.isInteger(n) || n < 3 || n > 50) {
+      throw new Error("dailyConfig.targetDiscoveries must be an integer in [3, 50]");
+    }
+    out.targetDiscoveries = n;
+  }
+  if (r.targetByDow != null) {
+    if (typeof r.targetByDow !== "object") {
+      throw new Error("dailyConfig.targetByDow must be an object");
+    }
+    const src = r.targetByDow as Record<string, unknown>;
+    const out2: Record<string, number> = {};
+    for (const [k, v] of Object.entries(src)) {
+      if (!/^[0-6]$/.test(k)) {
+        throw new Error("dailyConfig.targetByDow keys must be \"0\"–\"6\" (Sun=0)");
+      }
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 3 || n > 50) {
+        throw new Error(`dailyConfig.targetByDow[${k}] must be an integer in [3, 50]`);
+      }
+      out2[k] = n;
+    }
+    if (Object.keys(out2).length) out.targetByDow = out2;
+  }
   return Object.keys(out).length ? out : null;
+}
+
+/** Resolve the discovery target for a specific daily day. Precedence:
+ *  per-weekday override > base `targetDiscoveries` > `DEFAULT_TARGET_DISCOVERIES`.
+ *  `dayKey` is `YYYY-MM-DD` in UTC; the weekday is taken via `getUTCDay()`
+ *  so the number is stable regardless of the admin's local timezone. */
+export function resolveDailyTarget(
+  config: DailyConfig | null | undefined,
+  dayKey: string,
+): number {
+  if (!config) return DEFAULT_TARGET_DISCOVERIES;
+  const dow = new Date(`${dayKey}T00:00:00Z`).getUTCDay().toString();
+  return (
+    config.targetByDow?.[dow] ??
+    config.targetDiscoveries ??
+    DEFAULT_TARGET_DISCOVERIES
+  );
 }
