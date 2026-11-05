@@ -13,7 +13,9 @@
 /** Snapshot of the sound settings the audio graph reads from. */
 export interface AudioSettings {
   music: "piano" | "chimes" | "drift" | "hearth" | "rainfall" | "off";
-  sfx: boolean;
+  /** Which sfx voice palette to use. `"off"` silences all effects — the
+   *  pack name doubles as the on/off switch, so a boolean isn't needed. */
+  sfxPack: "classic" | "wood" | "chime" | "off";
   /** 0..1. The prototype's localStorage stores 0..100; translate at the
    *  settings boundary. */
   vol: number;
@@ -285,6 +287,65 @@ export function playPad(
     o.start(t);
     o.stop(t + len + 0.1);
   }
+}
+
+/** Short dry wood-knock: a sine with a fast exponential decay plus a tiny
+ *  click transient, routed through a highpass so it reads as "tapped" not
+ *  "bowed". Deliberately dry (no reverb send from caller — pass fxBus
+ *  directly and skip the fxRoom) so it sits close to the listener and
+ *  doesn't smear on busy chains. */
+export function playKnock(
+  core: AudioCore,
+  freq: number,
+  t: number,
+  vel: number,
+  bus: AudioNode,
+  len = 0.2,
+): void {
+  const { ctx } = core;
+  const out = ctx.createGain();
+  out.gain.value = vel;
+  const hp = ctx.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 180;
+  hp.Q.value = 0.5;
+  out.connect(hp);
+  hp.connect(bus);
+
+  // Body: sine at the target freq with a ~80–180 ms decay, sized by len.
+  const o = ctx.createOscillator();
+  const e = ctx.createGain();
+  o.type = "sine";
+  o.frequency.setValueAtTime(freq, t);
+  // Tiny pitch drop at the start makes it read as a damped wooden strike
+  // rather than a bell tone.
+  o.frequency.exponentialRampToValueAtTime(freq * 0.88, t + 0.03);
+  e.gain.setValueAtTime(0.0001, t);
+  e.gain.exponentialRampToValueAtTime(1, t + 0.004);
+  e.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  o.connect(e);
+  e.connect(out);
+  o.start(t);
+  o.stop(t + len + 0.02);
+
+  // Click transient: a 20 ms noise burst through a narrow bandpass at ~2 kHz
+  // to give the knock its "wooden" edge.
+  const nLen = Math.floor(ctx.sampleRate * 0.02);
+  const nb = ctx.createBuffer(1, nLen, ctx.sampleRate);
+  const nd = nb.getChannelData(0);
+  for (let i = 0; i < nLen; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nLen);
+  const ns = ctx.createBufferSource();
+  const nf = ctx.createBiquadFilter();
+  const ng = ctx.createGain();
+  ns.buffer = nb;
+  nf.type = "bandpass";
+  nf.frequency.value = 2000;
+  nf.Q.value = 1.6;
+  ng.gain.value = 0.35;
+  ns.connect(nf);
+  nf.connect(ng);
+  ng.connect(out);
+  ns.start(t);
 }
 
 /** A soft noise whoosh for the crumble effect: a band-passed burst that

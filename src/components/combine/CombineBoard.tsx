@@ -39,6 +39,7 @@ import {
   clearNewUnlock,
   type DailyResult,
   type MusicTrack,
+  type SfxPack,
 } from "@/combine/storage";
 import { useCollection } from "@/combine/useCollection";
 import { useReactions } from "@/combine/useReactions";
@@ -395,9 +396,9 @@ export function CombineBoard({
   // audio context sees them without needing a bus.
   const [sound, setSound] = useState<{
     music: MusicTrack;
-    sfx: boolean;
+    sfxPack: SfxPack;
     vol: number;
-  }>({ music: "piano", sfx: true, vol: 80 });
+  }>({ music: "piano", sfxPack: "classic", vol: 80 });
   useEffect(() => {
     setSound(loadSound());
   }, []);
@@ -1913,7 +1914,7 @@ export function CombineBoard({
           moveMode={moveMode != null}
           shoreMode={shoreMode}
           pluckMode={pluckMode}
-          soundOn={sound.music !== "off" || sound.sfx}
+          soundOn={sound.music !== "off" || sound.sfxPack !== "off"}
           onToggleHelpers={() => {
             // If a mode is active, the button is Cancel: exit the mode.
             if (clearMode) {
@@ -2278,9 +2279,13 @@ export function CombineBoard({
             onChange={(next) => {
               setSound(next);
               saveSound(next);
-              // Play a confirmation when SFX is toggled on, matching the
-              // prototype's setSfx behaviour.
-              if (next.sfx && !sound.sfx) playFx("place");
+              // Confirmation ping when SFX comes back on (off → anything).
+              // Also fires when switching between packs mid-session so the
+              // player hears the new voice immediately.
+              const wasOff = sound.sfxPack === "off";
+              const nowOn = next.sfxPack !== "off";
+              const packChanged = sound.sfxPack !== next.sfxPack;
+              if ((wasOff && nowOn) || (packChanged && nowOn)) playFx("place");
             }}
             onDismiss={() => setSoundOpen(false)}
           />

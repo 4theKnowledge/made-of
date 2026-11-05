@@ -39,6 +39,7 @@ const FOUND_KEY = "madeof:cbfound";
 const SEEN_AGES_PREFIX = "madeof:cbseenages:";
 const MUSIC_KEY = "madeof:music";
 const SFX_KEY = "madeof:sfx";
+const SFX_PACK_KEY = "madeof:sfxpack";
 const VOL_KEY = "madeof:vol";
 
 export type MusicTrack =
@@ -48,13 +49,18 @@ export type MusicTrack =
   | "hearth"
   | "rainfall"
   | "off";
+export type SfxPack = "classic" | "wood" | "chime" | "off";
 export interface SoundSettings {
   music: MusicTrack;
-  sfx: boolean;
+  sfxPack: SfxPack;
   vol: number; // 0..100
 }
 
-const SOUND_DEFAULT: SoundSettings = { music: "piano", sfx: true, vol: 80 };
+const SOUND_DEFAULT: SoundSettings = {
+  music: "piano",
+  sfxPack: "classic",
+  vol: 80,
+};
 
 export interface StoredGame {
   v: number;
@@ -417,11 +423,29 @@ export function loadSound(): SoundSettings {
   if (typeof window === "undefined") return SOUND_DEFAULT;
   try {
     const music = window.localStorage.getItem(MUSIC_KEY);
-    const sfx = window.localStorage.getItem(SFX_KEY);
+    const sfxPack = window.localStorage.getItem(SFX_PACK_KEY);
+    const legacySfx = window.localStorage.getItem(SFX_KEY);
     const vol = window.localStorage.getItem(VOL_KEY);
     // "handpan" was the earlier name for "chimes" — migrate silently so
     // old saves don't silently fall back to "off".
     const musicNormalised = music === "handpan" ? "chimes" : music;
+    // Sfx pack migration:
+    // - If the new key exists and is valid, use it.
+    // - Else if the legacy boolean key exists, promote it (true → classic,
+    //   false → off). The legacy key stays in storage; we just stop reading
+    //   it once the new key is written.
+    // - Else fall through to the default.
+    let resolvedPack: SfxPack = SOUND_DEFAULT.sfxPack;
+    if (
+      sfxPack === "classic" ||
+      sfxPack === "wood" ||
+      sfxPack === "chime" ||
+      sfxPack === "off"
+    ) {
+      resolvedPack = sfxPack;
+    } else if (legacySfx != null) {
+      resolvedPack = legacySfx === "1" ? "classic" : "off";
+    }
     return {
       music:
         musicNormalised === "piano" ||
@@ -432,7 +456,7 @@ export function loadSound(): SoundSettings {
         musicNormalised === "off"
           ? (musicNormalised as MusicTrack)
           : SOUND_DEFAULT.music,
-      sfx: sfx == null ? SOUND_DEFAULT.sfx : sfx === "1",
+      sfxPack: resolvedPack,
       vol: vol == null ? SOUND_DEFAULT.vol : Math.max(0, Math.min(100, Number(vol))),
     };
   } catch {
@@ -444,7 +468,7 @@ export function saveSound(s: SoundSettings): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(MUSIC_KEY, s.music);
-    window.localStorage.setItem(SFX_KEY, s.sfx ? "1" : "0");
+    window.localStorage.setItem(SFX_PACK_KEY, s.sfxPack);
     window.localStorage.setItem(VOL_KEY, String(Math.round(s.vol)));
   } catch {
     // ignore
