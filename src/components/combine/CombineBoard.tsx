@@ -1891,6 +1891,7 @@ export function CombineBoard({
           bundle={bundle}
           active={Boolean(drag?.overHold)}
           activeOk={Boolean(drag?.overHold && drag.overOk)}
+          dragging={Boolean(drag)}
           selected={selectedSlot}
           onSlotTap={onSlotTap}
           onSlotPointerDown={onSlotPointerDown}
