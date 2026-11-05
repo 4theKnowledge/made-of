@@ -41,6 +41,7 @@ import {
   type MusicTrack,
 } from "@/combine/storage";
 import { useCollection } from "@/combine/useCollection";
+import { useReactions } from "@/combine/useReactions";
 import {
   dailyShareQuery,
   dailyShareText,
@@ -284,6 +285,7 @@ export function CombineBoard({
     out: string;
     recipe: string[];
     firstLifetime: boolean;
+    recipeId?: string;
   } | null>(null);
   const [ageToast, setAgeToast] = useState<{
     age: number;
@@ -493,7 +495,7 @@ export function CombineBoard({
       // (420ms). Chain steps queue after each other, so we build a timeline
       // of fx patches and schedule them with setTimeout.
       let latestDiscovery:
-        | { out: string; recipe: string[]; firstLifetime: boolean }
+        | { out: string; recipe: string[]; firstLifetime: boolean; recipeId?: string }
         | null = null;
       let latestAgeUp: {
         age: number;
@@ -717,6 +719,7 @@ export function CombineBoard({
           latestDiscovery = {
             out: e.out,
             recipe: e.recipe,
+            recipeId: e.recipeId,
             firstLifetime,
           };
           discoveredOuts.add(e.out);
@@ -1763,6 +1766,33 @@ export function CombineBoard({
     return s;
   }, [state.found, collection]);
 
+  // Reactions — subscribe to just the recipe/item ids the active overlays
+  // need. Keeps the GET small per round-trip. The hook stabilises id lists
+  // internally so passing fresh arrays each render is cheap.
+  const reactionRecipeIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (discovery?.recipeId) ids.add(discovery.recipeId);
+    if (infoTile) {
+      for (const r of bundle.recipes) {
+        if (r.out === infoTile && r.id) ids.add(r.id);
+      }
+    }
+    return [...ids];
+  }, [discovery, infoTile, bundle.recipes]);
+  const reactionItemIds = useMemo(
+    () => (infoTile ? [infoTile] : []),
+    [infoTile],
+  );
+  const {
+    recipeReactions,
+    itemReactions,
+    authed: reactionsAuthed,
+    vote: voteReaction,
+  } = useReactions({
+    recipeIds: reactionRecipeIds,
+    itemIds: reactionItemIds,
+  });
+
   // Per-item mastery for everything the player has made this run. Computed
   // against `knownIds` so the denominator only ever includes recipe variants
   // whose ingredients the player has already seen — admins adding a new
@@ -2050,6 +2080,33 @@ export function CombineBoard({
             discovery={discovery}
             bundle={bundle}
             onDismiss={() => setDiscovery(null)}
+            reaction={
+              discovery.recipeId
+                ? recipeReactions.get(discovery.recipeId)
+                : undefined
+            }
+            onReact={
+              discovery.recipeId
+                ? (value) => voteReaction("recipe", discovery.recipeId!, value)
+                : undefined
+            }
+            authed={reactionsAuthed}
+            onReport={() => {
+              const inputs = discovery.recipe
+                .map((id) => bundle.items.get(id)?.name)
+                .filter((n): n is string => Boolean(n));
+              const outItem = bundle.items.get(discovery.out);
+              setFeedback({
+                type: "report",
+                payload: {
+                  category: "recipe_wrong",
+                  itemId: discovery.out,
+                  recipeInputs: inputs,
+                  ...(outItem ? { itemName: outItem.name } : {}),
+                },
+              });
+              setDiscovery(null);
+            }}
           />
         )}
         {hintToast && (

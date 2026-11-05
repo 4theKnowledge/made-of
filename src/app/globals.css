@@ -1368,6 +1368,27 @@ a.btn.primary{color:var(--bg)}
 .cbdisc .cbchip{margin-top:6px;color:#111417}
 .cbdisc-report{margin-top:8px;padding:2px 8px;background:transparent;border:1px solid currentColor;border-radius:3px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:inherit;cursor:pointer;opacity:.6}
 .cbdisc-report:hover{opacity:1}
+.cbdisc-react{margin-top:8px}
+
+/* Reactions primitive — up / down / report buttons in a tight row. The
+ * inner .ic uses the same pictogram SVG classes (.b / .l / .k) as
+ * elsewhere, so dark/light contrast comes free. */
+.cbrx{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.cbrx-row{display:inline-flex;align-items:center;gap:4px}
+.cbrx-btn{display:inline-grid;place-items:center;width:28px;height:28px;padding:2px;border:1.5px solid currentColor;border-radius:3px;background:transparent;color:inherit;cursor:pointer;box-sizing:border-box}
+.cbrx-btn .ic{width:20px;height:20px;border:0;background:transparent}
+.cbrx-btn .ic svg{width:100%;height:100%}
+.cbrx-btn:hover{background:color-mix(in srgb, currentColor 10%, transparent)}
+.cbrx-btn:active{transform:translateY(1px)}
+.cbrx-btn.on.up{background:var(--good, var(--accent));color:#fff;border-color:var(--good, var(--accent))}
+.cbrx-btn.on.down{background:var(--bad, #c84);color:#fff;border-color:var(--bad, #c84)}
+.cbrx-btn.flag{opacity:.7}
+.cbrx-btn.flag:hover{opacity:1}
+.cbrx-why{margin-top:2px;padding:2px 6px;background:transparent;border:0;color:inherit;font-family:var(--mono);font-size:10px;letter-spacing:.04em;text-decoration:underline;cursor:pointer;opacity:.75}
+.cbrx-why:hover{opacity:1}
+.cbrx.xs .cbrx-btn{width:22px;height:22px;padding:1px}
+.cbrx.xs .cbrx-btn .ic{width:16px;height:16px}
+.cbrx.xs .cbrx-why{font-size:9.5px}
 
 /* Ghost preview + preview badges */
 .cbc .ghost2{opacity:.38;width:62%;display:grid;place-items:center}

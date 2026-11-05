@@ -2,8 +2,10 @@ import React from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import type { HintResult } from "@/combine/hint";
 import type { ThemeBundle } from "@/combine/types";
+import type { ReactionState } from "@/combine/useReactions";
 import { cap } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
+import { ReactionButtons } from "@/components/combine/board-parts/ReactionButtons";
 
 export function AgeToast({
   toast,
@@ -147,12 +149,29 @@ export function DiscoveryToast({
   bundle,
   onDismiss,
   onReport,
+  reaction,
+  onReact,
+  authed,
 }: {
-  discovery: { out: string; recipe: string[]; firstLifetime: boolean };
+  discovery: {
+    out: string;
+    recipe: string[];
+    firstLifetime: boolean;
+    /** Recipe row id for the variant the player made. Optional so
+     *  mid-game saves that predate the id-carrying event shape still
+     *  render the toast — just without reaction buttons. */
+    recipeId?: string;
+  };
   bundle: ThemeBundle;
   onDismiss: () => void;
   /** Open feedback sheet seeded with this recipe. Hidden when absent. */
   onReport?: () => void;
+  /** The player's reaction state for this recipe (if available). */
+  reaction?: ReactionState;
+  /** Fired when the player taps a thumb. Parent owns the write. */
+  onReact?: (value: -1 | 0 | 1) => void;
+  /** Signed-in flag so the thumbs can degrade to sign-in prompts. */
+  authed?: boolean;
 }) {
   const item = bundle.items.get(discovery.out);
   if (!item) return null;
@@ -207,19 +226,32 @@ export function DiscoveryToast({
           </span>
         </div>
         {item.fact && <p>{item.fact}</p>}
-        {onReport && (
-          <button
-            type="button"
-            className="cbdisc-report"
-            onClick={(e) => {
-              e.stopPropagation();
-              onReport();
-            }}
-            aria-label="Report this recipe"
-            title="Report this recipe"
-          >
-            Report this recipe
-          </button>
+        {discovery.recipeId && onReact ? (
+          <div className="cbdisc-react" onClick={(e) => e.stopPropagation()}>
+            <ReactionButtons
+              target="recipe"
+              state={reaction}
+              onVote={(value) => onReact(value)}
+              onReport={onReport}
+              authed={!!authed}
+              size="xs"
+            />
+          </div>
+        ) : (
+          onReport && (
+            <button
+              type="button"
+              className="cbdisc-report"
+              onClick={(e) => {
+                e.stopPropagation();
+                onReport();
+              }}
+              aria-label="Report this recipe"
+              title="Report this recipe"
+            >
+              Report this recipe
+            </button>
+          )
         )}
       </div>
     </div>

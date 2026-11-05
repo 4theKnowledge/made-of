@@ -191,7 +191,7 @@ export type Event =
   | { type: "age-up"; age: number; sample: string[]; grants: HelperGrants }
   | { type: "crumble"; cells: number[] }
   | { type: "hold-crumble"; slots: number[]; tiles: string[] }
-  | { type: "discovery"; out: string; recipe: string[] }
+  | { type: "discovery"; out: string; recipe: string[]; recipeId: string }
   | { type: "dealt" }
   | { type: "wipe"; age: number }
   | { type: "over" };
@@ -506,7 +506,12 @@ function finishResolve(
   if (first) {
     state.found.push(recipe.out);
     state.madeAtBand[recipe.out] = recipe.band;
-    events.push({ type: "discovery", out: recipe.out, recipe: recipe.all });
+    events.push({
+      type: "discovery",
+      out: recipe.out,
+      recipe: recipe.all,
+      recipeId: recipe.id,
+    });
   }
   // `howMade` is the most recent recipe used, not just the first. The
   // DetailCard renders every known variant of a recipe and highlights
