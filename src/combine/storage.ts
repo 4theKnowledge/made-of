@@ -70,6 +70,11 @@ export interface StoredGame {
   n: number;
   /** RNG state as a 32-bit int. */
   rs: number;
+  /** Initial RNG seed the run started with. Daily runs only — endless/fast
+   *  omit this. On resume, `loadGame` compares this against today's current
+   *  payload seed; a mismatch means the admin reset today's daily mid-run,
+   *  so the stale save is dropped and the player starts fresh. */
+  initialSeed?: number;
   board: Array<string | null>;
   tray: Array<string | null>;
   score: number;
@@ -132,6 +137,7 @@ function toStored(state: GameState): StoredGame {
     daily: state.daily,
     n: state.n,
     rs: state.rng.rs,
+    initialSeed: state.initialSeed ?? undefined,
     board: state.board.slice(),
     tray: state.tray.slice(),
     score: state.score,
@@ -232,7 +238,7 @@ function readStored(key: string): StoredGame | null {
  *  to "endless" when `daily` is null; pass `"fast"` to read the fast slot. */
 export function loadGame(
   bundle: ThemeBundle,
-  opts: { daily: string | null; mode?: Mode },
+  opts: { daily: string | null; mode?: Mode; expectedSeed?: number | null },
 ): StoredGame | null {
   const mode: Mode = opts.mode ?? (opts.daily ? "daily" : "endless");
   const key = mode === "fast" ? FAST_KEY : opts.daily ? DAILY_KEY : ENDLESS_KEY;
@@ -246,6 +252,20 @@ export function loadGame(
   if (s.mode !== mode) return null;
   // Daily: the save must belong to today's puzzle.
   if (mode === "daily" && s.daily !== opts.daily) return null;
+  // Daily: if caller provided today's expected seed, drop the save when it
+  // doesn't match. This is the resume-after-admin-reset-today path — the
+  // seed on the current payload is fresh, but the save's initialSeed still
+  // reflects the pre-reset puzzle. A missing initialSeed field (older save
+  // written before this field existed) also drops, forcing one fresh run.
+  if (
+    mode === "daily" &&
+    typeof opts.expectedSeed === "number" &&
+    s.initialSeed !== opts.expectedSeed &&
+    !s.over
+  ) {
+    window.localStorage.removeItem(DAILY_KEY);
+    return null;
+  }
   // Endless/fast: a finished game is nothing to resume.
   if (mode !== "daily" && s.over) return null;
   // A finished daily save is a frozen review board — stale tile ids and
@@ -326,6 +346,7 @@ export function hydrateGame(s: StoredGame, opts: { target?: number | null } = {}
     // hydrate from is a real player save, so start clean.
     debug: false,
     target: s.mode === "daily" ? opts.target ?? null : null,
+    initialSeed: s.mode === "daily" ? s.initialSeed ?? null : null,
   };
 }
 

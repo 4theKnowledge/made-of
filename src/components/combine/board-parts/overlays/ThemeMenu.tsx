@@ -11,6 +11,7 @@ export function ThemeMenu({
   daily,
   current,
   dailyDone,
+  dailyEnabled = true,
   onPickTheme,
   onPickDaily,
   onPickFast,
@@ -24,6 +25,8 @@ export function ThemeMenu({
   daily: string | null;
   current: ThemeKey;
   dailyDone: DailyResult | null;
+  /** Feature flag — hide the Today/Daily section entirely when false. */
+  dailyEnabled?: boolean;
   onPickTheme: (which: ThemeKey) => void;
   onPickDaily: () => void;
   onPickFast: (which: ThemeKey) => void;
@@ -42,8 +45,8 @@ export function ThemeMenu({
       ariaLabel="Choose a theme"
       className="cbthemes"
     >
-      <span className="k">Today</span>
-        {dailyDone ? (
+      {dailyEnabled && <span className="k">Today</span>}
+        {dailyEnabled && (dailyDone ? (
           <div
             className="cbtopt cbdaily done"
             role="button"
@@ -83,7 +86,7 @@ export function ThemeMenu({
               Same start and same tiles for everyone today. One go. 6×6.
             </span>
           </button>
-        )}
+        ))}
         <span className="k">Endless</span>
         {(Object.keys(bundles) as ThemeKey[]).map((key) => {
           const b = bundles[key];

@@ -168,6 +168,10 @@ export interface GameState {
    *  payloads that predate the target-list feature — in that case the
    *  pre-existing final-age victory still fires. */
   target: number | null;
+  /** The initial seed this run started with. Daily runs only — endless/fast
+   *  leave this null. Stamped onto saves so a resume after admin reset-today
+   *  can detect the seed mismatch and drop the stale save. */
+  initialSeed: number | null;
 }
 
 /* Events — fire-and-forget notifications for the UI/audio layer. */
@@ -854,6 +858,7 @@ export function newGame(
     lastSnapshot: null,
     debug: false,
     target,
+    initialSeed: mode === "daily" ? seed : null,
   };
 
   // Initial helpers scale to age-0's band population — see HELPER_PER_ITEMS.

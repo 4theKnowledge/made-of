@@ -121,6 +121,14 @@ interface Props {
    *  feature — in either case the engine falls back to the legacy
    *  age-progression end. */
   dailyTarget?: number | null;
+  /** Today's daily RNG seed, frozen on the payload. Compared against a
+   *  saved game's `initialSeed` so an admin reset-today mid-run drops the
+   *  stale save and starts fresh. Null if no daily payload exists. */
+  dailyPayloadSeed?: number | null;
+  /** Feature flag — when false, hide every daily entry point (deep-link
+   *  resolution, auto-open on first visit, theme-menu Daily option).
+   *  Server-side gate runs `env flag OR isAdmin()` before passing. */
+  dailyEnabled?: boolean;
   /** Server-provided admin flag. Only mounts the debug panel entry point.
    *  The reducer trusts the flag UI-side; real security is at the admin
    *  session check that produced this. */
@@ -140,6 +148,8 @@ export function CombineBoard({
   fastBundles: fastSerialised,
   dailyBundles: dailySerialised,
   dailyTarget = null,
+  dailyPayloadSeed = null,
+  dailyEnabled = true,
   admin = false,
   signedIn = false,
 }: Props) {
@@ -245,13 +255,16 @@ export function CombineBoard({
     // Deep link: ?d=<dayKey> on /combine starts today's daily. Yesterday's
     // keys fall through to the regular endless resume (today's daily will
     // still be a tap away from the theme menu).
+    // Gated by `dailyEnabled`: when the feature flag is off for this
+    // viewer, we skip the deep-link resolution and fall through to the
+    // endless path — shared daily share URLs just land on endless.
     const sp =
       typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
     const deepLinkDay = sp?.get("d");
-    if (deepLinkDay && deepLinkDay === todayKey()) {
+    if (dailyEnabled && deepLinkDay && deepLinkDay === todayKey()) {
       const day = deepLinkDay;
       const dailyBundle = dailyBundles.everything;
-      const saved = loadGame(dailyBundle, { daily: day });
+      const saved = loadGame(dailyBundle, { daily: day, expectedSeed: dailyPayloadSeed });
       setState(
         saved
           ? hydrateGame(saved, { target: dailyTarget })
@@ -283,9 +296,9 @@ export function CombineBoard({
       return;
     }
     const today = todayKey();
-    if (!loadDailyDone(today)) {
+    if (dailyEnabled && !loadDailyDone(today)) {
       const dailyBundle = dailyBundles.everything;
-      const saved = loadGame(dailyBundle, { daily: today });
+      const saved = loadGame(dailyBundle, { daily: today, expectedSeed: dailyPayloadSeed });
       setState(
         saved
           ? hydrateGame(saved, { target: dailyTarget })
@@ -297,7 +310,7 @@ export function CombineBoard({
             }).state,
       );
     }
-  }, [bundles.everything, dailyBundles.everything, fastBundles.everything, dailyTarget]);
+  }, [bundles.everything, dailyBundles.everything, fastBundles.everything, dailyTarget, dailyPayloadSeed, dailyEnabled]);
   const [selectedSlot, setSelectedSlot] = useState<{
     source: "tray" | "hold";
     slot: number;
@@ -1021,6 +1034,10 @@ export function CombineBoard({
   );
 
   const startDaily = useCallback(() => {
+    // Feature-flag guard: when daily is gated off for this viewer the
+    // UI should never surface the entry point, but any stray callback
+    // (stale onClick ref, keyboard shortcut) short-circuits here too.
+    if (!dailyEnabled) return;
     const day = todayKey();
     // Resume today's daily save if any (including the finished state kept
     // for review). Only start a fresh daily when there's no save at all AND
@@ -1033,7 +1050,7 @@ export function CombineBoard({
     // instead of starting the fresh run the reset is meant to allow.
     const done = loadDailyDone(day);
     const dailyBundle = dailyBundles.everything;
-    const saved = loadGame(dailyBundle, { daily: day });
+    const saved = loadGame(dailyBundle, { daily: day, expectedSeed: dailyPayloadSeed });
     if (saved) {
       saveGame(state);
       setState(hydrateGame(saved, { target: dailyTarget }));
@@ -1054,7 +1071,7 @@ export function CombineBoard({
       );
     }
     resetTransient();
-  }, [bundles, dailyBundles, state, resetTransient, dailyTarget]);
+  }, [bundles, dailyBundles, state, resetTransient, dailyTarget, dailyPayloadSeed, dailyEnabled]);
 
   const shareDaily = useCallback(async () => {
     const dr = dailyDone;
@@ -2170,6 +2187,7 @@ export function CombineBoard({
             daily={state.daily}
             current={state.theme}
             dailyDone={dailyDone}
+            dailyEnabled={dailyEnabled}
             onPickTheme={(which) => {
               setThemeOpen(false);
               switchTheme(which);
