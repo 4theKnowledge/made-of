@@ -90,6 +90,7 @@ import { SoundMenu } from "@/components/combine/board-parts/overlays/SoundMenu";
 import { ThemeMenu } from "@/components/combine/board-parts/overlays/ThemeMenu";
 import { AgeBar } from "@/components/combine/board-parts/board/AgeBar";
 import { Board } from "@/components/combine/board-parts/board/Board";
+import { BoardErrorBoundary } from "@/components/combine/board-parts/board/BoardErrorBoundary";
 import { DragGhost } from "@/components/combine/board-parts/board/DragGhost";
 import { Hold } from "@/components/combine/board-parts/board/Hold";
 import { Shelf } from "@/components/combine/board-parts/board/Shelf";
@@ -1945,30 +1946,32 @@ export function CombineBoard({
           newUnlocks={newUnlocks}
           onInfo={(id) => setInfoTile(id)}
         />
-        <Board
-          state={state}
-          bundle={bundle}
-          fx={
-            state.choosing
-              ? {
-                  ...fx,
-                  fuse: new Set([
-                    ...(fx.fuse ?? []),
-                    ...state.choosing.cells,
-                  ]),
-                }
-              : fx
-          }
-          preview={preview}
-          dragOver={drag ? { cell: drag.overCell, ok: drag.overOk } : null}
-          clearMode={clearMode}
-          moveMode={moveMode}
-          shoreMode={shoreMode}
-          pluckMode={pluckMode}
-          lastChance={lastChance}
-          onCellTap={onCellTap}
-          onCellPointerDown={onCellPointerDown}
-        />
+        <BoardErrorBoundary>
+          <Board
+            state={state}
+            bundle={bundle}
+            fx={
+              state.choosing
+                ? {
+                    ...fx,
+                    fuse: new Set([
+                      ...(fx.fuse ?? []),
+                      ...state.choosing.cells,
+                    ]),
+                  }
+                : fx
+            }
+            preview={preview}
+            dragOver={drag ? { cell: drag.overCell, ok: drag.overOk } : null}
+            clearMode={clearMode}
+            moveMode={moveMode}
+            shoreMode={shoreMode}
+            pluckMode={pluckMode}
+            lastChance={lastChance}
+            onCellTap={onCellTap}
+            onCellPointerDown={onCellPointerDown}
+          />
+        </BoardErrorBoundary>
         {lastChance && !state.over && (
           <button
             type="button"
