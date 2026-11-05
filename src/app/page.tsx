@@ -110,7 +110,7 @@ export default async function HomePage() {
 
   return (
     <main className="wrap">
-      <Header />
+      <Header current="home" />
 
       <section className="homeHero">
         <span className="eyebrow">Made Of</span>

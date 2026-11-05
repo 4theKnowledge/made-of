@@ -2402,54 +2402,44 @@ a.btn.primary{color:var(--bg)}
 }
 .heroTree-final-cell { min-height: 108px; }
 
-/* Composite tile: bordered container holding pictogram + name stacked.
-   Single frame per item; the name belongs to its picture visually. */
-.heroTree-tile {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 10px 5px;
-  background: var(--surface);
-  border: 1.5px solid var(--ink);
-  border-radius: 3px;
+/* Wrapper slot that handles the fade-in / glow animation. The inner tile
+   itself (`.cbp` from Combine) carries the tier fill, border, and label
+   typography — reused so the hero reads as the same visual grammar. */
+/* Wrapper that handles the fade/glow animation. .cbp inside is forced to
+   an explicit size — .cbp's own width:100%+aspect-ratio:1 gets confused
+   inside a flex parent on the 1fr final row, so we pin dimensions here. */
+.heroTree-slot {
+  display: inline-block;
   opacity: 0;
   animation:
     heroTree-fade 0.45s ease-out forwards,
     heroTree-glow-soft 1.2s ease-out 0.45s;
   will-change: opacity, filter;
 }
-.heroTree-tile.is-final {
-  padding: 10px 14px 8px;
+.heroTree-slot.is-final {
   animation:
     heroTree-fade 0.5s ease-out forwards,
     heroTree-glow 1.8s ease-out 0.5s;
 }
-.heroTree-tile-name {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--ink);
-  text-transform: lowercase;
-  white-space: nowrap;
-  text-align: center;
+.heroTree-slot .cbp {
+  cursor: default;
+  max-width: none;
+  width: 84px;
+  height: 84px;
+  aspect-ratio: auto;
 }
-.heroTree-tile.is-final .heroTree-tile-name {
-  font-size: 13px;
-  font-weight: 600;
+.heroTree-slot.is-final .cbp {
+  width: 112px;
+  height: 112px;
 }
 
 @media (max-width: 520px) {
   .heroTree-run { max-width: 100%; }
   .heroTree-row { gap: 4px; }
-  .heroTree-tile { padding: 5px 6px 4px; gap: 3px; }
-  .heroTree-tile.is-final { padding: 7px 10px 6px; }
-  .heroTree-tile-name { font-size: 10px; letter-spacing: 0.02em; }
-  .heroTree-tile.is-final .heroTree-tile-name { font-size: 12px; }
-  .heroTree-tile .ic { width: 36px !important; height: 36px !important; }
-  .heroTree-tile.is-final .ic { width: 52px !important; height: 52px !important; }
-  .heroTree-cell { min-height: 72px; }
-  .heroTree-final-cell { min-height: 92px; }
+  .heroTree-slot .cbp { width: 68px; height: 68px; }
+  .heroTree-slot.is-final .cbp { width: 92px; height: 92px; }
+  .heroTree-cell { min-height: 80px; }
+  .heroTree-final-cell { min-height: 100px; }
   .heroTree-run {
     grid-template-rows: auto 22px auto 36px auto;
   }
@@ -2538,7 +2528,7 @@ a.btn.primary{color:var(--bg)}
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .heroTree-tile,
+  .heroTree-slot,
   .heroTree-connector,
   .heroTree-converge line,
   .heroTree-spark {

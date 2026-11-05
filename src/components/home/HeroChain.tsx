@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Pictogram } from "@/pictograms/Pictogram";
+import { CombineTile } from "@/components/combine/board-parts/CombineTile";
+import type { CombineItem } from "@/combine/types";
 import type { ItemKind, Tier } from "@/db/schema";
 
 export interface TreeItem {
@@ -79,7 +80,7 @@ export function HeroChain({ trees }: { trees: Tree[] }) {
           ))}
         </div>
 
-        {/* Mid → final converging lines. SVG so the lines actually reach the
+        {/* Mid → final converging lines. SVG so lines actually reach the
             final tile regardless of column count. preserveAspect=none lets
             the X-axis stretch with the grid cell. */}
         <svg
@@ -126,11 +127,21 @@ export function HeroChain({ trees }: { trees: Tree[] }) {
   );
 }
 
-/**
- * Composite tile: pictogram on top, name underneath, both wrapped in a
- * single bordered container. Keeps the hero's visual grammar tight — one
- * frame per item, name clearly belonging to its picture.
- */
+/** Adapt a TreeItem to the CombineItem shape CombineTile expects. Only the
+ *  fields the tray variant reads (name, tier, kind, symbol) need to be real;
+ *  the rest are harmless stubs so TS is happy. */
+function toCombineItem(t: TreeItem): CombineItem {
+  return {
+    id: t.slug,
+    slug: t.slug,
+    name: t.name,
+    tier: t.tier,
+    symbol: t.symbol,
+    kind: t.kind,
+    fact: "",
+  };
+}
+
 function TreeTile({
   item,
   delay,
@@ -142,18 +153,15 @@ function TreeTile({
 }) {
   return (
     <span
-      className={`heroTree-tile${isFinal ? " is-final" : ""}`}
+      className={`heroTree-slot${isFinal ? " is-final" : ""}`}
       style={{ animationDelay: delay }}
     >
-      <Pictogram
-        name={item.name}
-        tier={item.tier}
-        kind={item.kind}
-        symbol={item.symbol}
-        pictogram={item.pictogram}
-        size={isFinal ? 64 : 44}
+      <CombineTile
+        item={toCombineItem(item)}
+        variant="tray"
+        label
+        as="span"
       />
-      <span className="heroTree-tile-name">{item.name}</span>
     </span>
   );
 }

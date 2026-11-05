@@ -6,6 +6,7 @@ import { useEffect, useId, useState } from "react";
 import { AuthNavLink } from "./AuthNavLink";
 
 type Current =
+  | "home"
   | "combine"
   | "link"
   | "craft"
@@ -20,6 +21,7 @@ function buildLinks(
   exploreHref: string,
 ): Array<{ href: string; label: string; key: Current }> {
   return [
+    { href: "/", label: "Home", key: "home" },
     { href: "/combine", label: "Combine", key: "combine" },
     { href: "/leaderboard", label: "Leaderboard", key: "leaderboard" },
     { href: exploreHref, label: "Explore", key: "explore" },
