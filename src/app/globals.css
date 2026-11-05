@@ -986,9 +986,15 @@ a.btn.primary{color:var(--bg)}
 .cbghost .ic{width:60%;height:auto;aspect-ratio:1;border:0;background:transparent}
 .cbghost .cbn{font-size:9px}
 
-.cbchoose{position:absolute;left:6px;right:6px;top:42%;z-index:40;padding:10px;border:2.5px solid var(--ink);border-radius:4px;background:var(--bg);box-shadow:4px 4px 0 var(--ink);display:flex;flex-direction:column;gap:8px;animation:mdin .2s ease-out}
-.cbchoose .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;text-align:center}
-.cbchoose .opts{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+/* Cap the picker to the viewport so a high alt-output count
+ * (common-bases like water+* or carbon+* can balloon to 10+ options)
+ * doesn't push the dialog off the screen on mobile. The dialog itself
+ * stays bounded; the .opts list scrolls inside it. */
+.cbchoose{position:absolute;left:6px;right:6px;top:42%;z-index:40;max-height:calc(100dvh - 48px);padding:10px;border:2.5px solid var(--ink);border-radius:4px;background:var(--bg);box-shadow:4px 4px 0 var(--ink);display:flex;flex-direction:column;gap:8px;animation:mdin .2s ease-out;box-sizing:border-box;overflow:hidden}
+.cbchoose .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;text-align:center;flex:none}
+.cbchoose .opts{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;min-height:0;padding:2px}
+/* Footer button (Cancel) stays pinned under the scrolling list. */
+.cbchoose > .cbh{flex:none}
 .cbopt{width:76px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 4px;border:2px solid var(--pk);border-radius:4px;background:var(--fill);box-shadow:2px 2px 0 var(--pk);color:#111417;font:inherit;font-size:11.5px;font-weight:700;line-height:1.1;text-align:center;cursor:pointer}
 .cbopt .ic{width:34px;height:34px;border:0;background:transparent}
 .cbopt .ic svg{width:100%;height:100%}
