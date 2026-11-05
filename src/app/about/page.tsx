@@ -181,6 +181,21 @@ export default async function AboutPage() {
 
         <section className="fgrid">
           <article className="feat">
+            <h3>Combine</h3>
+            <p>
+              Drag two touching things together to make a third, and watch
+              recipes chain. Endless, fast and daily modes, with a lifetime
+              collection as you go.
+            </p>
+            <Link
+              className="btn"
+              href="/combine"
+              style={{ alignSelf: "flex-start" }}
+            >
+              Play Combine
+            </Link>
+          </article>
+          <article className="feat">
             <h3>Explore</h3>
             <p>
               Pick anything and see what it takes and what it leads to. Follow
@@ -192,34 +207,6 @@ export default async function AboutPage() {
               style={{ alignSelf: "flex-start" }}
             >
               Start exploring
-            </Link>
-          </article>
-          <article className="feat">
-            <h3>Link</h3>
-            <p>
-              A new puzzle each day: get from one thing to another in as few
-              links as you can.
-            </p>
-            <Link
-              className="btn"
-              href="/link"
-              style={{ alignSelf: "flex-start" }}
-            >
-              Play today&rsquo;s puzzle
-            </Link>
-          </article>
-          <article className="feat">
-            <h3>Craft</h3>
-            <p>
-              Start with only the big bang and build your way to a pencil, a
-              phone or a city.
-            </p>
-            <Link
-              className="btn"
-              href="/craft"
-              style={{ alignSelf: "flex-start" }}
-            >
-              Start building
             </Link>
           </article>
         </section>

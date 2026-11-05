@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { Footer } from "@/components/common/Footer";
 import { Header } from "@/components/common/Header";
 import { getLiveSnapshot } from "@/graph/live";
@@ -25,11 +26,16 @@ export const metadata: Metadata = {
   alternates: { canonical: "/link" },
 };
 
+// Link mode is paused — route 404s publicly while the code stays intact.
+// See docs/REVIVING-LINK-CRAFT.md to bring it back.
+const PAUSED = true;
+
 export default async function LinkPage({
   searchParams,
 }: {
   searchParams: Promise<{ mode?: string }>;
 }) {
+  if (PAUSED) notFound();
   const { mode: modeParam } = await searchParams;
   const mode: LinkMode = modeParam === "free" ? "free" : "daily";
 

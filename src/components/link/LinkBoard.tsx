@@ -473,8 +473,8 @@ export function LinkBoard({
             <span className="msg" role="status">{copyMsg}</span>
           </div>
           <p className="msg nudge">
-            Want to play this with a class?{" "}
-            <Link href="/pricing">See what&rsquo;s coming for classrooms</Link>.
+            Like Made Of?{" "}
+            <Link href="/pricing">See what&rsquo;s free and what&rsquo;s coming</Link>.
           </p>
         </section>
       )}

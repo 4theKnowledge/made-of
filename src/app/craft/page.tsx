@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { Footer } from "@/components/common/Footer";
 import { Header } from "@/components/common/Header";
 import { getLiveSnapshot } from "@/graph/live";
@@ -29,7 +30,12 @@ export const metadata: Metadata = {
 const DEFAULT_TARGET_SLUG = "pencil";
 const ORIGIN_SLUG = "big-bang";
 
+// Craft mode is paused — route 404s publicly while the code stays intact.
+// See docs/REVIVING-LINK-CRAFT.md to bring it back.
+const PAUSED = true;
+
 export default async function CraftPage() {
+  if (PAUSED) notFound();
   const live = await getLiveSnapshot();
 
   // Pick an initial target. We default to pencil (prototype default); if it

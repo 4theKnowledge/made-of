@@ -68,7 +68,7 @@ export default function MethodPage() {
             </li>
             <li>
               <b>Hypothesis.</b> Plausible, but the evidence is thin. Treated
-              as such on the map and in the Daily link puzzle.
+              as such on the map and in the games.
             </li>
           </ul>
         </section>

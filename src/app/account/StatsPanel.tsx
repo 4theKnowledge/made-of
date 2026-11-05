@@ -1,6 +1,12 @@
 import Link from "next/link";
 import type { AccountStats } from "@/lib/stats/load";
 
+// Hide From scratch stats while the Craft mode is paused (see
+// docs/REVIVING-LINK-CRAFT.md). Historical rows stay in the DB; this
+// only hides the account-page panel so the public app doesn't reference
+// a paused mode.
+const CRAFT_PAUSED = true;
+
 function titleCase(s: string): string {
   return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1);
 }
@@ -33,14 +39,14 @@ export function StatsPanel({ stats }: { stats: AccountStats }) {
   const { craft, combine } = stats;
 
   const nothingYet =
-    craft.totalSolves === 0 &&
+    (CRAFT_PAUSED ? true : craft.totalSolves === 0) &&
     combine.totalDiscovered === 0 &&
     combine.totalRuns === 0;
   if (nothingYet) {
     return (
       <p style={{ color: "var(--muted)", margin: 0 }}>
-        No stats yet. Play <Link href="/scratch">From scratch</Link> or{" "}
-        <Link href="/combine">Combine</Link> and your personal bests will show up here.
+        No stats yet. Play <Link href="/combine">Combine</Link> and your
+        personal bests will show up here.
       </p>
     );
   }
@@ -58,38 +64,40 @@ export function StatsPanel({ stats }: { stats: AccountStats }) {
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
-      <div>
-        <h4 style={{ margin: "0 0 10px", fontSize: 14, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted)" }}>
-          From scratch
-        </h4>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
-          <Stat label="Best score" value={String(craft.bestScore)} hint={`out of 1000`} />
-          <Stat label="Total score" value={craft.totalScore.toLocaleString()} />
-          <Stat label="Solves" value={String(craft.totalSolves)} />
-          <Stat label="Unique targets" value={String(craft.uniqueTargets)} />
-          <Stat label="At or under par" value={String(craft.atOrUnderPar)} />
-          <Stat label="Three-star solves" value={String(craft.threeStarSolves)} />
-        </div>
-        {bestEntries.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 6 }}>
-              Personal bests
-            </div>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
-              {bestEntries.map(([slug, best]) => (
-                <li key={slug} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 14 }}>
-                  <a href={`/i/${slug}`} style={{ color: "var(--ink)" }}>
-                    {slug.replace(/-/g, " ")}
-                  </a>
-                  <span style={{ color: "var(--muted)", fontFamily: "var(--mono, 'Chivo Mono'), monospace", fontSize: 13 }}>
-                    {best.bestScore} pts · {best.bestMoves} moves · {fmtTime(best.bestTimeMs)} · {"★".repeat(best.bestStars)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+      {!CRAFT_PAUSED && (
+        <div>
+          <h4 style={{ margin: "0 0 10px", fontSize: 14, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted)" }}>
+            From scratch
+          </h4>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
+            <Stat label="Best score" value={String(craft.bestScore)} hint={`out of 1000`} />
+            <Stat label="Total score" value={craft.totalScore.toLocaleString()} />
+            <Stat label="Solves" value={String(craft.totalSolves)} />
+            <Stat label="Unique targets" value={String(craft.uniqueTargets)} />
+            <Stat label="At or under par" value={String(craft.atOrUnderPar)} />
+            <Stat label="Three-star solves" value={String(craft.threeStarSolves)} />
           </div>
-        )}
-      </div>
+          {bestEntries.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 6 }}>
+                Personal bests
+              </div>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
+                {bestEntries.map(([slug, best]) => (
+                  <li key={slug} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 14 }}>
+                    <a href={`/i/${slug}`} style={{ color: "var(--ink)" }}>
+                      {slug.replace(/-/g, " ")}
+                    </a>
+                    <span style={{ color: "var(--muted)", fontFamily: "var(--mono, 'Chivo Mono'), monospace", fontSize: 13 }}>
+                      {best.bestScore} pts · {best.bestMoves} moves · {fmtTime(best.bestTimeMs)} · {"★".repeat(best.bestStars)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       <div>
         <h4 style={{ margin: "0 0 10px", fontSize: 14, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted)" }}>

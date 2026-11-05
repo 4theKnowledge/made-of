@@ -69,8 +69,8 @@ export default function PrivacyPage() {
               open &mdash; a Stripe customer id so billing works.
             </li>
             <li>
-              <b>Your saved progress:</b> daily streaks, pinned items and
-              crafting state. Tied to your account id, not your email.
+              <b>Your saved progress:</b> Combine runs, discoveries, personal
+              bests and pinned items. Tied to your account id, not your email.
             </li>
           </ul>
         </section>

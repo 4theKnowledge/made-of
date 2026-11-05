@@ -88,14 +88,8 @@ export default async function NotFound() {
           <Link href="/" className="btn primary">
             Play Combine
           </Link>
-          <Link href="/link" className="btn">
-            Today&rsquo;s Link puzzle
-          </Link>
           <Link href="/explore/water" className="btn">
             Explore
-          </Link>
-          <Link href="/craft" className="btn">
-            Craft
           </Link>
         </ButtonGroup>
       </section>

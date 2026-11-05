@@ -30,8 +30,8 @@ export default function robots(): MetadataRoute.Robots {
 
   return {
     rules: [
-      // Everyone: no /api, no /admin.
-      { userAgent: "*", disallow: ["/api/", "/admin/"] },
+      // Everyone: no /api, no /admin, no currently-paused modes.
+      { userAgent: "*", disallow: ["/api/", "/admin/", "/link", "/craft"] },
       // AI training crawlers: fully blocked.
       ...trainingBots.map((ua) => ({
         userAgent: ua,
