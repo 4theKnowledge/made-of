@@ -31,7 +31,12 @@ export function fx(kind: SfxKind, arg?: number): void {
   if (!core.settings.sfx) return;
   if (core.ctx.state === "suspended") void core.ctx.resume();
   const t = core.ctx.currentTime + 0.01;
-  const S = core.settings.music === "piano" ? PENTA : KURD;
+  // Piano and Hearth share the diatonic piano palette; the other tracks
+  // (chimes, drift, rainfall, off) use the D Kurd scale so the handpan-
+  // voice sfx sit inside the same mode as the music.
+  const usePenta =
+    core.settings.music === "piano" || core.settings.music === "hearth";
+  const S = usePenta ? PENTA : KURD;
   const bus = core.fxBus;
   const strikeOn = (freq: number, when: number, vel: number, len?: number) =>
     strike(core, freq, when, vel, bus, len);

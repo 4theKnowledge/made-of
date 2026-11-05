@@ -70,7 +70,10 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;position:rel
 .btn:hover{box-shadow:2px 2px 0 var(--ink);transform:translate(-1px,-1px)}
 .btn{transition:transform .12s, box-shadow .12s}
 .btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.danger{border-color:#c0392b;color:#c0392b}
+.btn.danger:hover{box-shadow:2px 2px 0 #c0392b;background:#c0392b;color:#fff}
 .btn:disabled{opacity:.45;cursor:default;border-color:var(--line)}
+.feat.feat-danger{border-color:#c0392b;background:color-mix(in srgb, #c0392b 4%, var(--surface))}
 
 /* Icons */
 .ic{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:3px;flex:none;box-sizing:border-box;background:var(--fill,#fff);border:1.5px solid var(--pk);color:var(--pk);font-size:14px;line-height:1;overflow:hidden}
@@ -1663,6 +1666,17 @@ a.btn.primary{color:var(--bg)}
 
 .cbvol{display:flex;align-items:center;gap:10px;width:100%;font-size:13px;font-weight:700}
 .cbvol input{flex:1;accent-color:var(--ink)}
+
+/* Music track tiles: a 3-up grid of mini board tiles (pictogram + name + tag). */
+.cbsoundgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%}
+.cbsoundtile{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px 8px;border:2px solid var(--ink);border-radius:4px;background:var(--surface);color:var(--ink);font:inherit;cursor:pointer;box-shadow:3px 3px 0 var(--ink);transition:transform .1s}
+.cbsoundtile .ic{width:40px;height:40px}
+.cbsoundtile b{font-size:13px;line-height:1.1;text-align:center}
+.cbsoundtile .t{font-size:11px;color:var(--muted);text-align:center;line-height:1.1}
+.cbsoundtile:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+.cbsoundtile:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
+.cbsoundtile.on{background:var(--ink);color:var(--bg)}
+.cbsoundtile.on .t{color:inherit;opacity:.75}
 
 .cbdaily{border-color:var(--accent)}
 .cbdaily.done{gap:10px}

@@ -12,7 +12,7 @@
 
 /** Snapshot of the sound settings the audio graph reads from. */
 export interface AudioSettings {
-  music: "piano" | "chimes" | "drift" | "off";
+  music: "piano" | "chimes" | "drift" | "hearth" | "rainfall" | "off";
   sfx: boolean;
   /** 0..1. The prototype's localStorage stores 0..100; translate at the
    *  settings boundary. */
@@ -236,7 +236,7 @@ export function strike(
   bus: AudioNode,
   len = 1,
 ): void {
-  if (core.settings.music === "piano") {
+  if (core.settings.music === "piano" || core.settings.music === "hearth") {
     playPiano(core, freq, t, vel * 0.8, bus, len);
   } else {
     playHandpan(core, freq, t, vel, bus, len);
@@ -310,6 +310,107 @@ export function playHush(core: AudioCore, t: number, vel: number): void {
   s.start(t);
 }
 
+/** Short soft wood-creak accent for the Hearth track: a quiet band-passed
+ *  noise burst centred low (~180 Hz) that wobbles down a touch. Deliberately
+ *  dry (routes to the bus the caller picks, not the reverb) so it reads as
+ *  "near" rather than "in the room". */
+export function playCreak(core: AudioCore, t: number, vel: number, bus: AudioNode): void {
+  const { ctx } = core;
+  const len = Math.floor(ctx.sampleRate * 0.5);
+  const b = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = b.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const s = ctx.createBufferSource();
+  const f = ctx.createBiquadFilter();
+  const g = ctx.createGain();
+  s.buffer = b;
+  f.type = "bandpass";
+  f.frequency.setValueAtTime(220, t);
+  f.frequency.exponentialRampToValueAtTime(140, t + 0.35);
+  f.Q.value = 2.4;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vel, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+  s.connect(f);
+  f.connect(g);
+  g.connect(bus);
+  s.start(t);
+}
+
+/** Long-lived noise bed for Rainfall. Returns a stop handle so callers can
+ *  tear it down on track change / fade. Uses a looping noise buffer through
+ *  a lowpass whose cutoff drifts 300 ↔ 1200 Hz on a slow sine LFO, so the
+ *  rain "breathes" instead of sitting as flat hiss. */
+export function startNoiseBed(
+  core: AudioCore,
+  bus: AudioNode,
+): { stop: () => void } {
+  const { ctx } = core;
+  // 2 s loop of pink-ish noise (filtered white): long enough that the loop
+  // point is not audible; short enough that the GC isn't holding on to a
+  // huge buffer for the whole session.
+  const loopSec = 2;
+  const frames = Math.floor(ctx.sampleRate * loopSec);
+  const buf = ctx.createBuffer(1, frames, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  // Cheap pink-ish noise via a running average of a few white samples;
+  // takes the edge off the high end so it reads as rain rather than hiss.
+  let a = 0;
+  let b = 0;
+  let c = 0;
+  for (let i = 0; i < frames; i++) {
+    const w = Math.random() * 2 - 1;
+    a = 0.99 * a + 0.01 * w;
+    b = 0.9 * b + 0.1 * w;
+    c = 0.5 * c + 0.5 * w;
+    d[i] = (a * 2 + b + c * 0.5) / 3.5;
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.loop = true;
+
+  const lp = ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.Q.value = 0.6;
+  lp.frequency.value = 600;
+
+  // LFO on the cutoff. A ~7 s sine between 300 and 1200 Hz.
+  const lfo = ctx.createOscillator();
+  lfo.type = "sine";
+  lfo.frequency.value = 1 / 7;
+  const lfoGain = ctx.createGain();
+  lfoGain.gain.value = 450; // amplitude ±450 Hz around 750 Hz midpoint
+  lp.frequency.setValueAtTime(750, ctx.currentTime);
+  lfo.connect(lfoGain);
+  lfoGain.connect(lp.frequency);
+
+  const out = ctx.createGain();
+  out.gain.value = 1;
+
+  src.connect(lp);
+  lp.connect(out);
+  out.connect(bus);
+
+  src.start();
+  lfo.start();
+
+  return {
+    stop: () => {
+      try {
+        src.stop();
+        lfo.stop();
+      } catch {
+        // already stopped
+      }
+      src.disconnect();
+      lp.disconnect();
+      lfo.disconnect();
+      lfoGain.disconnect();
+      out.disconnect();
+    },
+  };
+}
+
 /* ========================================================================
  * Helpers
  * ====================================================================== */
@@ -328,6 +429,10 @@ function clamp01(x: number): number {
 export function musicBusGain(track: AudioSettings["music"]): number {
   if (track === "piano") return 0.2;
   if (track === "drift") return 0.13;
+  if (track === "hearth") return 0.18;
+  // Rainfall is a continuous noise bed; it has to sit well below the
+  // chord-based voices or it dominates and masks everything.
+  if (track === "rainfall") return 0.08;
   return 0.16;
 }
 

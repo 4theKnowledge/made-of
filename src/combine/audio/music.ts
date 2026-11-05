@@ -12,9 +12,11 @@ import {
   getContext,
   midiToFreq,
   musicBusGain,
+  playCreak,
   playHandpan,
   playPad,
   playPiano,
+  startNoiseBed,
   type AudioCore,
 } from "./core";
 
@@ -46,6 +48,10 @@ interface MusicState {
   /** Supplied by callers so tracks can modulate density by how deep the
    *  player is into the game (same as the prototype's CB.age). */
   busyGetter: () => number;
+  /** Rainfall's long-lived noise bed. Nulled when another track is active. */
+  noiseBed: { stop: () => void } | null;
+  /** Timestamp of the next distant piano accent for Rainfall. */
+  rainNextAccentT: number;
 }
 
 const state: MusicState = {
@@ -58,6 +64,8 @@ const state: MusicState = {
   chord: 0,
   quiet: 0,
   busyGetter: () => 0,
+  noiseBed: null,
+  rainNextAccentT: 0,
 };
 
 function tickChimes(core: AudioCore): void {
@@ -157,6 +165,83 @@ function tickPiano(core: AudioCore): void {
   }
 }
 
+/** Hearth: slower than piano, a held low chord root plus the occasional
+ *  mid or high piano note. Chord holds for two bars. A quiet wood-creak
+ *  accent fires with low probability so the track doesn't feel sterile. */
+function tickHearth(core: AudioCore): void {
+  const { ctx, musicBus } = core;
+  const BEAT = 1.6;
+  while (state.nextT < ctx.currentTime + 0.6) {
+    const t = state.nextT + (Math.random() - 0.5) * 0.04;
+    const b = state.step % 8;
+    const C = CHORDS[state.chord];
+    if (b === 0) {
+      // Low root, long and gentle — the hearth.
+      playPiano(core, midiToFreq(C[0]), t, 0.5, musicBus, 2.4);
+      if (Math.random() < 0.55) {
+        playPiano(core, midiToFreq(C[2]), t + 0.05, 0.26, musicBus, 2.0);
+      }
+    } else if (b === 3 && Math.random() < 0.3) {
+      playPiano(
+        core,
+        midiToFreq(C[1 + Math.floor(Math.random() * 3)]),
+        t,
+        0.22,
+        musicBus,
+        1.6,
+      );
+    } else if (b === 5 && Math.random() < 0.18) {
+      playPiano(
+        core,
+        midiToFreq(C[2 + Math.floor(Math.random() * 3)] + 12),
+        t,
+        0.18,
+        musicBus,
+        1.4,
+      );
+    }
+    // Rare wood-creak accent. Dry (not through reverb) so it reads "near".
+    if (Math.random() < 0.05) {
+      playCreak(core, t + 0.1, 0.12, musicBus);
+    }
+    state.step++;
+    state.nextT += BEAT;
+    // Chord moves every 2 bars (step % 16 === 0), slower than piano.
+    if (state.step % 16 === 0) {
+      state.chord = (state.chord + 1) % CHORDS.length;
+    }
+  }
+}
+
+/** Rainfall: continuous noise bed (lazily started once) plus a very distant
+ *  piano chord-tone every ~14–20 s. The piano accent gives it a hint of
+ *  musical shape so it isn't pure white noise. */
+function tickRainfall(core: AudioCore): void {
+  const { ctx, musicBus } = core;
+  // Start the noise bed the first time we tick. Kept alive in state so
+  // changing tracks / fading can tear it down cleanly.
+  if (!state.noiseBed) {
+    state.noiseBed = startNoiseBed(core, musicBus);
+    state.rainNextAccentT = ctx.currentTime + 4;
+  }
+  while (state.rainNextAccentT < ctx.currentTime + 0.5) {
+    const t = state.rainNextAccentT;
+    const C = CHORDS[state.chord];
+    // Route accents through the main music bus; the bus already has the
+    // reverb send wired by the audio graph, so they come back wet and
+    // distant.
+    const tone = C[1 + Math.floor(Math.random() * 4)];
+    playPiano(core, midiToFreq(tone), t, 0.14, musicBus, 2.4);
+    state.step++;
+    // Next accent in 14–20 s.
+    state.rainNextAccentT = t + 14 + Math.random() * 6;
+    // Advance chord slowly so successive accents don't lock on one note.
+    if (state.step % 2 === 0) {
+      state.chord = (state.chord + 1) % CHORDS.length;
+    }
+  }
+}
+
 function tickDrift(core: AudioCore): void {
   const { ctx, musicBus } = core;
   // One pad note every ~6 s, lasting ~9 s so they overlap into a wash.
@@ -203,15 +288,28 @@ export function startMusic(opts?: { busyGetter?: () => number }): void {
   state.quiet = 0;
   state.timer = setInterval(() => {
     if (!core.ctx) return;
+    // Any track that isn't Rainfall should release the noise bed. This
+    // runs each tick so switching tracks mid-session cleans up without a
+    // dedicated handler.
+    if (core.settings.music !== "rainfall" && state.noiseBed) {
+      state.noiseBed.stop();
+      state.noiseBed = null;
+    }
     if (core.settings.music === "piano") tickPiano(core);
     else if (core.settings.music === "chimes") tickChimes(core);
     else if (core.settings.music === "drift") tickDrift(core);
+    else if (core.settings.music === "hearth") tickHearth(core);
+    else if (core.settings.music === "rainfall") tickRainfall(core);
   }, 120);
 }
 
 export function stopMusic(): void {
   if (state.timer) clearInterval(state.timer);
   state.timer = null;
+  if (state.noiseBed) {
+    state.noiseBed.stop();
+    state.noiseBed = null;
+  }
 }
 
 /** Fade the music bus to silence over `seconds`, then stop scheduling. Returns
@@ -222,6 +320,10 @@ export function fadeOutMusic(seconds = 0.08): number {
   const core = getContext();
   if (state.timer) clearInterval(state.timer);
   state.timer = null;
+  if (state.noiseBed) {
+    state.noiseBed.stop();
+    state.noiseBed = null;
+  }
   if (!core) return 0;
   const { ctx, musicBus } = core;
   const now = ctx.currentTime;

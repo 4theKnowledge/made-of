@@ -41,7 +41,13 @@ const MUSIC_KEY = "madeof:music";
 const SFX_KEY = "madeof:sfx";
 const VOL_KEY = "madeof:vol";
 
-export type MusicTrack = "piano" | "chimes" | "drift" | "off";
+export type MusicTrack =
+  | "piano"
+  | "chimes"
+  | "drift"
+  | "hearth"
+  | "rainfall"
+  | "off";
 export interface SoundSettings {
   music: MusicTrack;
   sfx: boolean;
@@ -421,6 +427,8 @@ export function loadSound(): SoundSettings {
         musicNormalised === "piano" ||
         musicNormalised === "chimes" ||
         musicNormalised === "drift" ||
+        musicNormalised === "hearth" ||
+        musicNormalised === "rainfall" ||
         musicNormalised === "off"
           ? (musicNormalised as MusicTrack)
           : SOUND_DEFAULT.music,
