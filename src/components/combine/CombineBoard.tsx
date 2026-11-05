@@ -920,13 +920,8 @@ export function CombineBoard({
 
   const switchTheme = useCallback(
     (which: ThemeKey) => {
-      // If we're already playing this theme in classic endless, nothing to do.
-      if (
-        which === state.theme &&
-        !state.daily &&
-        state.mode === "classic"
-      )
-        return;
+      // If we're already playing this theme in endless, nothing to do.
+      if (which === state.theme && state.mode === "endless") return;
       // Save the current game before swapping; try to resume the chosen
       // theme's endless save, otherwise start fresh. Fast runs don't persist,
       // so switching out of fast always lands on a fresh classic game (or the

@@ -238,9 +238,10 @@ export function loadGame(
 export function hydrateGame(s: StoredGame): GameState {
   return {
     theme: s.theme,
-    // Pre-mode saves are all classic (fast never persists). Default here
-    // keeps hydration safe without a version bump.
-    mode: "classic",
+    // Pre-mode saves wrote `mode: "classic"`; after the endless/daily/fast
+    // split we derive the mode from the stored daily key. Fast never
+    // persists, so the only legitimate stored modes are endless and daily.
+    mode: s.daily ? "daily" : "endless",
     daily: s.daily,
     n: s.n,
     rng: { rs: s.rs | 0 },

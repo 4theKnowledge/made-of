@@ -70,9 +70,19 @@ export async function POST(req: Request) {
       ? Math.max(0, Math.min(serverSeason, Math.floor(body.season)))
       : null;
   const season = clientSeason ?? serverSeason;
-  // Mode stamps a run so leaderboards can partition classic (endless/daily)
-  // from fast without a schema change. Unknown/missing → classic.
-  const mode = body.mode === "fast" ? "fast" : "classic";
+  // Mode stamps a run so leaderboards can partition endless, daily and
+  // fast without a schema change. Unknown/missing → infer from daily key
+  // (daily present → "daily", else "endless"). Legacy `"classic"` from
+  // old clients is treated as endless.
+  const rawMode = body.mode;
+  const mode: "endless" | "daily" | "fast" =
+    rawMode === "fast"
+      ? "fast"
+      : rawMode === "daily"
+        ? "daily"
+        : daily
+          ? "daily"
+          : "endless";
   const base = { score, made, age, season, mode };
 
   await getDb()

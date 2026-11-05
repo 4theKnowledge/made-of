@@ -94,7 +94,7 @@ describe("pickGuests", () => {
 describe("guestPoolFor + reachableGuestRecipe", () => {
   const snapshot = buildSnapshot(toRows(loadKnowledgeBase()));
   const full = buildThemeBundle(snapshot, "everything");
-  const capped = buildThemeBundle(snapshot, "everything", 0, "classic", {
+  const capped = buildThemeBundle(snapshot, "everything", 0, "daily", {
     maxAges: 4,
     guestIngredient: { perRun: 2, minBand: 5 },
   });

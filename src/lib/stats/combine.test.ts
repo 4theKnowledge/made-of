@@ -102,7 +102,7 @@ describe("computeCombineStats", () => {
         run("everything", 300),
         run("everything", 500, { mode: "fast" }),
         run("everything", 700, { mode: "fast" }),
-        run("everyday", 120, { mode: "classic" }),
+        run("everyday", 120, { mode: "endless" }),
       ],
     );
     // Classic bucket keeps only classic runs.

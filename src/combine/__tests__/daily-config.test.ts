@@ -56,7 +56,7 @@ describe("buildThemeBundle with dailyConfig", () => {
   });
 
   it("maxAges caps the ages list and drops above-cap recipes", () => {
-    const daily = buildThemeBundle(snapshot, "everything", 0, "classic", {
+    const daily = buildThemeBundle(snapshot, "everything", 0, "daily", {
       maxAges: 4,
     });
     expect(daily.theme.ages.length).toBe(4);
@@ -66,7 +66,7 @@ describe("buildThemeBundle with dailyConfig", () => {
   });
 
   it("guestIngredient populates guestPool with above-cap outputs", () => {
-    const daily = buildThemeBundle(snapshot, "everything", 0, "classic", {
+    const daily = buildThemeBundle(snapshot, "everything", 0, "daily", {
       maxAges: 4,
       guestIngredient: { perRun: 2, minBand: 5 },
     });
@@ -79,7 +79,7 @@ describe("buildThemeBundle with dailyConfig", () => {
   });
 
   it("perRun=0 omits the guest pool even when guestIngredient is present", () => {
-    const daily = buildThemeBundle(snapshot, "everything", 0, "classic", {
+    const daily = buildThemeBundle(snapshot, "everything", 0, "daily", {
       maxAges: 4,
       guestIngredient: { perRun: 0, minBand: 5 },
     });
@@ -87,7 +87,7 @@ describe("buildThemeBundle with dailyConfig", () => {
   });
 
   it("ageNeedScale lowers ageNeed across every age", () => {
-    const daily = buildThemeBundle(snapshot, "everything", 0, "classic", {
+    const daily = buildThemeBundle(snapshot, "everything", 0, "daily", {
       maxAges: 4,
       ageNeedScale: 0.5,
     });
@@ -115,7 +115,7 @@ describe("buildThemeBundle with dailyConfig", () => {
   });
 
   it("serialising + hydrating a daily bundle preserves dailyConfig + guestPool", () => {
-    const daily = buildThemeBundle(snapshot, "everything", 0, "classic", {
+    const daily = buildThemeBundle(snapshot, "everything", 0, "daily", {
       maxAges: 4,
       guestIngredient: { perRun: 2, minBand: 5 },
     });
@@ -125,7 +125,7 @@ describe("buildThemeBundle with dailyConfig", () => {
   });
 
   it("newGame on a capped daily bundle respects the cap (ages array)", () => {
-    const daily = buildThemeBundle(snapshot, "everything", 0, "classic", {
+    const daily = buildThemeBundle(snapshot, "everything", 0, "daily", {
       maxAges: 3,
     });
     const { state } = newGame("everything", daily, { daily: "2026-01-01", size: 6 });

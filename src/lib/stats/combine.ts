@@ -23,9 +23,10 @@ export type CombineRunResult = {
   /** Day key for daily runs. */
   daily?: string;
   /** Play mode at run-end. Absent in rows written before Fast launched —
-   *  treat missing as `"classic"`. Used to split stats so Fast and Endless
-   *  don't share a best-score bucket. */
-  mode?: "classic" | "fast";
+   *  treat missing as endless. Legacy `"classic"` (written before the
+   *  endless/daily split) is also read as endless. Used to split stats so
+   *  Fast doesn't share a best-score bucket with the classic reducer. */
+  mode?: "endless" | "daily" | "fast" | "classic";
 };
 
 export type CombineRun = {

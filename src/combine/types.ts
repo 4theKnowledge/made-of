@@ -8,11 +8,24 @@ import type { DailyConfig } from "./daily-config";
 
 export type ThemeKey = "everything";
 
-/** Combine play mode. `classic` is the age-banded progression game (what
- *  endless and daily both play). `fast` restricts to 2-part recipes and
- *  flattens the age structure so every tile is almost always combinable —
- *  tuned for rapid-fire combos on the same 6×6 board. */
-export type Mode = "classic" | "fast";
+/** Combine play mode. Three first-class modes:
+ *  - `endless` — age-banded progression, long-running, score+collection.
+ *  - `daily` — age-banded progression tuned by a theme's `dailyConfig`
+ *    (capped ages, guest-of-the-day). Separate collection scope.
+ *  - `fast` — 2-part recipes only, single band, score-only. Shares the
+ *    endless collection scope at the DB level but does not add to it.
+ *
+ *  `endless` and `daily` share the same reducer paths (see `isClassic`);
+ *  the mode is kept distinct for UI, admin, leaderboards, and stats. */
+export type Mode = "endless" | "daily" | "fast";
+
+/** True when the mode uses the age-banded "classic" reducer paths
+ *  (endless + daily). Fast is the only non-classic mode today. The engine
+ *  historically used `mode === "classic"` for this; the predicate keeps
+ *  that logic working after the mode rename. */
+export function isClassic(mode: Mode): boolean {
+  return mode !== "fast";
+}
 
 export interface ThemeMeta {
   k: ThemeKey;

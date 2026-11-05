@@ -87,7 +87,7 @@ export function ThemeMenu({
         <span className="k">Endless</span>
         {(Object.keys(bundles) as ThemeKey[]).map((key) => {
           const b = bundles[key];
-          const on = key === current && !daily && mode === "classic";
+          const on = key === current && mode === "endless";
           return (
             <button
               key={key}
@@ -104,7 +104,7 @@ export function ThemeMenu({
         <span className="k">Fast</span>
         {(Object.keys(fastBundles) as ThemeKey[]).map((key) => {
           const b = fastBundles[key];
-          const on = key === current && !daily && mode === "fast";
+          const on = key === current && mode === "fast";
           return (
             <button
               key={`fast-${key}`}

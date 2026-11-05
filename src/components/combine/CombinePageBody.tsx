@@ -59,7 +59,7 @@ export async function CombinePageBody() {
         live.snapshot,
         "everything",
         prev.everything ?? 0,
-        "classic",
+        "daily",
         dailyConfigs.everything,
       );
       const { extensions } = resolveGuestRecipes(

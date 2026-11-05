@@ -186,7 +186,7 @@ describe("computePreview — truthful +N (only counts known alts)", () => {
   const bundle = fakeBundle(recipes, ["a", "b"]);
   // Minimal GameState shape used by computePreview — only fields it reads.
   const baseState: Partial<GameState> = {
-    mode: "classic",
+    mode: "endless",
     board: ["b", null, null, null],
     tray: ["a", null, null],
     hold: [null],

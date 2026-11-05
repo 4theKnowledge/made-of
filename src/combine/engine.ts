@@ -26,6 +26,7 @@ import {
 } from "./match";
 import { dealTray } from "./deal";
 import { dailySeed, freshEndlessSeed, makeRng, pick, shuffle, type RngState } from "./rng";
+import { isClassic } from "./types";
 import type { CombineRecipe, Mode, ThemeBundle, ThemeKey } from "./types";
 
 /* ========================================================================
@@ -502,7 +503,7 @@ function finishResolve(
   // Players still score and chain, but the collection stays untouched so
   // classic progression is never shortcutted by combo-dense fast runs.
   const uniqueFind = !state.found.includes(recipe.out);
-  const first = state.mode !== "fast" && uniqueFind;
+  const first = isClassic(state.mode) && uniqueFind;
   if (first) {
     state.found.push(recipe.out);
     state.madeAtBand[recipe.out] = recipe.band;
@@ -518,7 +519,7 @@ function finishResolve(
   // this one; keeping it fresh means players see their latest path
   // marked even on items they'd previously made via another recipe.
   // Fast mode still skips (collection stays untouched there).
-  if (state.mode !== "fast") {
+  if (isClassic(state.mode)) {
     state.howMade[recipe.out] = recipe.all.slice();
   }
   state.madeCounts[recipe.out] = (state.madeCounts[recipe.out] ?? 0) + 1;
@@ -530,7 +531,7 @@ function finishResolve(
   // Fast mode has no real ages — `ageMade` is just a stopping condition — so
   // it keeps counting every on-band craft.
   if (recipe.band === state.age + 1 && mult === 1) {
-    if (state.mode === "fast" || uniqueFind) state.ageMade++;
+    if (!isClassic(state.mode) || uniqueFind) state.ageMade++;
   }
   events.push({
     type: "combine",
@@ -783,7 +784,10 @@ export function newGame(
   opts: { mode?: Mode; daily?: string | null; size?: number; seed?: number } = {},
 ): ReduceResult {
   const daily = opts.daily ?? null;
-  const mode: Mode = opts.mode ?? "classic";
+  // Default mode from presence of a day key: daily → "daily", else
+  // "endless". Fast runs always pass mode explicitly, so this default
+  // never produces a fast game.
+  const mode: Mode = opts.mode ?? (daily ? "daily" : "endless");
   const size = opts.size ?? 6;
   const seed =
     opts.seed ?? (daily ? dailySeed(daily) : freshEndlessSeed());

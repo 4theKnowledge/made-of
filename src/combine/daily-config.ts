@@ -4,7 +4,7 @@
  * Endless and daily both play the `classic` mode, but a daily run should fit
  * in ~15 min while endless can run as long as the player wants. The admin
  * sets these per-theme on `combine_themes.dailyConfig`; `buildThemeBundle`
- * reads them when `mode` is `"classic"` and a daily key is in play.
+ * reads them when the bundle is built for `mode: "daily"`.
  *
  * `guestIngredient` is a deterministic "guest of the day" tile injected
  * into the dealer: per-day RNG picks N tiles from bands at or above

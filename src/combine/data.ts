@@ -395,7 +395,7 @@ export function buildThemeBundle(
   snapshot: Snapshot,
   theme: ThemeKey,
   prevNumAges: number = 0,
-  mode: Mode = "classic",
+  mode: Mode = "endless",
   dailyConfig: DailyConfig | null = null,
   guestRecipes: GuestRecipeExtension[] | null = null,
 ): ThemeBundle {
@@ -689,7 +689,7 @@ export function buildAllDailyBundles(
       snapshot,
       "everything",
       prevNumAges.everything ?? 0,
-      "classic",
+      "daily",
       dailyConfigs.everything ?? null,
       guestRecipes.everything ?? null,
     ),

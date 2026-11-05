@@ -102,7 +102,7 @@ export async function scheduleTheme(
     snapshot,
     themeCode,
     0,
-    "classic",
+    "daily",
     dailyConfig,
   );
 

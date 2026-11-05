@@ -297,7 +297,7 @@ async function main() {
   const kb = loadKnowledgeBase();
   const snap = buildSnapshot(toRows(kb));
   const cfg: DailyConfig = { maxAges, ageNeedScale };
-  const bundle = buildThemeBundle(snap, "everything", 0, "classic", cfg);
+  const bundle = buildThemeBundle(snap, "everything", 0, "daily", cfg);
 
   const seeds = Array.from({ length: games }, (_, i) => 0xC0FFEE ^ (i * 2654435761));
   const result = measureDailyLength("everything", bundle, seeds);
