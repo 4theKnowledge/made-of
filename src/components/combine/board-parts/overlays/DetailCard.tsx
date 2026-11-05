@@ -5,12 +5,15 @@ import { cap, KIND } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 import { ButtonGroup } from "@/components/common/ButtonGroup";
+import type { MasteryInfo } from "@/components/combine/board-parts/types";
 
 export function DetailCard({
   tileId,
   bundle,
   known,
   howMade,
+  madeSignatures,
+  mastery,
   onDismiss,
   onReport,
 }: {
@@ -22,6 +25,12 @@ export function DetailCard({
    *  When present for `tileId`, it wins over the bundle's canonical recipe
    *  so items with multiple valid recipes show the one the player made. */
   howMade: Record<string, string[]>;
+  /** Sorted-ingredient signatures the player has ever made for this item
+   *  (lifetime, across runs, scope-aware). Used to decorate each recipe row
+   *  as "made before" vs. "haven't tried yet". */
+  madeSignatures?: ReadonlySet<string>;
+  /** Pre-computed mastery accounting for this item. Omitted in fast mode. */
+  mastery?: MasteryInfo;
   onDismiss: () => void;
   /** Open the feedback sheet pre-seeded for this item. Omitted = no button. */
   onReport?: () => void;
@@ -49,13 +58,14 @@ export function DetailCard({
   // Dedupe by sorted ingredient signature so the same recipe modelled as
   // multiple edges (e.g. alternative orderings) collapses to one row.
   const sigOf = (all: readonly string[]) => [...all].sort().join("+");
-  const recipeRows: { all: string[]; used: boolean }[] = [];
+  const recipeRows: { all: string[]; used: boolean; made: boolean }[] = [];
   const seen = new Set<string>();
+  const isMade = (sig: string): boolean => !!madeSignatures?.has(sig);
   for (const r of allKnownRecipes) {
     const sig = sigOf(r.all);
     if (seen.has(sig)) continue;
     seen.add(sig);
-    recipeRows.push({ all: r.all.slice(), used: false });
+    recipeRows.push({ all: r.all.slice(), used: false, made: isMade(sig) });
   }
   // Mark the path the player actually used this run. Add it defensively
   // in case howMade recorded a recipe that isn't in the current bundle
@@ -63,8 +73,15 @@ export function DetailCard({
   if (playerRecipe) {
     const sig = sigOf(playerRecipe);
     const existing = recipeRows.find((row) => sigOf(row.all) === sig);
-    if (existing) existing.used = true;
-    else recipeRows.push({ all: playerRecipe.slice(), used: true });
+    if (existing) {
+      existing.used = true;
+      // The current run's make might not be reflected in `madeSignatures`
+      // yet (POST is in flight / optimistic update hasn't settled). If the
+      // player is holding the current recipe, mark it made too.
+      existing.made = true;
+    } else {
+      recipeRows.push({ all: playerRecipe.slice(), used: true, made: true });
+    }
   }
   // Lore fallback when no bundle / player recipe is visible — used for
   // items whose only "made from" story lives in the item view.
@@ -111,14 +128,34 @@ export function DetailCard({
             symbol={item.symbol}
           />
           <span className="pill cbinfo-kind">{KIND[item.kind]}</span>
+          {mastery?.mastered ? (
+            <span className="pill cbinfo-mastery mastered" aria-label="Mastered">
+              <span aria-hidden="true">◆</span> Mastered
+            </span>
+          ) : mastery && mastery.available > 1 && mastery.made > 0 ? (
+            <span
+              className="pill cbinfo-mastery"
+              aria-label={`${mastery.made} of ${mastery.available} recipes made`}
+            >
+              {mastery.made}/{mastery.available} recipes
+            </span>
+          ) : null}
         </div>
         <div className="nm">{cap(item.name)}</div>
         {recipeRows.length > 0 ? (
           recipeRows.map((row, rowIdx) => (
             <div
               key={sigOf(row.all)}
-              className={row.used ? "cbchip used" : "cbchip"}
-              aria-label={row.used ? "Made from (used this run)" : "Made from"}
+              className={`cbchip${row.used ? " used" : ""}${
+                row.made ? " made" : " unmade"
+              }`}
+              aria-label={
+                row.used
+                  ? "Made from (used this run)"
+                  : row.made
+                  ? "Made from (made before)"
+                  : "Made from (not yet made — tap to try)"
+              }
             >
               {row.all.map((pid, k) => {
                 const p = bundle.items.get(pid);

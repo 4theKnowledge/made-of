@@ -26,7 +26,10 @@ export interface Preview {
   out?: string;
   /** True for drop-on-top targets. */
   on?: boolean;
-  /** How many alternatives exist for this recipe (for the +N badge). */
+  /** How many *known* alternatives exist for this recipe signature (for the
+   *  +N badge). Counts only outputs the player has already unlocked — so the
+   *  badge never leaks "there are 3 possibilities here" when the player can
+   *  only see 1 of them. */
   n?: number;
 }
 
@@ -73,6 +76,11 @@ export function computePreview(
     const alts = altsOf(r);
     return alts.find((q) => found.has(q.out)) ?? null;
   };
+  const knownAltsCount = (r: CombineRecipe): number => {
+    let n = 0;
+    for (const q of altsOf(r)) if (found.has(q.out)) n++;
+    return n;
+  };
   for (let i = 0; i < board.length; i++) {
     if (i === skipCell) continue;
     const v = board[i];
@@ -80,7 +88,11 @@ export function computePreview(
       const m = matchOn(bundle, board, i, x, state.n);
       if (!m) continue;
       const k = knownAlt(m.recipe);
-      if (k) out.set(i, { out: k.out, on: true, n: altsOf(m.recipe).length });
+      if (k) out.set(i, { out: k.out, on: true, n: knownAltsCount(m.recipe) });
+      // Recipe matches but no alternative output is known — leave the cell
+      // silent. Signalling "something happens here" would trivialise the
+      // hunt for unknown terminals; a follow-up task may expose this as an
+      // opt-in (default off).
     }
   }
   for (let i = 0; i < board.length; i++) {
@@ -89,9 +101,46 @@ export function computePreview(
     const m = matchAt(bundle, board, i, x, state.n);
     if (!m) continue;
     const k = knownAlt(m.recipe);
-    if (k) out.set(i, { out: k.out, n: altsOf(m.recipe).length });
+    if (k) out.set(i, { out: k.out, n: knownAltsCount(m.recipe) });
   }
   return out;
+}
+
+/** Mastery accounting for a single item. `made` is the sig count the player
+ *  has actually produced; `available` is the count of recipe variants whose
+ *  ingredients are all known to the player (so admins adding an upstream
+ *  variant can't retroactively drop mastery, and we never surface a count
+ *  that references ingredients the player hasn't seen). `mastered` means
+ *  there is at least one path and the player has made all visible ones. */
+export interface MasteryInfo {
+  made: number;
+  available: number;
+  mastered: boolean;
+}
+
+/** Compute mastery for `itemId` given the player's known ingredient set and
+ *  the recipe signatures they've produced. See `MasteryInfo` for shape. */
+export function computeMastery(
+  bundle: ThemeBundle,
+  itemId: string,
+  known: ReadonlySet<string>,
+  madeSignatures: ReadonlySet<string>,
+): MasteryInfo {
+  // Collect every variant whose ingredients are all known or base. Dedupe by
+  // sorted-ingredient signature — alt-output variants share the same sig
+  // (and would otherwise be double-counted here).
+  const availableSigs = new Set<string>();
+  for (const r of bundle.recipes) {
+    if (r.out !== itemId) continue;
+    if (!r.all.every((pid) => known.has(pid) || bundle.base.includes(pid))) {
+      continue;
+    }
+    availableSigs.add([...r.all].sort().join("+"));
+  }
+  let made = 0;
+  for (const sig of availableSigs) if (madeSignatures.has(sig)) made++;
+  const available = availableSigs.size;
+  return { made, available, mastered: available > 0 && made === available };
 }
 
 /**

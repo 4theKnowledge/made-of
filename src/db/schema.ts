@@ -535,6 +535,14 @@ export const combineDiscoveries = pgTable(
     firstFoundAt: timestamp("first_found_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // Sorted-ingredient signatures (sort(recipe.all).join("+")) the player has
+    // used to make this item under this scope. Empty = unlocked via a
+    // base-ingredient leak (no make), or pre-mastery discovery. Mastery = this
+    // set covers every variant whose ingredients are all known to the player.
+    recipeSignatures: text("recipe_signatures")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
   },
   (t) => [
     primaryKey({ columns: [t.userId, t.itemId, t.scope] }),

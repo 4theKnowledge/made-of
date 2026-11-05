@@ -156,6 +156,10 @@ describe("place (unique output recipe)", () => {
     expect(events.some((e) => e.type === "combine")).toBe(true);
     expect(events.some((e) => e.type === "discovery")).toBe(true);
     expect(state.found).toContain("dough");
+    // Mastery: the combine event carries the sorted-ingredient signature so
+    // the client can tag the discovery with the exact variant used.
+    const combineEv = events.find((e) => e.type === "combine");
+    expect(combineEv && "inputSignature" in combineEv ? combineEv.inputSignature : "").toBe("flour+water");
   });
 
   it("rejects placement on an occupied cell", () => {

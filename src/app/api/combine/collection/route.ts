@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 import { getDb, schema } from "@/db/client";
 
@@ -12,10 +12,14 @@ function parseScope(raw: string | null): Scope {
   return raw === "daily" ? "daily" : "endless";
 }
 
-/** Return the signed-in user's Combine collection for the given scope as a map
- *  of itemId → epoch-ms of first discovery. The daily scope and the endless
- *  scope are fully independent so a daily puzzle starts fair even if the
- *  player has grinded a huge endless collection. */
+/** Max signatures per (user, item, scope). Admin edits could keep minting
+ *  variants; capping bounds row size. In practice an item has <10 variants. */
+const MAX_SIGS_PER_ITEM = 32;
+
+/** Return the signed-in user's Combine collection for the given scope as a
+ *  map of itemId → epoch-ms of first discovery, plus the per-item set of
+ *  recipe signatures used (powering the mastery tier). Scopes stay
+ *  independent so a daily puzzle isn't walked in with endless progress. */
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return new NextResponse("Unauthorized", { status: 401 });
@@ -26,6 +30,7 @@ export async function GET(req: Request) {
     .select({
       itemId: schema.combineDiscoveries.itemId,
       firstFoundAt: schema.combineDiscoveries.firstFoundAt,
+      recipeSignatures: schema.combineDiscoveries.recipeSignatures,
     })
     .from(schema.combineDiscoveries)
     .where(
@@ -36,18 +41,26 @@ export async function GET(req: Request) {
     );
 
   const found: Record<string, number> = {};
-  for (const r of rows) found[r.itemId] = r.firstFoundAt.getTime();
-  return NextResponse.json({ found });
+  const signatures: Record<string, string[]> = {};
+  for (const r of rows) {
+    found[r.itemId] = r.firstFoundAt.getTime();
+    if (r.recipeSignatures.length > 0) signatures[r.itemId] = r.recipeSignatures;
+  }
+  return NextResponse.json({ found, signatures });
 }
 
 /** Record new discoveries for the given scope. Existing rows keep their
- *  original timestamp (ON CONFLICT DO NOTHING). Request body:
- *  `{ ids: string[], scope?: "endless" | "daily" }`. */
+ *  original firstFoundAt but merge incoming signatures (deduped, capped).
+ *  Request body: `{ ids: string[], scope?: Scope, signatures?: Record<string, string[]> }`.
+ *
+ *  `signatures[itemId]` is the sorted-ingredient variants the player has
+ *  made for `itemId` in this batch. Ids without a sig entry are "unlock
+ *  only" (base-ingredient leaks, old clients) — row inserted with `[]`. */
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return new NextResponse("Unauthorized", { status: 401 });
 
-  let body: { ids?: unknown; scope?: unknown };
+  let body: { ids?: unknown; scope?: unknown; signatures?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -60,6 +73,21 @@ export async function POST(req: Request) {
     : [];
   if (ids.length === 0) return NextResponse.json({ ok: true, added: 0 });
 
+  // Parse signatures map defensively — a bad client should never crash the
+  // route. Any id that doesn't survive validation falls back to "unlock only".
+  const rawSigs = body.signatures;
+  const sigsByItem = new Map<string, string[]>();
+  if (rawSigs && typeof rawSigs === "object" && !Array.isArray(rawSigs)) {
+    for (const [id, val] of Object.entries(rawSigs as Record<string, unknown>)) {
+      if (typeof id !== "string") continue;
+      if (!Array.isArray(val)) continue;
+      const clean = val
+        .filter((s): s is string => typeof s === "string" && s.length > 0)
+        .slice(0, MAX_SIGS_PER_ITEM);
+      if (clean.length > 0) sigsByItem.set(id, clean);
+    }
+  }
+
   const db = getDb();
 
   const existing = await db
@@ -70,17 +98,39 @@ export async function POST(req: Request) {
   if (validIds.length === 0) return NextResponse.json({ ok: true, added: 0 });
 
   const now = new Date();
+  const rows = validIds.map((id) => ({
+    userId: session.user.id,
+    itemId: id,
+    scope,
+    firstFoundAt: now,
+    recipeSignatures: sigsByItem.get(id) ?? [],
+  }));
+
+  // Merge-on-conflict: keep the row's original firstFoundAt (no update on
+  // that column), union the existing signatures with the incoming ones,
+  // dedupe, cap at MAX_SIGS_PER_ITEM. Returning only counts freshly-inserted
+  // rows because the ON CONFLICT path still returns one row per upserted
+  // record — callers just use the count as "touched", not "newly unlocked".
   const result = await db
     .insert(schema.combineDiscoveries)
-    .values(
-      validIds.map((id) => ({
-        userId: session.user.id,
-        itemId: id,
-        scope,
-        firstFoundAt: now,
-      })),
-    )
-    .onConflictDoNothing()
+    .values(rows)
+    .onConflictDoUpdate({
+      target: [
+        schema.combineDiscoveries.userId,
+        schema.combineDiscoveries.itemId,
+        schema.combineDiscoveries.scope,
+      ],
+      set: {
+        recipeSignatures: sql`(
+          SELECT COALESCE(array_agg(s), ARRAY[]::text[])
+          FROM (
+            SELECT DISTINCT s
+            FROM unnest(${schema.combineDiscoveries.recipeSignatures} || excluded.recipe_signatures) AS s
+            LIMIT ${MAX_SIGS_PER_ITEM}
+          ) AS merged
+        )`,
+      },
+    })
     .returning({ itemId: schema.combineDiscoveries.itemId });
 
   return NextResponse.json({ ok: true, added: result.length });

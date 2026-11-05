@@ -1436,7 +1436,15 @@ a.btn.primary{color:var(--bg)}
  * variants. Accent border + accent-tinted background so the "last made
  * from" row stands out without hiding the alternatives. */
 .cbinfo .cbchip.used{border-radius:3px;outline:2px solid var(--accent);outline-offset:2px;background:color-mix(in srgb, var(--accent) 10%, transparent)}
+/* Recipe rows the player has never produced read muted so the eye lands
+ * on what's been done. .used still wins — it keeps its full outline. */
+.cbinfo .cbchip.unmade{opacity:.75}
 .cbinfo .cbchip-label{font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.03em;margin:0 0 4px}
+/* Mastery pill at the top of the DetailCard. Anchored next to the kind pill
+ * on the card header. Two flavours: "Mastered" (green, filled) and a muted
+ * N/M progress chip for partial. */
+.cbinfo-mastery{position:absolute;top:-6px;right:-8px;transform:translateY(22px);padding:1px 5px;font-size:8.5px;letter-spacing:.06em;border-width:1px;background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:700;box-shadow:1px 1px 0 var(--pk);white-space:nowrap}
+.cbinfo-mastery.mastered{background:var(--good, var(--accent));border-color:var(--good, var(--accent));color:#fff}
 /* Full-width primary dismiss used by overlays with a single bottom action
    (e.g. the collection book). Matches the thumb-friendly height of row2. */
 .cbh.cbback{width:100%;justify-content:center;height:48px;font-size:14px;flex:none}

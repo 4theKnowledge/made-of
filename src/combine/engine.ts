@@ -175,6 +175,11 @@ export type Event =
        *  to overlay the ingredients during the fuse pulse, since the engine
        *  has already consumed them by the time the UI applies this state. */
       inputs: string[];
+      /** Sorted-ingredient signature (`sort(recipe.all).join("+")`) — the
+       *  same key `bundle.sameIngredients` and DetailCard dedupe on. Routed
+       *  through so mastery recording can tag the discovery with the exact
+       *  variant used without re-sorting. */
+      inputSignature: string;
       /** Cell the output tile landed on. */
       at: number;
       out: string;
@@ -519,6 +524,7 @@ function finishResolve(
     type: "combine",
     cells: cells.slice(),
     inputs,
+    inputSignature: [...recipe.all].sort().join("+"),
     at: choice,
     out: recipe.out,
     pts,

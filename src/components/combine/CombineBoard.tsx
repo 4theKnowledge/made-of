@@ -55,9 +55,11 @@ import { ButtonGroup } from "@/components/common/ButtonGroup";
 import { HowToPlay } from "@/components/common/HowToPlay";
 import { CombineDebugPanel } from "@/components/combine/CombineDebugPanel";
 import {
+  computeMastery,
   computePreview,
   type ChainTrace,
   type Fx,
+  type MasteryInfo,
 } from "@/components/combine/board-parts/types";
 import { vibrate } from "@/components/combine/board-parts/util";
 import {
@@ -113,6 +115,10 @@ interface Props {
   signedIn?: boolean;
 }
 
+// Shared empty set for the DetailCard's `madeSignatures` prop so the common
+// "no signatures recorded yet" case keeps a stable reference.
+const EMPTY_SIG_SET: ReadonlySet<string> = new Set();
+
 /** The top-level client component that owns engine state. */
 export function CombineBoard({
   bundles: serialised,
@@ -153,6 +159,7 @@ export function CombineBoard({
   const collectionScope = state.daily ? "daily" : "endless";
   const {
     collection,
+    signatures: collectionSignatures,
     authed: collectionAuthed,
     isPending: collectionPending,
     record: recordDiscoveries,
@@ -842,17 +849,26 @@ export function CombineBoard({
       // the lifetime collection without this gate. Classic progression must
       // never be shortcutted by combo-dense fast runs.
       if (r.state.mode !== "fast") {
-        const found: string[] = [];
+        // Two record kinds: `make` (combine event → tag with signature so
+        // mastery can track which variant was used), and `unlock-only`
+        // (base-ingredient leak from combine inputs → no signature, since
+        // it's not a make). Discovery events alone don't carry inputs so
+        // mastery rides exclusively on combine events; the output appears
+        // in both discovery and combine events on the same make, so
+        // mastering happens on the first time an output is made. Dedupe
+        // the unlock-only ids to keep payloads tight.
+        const records: Array<{ id: string; signature?: string }> = [];
+        const unlockOnly = new Set<string>();
         for (const e of r.events) {
-          if (e.type === "discovery") {
-            found.push(e.out);
-          } else if (e.type === "combine") {
+          if (e.type === "combine") {
+            records.push({ id: e.out, signature: e.inputSignature });
             for (const id of e.inputs) {
-              if (!bundle.outputs.has(id)) found.push(id);
+              if (!bundle.outputs.has(id)) unlockOnly.add(id);
             }
           }
         }
-        if (found.length) recordDiscoveries(found);
+        for (const id of unlockOnly) records.push({ id });
+        if (records.length) recordDiscoveries(records);
       }
     },
     [state, bundle, applyEvents, best, fastBest, bundles, recordDiscoveries],
@@ -1721,6 +1737,22 @@ export function CombineBoard({
     return s;
   }, [state.found, collection]);
 
+  // Per-item mastery for everything the player has made this run. Computed
+  // against `knownIds` so the denominator only ever includes recipe variants
+  // whose ingredients the player has already seen — admins adding a new
+  // upstream variant can't retroactively drop a player's mastery count.
+  // Fast mode has no collection or mastery; return an empty map so the
+  // Shelf renders no mastery/progress badges.
+  const mastery = useMemo(() => {
+    const m = new Map<string, MasteryInfo>();
+    if (state.mode === "fast") return m;
+    for (const id of state.found) {
+      const made = collectionSignatures.get(id);
+      m.set(id, computeMastery(bundle, id, knownIds, made ?? new Set()));
+    }
+    return m;
+  }, [state.found, state.mode, bundle, knownIds, collectionSignatures]);
+
   // "Last chance": the board is full, no combine can be finished from
   // tray/holds, but a helper spend (mv/swap/clear/pluck/wipe) could still
   // produce one. A board with empty cells isn't a dead end — the player can
@@ -2056,6 +2088,8 @@ export function CombineBoard({
             bundle={bundle}
             known={knownIds}
             howMade={state.howMade}
+            madeSignatures={collectionSignatures.get(infoTile) ?? EMPTY_SIG_SET}
+            mastery={mastery.get(infoTile)}
             onDismiss={() => {
               setInfoTile(null);
               setInfoCell(null);

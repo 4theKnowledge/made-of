@@ -1,0 +1,1 @@
+ALTER TABLE "combine_discoveries" ADD COLUMN "recipe_signatures" text[] DEFAULT ARRAY[]::text[] NOT NULL;
