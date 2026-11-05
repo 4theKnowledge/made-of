@@ -27,6 +27,9 @@ export interface AudioCore {
   musicBus: GainNode;
   fxBus: GainNode;
   verb: ConvolverNode;
+  /** The fxBus→verb send gain. `openVerb` ramps this to put big sfx in a
+   *  bigger room briefly. Default 1.4. */
+  fxRoomSend: GainNode;
   /** Current settings. Mutated by `applySettings`. */
   settings: AudioSettings;
   /** Call to apply new settings to the live graph. */
@@ -94,6 +97,7 @@ export function ensureContext(settings: AudioSettings): AudioCore | null {
     musicBus,
     fxBus,
     verb,
+    fxRoomSend: fxRoom,
     settings: { ...settings },
     applySettings(next) {
       core.settings = { ...next };
@@ -126,6 +130,57 @@ export function hasContext(): boolean {
 
 export function getContext(): AudioCore | null {
   return singleton;
+}
+
+/** Briefly duck the music bus so a sfx can land legibly over the music.
+ *  Ramps musicBus.gain down by `amountDb`, holds for `holdMs`, then ramps
+ *  back to the per-track baseline via `musicBusGain(track)` over `releaseMs`.
+ *  No-op when music is "off" — nothing to duck.
+ *
+ *  Overlapping ducks (closely-spaced sfx) compose cleanly: each call cancels
+ *  the previous schedule from `now` onwards and restarts from the current
+ *  gain value, so you never get a pump when a second sfx fires inside the
+ *  first duck's release window. */
+export function duck(
+  core: AudioCore,
+  amountDb: number,
+  holdMs: number,
+  releaseMs: number,
+): void {
+  if (core.settings.music === "off") return;
+  const { ctx, musicBus } = core;
+  const now = ctx.currentTime;
+  const baseline = musicBusGain(core.settings.music);
+  // dB → linear. amountDb is negative (e.g. -4 = ducked 4 dB); the helper
+  // accepts the magnitude for readability.
+  const duckedGain = baseline * Math.pow(10, -Math.abs(amountDb) / 20);
+  musicBus.gain.cancelScheduledValues(now);
+  // Grab the gain value *at the moment the first sfx fires* so an overlapping
+  // duck doesn't pump back up to baseline between hits.
+  const current = musicBus.gain.value;
+  musicBus.gain.setValueAtTime(current, now);
+  musicBus.gain.linearRampToValueAtTime(Math.min(current, duckedGain), now + 0.02);
+  musicBus.gain.setValueAtTime(Math.min(current, duckedGain), now + 0.02 + holdMs / 1000);
+  musicBus.gain.linearRampToValueAtTime(
+    baseline,
+    now + 0.02 + holdMs / 1000 + releaseMs / 1000,
+  );
+}
+
+/** Briefly open the fxBus→verb send so a big moment (long fuse chain, big
+ *  unlock) sits in a larger room. `mult` multiplies the current send gain
+ *  (default 1.4); the send returns to default after `holdMs` via a short
+ *  linear ramp. Composes with overlapping calls the same way `duck` does. */
+export function openVerb(core: AudioCore, mult: number, holdMs: number): void {
+  const { ctx, fxRoomSend } = core;
+  const now = ctx.currentTime;
+  const baseline = 1.4;
+  const peak = baseline * mult;
+  fxRoomSend.gain.cancelScheduledValues(now);
+  const current = fxRoomSend.gain.value;
+  fxRoomSend.gain.setValueAtTime(current, now);
+  fxRoomSend.gain.linearRampToValueAtTime(Math.max(current, peak), now + 0.03);
+  fxRoomSend.gain.linearRampToValueAtTime(baseline, now + 0.03 + holdMs / 1000);
 }
 
 /* ========================================================================

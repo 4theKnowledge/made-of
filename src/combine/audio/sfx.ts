@@ -6,11 +6,14 @@
  */
 
 import {
+  duck,
   getContext,
   midiToFreq,
+  openVerb,
   playHandpan,
   playHush,
   playKnock,
+  playPiano,
   strike,
   type AudioCore,
 } from "./core";
@@ -42,6 +45,28 @@ function paletteFor(core: AudioCore): number[] {
   return usePenta ? PENTA : KURD;
 }
 
+/** Short-form duck shape per sfx. Short, hot hits get a quick 4 dB nudge;
+ *  big moments (unlock / discover / age / over) hold longer and release
+ *  more gently so the music doesn't pump back up under the arpeggio. */
+function duckFor(kind: SfxKind): { db: number; hold: number; release: number } {
+  switch (kind) {
+    case "unlock":
+      return { db: 6, hold: 400, release: 500 };
+    case "discover":
+    case "age":
+    case "over":
+      return { db: 5, hold: 300, release: 400 };
+    case "fuse":
+      return { db: 5, hold: 200, release: 320 };
+    case "crumble":
+      // Hush is a wash of noise — ducking the music under it fights the
+      // mood. Skip the duck for crumble.
+      return { db: 0, hold: 0, release: 0 };
+    default:
+      return { db: 4, hold: 60, release: 240 };
+  }
+}
+
 /** Play one effect. `arg` is used by `fuse` to size the run (chain mult). */
 export function fx(kind: SfxKind, arg?: number): void {
   const core = getContext();
@@ -52,6 +77,9 @@ export function fx(kind: SfxKind, arg?: number): void {
   const t = core.ctx.currentTime + 0.01;
   const S = paletteFor(core);
   const bus = core.fxBus;
+  // Duck the music so the sfx stays legible. No-op for `off` music.
+  const d = duckFor(kind);
+  if (d.db > 0) duck(core, d.db, d.hold, d.release);
   if (pack === "wood") {
     playWood(core, kind, t, S, bus, arg);
   } else if (pack === "chime") {
@@ -79,11 +107,7 @@ function playClassic(
       strikeOn(pick(S.slice(5)), t, 0.32, 0.6);
       return;
     case "fuse": {
-      const n = Math.min(5, 1 + (arg ?? 1));
-      const s = 2 + Math.floor(Math.random() * 3);
-      for (let k = 0; k < n; k++) {
-        strikeOn(S[Math.min(S.length - 1, s + k)], t + k * 0.09, 0.5, 0.9);
-      }
+      playFuseRamp(core, t, S, bus, arg, "classic");
       return;
     }
     case "discover":
@@ -112,10 +136,67 @@ function playClassic(
       playHush(core, t, 0.5);
       return;
     case "over":
+      // Low sub-strike under the first note gives game-over real weight.
+      // The piano voice at half-freq (one octave down) + longer tail sits
+      // below the arpeggio without muddying it.
+      playPiano(core, S[0] * 0.5, t, 0.5, bus, 2.6);
       [9, 7, 5, 3, 0].forEach((s, k) =>
         strikeOn(S[s], t + k * 0.22, 0.45, 1.5),
       );
       return;
+  }
+}
+
+/** Chain-aware fuse ramp — pitches climb through the scale, velocities
+ *  grow across the run, and the final hit opens the reverb send so x5
+ *  chains feel celebratory. Shape is shared across packs; voice differs.
+ *
+ *  - `arg` is the chain multiplier (1..∞). We cap at 5 hits — more than
+ *    that isn't audibly distinct and gets in the way of the next sfx.
+ *  - Velocity ramps 0.42 → 0.60 across the run.
+ *  - Spacing shortens from 0.09 s at chain=1 to 0.07 s at chain=5 so long
+ *    chains feel rolling rather than plodding.
+ *  - Last hit of a chain ≥3 lands on a chord tone (highest reachable one
+ *    in the scale) and opens the fxBus→verb send for 220 ms. */
+function playFuseRamp(
+  core: AudioCore,
+  t: number,
+  S: number[],
+  bus: AudioNode,
+  arg: number | undefined,
+  pack: "classic" | "wood" | "chime",
+): void {
+  const n = Math.min(5, 1 + (arg ?? 1));
+  const startIdx = 2 + Math.floor(Math.random() * 2);
+  const spacing = 0.09 - (n - 1) * 0.005;
+  // Chord-tone landing for the final hit of ≥3-chains: the current song
+  // progression is in CHORDS[0] (Dmaj7) ≈ the scale's root cluster. Rather
+  // than threading music.ts chord state in here (which would couple sfx to
+  // music), approximate by snapping to an index that lines up with the
+  // tonic cluster — indices 7 (fifth) / 9 (octave) always resolve inside
+  // our two palettes (PENTA and KURD).
+  for (let k = 0; k < n; k++) {
+    const isLast = k === n - 1;
+    const idx = isLast && n >= 3
+      ? 9
+      : Math.min(S.length - 1, startIdx + k);
+    const vel = 0.42 + (0.60 - 0.42) * (n === 1 ? 1 : k / (n - 1));
+    const freq = S[idx];
+    const when = t + k * spacing;
+    if (pack === "wood") {
+      playKnock(core, freq, when, vel + 0.1, bus, 0.16 + (isLast ? 0.04 : 0));
+    } else if (pack === "chime") {
+      // Chime's palette is an octave up; keep that here.
+      playHandpan(core, freq * 2, when, vel, bus, 1.4 + (isLast ? 0.4 : 0));
+    } else {
+      strike(core, freq, when, vel, bus, 0.9 + (isLast ? 0.4 : 0));
+    }
+  }
+  if (n >= 3) {
+    // Open the fx→verb send on the last hit so the big chain finishes in a
+    // bigger room. Timed to coincide with the landing note.
+    const openAt = (n - 1) * spacing;
+    setTimeout(() => openVerb(core, 2.4, 220), Math.max(0, openAt * 1000));
   }
 }
 
@@ -141,12 +222,7 @@ function playWood(
       knock(pick(low), t, 0.45, 0.14);
       return;
     case "fuse": {
-      const n = Math.min(5, 1 + (arg ?? 1));
-      const s = 2 + Math.floor(Math.random() * 2);
-      for (let k = 0; k < n; k++) {
-        // Gentle pitch rise through the run, louder on the final hit.
-        knock(low[Math.min(low.length - 1, s + k)], t + k * 0.08, 0.55 + k * 0.04, 0.16);
-      }
+      playFuseRamp(core, t, S, bus, arg, "wood");
       return;
     }
     case "discover":
@@ -179,6 +255,9 @@ function playWood(
       playHush(core, t, 0.5);
       return;
     case "over":
+      // Low sub-strike underneath — Wood keeps the knock timbre but uses a
+      // longer, lower one for weight.
+      playKnock(core, low[0] * 0.5, t, 0.6, bus, 0.42);
       [5, 4, 2, 1, 0].forEach((s, k) =>
         knock(low[Math.min(low.length - 1, s)], t + k * 0.18, 0.5, 0.26),
       );
@@ -210,11 +289,10 @@ function playChime(
       ring(pick(high.slice(5)), t, 0.28, 1.1);
       return;
     case "fuse": {
-      const n = Math.min(5, 1 + (arg ?? 1));
-      const s = 3 + Math.floor(Math.random() * 2);
-      for (let k = 0; k < n; k++) {
-        ring(high[Math.min(high.length - 1, s + k)], t + k * 0.1, 0.45, 1.4);
-      }
+      // Chime pack calls playFuseRamp with its own palette (`S`, not
+      // `high`); the shared ramp does the octave-up internally when
+      // pack === "chime".
+      playFuseRamp(core, t, S, bus, arg, "chime");
       return;
     }
     case "discover":
@@ -247,6 +325,9 @@ function playChime(
       playHush(core, t, 0.5);
       return;
     case "over":
+      // Low sub-ring an octave below the scale's root, with a very long
+      // tail — Chime's weighty bell at the bottom of the carillon.
+      ring(S[0], t, 0.42, 3.0);
       [9, 7, 5, 3, 0].forEach((s, k) =>
         ring(high[s], t + k * 0.24, 0.4, 2.0),
       );
