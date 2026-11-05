@@ -237,6 +237,15 @@ function cloneTray(t: Array<string | null>): Array<string | null> {
 function cloneCrumb(c: Array<CrumbleCounter | null>): Array<CrumbleCounter | null> {
   return c.map((x) => (x ? { ...x } : null));
 }
+/** Collapse null gaps in the hold array to the right, preserving relative
+ *  order of held tiles. Total length (= capacity) is unchanged. Called after
+ *  the player drags a tile *out* of hold, so the remaining tiles reflow left
+ *  and the empty slots sit at the end. Crumble (`afterMove`) leaves gaps in
+ *  place on purpose and doesn't call this. */
+function compactHold(hold: Array<string | null>): void {
+  const kept = hold.filter((v) => v != null);
+  for (let i = 0; i < hold.length; i++) hold[i] = i < kept.length ? kept[i] : null;
+}
 function cloneState(s: GameState): GameState {
   return {
     ...s,
@@ -908,6 +917,7 @@ export function reduce(
       if (state.board[action.cell] != null) return { state: prev, events: [] };
       state.lastSnapshot = snapshotState(prev);
       srcArr[action.slot] = null;
+      if (src === "hold") compactHold(state.hold);
       state.moves++;
       state.score += 1;
       state.board[action.cell] = t;
@@ -951,6 +961,7 @@ export function reduce(
       }
       state.lastSnapshot = snapshotState(prev);
       srcArr[action.slot] = null;
+      if (src === "hold") compactHold(state.hold);
       state.moves++;
       state.score += 1;
       const cells = m.cells.slice(); // includes the target cell
