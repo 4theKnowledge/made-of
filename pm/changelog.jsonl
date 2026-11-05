@@ -44,3 +44,4 @@
 {"id": "C-0044", "ts": "2026-11-05T20:41:25Z", "kind": "fix", "summary": "Combine fast runs persist across refresh (own localStorage slot) (T-0094)", "refs": {"task": "T-0094"}}
 {"id": "C-0045", "ts": "2026-11-05T20:42:27Z", "kind": "fix", "summary": "Combine fast mode: collection book + game-over summary no longer merge run-local finds into the lifetime figures", "refs": {"task": "T-0096"}}
 {"id": "C-0046", "ts": "2026-11-05T20:49:35Z", "kind": "feature", "summary": "React error boundaries across the app: root + global-error + per-segment error.tsx for combine/craft/link/account/admin/i/[slug]/explore/[slug], plus a client ErrorBoundary around the Combine board", "refs": {"task": "T-0070"}}
+{"id": "C-0047", "ts": "2026-11-05T20:53:18Z", "kind": "feature", "summary": "Endless & fast Combine shares now render a rich OG preview with score, unlocks, and mode/theme (T-0099)", "refs": {"task": "T-0099"}}

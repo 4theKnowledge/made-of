@@ -46,6 +46,7 @@ import {
   dailyShareQuery,
   dailyShareText,
   endlessShareText,
+  fastShareText,
   resolveItemName,
   shareText,
 } from "@/combine/share";
@@ -2045,7 +2046,9 @@ export function CombineBoard({
             onShare={async () => {
               const text = state.daily
                 ? dailyShareText(state.daily, state, bundle)
-                : endlessShareText(state, bundle);
+                : state.mode === "fast"
+                  ? fastShareText(state, bundle)
+                  : endlessShareText(state, bundle);
               await shareText(text);
             }}
           />
@@ -2066,7 +2069,9 @@ export function CombineBoard({
                 onClick={async () => {
                   const payload = state.daily
                     ? dailyShareText(state.daily, state, bundle)
-                    : endlessShareText(state, bundle);
+                    : state.mode === "fast"
+                      ? fastShareText(state, bundle)
+                      : endlessShareText(state, bundle);
                   await shareText(payload);
                 }}
               >

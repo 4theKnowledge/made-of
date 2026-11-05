@@ -96,7 +96,9 @@ export function endlessShareText(
   state: GameState,
   bundle: ThemeBundle,
 ): SharePayload {
-  const ageName = bundle.theme.ages[state.age];
+  const ages = bundle.theme.ages;
+  const ageName = ages[state.age] ?? "";
+  const top = bestShelfItem(state, bundle);
   const foundLine = state.found.length
     ? ` · ${state.found.length} new discover${state.found.length > 1 ? "ies" : "y"}`
     : "";
@@ -106,10 +108,88 @@ export function endlessShareText(
     `${state.shelf.length} finished things · longest chain ×${state.longest || 1}` +
     foundLine;
   return {
-    title: "Made Of · Combine",
+    title: `Made Of · Combine · ${bundle.theme.name}`,
     text,
-    url: SHARE_URL,
+    url: `${SHARE_URL}?${modeShareQuery("endless", {
+      score: state.score,
+      age: state.age,
+      made: state.made,
+      ageName,
+      ageCount: ages.length,
+      themeName: bundle.theme.name,
+      best: top,
+      found: state.found.length,
+      longest: state.longest,
+      shelf: state.shelf.length,
+    })}`,
   };
+}
+
+export function fastShareText(
+  state: GameState,
+  bundle: ThemeBundle,
+): SharePayload {
+  const top = bestShelfItem(state, bundle);
+  const foundLine = state.found.length
+    ? ` · ${state.found.length} new discover${state.found.length > 1 ? "ies" : "y"}`
+    : "";
+  const chainLine = state.longest > 1 ? ` · longest chain ×${state.longest}` : "";
+  const shelfLine = state.shelf.length
+    ? ` · ${state.shelf.length} finished thing${state.shelf.length > 1 ? "s" : ""}`
+    : "";
+  const text =
+    `Made Of · Fast Combine (${bundle.theme.name})\n` +
+    `${state.score.toLocaleString("en")} points · ${state.made} made${
+      top ? ` · best: ${top}` : ""
+    }${foundLine}${chainLine}${shelfLine}`;
+  return {
+    title: `Made Of · Fast Combine · ${bundle.theme.name}`,
+    text,
+    url: `${SHARE_URL}?${modeShareQuery("fast", {
+      score: state.score,
+      made: state.made,
+      themeName: bundle.theme.name,
+      best: top,
+      found: state.found.length,
+      longest: state.longest,
+      shelf: state.shelf.length,
+    })}`,
+  };
+}
+
+/** Build share URL query for endless/fast. Daily uses its own `dailyShareQuery`
+ *  so it can keep `d=<day>` as the identifying param. */
+export function modeShareQuery(
+  mode: "endless" | "fast",
+  r: {
+    score: number;
+    made: number;
+    themeName: string;
+    best: string | null;
+    found?: number;
+    longest?: number;
+    shelf?: number;
+    age?: number;
+    ageName?: string;
+    ageCount?: number;
+  },
+): string {
+  const q = new URLSearchParams({
+    mo: mode,
+    s: String(r.score),
+    m: String(r.made),
+    tn: r.themeName,
+  });
+  if (mode === "endless") {
+    if (typeof r.age === "number") q.set("a", String(r.age));
+    if (r.ageName) q.set("an", r.ageName);
+    if (typeof r.ageCount === "number") q.set("ac", String(r.ageCount));
+  }
+  if (r.best) q.set("b", r.best);
+  if (r.found && r.found > 0) q.set("f", String(r.found));
+  if (r.longest && r.longest > 1) q.set("lc", String(r.longest));
+  if (r.shelf && r.shelf > 0) q.set("sh", String(r.shelf));
+  return q.toString();
 }
 
 /** Resolve an item id (uuid) to its display name. Falls back to the input
