@@ -23,3 +23,4 @@
 {"id": "C-0023", "ts": "2026-11-05T01:25:13Z", "kind": "feature", "summary": "Combine: tap-to-promote for 1-input recipes (star → supernova chain + heavy elements)", "refs": {"task": "T-0068"}}
 {"id": "C-0024", "ts": "2026-11-05T03:40:54Z", "kind": "feature", "summary": "Combine: distinct lifetime-unlock toast, unlock SFX, and persistent ★ badge on shelf tiles", "refs": {"task": "T-0034"}}
 {"id": "C-0025", "ts": "2026-11-05T05:56:20Z", "kind": "fix", "summary": "Combine Hold zone scrolls horizontally when held tiles overflow its width (T-0071).", "refs": {}}
+{"id": "C-0026", "ts": "2026-11-05T05:58:49Z", "kind": "fix", "summary": "Combine shelf/hold slots hold 30x30 aspect instead of squishing when overflowing (T-0072).", "refs": {}}
