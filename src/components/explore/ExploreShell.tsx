@@ -80,20 +80,9 @@ export function ExploreShell({ view: initial }: { view: ExploreView }) {
         <Bowtie view={view} mode="explore" onChipClick={onChipClick} />
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          flexWrap: "wrap",
-          padding: "8px 2px",
-          fontSize: 13,
-          color: "var(--muted)",
-        }}
-      >
-        <span>Something off about {view.item.name}?</span>
+      <div style={{ padding: "8px 2px" }}>
         <ReportMistakeButton
-          label="Report a mistake"
+          label={`Something off about ${view.item.name}?`}
           className="btn"
           payload={{
             category: "item_wrong",
