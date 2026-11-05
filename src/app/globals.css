@@ -2398,38 +2398,47 @@ a.btn.primary{color:var(--bg)}
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  min-height: 72px;
+  min-height: 84px;
 }
-.heroTree-final-cell { min-height: 92px; }
+.heroTree-final-cell { min-height: 108px; }
 
-.heroTree-item {
+/* Composite tile: bordered container holding pictogram + name stacked.
+   Single frame per item; the name belongs to its picture visually. */
+.heroTree-tile {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  padding: 6px 10px 5px;
+  background: var(--surface);
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
   opacity: 0;
   transform: scale(0.55);
   animation: heroTree-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   will-change: opacity, transform;
 }
-.heroTree-item.is-final {
+.heroTree-tile.is-final {
+  padding: 10px 14px 8px;
   animation:
     heroTree-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
     heroTree-glow 1.8s ease-out 0.6s;
 }
-.heroTree-label {
+.heroTree-tile-name {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11px;
   letter-spacing: 0.04em;
-  color: var(--muted);
+  color: var(--ink);
   text-transform: lowercase;
   white-space: nowrap;
   text-align: center;
 }
+.heroTree-tile.is-final .heroTree-tile-name {
+  font-size: 13px;
+  font-weight: 600;
+}
 
-/* Connectors: thin vertical lines that draw from top to bottom to visually
-   connect raw → mid and (converging) mid → final. We render one span per
-   branch column; the span draws itself by animating height from 0 to full. */
+/* Vertical connectors raw → mid. One per column; animates height 0→100%. */
 .heroTree-connectors {
   display: grid;
   grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
@@ -2448,17 +2457,20 @@ a.btn.primary{color:var(--bg)}
 .heroTree-connectors-rm .heroTree-connector { align-self: start; }
 .heroTree-connector.is-hidden { display: none; }
 
-/* Converging connectors mid → final. These are diagonals that lean toward
-   the horizontal centre of the row; `--i` is the column offset from centre
-   (e.g. -1, 0, +1 for a 3-col row). */
-.heroTree-connector-converge {
-  width: 1.5px;
+/* Mid → final converging SVG. Spans the grid row like a .heroTree-row so
+   its X-axis maps to the same column grid; lines originate at each column
+   centre (top) and meet at the row centre (bottom). */
+.heroTree-converge {
+  width: 100%;
   height: 44px;
-  background: var(--ink);
+  display: block;
+  pointer-events: none;
+}
+.heroTree-converge line {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
   opacity: 0;
-  transform-origin: top center;
-  /* Lean toward centre: angle grows with distance from midline. */
-  transform: rotate(calc(var(--i, 0) * -14deg));
   animation: heroTree-converge 0.45s ease-out forwards;
 }
 
@@ -2488,8 +2500,8 @@ a.btn.primary{color:var(--bg)}
   100% { height: 100%; opacity: 0.35; }
 }
 @keyframes heroTree-converge {
-  0% { opacity: 0; height: 0; }
-  100% { opacity: 0.35; height: 44px; }
+  0% { opacity: 0; }
+  100% { opacity: 0.35; }
 }
 @keyframes heroTree-bang {
   0%   { opacity: 0; transform: translateX(-50%) scale(0); }
@@ -2504,16 +2516,16 @@ a.btn.primary{color:var(--bg)}
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .heroTree-item,
+  .heroTree-tile,
   .heroTree-connector,
+  .heroTree-converge line,
   .heroTree-spark {
     animation: none !important;
     opacity: 1;
     transform: none;
   }
-  .heroTree-item { opacity: 1; transform: none; }
   .heroTree-connector { height: 100%; opacity: 0.35; }
-  .heroTree-connector-converge { height: 44px; opacity: 0.35; transform: rotate(calc(var(--i, 0) * -14deg)); }
+  .heroTree-converge line { opacity: 0.35; }
   .heroTree-spark { display: none; }
 }
 
