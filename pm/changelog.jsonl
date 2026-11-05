@@ -34,3 +34,5 @@
 {"id": "C-0034", "ts": "2026-11-05T13:02:10Z", "kind": "feature", "summary": "Combine reactions: thumbs-up/down/flag on DiscoveryToast (recipe) and DetailCard (item or specific recipe via target picker); polymorphic reactions table serves both", "refs": {"task": "T-0056"}}
 {"id": "C-0035", "ts": "2026-11-05T13:05:25Z", "kind": "refactor", "summary": "DetailCard: replace green MASTERED pill with corner ◆ badge, matching CollectionBook", "refs": {"task": "T-0086"}}
 {"id": "C-0036", "ts": "2026-11-05T13:08:11Z", "kind": "fix", "summary": "Combine Ages dialog: cap height, make age list scroll internally with bottom-fade \"more below\" hint", "refs": {"task": "T-0087"}}
+{"id": "C-0037", "ts": "2026-11-05T13:12:58Z", "kind": "feature", "summary": "Combine daily schedule precomputed per (theme, day) with rotation memory + weighted sampling. Admin can review and regenerate 30 days; nightly Railway cron extends.", "refs": {"task": "T-0084"}}
+{"id": "C-0038", "ts": "2026-11-05T13:36:03Z", "kind": "fix", "summary": "pm UI renders markdown again — restored vendored marked + DOMPurify + help-modal, added missing /vendor/help-modal.js route", "refs": {"task": "T-0089"}}

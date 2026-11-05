@@ -46,7 +46,7 @@ import store
 PM_DIR = Path(__file__).parent
 STATIC_ALLOW = {
     "index.html", "changelog.html", "tasks.jsonl", "changelog.jsonl",
-    "vendor/marked.esm.js", "vendor/purify.es.mjs",
+    "vendor/marked.esm.js", "vendor/purify.es.mjs", "vendor/help-modal.js",
 }
 
 TASK_ID_RE = re.compile(r"^/api/tasks/(T-\d+)$")
@@ -134,6 +134,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/vendor/purify.es.mjs":
             self._send_static("vendor/purify.es.mjs")
+            return
+        if path == "/vendor/help-modal.js":
+            self._send_static("vendor/help-modal.js")
             return
 
         if path == "/api/tasks":
