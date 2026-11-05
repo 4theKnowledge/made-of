@@ -256,8 +256,14 @@ export function CombineBoard({
       );
       return;
     }
-    // Fast beats endless on resume: if a fast run is in-flight, that's
-    // what the player was last doing. Falls through to endless otherwise.
+    // Resume priority on plain /combine:
+    //   1. In-flight fast run (what the player was last doing).
+    //   2. In-flight endless run.
+    //   3. Today's daily when unfinished — resumes the mid-run save if
+    //      any, else starts a fresh daily. Only kicks in when there's
+    //      nothing mid-run to protect the "refresh doesn't eat my run"
+    //      promise for fast/endless.
+    //   4. Fall through to the deterministic fresh endless in `initial`.
     const fastSave = loadGame(fastBundles.everything, { daily: null, mode: "fast" });
     if (fastSave) {
       setState(hydrateGame(fastSave));
@@ -266,6 +272,21 @@ export function CombineBoard({
     const everythingSave = loadGame(bundles.everything, { daily: null });
     if (everythingSave) {
       setState(hydrateGame(everythingSave));
+      return;
+    }
+    const today = todayKey();
+    if (!loadDailyDone(today)) {
+      const dailyBundle = dailyBundles.everything;
+      const saved = loadGame(dailyBundle, { daily: today });
+      setState(
+        saved
+          ? hydrateGame(saved)
+          : newGame("everything", dailyBundle, {
+              daily: today,
+              size: 6,
+              seed: dailySeed(today),
+            }).state,
+      );
     }
   }, [bundles.everything, dailyBundles.everything, fastBundles.everything]);
   const [selectedSlot, setSelectedSlot] = useState<{
