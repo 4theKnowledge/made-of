@@ -844,8 +844,9 @@ a.btn.primary{color:var(--bg)}
 .cbshelf.none{background:color-mix(in srgb, var(--ink) 3%, transparent);border-color:color-mix(in srgb, var(--ink) 20%, transparent);overflow:hidden}
 .cbshelf-slots{display:inline-flex;align-items:center;gap:5px;flex-wrap:nowrap;min-width:0;flex:1 1 auto}
 .cbhold{-webkit-mask-image:none;mask-image:none;overflow:hidden}
-.cbhold .cbshelf-slots{flex:0 0 auto}
-.cbhold .cbshelf-empty{display:flex;flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;justify-content:flex-end;align-items:center;gap:7px;padding-right:4px;margin-left:auto}
+.cbhold .cbshelf-slots{flex:1 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden;touch-action:pan-x;scrollbar-width:thin}
+.cbhold .cbshelf-empty{display:flex;flex:0 1 auto;min-width:0;overflow:hidden;white-space:nowrap;justify-content:flex-end;align-items:center;gap:7px;padding-right:4px;margin-left:auto}
+.cbhold:not(.none) .cbshelf-empty{display:none}
 .cbhold .cbshelf-empty em{overflow:hidden;text-overflow:ellipsis}
 .cbshelf-tally{position:sticky;right:0;flex:0 0 auto;display:flex;align-items:center;gap:7px;white-space:nowrap;padding:0 4px 0 18px;margin-left:auto;background:linear-gradient(to right, transparent, var(--bg) 14px)}
 .cbshelf-tally em{font-style:normal}
