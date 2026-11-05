@@ -38,3 +38,4 @@
 {"id": "C-0038", "ts": "2026-11-05T13:36:03Z", "kind": "fix", "summary": "pm UI renders markdown again — restored vendored marked + DOMPurify + help-modal, added missing /vendor/help-modal.js route", "refs": {"task": "T-0089"}}
 {"id": "C-0039", "ts": "2026-11-05T13:36:42Z", "kind": "feature", "summary": "Combine daily is a first-class mode. Dedicated /admin/combine/daily page; daily config moved to a singleton row. Regenerate protects today; schedule view shows served history.", "refs": {"task": "T-0088"}}
 {"id": "C-0040", "ts": "2026-11-05T13:37:33Z", "kind": "fix", "summary": "Dev sign-in bypass no longer triggers Resend emails when RESEND_API_KEY is set locally", "refs": {"task": "T-0091"}}
+{"id": "C-0041", "ts": "2026-11-05T14:14:38Z", "kind": "fix", "summary": "Footer Feedback button now styled like other links and no longer overflows on mobile game pages (T-0092)", "refs": {"task": "T-0092"}}

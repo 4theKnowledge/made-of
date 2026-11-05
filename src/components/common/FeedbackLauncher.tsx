@@ -12,15 +12,6 @@ export function FeedbackLauncher({ signedIn }: { signedIn: boolean }) {
         type="button"
         onClick={() => setOpen(true)}
         className="footLink"
-        style={{
-          background: "none",
-          border: 0,
-          padding: 0,
-          font: "inherit",
-          color: "inherit",
-          cursor: "pointer",
-          textDecoration: "underline",
-        }}
       >
         Feedback
       </button>

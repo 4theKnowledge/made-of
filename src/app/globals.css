@@ -327,8 +327,9 @@ a.btn.primary{color:var(--bg)}
 .foot .ftag{color:var(--muted)}
 .foot .fsep{flex:1}
 .foot .footLinks{display:inline-flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
-.foot a{color:var(--ink);text-decoration:none;font-weight:500}
-.foot a:hover{text-decoration:underline}
+.foot a,.foot .footLink{color:var(--ink);text-decoration:none;font-weight:500}
+.foot a:hover,.foot .footLink:hover{text-decoration:underline}
+.foot .footLink{background:none;border:0;padding:0;font:inherit;cursor:pointer;text-align:left;justify-self:start}
 .foot .support{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--line);border-radius:3px;padding:4px 12px;color:var(--ink);font-weight:500}
 .foot .support em{font-style:normal;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .sponsorMock{background:var(--surface);border:1.5px solid var(--ink);border-radius:4px;padding:16px;display:flex;flex-direction:column;gap:12px}
@@ -540,7 +541,7 @@ a.btn.primary{color:var(--bg)}
   .foot .footBrand{justify-content:flex-start}
   .foot .support{align-self:flex-start}
   .foot .footLinks{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;row-gap:10px}
-  .foot .footLinks a{padding:4px 0}
+  .foot .footLinks a,.foot .footLinks .footLink{padding:4px 0}
   /* Game pages (Combine, Explore, Scratch) opt into a one-row footer on
      mobile so the board doesn't get pushed down. Desktop ignores this. */
   .foot[data-compact-on-mobile]{flex-direction:row;flex-wrap:nowrap;align-items:center;gap:10px;font-size:12.5px;padding-top:12px}
@@ -549,10 +550,11 @@ a.btn.primary{color:var(--bg)}
   .foot[data-compact-on-mobile] .support{display:none}
   .foot[data-compact-on-mobile] .fbrand{font-size:13.5px}
   .foot[data-compact-on-mobile] .footLinks{display:inline-flex;flex-wrap:nowrap;gap:10px;grid-template-columns:none}
-  .foot[data-compact-on-mobile] .footLinks a{padding:0;font-size:12.5px}
-  /* In compact mode, drop the two Pricing-related links to keep the row
-     short. About / Privacy / Terms / Method remain reachable. */
-  .foot[data-compact-on-mobile] .footLinks a[href^="/pricing"]{display:none}
+  .foot[data-compact-on-mobile] .footLinks a,.foot[data-compact-on-mobile] .footLinks .footLink{padding:0;font-size:12.5px}
+  /* In compact mode, drop Pricing-related links and Method to keep the row
+     short. About / Changelog / Privacy / Terms / Feedback remain reachable. */
+  .foot[data-compact-on-mobile] .footLinks a[href^="/pricing"],
+  .foot[data-compact-on-mobile] .footLinks a[href="/method"]{display:none}
 }
 
 /* The details of the centre card live inside it on wide screens, and under the bowtie on phones */
