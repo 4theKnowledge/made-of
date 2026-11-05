@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm";
 import { getLiveSnapshot } from "@/graph/live";
 import { Footer } from "@/components/common/Footer";
 import { Header } from "@/components/common/Header";
@@ -10,11 +9,11 @@ import {
   type GuestRecipeExtension,
 } from "@/combine/data";
 import type { DailyConfig } from "@/combine/daily-config";
+import { getActiveDaily } from "@/combine/daily-config-db";
 import type { ThemeKey } from "@/combine/types";
 import { serialiseBundle } from "@/combine/serialise";
 import { loadAllSeasons, promoteSeason } from "@/combine/season";
 import { CombineBoard } from "@/components/combine/CombineBoard";
-import { getDb, schema } from "@/db/client";
 import { getDailyPayload, resolveGuestRecipes } from "@/combine/daily-schedule-db";
 import { todayKey } from "@/combine/rng";
 import { getSession, isAdmin } from "@/lib/session";
@@ -33,41 +32,41 @@ export async function CombinePageBody() {
   }
   const fastBundles = buildAllFastBundles(live.snapshot);
 
-  // Load per-theme dailyConfig from the DB. A theme without one shares its
-  // endless bundle for daily play. Only the keys we actually use are read.
-  const db = getDb();
-  const everythingRow = await db
-    .select({ dailyConfig: schema.combineThemes.dailyConfig })
-    .from(schema.combineThemes)
-    .where(eq(schema.combineThemes.code, "everything"))
-    .limit(1);
-  const dailyConfigs: Partial<Record<ThemeKey, DailyConfig | null>> = {
-    everything: (everythingRow[0]?.dailyConfig ?? null) as DailyConfig | null,
-  };
+  // Load the singleton daily config. If none is set, daily plays with the
+  // same shape as endless (no cap, no guests). The active theme drives
+  // which per-theme bundle receives the daily knobs.
+  const activeDaily = await getActiveDaily();
+  const dailyConfigs: Partial<Record<ThemeKey, DailyConfig | null>> = {};
+  if (activeDaily) {
+    dailyConfigs[activeDaily.themeCode] = activeDaily.config;
+  }
 
   // Resolve today's guest recipes from the precomputed schedule. A missing
   // row (first-time setup, cron hasn't run yet) falls back to zero guests —
   // the daily still plays, just without rare-item drip.
   const today = todayKey();
   const guestRecipes: Partial<Record<ThemeKey, GuestRecipeExtension[] | null>> = {};
-  if (dailyConfigs.everything) {
-    const payload = await getDailyPayload("everything", today);
+  if (activeDaily) {
+    const payload = await getDailyPayload(activeDaily.themeCode, today);
     if (payload && payload.guestOutputIds.length > 0) {
-      // We need both the full and capped bundles to resolve guest recipes.
-      const fullEverything = buildThemeBundle(live.snapshot, "everything", prev.everything ?? 0);
-      const cappedEverything = buildThemeBundle(
+      const fullThemeBundle = buildThemeBundle(
         live.snapshot,
-        "everything",
-        prev.everything ?? 0,
+        activeDaily.themeCode,
+        prev[activeDaily.themeCode] ?? 0,
+      );
+      const cappedThemeBundle = buildThemeBundle(
+        live.snapshot,
+        activeDaily.themeCode,
+        prev[activeDaily.themeCode] ?? 0,
         "daily",
-        dailyConfigs.everything,
+        activeDaily.config,
       );
       const { extensions } = resolveGuestRecipes(
-        fullEverything,
-        cappedEverything,
+        fullThemeBundle,
+        cappedThemeBundle,
         payload.guestOutputIds,
       );
-      guestRecipes.everything = extensions;
+      guestRecipes[activeDaily.themeCode] = extensions;
     }
   }
   const dailyBundles = buildAllDailyBundles(

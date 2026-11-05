@@ -16,7 +16,7 @@ import {
   reachableGuestRecipe,
   type ScheduleInput,
 } from "./daily-schedule";
-import type { DailyConfig } from "./daily-config";
+import { getActiveDaily } from "./daily-config-db";
 import { todayKey } from "./rng";
 import type { ThemeKey } from "./types";
 
@@ -63,37 +63,33 @@ export function resolveGuestRecipes(
   return { extensions, unresolved };
 }
 
-/** Extend or regenerate a theme's schedule. Reads the theme row, builds
- *  the full + capped bundles, pulls prior rows for rotation state, writes
- *  new rows via upsert.
+/** Extend or regenerate the active daily's schedule. Reads the singleton
+ *  daily config, builds the full + capped bundles for its theme, pulls
+ *  prior rows for rotation state, writes new rows via upsert.
  *
  *  - `mode: "extend"` only writes days that don't already have a row.
  *  - `mode: "regenerate"` wipes days ≥ today and rewrites them.
  *
  *  Returns summary counts plus the newly written payloads so admin UI can
- *  render the schedule immediately. */
-export async function scheduleTheme(
+ *  render the schedule immediately. `themeCode` in the result lets the
+ *  caller know which theme received the schedule. */
+export async function scheduleActiveDaily(
   snapshot: Snapshot,
-  themeCode: ThemeKey,
   mode: "extend" | "regenerate",
   days: number = 30,
 ): Promise<{
+  themeCode: ThemeKey | null;
   written: Array<{ day: string; payload: DailyPayload }>;
   skipped: number;
   removed: number;
   unresolvedExamples: string[];
 }> {
   const db = getDb();
-  const [theme] = await db
-    .select({ dailyConfig: schema.combineThemes.dailyConfig })
-    .from(schema.combineThemes)
-    .where(eq(schema.combineThemes.code, themeCode))
-    .limit(1);
-  if (!theme) throw new Error(`theme ${themeCode} not found`);
-  const dailyConfig = (theme.dailyConfig ?? null) as DailyConfig | null;
-  if (!dailyConfig) {
-    return { written: [], skipped: 0, removed: 0, unresolvedExamples: [] };
+  const active = await getActiveDaily();
+  if (!active) {
+    return { themeCode: null, written: [], skipped: 0, removed: 0, unresolvedExamples: [] };
   }
+  const { themeCode, config: dailyConfig } = active;
 
   const fullBundle = buildThemeBundle(snapshot, themeCode);
   // Capped bundle (same theme but with dailyConfig). Shares prevNumAges=0
@@ -196,6 +192,7 @@ export async function scheduleTheme(
   }
 
   return {
+    themeCode,
     written,
     skipped,
     removed,

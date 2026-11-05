@@ -465,11 +465,6 @@ export const combineThemes = pgTable(
     label: text("label").notNull(),
     description: text("description"),
     position: integer("position").notNull().default(0),
-    // Daily-mode overrides. Shape: { maxAges?: number, ageNeedScale?: number,
-    // guestIngredient?: { perRun: number, minBand: number } } — see
-    // src/combine/daily-config.ts for the normaliser and defaults. Null →
-    // daily uses the same config as endless.
-    dailyConfig: jsonb("daily_config"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -479,6 +474,38 @@ export const combineThemes = pgTable(
   },
   (t) => [index("combine_themes_position_idx").on(t.position)],
 );
+
+/* ========================================================================
+ * Combine daily config (singleton).
+ *
+ * The daily mode is a top-level gameplay concept: one theme is "the daily
+ * theme" at a time, and that theme's daily carries the knobs (capped
+ * ages, ageNeedScale, guest ingredient). Modelled as a singleton row so
+ * there's always exactly one "active" config; swapping which theme hosts
+ * the daily is a single UPDATE.
+ *
+ * Shape of `config`: { maxAges?, ageNeedScale?, guestIngredient? } — see
+ * DailyConfig in src/combine/daily-config.ts.
+ * ====================================================================== */
+
+export const combineDailyConfig = pgTable("combine_daily_config", {
+  // Fixed PK — there's only ever one row. Enforces singleton without a
+  // partial-unique-index dance.
+  id: text("id").primaryKey().default("current"),
+  themeCode: text("theme_code")
+    .notNull()
+    .references(() => combineThemes.code, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+  config: jsonb("config").notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 /* Many-to-many membership: an item can belong to several themes. */
 export const itemCombineThemes = pgTable(

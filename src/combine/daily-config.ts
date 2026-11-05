@@ -3,7 +3,7 @@
  *
  * Endless and daily both play the `classic` mode, but a daily run should fit
  * in ~15 min while endless can run as long as the player wants. The admin
- * sets these per-theme on `combine_themes.dailyConfig`; `buildThemeBundle`
+ * sets these on the singleton `combine_daily_config` row; `buildThemeBundle`
  * reads them when the bundle is built for `mode: "daily"`.
  *
  * `guestIngredient` is a deterministic "guest of the day" tile injected
