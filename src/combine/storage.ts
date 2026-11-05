@@ -18,8 +18,10 @@ import type { Mode, ThemeBundle, ThemeKey } from "./types";
  *  a fresh game instead of hydrating into a broken state. v5: derived
  *  ages + sparse-band merge changed the band layout and age count. A
  *  pre-v5 save at age=4 under 9 ages can't be hydrated into a 6-age
- *  bundle without warping to "Final age" nonsense. */
-const SAVE_VERSION = 6;
+ *  bundle without warping to "Final age" nonsense.
+ *  v7: fast runs now persist to their own slot. Added `mode` to the
+ *  stored shape so hydrate doesn't have to infer from `daily`. */
+const SAVE_VERSION = 7;
 
 /** Bump to force every player who has already finished today's daily to
  *  be able to play it again. Stamped into DailyResult + the review save
@@ -30,6 +32,7 @@ const DAILY_EPOCH = 1;
 
 const ENDLESS_KEY = "madeof:cbsave";
 const DAILY_KEY = "madeof:cbsave:daily";
+const FAST_KEY = "madeof:cbsave:fast";
 const BEST_PREFIX = "madeof:cbbest:";
 const DAILY_DONE_KEY = "madeof:cbdaily";
 const FOUND_KEY = "madeof:cbfound";
@@ -50,6 +53,7 @@ const SOUND_DEFAULT: SoundSettings = { music: "piano", sfx: true, vol: 80 };
 export interface StoredGame {
   v: number;
   theme: ThemeKey;
+  mode: Mode;
   daily: string | null;
   n: number;
   /** RNG state as a 32-bit int. */
@@ -112,6 +116,7 @@ function toStored(state: GameState): StoredGame {
   return {
     v: SAVE_VERSION,
     theme: state.theme,
+    mode: state.mode,
     daily: state.daily,
     n: state.n,
     rs: state.rng.rs,
@@ -144,19 +149,23 @@ function toStored(state: GameState): StoredGame {
   };
 }
 
+function keyForMode(state: GameState): string {
+  if (state.mode === "fast") return FAST_KEY;
+  if (state.daily) return DAILY_KEY;
+  return ENDLESS_KEY;
+}
+
 export function saveGame(state: GameState): void {
   if (typeof window === "undefined") return;
   // Debug sessions never persist — a cheat run shouldn't overwrite the
   // player's real endless save, and on reload we want to hydrate the
   // real save instead of the debug one.
   if (state.debug) return;
-  // Fast runs are ephemeral. They're score-only sprints; persisting them
-  // would clash with the endless save slot and offers no resume value.
-  if (state.mode === "fast") return;
   try {
-    const key = state.daily ? DAILY_KEY : ENDLESS_KEY;
+    const key = keyForMode(state);
     if (state.over && !state.daily) {
-      // A finished endless game has nothing to resume into.
+      // A finished endless or fast game has nothing to resume into. Daily
+      // keeps its final state as a review slot (see startDaily).
       window.localStorage.removeItem(key);
       return;
     }
@@ -177,6 +186,14 @@ function readStored(key: string): StoredGame | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as StoredGame;
     if (!parsed) return null;
+    // v6 → v7 migration: v6 had no explicit `mode` field (fast didn't
+    // persist, so endless vs. daily was inferable from `daily`). Stamp a
+    // mode and upgrade the version in-place so returning players don't
+    // lose their endless/daily save to the version bump.
+    if (parsed.v === 6 && !parsed.mode) {
+      parsed.mode = parsed.daily ? "daily" : "endless";
+      parsed.v = SAVE_VERSION;
+    }
     // Any schema mismatch (version, missing or wrong-shape board/tray) →
     // drop the entry and start fresh. The version check is the primary
     // guard; the shape checks are belt-and-braces in case someone writes
@@ -199,26 +216,31 @@ function readStored(key: string): StoredGame | null {
 }
 
 /** Load the saved game for the given mode, if one is valid for the given
- *  theme/day and all its tiles still exist in the bundle. */
+ *  theme/day and all its tiles still exist in the bundle. `mode` defaults
+ *  to "endless" when `daily` is null; pass `"fast"` to read the fast slot. */
 export function loadGame(
   bundle: ThemeBundle,
-  opts: { daily: string | null },
+  opts: { daily: string | null; mode?: Mode },
 ): StoredGame | null {
-  const key = opts.daily ? DAILY_KEY : ENDLESS_KEY;
+  const mode: Mode = opts.mode ?? (opts.daily ? "daily" : "endless");
+  const key = mode === "fast" ? FAST_KEY : opts.daily ? DAILY_KEY : ENDLESS_KEY;
   const s = readStored(key);
   if (!s) return null;
-  // Theme must match (endless can be stored under either theme; both bundles
-  // ship so this check is per-save).
+  // Theme must match (endless/fast can be stored under either theme; both
+  // bundles ship so this check is per-save).
   if (s.theme !== bundle.theme.k) return null;
+  // Mode must match the slot — guards against a stale save from before the
+  // mode field existed landing in the wrong resume path.
+  if (s.mode !== mode) return null;
   // Daily: the save must belong to today's puzzle.
-  if (opts.daily && s.daily !== opts.daily) return null;
-  // Endless: a finished game is nothing to resume.
-  if (!opts.daily && s.over) return null;
+  if (mode === "daily" && s.daily !== opts.daily) return null;
+  // Endless/fast: a finished game is nothing to resume.
+  if (mode !== "daily" && s.over) return null;
   // A finished daily save is a frozen review board — stale tile ids and
   // out-of-range ages are inert because nothing runs through the reducer.
   // Skip the content-drift guards so content edits between the finish and
   // the review tap don't nuke the player's result.
-  if (opts.daily && s.over) return s;
+  if (mode === "daily" && s.over) return s;
   // All referenced tiles must still exist (the knowledge base may have
   // shifted between runs).
   for (const v of s.board) if (v && !bundle.items.has(v)) return null;
@@ -230,6 +252,7 @@ export function loadGame(
   // (merge collapsed a sparse band, admin removed content) and the stored
   // age is past the current last age, drop the save — hydrating would land
   // the player on "Final age" with a nonsensical "step N+1 of N" header.
+  // Fast mode is single-band (ages.length is 1), so this still holds.
   if (s.age < 0 || s.age >= bundle.theme.ages.length) return null;
   return s;
 }
@@ -238,10 +261,7 @@ export function loadGame(
 export function hydrateGame(s: StoredGame): GameState {
   return {
     theme: s.theme,
-    // Pre-mode saves wrote `mode: "classic"`; after the endless/daily/fast
-    // split we derive the mode from the stored daily key. Fast never
-    // persists, so the only legitimate stored modes are endless and daily.
-    mode: s.daily ? "daily" : "endless",
+    mode: s.mode,
     daily: s.daily,
     n: s.n,
     rng: { rs: s.rs | 0 },

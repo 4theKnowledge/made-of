@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { hydrateGame, type StoredGame } from "../storage";
 
-/** Pre-mode-split saves wrote only `theme`/`daily` (no `mode` field). The
- *  `StoredGame` shape doesn't carry mode today — `hydrateGame` derives it
- *  from the presence of a daily key. This test locks that derivation so a
- *  future refactor can't silently regress the save/load contract. */
+/** `StoredGame` carries an explicit `mode` field since v7 (fast runs
+ *  needed their own slot). `hydrateGame` just echoes it through — this
+ *  test locks that round-trip so a future refactor can't silently
+ *  reintroduce mode-from-daily inference. */
 function base(partial: Partial<StoredGame> = {}): StoredGame {
   return {
-    v: 6,
+    v: 7,
     theme: "everything",
+    mode: "endless",
     daily: null,
     n: 6,
     rs: 1,
@@ -38,14 +39,19 @@ function base(partial: Partial<StoredGame> = {}): StoredGame {
   };
 }
 
-describe("hydrateGame mode derivation", () => {
-  it("endless save (daily=null) hydrates to mode=endless", () => {
-    const s = hydrateGame(base({ daily: null }));
+describe("hydrateGame mode", () => {
+  it("endless save hydrates to mode=endless", () => {
+    const s = hydrateGame(base({ mode: "endless" }));
     expect(s.mode).toBe("endless");
   });
 
-  it("daily save (daily=<dayKey>) hydrates to mode=daily", () => {
-    const s = hydrateGame(base({ daily: "2026-11-05" }));
+  it("daily save hydrates to mode=daily", () => {
+    const s = hydrateGame(base({ mode: "daily", daily: "2026-11-05" }));
     expect(s.mode).toBe("daily");
+  });
+
+  it("fast save hydrates to mode=fast", () => {
+    const s = hydrateGame(base({ mode: "fast" }));
+    expect(s.mode).toBe("fast");
   });
 });

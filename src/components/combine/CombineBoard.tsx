@@ -254,11 +254,18 @@ export function CombineBoard({
       );
       return;
     }
+    // Fast beats endless on resume: if a fast run is in-flight, that's
+    // what the player was last doing. Falls through to endless otherwise.
+    const fastSave = loadGame(fastBundles.everything, { daily: null, mode: "fast" });
+    if (fastSave) {
+      setState(hydrateGame(fastSave));
+      return;
+    }
     const everythingSave = loadGame(bundles.everything, { daily: null });
     if (everythingSave) {
       setState(hydrateGame(everythingSave));
     }
-  }, [bundles.everything, dailyBundles.everything]);
+  }, [bundles.everything, dailyBundles.everything, fastBundles.everything]);
   const [selectedSlot, setSelectedSlot] = useState<{
     source: "tray" | "hold";
     slot: number;
@@ -923,9 +930,10 @@ export function CombineBoard({
       // If we're already playing this theme in endless, nothing to do.
       if (which === state.theme && state.mode === "endless") return;
       // Save the current game before swapping; try to resume the chosen
-      // theme's endless save, otherwise start fresh. Fast runs don't persist,
-      // so switching out of fast always lands on a fresh classic game (or the
-      // saved classic resume, if any).
+      // theme's endless save, otherwise start fresh. switchTheme always
+      // lands on classic (switching themes implies leaving the fast
+      // sprint); the fast slot is preserved by saveGame so refreshing
+      // or coming back via startFast still finds it.
       saveGame(state);
       const nextBundle = bundles[which];
       const saved = loadGame(nextBundle, { daily: null });
@@ -961,8 +969,9 @@ export function CombineBoard({
 
   const startFast = useCallback(
     (which: ThemeKey) => {
-      // Fast runs don't persist — they're pure score-chase. Save the current
-      // (classic) game first so switching away doesn't lose progress.
+      // Save the current game first so switching from classic → fast
+      // doesn't lose the in-flight endless run (and vice versa — the new
+      // fast run will overwrite its own slot on next state tick).
       saveGame(state);
       setState(
         newGame(which, fastBundles[which], {
