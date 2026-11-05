@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
+import { ReportMistakeButton } from "@/components/common/ReportMistakeButton";
+import { getSession } from "@/lib/session";
 
+export const dynamic = "force-dynamic";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
@@ -11,7 +14,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/method" },
 };
 
-export default function MethodPage() {
+export default async function MethodPage() {
+  const session = await getSession();
+  const signedIn = !!session?.user?.id;
   return (
     <main className="wrap">
       <Header />
@@ -97,10 +102,10 @@ export default function MethodPage() {
         <section className="feat">
           <h3>Spotted a mistake?</h3>
           <p>
-            A report-a-mistake flow is coming before launch, along with contact
-            details for teachers, parents and sponsors. Until then, hold on to
-            notes — we&rsquo;ll ask for them.
+            Let us know &mdash; every report lands in our inbox and helps the
+            map get more accurate.
           </p>
+          <ReportMistakeButton signedIn={signedIn} label="Report a mistake" />
         </section>
       </div>
 

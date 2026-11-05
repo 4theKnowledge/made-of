@@ -3,6 +3,8 @@ import Link from "next/link";
 import { getLiveSnapshot } from "@/graph/live";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
+import { ReportMistakeButton } from "@/components/common/ReportMistakeButton";
+import { getSession } from "@/lib/session";
 import { Chip } from "@/components/Chip";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
@@ -56,6 +58,8 @@ const CONF_ORDER: Confidence[] = [
 export default async function AboutPage() {
   const live = await getLiveSnapshot();
   const db = getDb();
+  const session = await getSession();
+  const signedIn = !!session?.user?.id;
 
   // Count links by type (prototype: relN).
   const relCount: Record<LinkType, number> = { f: 0, w: 0, n: 0, s: 0, e: 0 };
@@ -321,8 +325,12 @@ export default async function AboutPage() {
           <h3>Get in touch</h3>
           <p>
             Spotted a mistake, or want to suggest something for the map?
-            A way to report it is coming soon, along with contact details for
-            teachers, parents and sponsors.
+            Send it through here &mdash; every report lands in our inbox.
+          </p>
+          <ReportMistakeButton signedIn={signedIn} label="Send feedback" />
+          <p style={{ marginTop: 16, color: "var(--muted)", fontSize: 14 }}>
+            Dedicated contact details for teachers, parents and sponsors are
+            coming soon.
           </p>
         </section>
       </div>

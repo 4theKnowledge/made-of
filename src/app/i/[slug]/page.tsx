@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Footer } from "@/components/common/Footer";
 import { Header } from "@/components/common/Header";
+import { ReportMistakeButton } from "@/components/common/ReportMistakeButton";
 import { getItemPage, type PageEdge } from "@/graph/queries";
 import { Chip } from "@/components/Chip";
 import { Pictogram } from "@/pictograms/Pictogram";
@@ -141,6 +142,15 @@ export default async function ItemPage({
           >
             Explore this
           </Link>
+          <ReportMistakeButton
+            label="Report a mistake"
+            className="btn"
+            payload={{
+              category: "item_wrong",
+              itemId: item.slug,
+              recipeInputs: [item.name],
+            }}
+          />
         </div>
       </section>
 

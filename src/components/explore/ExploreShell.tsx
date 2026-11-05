@@ -6,6 +6,7 @@ import { Pictogram } from "@/pictograms/Pictogram";
 import { Bowtie } from "@/components/bowtie/Bowtie";
 import { flyPictogram } from "@/components/bowtie/fly";
 import { ItemSearch } from "@/components/common/ItemSearch";
+import { ReportMistakeButton } from "@/components/common/ReportMistakeButton";
 import { formatFirstAppeared } from "@/lib/year";
 import type { ExploreView } from "./types";
 
@@ -78,6 +79,31 @@ export function ExploreShell({ view: initial }: { view: ExploreView }) {
       <div ref={focusHeadRef} style={{ display: "contents" }}>
         <Bowtie view={view} mode="explore" onChipClick={onChipClick} />
       </div>
+
+      <section
+        className="panel"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+          padding: "10px 14px",
+        }}
+      >
+        <span style={{ fontSize: 13, color: "var(--muted)" }}>
+          Something off about {view.item.name}?
+        </span>
+        <ReportMistakeButton
+          label="Report a mistake"
+          className="btn"
+          payload={{
+            category: "item_wrong",
+            itemId: view.item.slug,
+            recipeInputs: [view.item.name],
+          }}
+        />
+      </section>
 
       {view.originChain.length > 1 && (
         <section className="panel">
