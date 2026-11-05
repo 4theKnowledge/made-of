@@ -4,7 +4,7 @@
  * component that resolves today's payload at page-load time.
  */
 
-import { and, eq, gte, inArray } from "drizzle-orm";
+import { and, eq, gt, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import type { Snapshot } from "../graph/snapshot";
 import { buildThemeBundle, type GuestRecipeExtension } from "./data";
@@ -105,12 +105,16 @@ export async function scheduleActiveDaily(
   const today = UTC_TODAY();
   let removed = 0;
   if (mode === "regenerate") {
+    // Protect today's row: players may already be mid-run on it. Only
+    // wipe strictly future days. If the admin genuinely needs to force a
+    // new today-roll, deleting the (themeCode, today) row directly via
+    // SQL is still available — but the regenerate button never does it.
     const del = await db
       .delete(schema.combineDailies)
       .where(
         and(
           eq(schema.combineDailies.themeCode, themeCode),
-          gte(schema.combineDailies.day, today),
+          gt(schema.combineDailies.day, today),
         ),
       )
       .returning({ day: schema.combineDailies.day });
@@ -133,11 +137,18 @@ export async function scheduleActiveDaily(
   const input: ScheduleInput = { theme: themeCode, fullBundle, dailyConfig };
 
   // For "extend", start one day after the latest scheduled day (or today
-  // if nothing exists). For "regenerate", start at today.
+  // if nothing exists). For "regenerate", start tomorrow — today's row is
+  // intentionally protected from reroll so an admin tweak doesn't shift
+  // guests under players who are already mid-run.
   let startDay: string;
   const existingDays = new Set(priorRows.map((r) => r.day));
+  const dayAfter = (d: string): string => {
+    const dt = new Date(`${d}T00:00:00Z`);
+    dt.setUTCDate(dt.getUTCDate() + 1);
+    return dt.toISOString().slice(0, 10);
+  };
   if (mode === "regenerate") {
-    startDay = today;
+    startDay = dayAfter(today);
   } else {
     // Find latest-scheduled day ≥ today. If none, start today.
     const future = priorRows.map((r) => r.day).filter((d) => d >= today).sort();
@@ -145,11 +156,7 @@ export async function scheduleActiveDaily(
       startDay = today;
     } else {
       // Fill forward from the day after the last scheduled.
-      startDay = future[future.length - 1];
-      // nextDay is in daily-schedule.ts; reproduce quickly here.
-      const d = new Date(`${startDay}T00:00:00Z`);
-      d.setUTCDate(d.getUTCDate() + 1);
-      startDay = d.toISOString().slice(0, 10);
+      startDay = dayAfter(future[future.length - 1]);
     }
   }
 
@@ -200,15 +207,31 @@ export async function scheduleActiveDaily(
   };
 }
 
-/** Read the next N days of scheduled payloads for a theme, starting at
- *  today. Used by the admin review UI. */
+/** Read a window of scheduled payloads centred on today for the admin
+ *  review UI. `pastDays` counts historical days before today (immutable,
+ *  shown read-only in the UI); `futureDays` counts today-forward. Default
+ *  14 past + 30 future gives the admin ~2 weeks of context on what was
+ *  served + the full upcoming schedule.
+ *
+ *  Days without a row return an empty payload so the UI can render a
+ *  placeholder row rather than a gap. */
 export async function readSchedule(
   themeCode: string,
-  days: number = 30,
-): Promise<Array<{ day: string; payload: DailyPayload }>> {
+  futureDays: number = 30,
+  pastDays: number = 14,
+): Promise<Array<{ day: string; payload: DailyPayload; isPast: boolean }>> {
   const db = getDb();
   const today = UTC_TODAY();
-  const wanted = dayRange(today, days);
+  // Build the window: [today - pastDays, today - 1] + [today, today + futureDays - 1].
+  const past: string[] = [];
+  if (pastDays > 0) {
+    const start = new Date(`${today}T00:00:00Z`);
+    start.setUTCDate(start.getUTCDate() - pastDays);
+    past.push(...dayRange(start.toISOString().slice(0, 10), pastDays));
+  }
+  const future = dayRange(today, futureDays);
+  const wanted = [...past, ...future];
+  if (wanted.length === 0) return [];
   const rows = await db
     .select({
       day: schema.combineDailies.day,
@@ -225,6 +248,7 @@ export async function readSchedule(
   return wanted.map((day) => ({
     day,
     payload: byDay.get(day) ?? emptyPayload(),
+    isPast: day < today,
   }));
 }
 

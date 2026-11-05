@@ -47,6 +47,10 @@ export default async function AdminCombineThemesPage() {
           A theme is a curated subset of items playable together. Each item in a theme must be buildable from the
           theme&rsquo;s base ingredients — the validator on each theme page checks this.
         </p>
+        <p style={{ fontSize: 13, color: "var(--muted)" }}>
+          Daily config (which theme hosts today&apos;s daily, caps, guest items, 30-day schedule) lives on the{" "}
+          <Link href="/admin/combine/daily">Combine daily</Link> page.
+        </p>
       </section>
 
       <section className="feat" style={{ padding: 0 }}>

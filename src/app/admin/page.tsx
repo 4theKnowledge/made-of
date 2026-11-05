@@ -45,6 +45,7 @@ export default async function AdminHome() {
           <Link href="/admin/tree" className="btn">Knowledge base</Link>
           <Link href="/admin/kinds" className="btn">Kinds</Link>
           <Link href="/admin/combine/themes" className="btn">Combine themes</Link>
+          <Link href="/admin/combine/daily" className="btn">Combine daily</Link>
           <Link href="/admin/pictograms" className="btn">Pictogram audit</Link>
           <Link href="/admin/pictograms/upload" className="btn">Pictogram upload</Link>
           <Link href="/admin/import" className="btn">Import JSON</Link>
