@@ -1497,6 +1497,7 @@ a.btn.primary{color:var(--bg)}
  * N/M progress chip for partial. */
 .cbinfo-mastery{position:absolute;top:-6px;right:-8px;transform:translateY(22px);padding:1px 5px;font-size:8.5px;letter-spacing:.06em;border-width:1px;background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:700;box-shadow:1px 1px 0 var(--pk);white-space:nowrap}
 .cbinfo-mastery.mastered{background:var(--good, var(--accent));border-color:var(--good, var(--accent));color:#fff}
+.cbinfohd .cbinfo-mastery-badge{position:absolute;bottom:-6px;left:-6px;width:20px;height:20px;box-sizing:border-box;border-radius:50%;background:var(--good, var(--accent));color:#fff;font-size:13px;line-height:20px;text-align:center;pointer-events:none;z-index:2;box-shadow:1px 1px 0 var(--pk)}
 /* Full-width primary dismiss used by overlays with a single bottom action
    (e.g. the collection book). Matches the thumb-friendly height of row2. */
 .cbh.cbback{width:100%;justify-content:center;height:48px;font-size:14px;flex:none}

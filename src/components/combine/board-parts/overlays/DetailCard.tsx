@@ -181,8 +181,12 @@ export function DetailCard({
           />
           <span className="pill cbinfo-kind">{KIND[item.kind]}</span>
           {mastery?.mastered ? (
-            <span className="pill cbinfo-mastery mastered" aria-label="Mastered">
-              <span aria-hidden="true">◆</span> Mastered
+            <span
+              className="cbinfo-mastery-badge"
+              aria-label="Mastered"
+              title="Mastered"
+            >
+              <span aria-hidden="true">◆</span>
             </span>
           ) : mastery && mastery.available > 1 && mastery.made > 0 ? (
             <span
