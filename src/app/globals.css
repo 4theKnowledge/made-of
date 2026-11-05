@@ -1496,6 +1496,16 @@ a.btn.primary{color:var(--bg)}
 .cbchip-muted{--chip-ic-border:0;--chip-ic-bg:transparent;--chip-border:color-mix(in srgb, var(--ink) 50%, transparent);--chip-bg:var(--bg)}
 .cbchip-muted .ic svg{width:100%;height:100%}
 .cbchip-muted i{color:var(--muted);padding:0 2px}
+/* The muted chip strips the tile fill to transparent, so the element
+ * letter (and the .ic hardcoded `color: var(--pk)`) would read as dark
+ * on dark surfaces. Follow the ambient ink instead so dark theme flips
+ * correctly. Also follow for the SVG strokes used by letter-less
+ * pictograms (the `.b`/`.l` classes draw with `stroke: var(--pk)` on
+ * the base `.ic` rule). */
+.cbchip-muted .ic{color:var(--ink)}
+.cbchip-muted .ic svg .b{fill:transparent;stroke:var(--ink)}
+.cbchip-muted .ic svg .l{stroke:var(--ink)}
+.cbchip-muted .ic svg .k{fill:var(--ink)}
 
 /* End-of-run "New discoveries" list wraps the shared chip and adds
    a full-width "+N more" tagline underneath. */
@@ -1567,7 +1577,11 @@ a.btn.primary{color:var(--bg)}
 .cbbook .big2 small{font-size:14px;color:var(--muted)}
 .cbbar{width:100%;height:8px;border:1.5px solid var(--ink);border-radius:5px;overflow:hidden;background:var(--surface);flex:none}
 .cbbar i{display:block;height:100%;background:var(--fN)}
-.cbbookages{width:100%;overflow:auto;display:flex;flex-direction:column;gap:12px;text-align:left;padding:2px}
+/* Left/right padding leaves room for badges that poke past the tile edge
+ * (★ at left:-6px, ◆ at left:-6px, n/m at right:-6px) without being
+ * clipped by the overflow:auto. Top/bottom small so the grid still hugs
+ * the section headers. */
+.cbbookages{width:100%;overflow:auto;display:flex;flex-direction:column;gap:12px;text-align:left;padding:2px 8px}
 .cbbage .bh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
 .cbbage .bh b{font-size:14px}
 .cbbage .bh span{font-family:var(--mono);font-size:11px;color:var(--muted)}
@@ -1577,6 +1591,14 @@ a.btn.primary{color:var(--bg)}
 .bk .ic svg{width:100%;height:100%}
 .bk span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .bk.unk{border-style:dashed;border-color:color-mix(in srgb, var(--ink) 30%, transparent);background:transparent;color:var(--muted);cursor:default}
+/* Collection book tile accents. Same vocabulary as the Shelf's unlock
+ * styling pre-T-0081, but this is the correct surface — lifetime state
+ * belongs on the lifetime view, not the per-run history tray. */
+.bk.unlock{outline:2px solid var(--accent);outline-offset:2px}
+.bk.mastered{box-shadow:inset 0 0 0 1.5px var(--good, var(--accent))}
+.bk .cbunlock-star{position:absolute;top:-6px;left:-6px;min-width:15px;height:15px;padding:0 3px;box-sizing:border-box;border-radius:8px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;line-height:15px;text-align:center;pointer-events:none;z-index:2}
+.bk .cbmastery-badge{position:absolute;bottom:-6px;left:-6px;width:15px;height:15px;box-sizing:border-box;border-radius:50%;background:var(--good, var(--accent));color:#fff;font-size:10px;line-height:15px;text-align:center;pointer-events:none;z-index:2}
+.bk .cbprogress-badge{position:absolute;bottom:-6px;right:-6px;min-width:19px;height:14px;padding:0 3px;box-sizing:border-box;border-radius:7px;background:color-mix(in srgb, var(--ink) 80%, transparent);color:var(--bg);font-size:9px;font-weight:700;line-height:14px;text-align:center;pointer-events:none;z-index:2}
 .bk.unk .ic{opacity:.22;filter:brightness(0)}
 :root[data-theme="dark"] .bk.unk .ic{filter:brightness(0) invert(1)}
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .bk.unk .ic{filter:brightness(0) invert(1)} }
@@ -1602,10 +1624,19 @@ a.btn.primary{color:var(--bg)}
 .cbbookrow-recipes{display:flex;flex-direction:column;gap:4px;width:100%}
 .cbbookrow-recipes .cbchip{font-weight:600}
 .cbbookrow-none{font-style:italic;font-size:12px;color:var(--muted)}
-.cbcta{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:14px;row-gap:3px;width:calc(100% - 4px);margin:8px 2px;padding:12px 14px;border:1.5px dashed var(--ink);border-radius:6px;background:color-mix(in srgb, var(--ink) 4%, var(--surface));text-align:left;box-sizing:border-box}
-.cbcta b{grid-column:1;font-size:13px}
-.cbcta span{grid-column:1;font-size:12px;color:var(--muted);line-height:1.35}
-.cbcta .cbh{grid-column:2;grid-row:1 / span 2;align-self:center;height:34px;text-decoration:none;white-space:nowrap}
+/* Mastery summary line in the book header, under the big2 count. */
+.cbbook-mastery{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:2px 6px;border-radius:9px;background:color-mix(in srgb, var(--good, var(--accent)) 18%, transparent);color:var(--good, var(--accent));font-size:10.5px;font-weight:700;letter-spacing:.02em}
+/* Inline mastery / progress markers on the list row's name. */
+.cbbookrow-mastery{display:inline-flex;align-items:center;margin-left:6px;color:var(--good, var(--accent));font-size:13px;line-height:1}
+.cbbookrow-progress{display:inline-flex;align-items:center;margin-left:6px;padding:0 5px;border-radius:7px;background:color-mix(in srgb, var(--ink) 15%, transparent);color:var(--muted);font-family:var(--mono);font-size:10.5px;font-weight:700;line-height:1.3}
+/* Collection book sign-in CTA. Reads as a real call to action rather than
+ * a passive notice — accent-tinted background, solid accent border, and
+ * a filled primary button so the eye lands on "Sign in". */
+.cbcta{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:14px;row-gap:3px;width:calc(100% - 4px);margin:8px 2px;padding:12px 14px;border:2px solid var(--accent);border-radius:6px;background:color-mix(in srgb, var(--accent) 10%, var(--surface));text-align:left;box-sizing:border-box;box-shadow:3px 3px 0 var(--pk)}
+.cbcta b{grid-column:1;font-size:14px;color:var(--ink)}
+.cbcta span{grid-column:1;font-size:12px;color:var(--ink);opacity:.8;line-height:1.35}
+.cbcta .cbh{grid-column:2;grid-row:1 / span 2;align-self:center;height:36px;padding:0 14px;text-decoration:none;white-space:nowrap;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.cbcta .cbh:hover{filter:brightness(1.05)}
 
 /* ================= How to play ================= */
 /* Shared modal used by Daily, Combine and Scratch. */

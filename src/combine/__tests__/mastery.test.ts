@@ -137,6 +137,24 @@ describe("computeMastery", () => {
     expect(m).toEqual({ made: 1, available: 1, mastered: true });
   });
 
+  it("computes mastery for items known only via the lifetime collection (not this-run)", () => {
+    // CollectionBook covers items unlocked in prior runs. Mastery must work
+    // against whatever `known` set the caller provides — not tied to the
+    // engine's current-run `state.found`.
+    const bundle = fakeBundle(
+      [R("z", ["a", "b"]), R("z", ["c", "d"])],
+      ["a", "b", "c", "d"],
+    );
+    const lifetimeKnown = new Set(["a", "b", "c", "d", "z"]);
+    const m = computeMastery(
+      bundle,
+      "z",
+      lifetimeKnown,
+      new Set([sig(["a", "b"]), sig(["c", "d"])]),
+    );
+    expect(m).toEqual({ made: 2, available: 2, mastered: true });
+  });
+
   it("partial-mastery becomes full-mastery when the final variant is made", () => {
     const bundle = fakeBundle(
       [R("z", ["a", "b"]), R("z", ["c", "d"])],

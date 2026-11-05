@@ -2068,9 +2068,22 @@ export function CombineBoard({
             bundle={bundle}
             state={state}
             collection={collection}
+            signatures={collectionSignatures}
+            newUnlocks={newUnlocks}
             authed={collectionAuthed}
             authPending={collectionPending}
             onInfo={(id) => setInfoTile(id)}
+            onAcknowledge={(id) => {
+              if (!newUnlocks.has(id)) return;
+              const changed = clearNewUnlock(collectionScope, id);
+              if (!changed) return;
+              setNewUnlocks((prev) => {
+                if (!prev.has(id)) return prev;
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+              });
+            }}
             onDismiss={() => setBookOpen(false)}
           />
         )}

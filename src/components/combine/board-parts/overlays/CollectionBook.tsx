@@ -7,14 +7,20 @@ import type { CombineRecipe, ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { CombineTile } from "@/components/combine/board-parts/CombineTile";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
+import { computeMastery } from "@/components/combine/board-parts/types";
+
+const EMPTY_SET: ReadonlySet<string> = new Set();
 
 export function CollectionBook({
   bundle,
   state,
   collection,
+  signatures,
+  newUnlocks,
   authed,
   authPending,
   onInfo,
+  onAcknowledge,
   onDismiss,
 }: {
   bundle: ThemeBundle;
@@ -22,9 +28,20 @@ export function CollectionBook({
   /** Lifetime finds: itemId → firstFoundAt epoch ms. Signed-in users carry
    *  this across games; signed-out users accumulate it only in memory. */
   collection: Map<string, number>;
+  /** Per-item recipe signatures the player has produced. Omit or pass an
+   *  empty map for signed-out / pre-mastery clients — tiles just won't
+   *  show mastery badges. */
+  signatures?: ReadonlyMap<string, ReadonlySet<string>>;
+  /** Unacknowledged lifetime-unlock ids. Tiles render a ★ until the player
+   *  taps them (which fires `onAcknowledge`). Omit = no badges. */
+  newUnlocks?: ReadonlySet<string>;
   authed: boolean;
   authPending: boolean;
   onInfo: (id: string) => void;
+  /** Called with an item id when the player taps a tile with a ★ badge,
+   *  so the parent can clear the new-unlock marker. Also fires on list-row
+   *  taps for consistency. Safe to omit if newUnlocks is empty. */
+  onAcknowledge?: (id: string) => void;
   onDismiss: () => void;
 }) {
   const cat = useMemo(() => catalogue(bundle), [bundle]);
@@ -55,6 +72,38 @@ export function CollectionBook({
   }, [collection, state.found, collectables]);
   const got = findsForTheme.size;
   const pct = Math.round((100 * got) / Math.max(1, total));
+  // "Known" for mastery = everything in findsForTheme (lifetime + this-run
+  // merged) plus raw base ingredients. The computeMastery helper also
+  // consults bundle.base, but passing a fully-formed known set keeps the
+  // denominator honest when the player has unlocked a base-ingredient-only
+  // item via a leak.
+  const knownForMastery = useMemo(() => {
+    const s = new Set<string>(findsForTheme.keys());
+    for (const id of bundle.base) s.add(id);
+    return s;
+  }, [findsForTheme, bundle.base]);
+  // Per-item mastery for everything the player has unlocked. Derived on
+  // demand; bounded by `findsForTheme.size`.
+  const masteryByItem = useMemo(() => {
+    const m = new Map<
+      string,
+      { made: number; available: number; mastered: boolean }
+    >();
+    if (!signatures) return m;
+    for (const id of findsForTheme.keys()) {
+      const sigs = signatures.get(id);
+      m.set(
+        id,
+        computeMastery(bundle, id, knownForMastery, sigs ?? EMPTY_SET),
+      );
+    }
+    return m;
+  }, [findsForTheme, signatures, bundle, knownForMastery]);
+  const masteredCount = useMemo(() => {
+    let n = 0;
+    for (const info of masteryByItem.values()) if (info.mastered) n++;
+    return n;
+  }, [masteryByItem]);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [sort, setSort] = useState<"recent" | "alpha" | "kind" | "age">("recent");
   // Recipes for every discovered output, grouped by id. The quick-lookup
@@ -121,6 +170,11 @@ export function CollectionBook({
         <div className="cbbar">
           <i style={{ width: `${pct}%` }} />
         </div>
+        {masteredCount > 0 && (
+          <div className="cbbook-mastery" aria-label={`Mastered: ${masteredCount}`}>
+            <span aria-hidden="true">◆</span> {masteredCount} mastered
+          </div>
+        )}
         {!authPending && !authed && (
           <SignInCTA count={got} />
         )}
@@ -174,12 +228,27 @@ export function CollectionBook({
                 const recipes = recipesByOut.get(id) ?? [];
                 const no = String(cat.no.get(id)).padStart(3, "0");
                 const foundAt = findsForTheme.get(id) ?? 0;
+                const m = masteryByItem.get(id);
+                const isNew = newUnlocks?.has(id) ?? false;
+                const isMastered = m?.mastered ?? false;
+                const showProgress =
+                  !!m && m.available > 1 && m.made < m.available;
                 return (
                   <button
                     key={id}
                     type="button"
-                    className="cbbookrow"
+                    className={`cbbookrow${isNew ? " unlock" : ""}${
+                      isMastered ? " mastered" : ""
+                    }`}
+                    aria-label={`${cap(it.name)}${
+                      isNew ? ", new in your collection" : ""
+                    }${isMastered ? ", mastered" : ""}${
+                      showProgress
+                        ? `, ${m!.made} of ${m!.available} recipes`
+                        : ""
+                    }`}
                     onClick={() => {
+                      if (isNew) onAcknowledge?.(id);
                       onInfo(id);
                     }}
                   >
@@ -188,10 +257,35 @@ export function CollectionBook({
                         as="span"
                         variant="slot"
                         item={it}
+                        className={isNew ? "unlock" : undefined}
                         aria-hidden="true"
-                      />
+                      >
+                        {isNew && (
+                          <span className="cbunlock-star" aria-hidden="true">
+                            ★
+                          </span>
+                        )}
+                      </CombineTile>
                       <span className="cbbookrow-text">
-                        <b>{cap(it.name)}</b>
+                        <b>
+                          {cap(it.name)}
+                          {isMastered && (
+                            <span
+                              className="cbbookrow-mastery"
+                              aria-label="Mastered"
+                            >
+                              <span aria-hidden="true">◆</span>
+                            </span>
+                          )}
+                          {showProgress && (
+                            <span
+                              className="cbbookrow-progress"
+                              aria-label={`${m!.made} of ${m!.available} recipes`}
+                            >
+                              {m!.made}/{m!.available}
+                            </span>
+                          )}
+                        </b>
                         <small>
                           No. {no} · {it.kind} · {relativeTime(foundAt)}
                         </small>
@@ -267,18 +361,52 @@ export function CollectionBook({
                         </span>
                       );
                     }
+                    const m = masteryByItem.get(id);
+                    const isNew = newUnlocks?.has(id) ?? false;
+                    const isMastered = m?.mastered ?? false;
+                    const showProgress =
+                      !!m && m.available > 1 && m.made < m.available;
+                    const tileClasses: string[] = [];
+                    if (isNew) tileClasses.push("unlock");
+                    if (isMastered) tileClasses.push("mastered");
                     return (
                       <CombineTile
                         key={id}
                         variant="book"
                         item={it}
                         label
+                        className={
+                          tileClasses.length ? tileClasses.join(" ") : undefined
+                        }
                         onClick={() => {
+                          if (isNew) onAcknowledge?.(id);
                           onInfo(id);
                         }}
                         title={cap(it.name)}
+                        aria-label={`${cap(it.name)}${
+                          isNew ? ", new in your collection" : ""
+                        }${isMastered ? ", mastered" : ""}${
+                          showProgress
+                            ? `, ${m!.made} of ${m!.available} recipes`
+                            : ""
+                        }`}
                       >
                         <small>{relativeTime(foundAt)}</small>
+                        {isNew && (
+                          <span className="cbunlock-star" aria-hidden="true">
+                            ★
+                          </span>
+                        )}
+                        {isMastered && (
+                          <span className="cbmastery-badge" aria-hidden="true">
+                            ◆
+                          </span>
+                        )}
+                        {showProgress && (
+                          <span className="cbprogress-badge" aria-hidden="true">
+                            {m!.made}/{m!.available}
+                          </span>
+                        )}
                       </CombineTile>
                     );
                   })}

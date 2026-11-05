@@ -27,3 +27,4 @@
 {"id": "C-0027", "ts": "2026-11-05T11:51:10Z", "kind": "fix", "summary": "Combine: long-pressing a tile on mobile no longer selects page text", "refs": {"task": "T-0075"}}
 {"id": "C-0028", "ts": "2026-11-05T11:53:42Z", "kind": "fix", "summary": "Combine: \"Close call!\" now fires only on a genuine rescue (board was full; combine freed cells).", "refs": {"task": "T-0076"}}
 {"id": "C-0029", "ts": "2026-11-05T12:15:55Z", "kind": "feature", "summary": "Combine tracks per-recipe mastery; DetailCard shows \"Mastered\"/n-of-m pill and per-row made/unmade state; preview `+N` now counts only known alternatives", "refs": {"task": "T-0077"}}
+{"id": "C-0030", "ts": "2026-11-05T12:25:39Z", "kind": "feature", "summary": "Combine collection book surfaces mastery (◆ and n/m badges) and new-unlock ★ with tap-to-acknowledge; fixes muted-chip pictogram contrast in dark mode and redesigns the signed-out CTA", "refs": {"task": "T-0081"}}
