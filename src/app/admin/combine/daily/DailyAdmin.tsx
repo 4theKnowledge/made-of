@@ -153,8 +153,10 @@ export function DailyAdmin({
       <section className="feat">
         <h3 style={{ marginTop: 0, fontSize: 16 }}>Active theme</h3>
         <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
-          The daily plays on this theme. Switch themes with care — in-flight player
-          saves for today will stay on the previous theme until the day rolls over.
+          Which theme&apos;s recipes power today&apos;s daily. Endless and Fast are
+          unaffected — they always use the player&apos;s chosen theme. Switching
+          here is safe at any time, but players mid-run on today&apos;s daily keep
+          the previous theme until the day rolls over (UTC midnight).
         </p>
         <select
           value={themeCode}
@@ -171,8 +173,26 @@ export function DailyAdmin({
 
       <section className="feat">
         <h3 style={{ marginTop: 0, fontSize: 16 }}>Daily config</h3>
+        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
+          Tune how long a daily run takes and how much rare content it surfaces.
+          A fresh run must finish in one sitting, so the goal is &ldquo;satisfying in
+          ~15 minutes&rdquo; for the median player — not a completionist marathon.
+        </p>
         <div style={{ display: "grid", gap: 10, maxWidth: 520 }}>
-          <Field label="Max ages" hint="Cap the daily run to this many ages. Leave blank for no cap.">
+          <Field
+            label="Max ages"
+            hint={
+              <>
+                Caps the daily at this many ages (1 = only age I plays, no progression).{" "}
+                Blank → full theme (endless length), typically way too long for a single sitting.
+                <br />
+                <strong>Lower (3–5)</strong> = shorter, friendlier daily; players reach the end
+                and feel finished. <strong>Higher (6–8)</strong> = more content per day but
+                longer playtime and lower completion rate.{" "}
+                <em>Start at ~5 for the 15-minute target on Everything.</em>
+              </>
+            }
+          >
             <input
               type="number"
               min={1}
@@ -183,7 +203,20 @@ export function DailyAdmin({
               placeholder="no cap"
             />
           </Field>
-          <Field label="Age-need scale" hint="Multiplies first-finds required to advance each age. 1.0 = same as endless, 0.5 = half.">
+          <Field
+            label="Age-need scale"
+            hint={
+              <>
+                Multiplies how many unique on-band first-finds the player must make to leave
+                each age. 1.0 matches endless; lower values ask less.
+                <br />
+                <strong>&lt; 1.0 (e.g. 0.5)</strong> = faster age-ups, shorter run, less
+                exhaustive exploration. <strong>&gt; 1.0</strong> = more demanding age-ups
+                (rarely wanted for daily).{" "}
+                <em>0.4&ndash;0.6 pairs well with a 4&ndash;6 age cap.</em>
+              </>
+            }
+          >
             <input
               type="number"
               step="0.05"
@@ -200,11 +233,26 @@ export function DailyAdmin({
               Guest ingredient of the day (optional)
             </legend>
             <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
-              Per-day deterministic injection of items whose output lives above the age cap.
-              Drips rare items into the daily collection over months.
+              Each day, inject a deterministic set of above-cap recipes into the dealer.
+              Everyone sees the same guests; a rotation memory in the scheduler keeps a
+              given item out for ~one full cycle before it can repeat. This is what lets
+              players discover rare items that normally live past the daily&apos;s age cap.
+              Leave Per run at 0 to disable.
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <Field label="Per run" hint="0..10.">
+              <Field
+                label="Per run"
+                hint={
+                  <>
+                    How many guest recipes to inject each day.
+                    <br />
+                    <strong>0</strong> = disabled. <strong>1–2</strong> = a small daily surprise,
+                    collection drips in over months. <strong>3+</strong> = heavier — can feel
+                    noisy or make the daily harder to parse.{" "}
+                    <em>1 or 2 is a good default.</em>
+                  </>
+                }
+              >
                 <input
                   type="number"
                   min={0}
@@ -215,7 +263,20 @@ export function DailyAdmin({
                   placeholder="0"
                 />
               </Field>
-              <Field label="Min band" hint="1..30. Guests must live in this band or higher.">
+              <Field
+                label="Min band"
+                hint={
+                  <>
+                    Guests must live in this band or higher (1 = earliest, 14 = latest on
+                    Everything today). The game auto-raises this to at least &ldquo;cap + 1&rdquo;
+                    so guests never overlap the normal daily progression.
+                    <br />
+                    <strong>Just above the cap</strong> = adjacent rare items players nearly
+                    reached. <strong>Much higher</strong> = exotic late-game drops.{" "}
+                    <em>Try cap + 1 to start.</em>
+                  </>
+                }
+              >
                 <input
                   type="number"
                   min={1}
@@ -391,14 +452,18 @@ function Field({
   children,
 }: {
   label: string;
-  hint?: string;
+  hint?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
       <span>{label}</span>
       {children}
-      {hint && <span style={{ fontSize: 11, color: "var(--muted)" }}>{hint}</span>}
+      {hint && (
+        <span style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.45 }}>
+          {hint}
+        </span>
+      )}
     </label>
   );
 }
