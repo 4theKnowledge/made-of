@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CombineTile } from "@/components/combine/board-parts/CombineTile";
 import type { CombineItem } from "@/combine/types";
 import type { ItemKind, Tier } from "@/db/schema";
@@ -26,18 +26,37 @@ export interface Tree {
   final: TreeItem;
 }
 
-const LOOP_MS = 8400;
+/** How long (ms) a sequence takes from mount to fully drawn. Roughly:
+ *  cols*0.28s stagger + 1.9s to final tile + 0.6s glow tail. Must stay in
+ *  sync with the animationDelay calcs below. */
+const SEQUENCE_MS = 3600;
 
 export function HeroChain({ trees }: { trees: Tree[] }) {
   const [idx, setIdx] = useState(0);
+  const [nonce, setNonce] = useState(0);
+  const [finished, setFinished] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // On each run (tree change OR same-tree replay via nonce), schedule a
+  // "finished" flip at the end of the sequence so the replay button shows.
   useEffect(() => {
-    if (trees.length <= 1) return;
-    const t = setInterval(() => {
+    setFinished(false);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setFinished(true), SEQUENCE_MS);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [idx, nonce]);
+
+  const advance = () => {
+    if (trees.length <= 1) {
+      // Replay the same tree by bumping the nonce (re-keys the inner div
+      // so CSS animations restart from frame 0).
+      setNonce((n) => n + 1);
+    } else {
       setIdx((i) => (i + 1) % trees.length);
-    }, LOOP_MS);
-    return () => clearInterval(t);
-  }, [trees.length]);
+    }
+  };
 
   const tree = trees[idx];
   if (!tree) return null;
@@ -46,11 +65,12 @@ export function HeroChain({ trees }: { trees: Tree[] }) {
   const cols = branches.length;
 
   return (
-    <div className="heroTree" aria-hidden="true">
+    <div className="heroTree">
       <div
-        key={tree.id}
+        key={`${tree.id}-${nonce}`}
         className="heroTree-run"
         style={{ "--cols": cols } as React.CSSProperties}
+        aria-hidden="true"
       >
         <span className="heroTree-spark" />
 
@@ -116,6 +136,33 @@ export function HeroChain({ trees }: { trees: Tree[] }) {
             />
           </div>
         </div>
+      </div>
+
+      <div className="heroTree-controls">
+        <button
+          type="button"
+          className="heroTree-replay"
+          onClick={advance}
+          data-ready={finished ? "" : undefined}
+          aria-label={trees.length > 1 ? "Show the next recipe" : "Replay the animation"}
+        >
+          <svg
+            viewBox="0 0 16 16"
+            width="12"
+            height="12"
+            aria-hidden="true"
+          >
+            <path
+              d="M 2 8 A 6 6 0 1 1 8 14 M 2 8 L 5 5 M 2 8 L 5 11"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span>{trees.length > 1 ? "Next recipe" : "Replay"}</span>
+        </button>
       </div>
 
       <span className="sr-only">

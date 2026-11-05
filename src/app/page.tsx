@@ -8,6 +8,10 @@ import {
   type TreeItem,
 } from "@/components/home/HeroChain";
 import { ModeGrid } from "@/components/home/ModeGrid";
+import {
+  CombineVisual,
+  ExploreVisual,
+} from "@/components/home/ModeVisual";
 import { getLiveSnapshot } from "@/graph/live";
 
 export const dynamic = "force-dynamic";
@@ -119,7 +123,27 @@ export default async function HomePage() {
         {trees.length > 0 && <HeroChain trees={trees} />}
       </section>
 
-      <ModeGrid />
+      <ModeGrid
+        combineVisual={
+          <CombineVisual
+            items={{
+              rock: live.snapshot.bySlug.get("rock"),
+              water: live.snapshot.bySlug.get("water"),
+              clay: live.snapshot.bySlug.get("clay"),
+            }}
+          />
+        }
+        exploreVisual={
+          <ExploreVisual
+            items={{
+              flour: live.snapshot.bySlug.get("flour"),
+              water: live.snapshot.bySlug.get("water"),
+              bread: live.snapshot.bySlug.get("bread"),
+              sandwich: live.snapshot.bySlug.get("sandwich"),
+            }}
+          />
+        }
+      />
 
       <Footer />
     </main>

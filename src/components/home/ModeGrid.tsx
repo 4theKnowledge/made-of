@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 interface Mode {
   href: string;
@@ -6,33 +7,47 @@ interface Mode {
   blurb: string;
   cta: string;
   primary?: boolean;
+  visual?: ReactNode;
 }
 
-const MODES: Mode[] = [
-  {
-    href: "/combine",
-    title: "Combine",
-    blurb:
-      "Drag touching things together to make a third, and watch recipes chain. Endless, fast and daily modes, with a lifetime collection as you go.",
-    cta: "Play today’s Combine",
-    primary: true,
-  },
-  {
-    href: "/explore/water",
-    title: "Explore",
-    blurb:
-      "Pick anything and see what it takes and what it leads to. Follow a thread as far as you like.",
-    cta: "Start exploring",
-  },
-];
+export function ModeGrid({
+  combineVisual,
+  exploreVisual,
+}: {
+  combineVisual?: ReactNode;
+  exploreVisual?: ReactNode;
+}) {
+  const modes: Mode[] = [
+    {
+      href: "/combine",
+      title: "Combine",
+      blurb:
+        "Drag touching things together to make a third, and watch recipes chain. Endless, fast and daily modes, with a lifetime collection as you go.",
+      cta: "Play today’s Combine",
+      primary: true,
+      visual: combineVisual,
+    },
+    {
+      href: "/explore/water",
+      title: "Explore",
+      blurb:
+        "Pick anything and see what it takes and what it leads to. Follow a thread as far as you like.",
+      cta: "Start exploring",
+      visual: exploreVisual,
+    },
+  ];
 
-export function ModeGrid() {
   return (
     <section className="homeModes">
-      {MODES.map((m) => (
-        <article key={m.href} className="feat">
-          <h3>{m.title}</h3>
-          <p>{m.blurb}</p>
+      {modes.map((m) => (
+        <article key={m.href} className="feat modeCard">
+          <div className="modeCard-head">
+            <div className="modeCard-text">
+              <h3>{m.title}</h3>
+              <p>{m.blurb}</p>
+            </div>
+            {m.visual && <div className="modeCard-viz">{m.visual}</div>}
+          </div>
           <Link
             href={m.href}
             className={`btn${m.primary ? " primary" : ""}`}

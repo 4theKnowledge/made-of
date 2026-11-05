@@ -2366,6 +2366,85 @@ a.btn.primary{color:var(--bg)}
 }
 .homeModes .feat { min-height: 160px; }
 
+/* Mode card: text on the left, compact visual accent on the right. The
+   visual complements the copy, doesn't dominate it. */
+.modeCard-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.modeCard-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.modeCard-viz {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+/* Mini pictogram tile — bordered square with tier fill, no label. */
+.modeViz {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.modeViz-ptile {
+  display: inline-grid;
+  place-items: center;
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  background: var(--fill, #fff);
+  box-shadow: 1.5px 1.5px 0 var(--ink);
+}
+.modeViz-ptile .ic {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.modeViz-ptile .ic svg { width: 82%; height: 82%; }
+.modeViz-op {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* Explore micro-bowtie: input column + wires + centre + wires + output. */
+.modeViz-explore { gap: 0; }
+.modeViz-explore .modeViz-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.modeViz-wires {
+  width: 14px;
+  height: 56px;
+  display: block;
+}
+.modeViz-wires line {
+  stroke: var(--ink);
+  stroke-width: 1.4;
+  opacity: 0.4;
+  vector-effect: non-scaling-stroke;
+}
+.modeViz-wires-out { width: 10px; }
+.modeViz-centre { display: flex; align-items: center; }
+
+@media (max-width: 420px) {
+  /* On the narrowest phones, drop the visual to keep cards readable. */
+  .modeCard-viz { display: none; }
+}
+
 /* ===== Hero branching tree animation ===== */
 
 .heroTree {
@@ -2405,6 +2484,39 @@ a.btn.primary{color:var(--bg)}
 /* Wrapper slot that handles the fade-in / glow animation. The inner tile
    itself (`.cbp` from Combine) carries the tier fill, border, and label
    typography — reused so the hero reads as the same visual grammar. */
+/* Replay / next-recipe control. Tiny muted text link, invisible until the
+   sequence finishes, then softly fades in. Sits centred under the tree. */
+.heroTree-controls {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+  min-height: 24px; /* reserves space so layout doesn't jump on reveal */
+}
+.heroTree-replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 2px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.25s ease-out, color 0.15s;
+  pointer-events: none;
+}
+.heroTree-replay[data-ready] {
+  opacity: 0.75;
+  pointer-events: auto;
+}
+.heroTree-replay:hover { color: var(--ink); opacity: 1; }
+.heroTree-replay svg { opacity: 0.8; }
+
 /* Wrapper that handles the fade/glow animation. .cbp inside is forced to
    an explicit size — .cbp's own width:100%+aspect-ratio:1 gets confused
    inside a flex parent on the 1fr final row, so we pin dimensions here. */
