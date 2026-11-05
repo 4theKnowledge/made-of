@@ -40,3 +40,4 @@
 {"id": "C-0040", "ts": "2026-11-05T13:37:33Z", "kind": "fix", "summary": "Dev sign-in bypass no longer triggers Resend emails when RESEND_API_KEY is set locally", "refs": {"task": "T-0091"}}
 {"id": "C-0041", "ts": "2026-11-05T14:14:38Z", "kind": "fix", "summary": "Footer Feedback button now styled like other links and no longer overflows on mobile game pages (T-0092)", "refs": {"task": "T-0092"}}
 {"id": "C-0042", "ts": "2026-11-05T14:24:29Z", "kind": "fix", "summary": "Combine fast mode now populates the on-board History tray and DetailCard \"how you made it\" (T-0093)", "refs": {"task": "T-0093"}}
+{"id": "C-0043", "ts": "2026-11-05T20:39:38Z", "kind": "fix", "summary": "Combine DetailCard: \"Full story in Explore\" and \"Back to the game\" now sit side-by-side in a ButtonGroup", "refs": {"task": "T-0095"}}

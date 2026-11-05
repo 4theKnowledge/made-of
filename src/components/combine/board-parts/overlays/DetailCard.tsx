@@ -4,6 +4,7 @@ import type { ThemeBundle } from "@/combine/types";
 import { cap, KIND } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
+import { ButtonGroup } from "@/components/common/ButtonGroup";
 import type { MasteryInfo } from "@/components/combine/board-parts/types";
 import { ReactionButtons } from "@/components/combine/board-parts/ReactionButtons";
 import type { ReactionState, ReactionTarget } from "@/combine/useReactions";
@@ -364,19 +365,25 @@ export function DetailCard({
             )}
           </div>
         )}
-        {canExplore && (
-          <a
-            className="cbh"
-            href={`/explore/${item.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Full story in Explore
-          </a>
+        {canExplore ? (
+          <ButtonGroup align="stretch">
+            <a
+              className="cbh"
+              href={`/explore/${item.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Full story in Explore
+            </a>
+            <button type="button" className="cbh" onClick={onDismiss}>
+              Back to the game
+            </button>
+          </ButtonGroup>
+        ) : (
+          <button type="button" className="cbh cbback" onClick={onDismiss}>
+            Back to the game
+          </button>
         )}
-        <button type="button" className="cbh cbback" onClick={onDismiss}>
-          Back to the game
-        </button>
     </ResponsiveSheet>
   );
 }
