@@ -166,6 +166,8 @@ function buildAuth() {
         sendMagicLink: async ({ email, url }) => {
           if (process.env.NODE_ENV !== "production") {
             devMagicLinks.set(email, url);
+            console.log(`[auth] magic link for ${email}: ${url}`);
+            return;
           }
           if (!process.env.RESEND_API_KEY) {
             console.log(`[auth] magic link for ${email}: ${url}`);
