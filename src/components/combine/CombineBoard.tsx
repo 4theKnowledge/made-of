@@ -2186,6 +2186,9 @@ export function CombineBoard({
             howMade={state.howMade}
             madeSignatures={collectionSignatures.get(infoTile) ?? EMPTY_SIG_SET}
             mastery={mastery.get(infoTile)}
+            itemReactions={itemReactions}
+            onVoteReaction={voteReaction}
+            reactionsAuthed={reactionsAuthed}
             onDismiss={() => {
               setInfoTile(null);
               setInfoCell(null);
@@ -2201,6 +2204,24 @@ export function CombineBoard({
                   category: "item_wrong",
                   itemId: id,
                   ...(it ? { recipeInputs: [it.name] } : {}),
+                },
+              });
+            }}
+            onReportRecipe={(ingredients) => {
+              const id = infoTile;
+              setInfoTile(null);
+              setInfoCell(null);
+              const it = bundle.items.get(id);
+              const inputs = ingredients
+                .map((pid) => bundle.items.get(pid)?.name)
+                .filter((n): n is string => Boolean(n));
+              setFeedback({
+                type: "report",
+                payload: {
+                  category: "recipe_wrong",
+                  itemId: id,
+                  recipeInputs: inputs,
+                  ...(it ? { itemName: it.name } : {}),
                 },
               });
             }}

@@ -1382,13 +1382,38 @@ a.btn.primary{color:var(--bg)}
 .cbrx-btn:active{transform:translateY(1px)}
 .cbrx-btn.on.up{background:var(--good, var(--accent));color:#fff;border-color:var(--good, var(--accent))}
 .cbrx-btn.on.down{background:var(--bad, #c84);color:#fff;border-color:var(--bad, #c84)}
-.cbrx-btn.flag{opacity:.7}
-.cbrx-btn.flag:hover{opacity:1}
 .cbrx-why{margin-top:2px;padding:2px 6px;background:transparent;border:0;color:inherit;font-family:var(--mono);font-size:10px;letter-spacing:.04em;text-decoration:underline;cursor:pointer;opacity:.75}
 .cbrx-why:hover{opacity:1}
 .cbrx.xs .cbrx-btn{width:22px;height:22px;padding:1px}
 .cbrx.xs .cbrx-btn .ic{width:16px;height:16px}
 .cbrx.xs .cbrx-why{font-size:9.5px}
+/* Labeled variant — each button shows a short word next to its icon so
+ * the intent is self-evident. Used in DetailCard where the reaction row
+ * is a considered action, not an inline compact control. Must override
+ * the base `.cbrx-btn { display: inline-grid }` to get a horizontal row. */
+.cbrx.labeled .cbrx-btn{display:inline-flex;align-items:center;justify-content:center;width:auto;min-width:72px;height:32px;padding:0 10px;gap:6px}
+.cbrx.labeled .cbrx-btn .ic{width:16px;height:16px;flex:none}
+.cbrx-lab{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.02em;line-height:1}
+/* DetailCard reaction row. Downvote and flag open a picker (see
+ * .cbrx-picker) so the player can target item vs specific recipe. */
+.cbinfo-rx{display:flex;justify-content:center;margin:2px 0 8px}
+/* Routing picker. Appears beneath the Feedback row when the player taps
+ * thumbs-down or the flag. One-tap on the pre-highlighted "This item"
+ * option, or pick a specific recipe row. */
+.cbrx-picker{display:flex;flex-direction:column;gap:6px;margin:0 0 10px;padding:10px;border:1.5px solid var(--ink);border-radius:4px;background:color-mix(in srgb, var(--ink) 4%, var(--surface));box-shadow:2px 2px 0 var(--pk)}
+.cbrx-picker-k{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;color:var(--ink);padding:0 0 4px}
+.cbrx-picker-opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1.5px solid color-mix(in srgb, var(--ink) 30%, transparent);border-radius:4px;background:var(--bg);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.cbrx-picker-opt:hover{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 8%, var(--bg))}
+.cbrx-picker-opt.item{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, var(--bg))}
+.cbrx-picker-opt .ic{width:30px;height:30px;flex:none}
+.cbrx-picker-opt > span{display:flex;flex-direction:column;min-width:0;flex:1}
+.cbrx-picker-opt b{font-size:13px;line-height:1.1}
+.cbrx-picker-opt small{font-size:11px;color:var(--muted);line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cbrx-picker-recipe{display:inline-flex;align-items:center;gap:3px;flex:none}
+.cbrx-picker-recipe .ic{width:22px;height:22px}
+.cbrx-picker-recipe i{font-style:normal;opacity:.5;padding:0 1px}
+.cbrx-picker-cancel{padding:6px 10px;background:transparent;border:0;color:var(--muted);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline}
+.cbrx-picker-cancel:hover{color:var(--ink)}
 
 /* Ghost preview + preview badges */
 .cbc .ghost2{opacity:.38;width:62%;display:grid;place-items:center}
