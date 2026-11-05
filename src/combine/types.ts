@@ -27,6 +27,11 @@ export interface ThemeMeta {
 /** One recipe projected into Combine's world. In Combine both `f` (made
  *  from) and `w` (made with — tools) are consumed when the group matches. */
 export interface CombineRecipe {
+  /** Underlying `recipes.id` (UUID). Used by the reactions UI to vote on
+   *  the specific authored recipe row, and by admin triage to join with
+   *  reactions / feedback tables. May be empty for synthetic recipes in
+   *  tests — all production bundles carry it. */
+  id: string;
   /** Output item slug. */
   out: string;
   /** Ingredients that are "made from". */

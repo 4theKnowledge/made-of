@@ -93,6 +93,7 @@ function fakeBundle(opts: {
 }
 
 const R = (out: string, all: string[], band: number): CombineRecipe => ({
+  id: `test-${out}-${all.join("+")}`,
   out,
   from: all,
   with: [],

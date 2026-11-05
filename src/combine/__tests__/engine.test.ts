@@ -93,6 +93,7 @@ function fakeBundle(opts: {
 }
 
 const R = (out: string, all: string[]): CombineRecipe => ({
+  id: `test-${out}-${all.join("+")}`,
   out,
   from: all,
   with: [],
@@ -642,7 +643,7 @@ describe("hold zone", () => {
       // "future" sits in band 3; its ingredients aren't in `USE` for ages
       // 0 or 1 (which see bands [0,1,2] and [1,2,3] respectively), so a
       // held "future-tool" tile should crumble when ageing from 0 → 1.
-      { out: "warp", from: ["spice"], with: [], needs: [], evolved: [], all: ["spice"], lvl: 1, band: 3 },
+      { id: "test-warp-spice", out: "warp", from: ["spice"], with: [], needs: [], evolved: [], all: ["spice"], lvl: 1, band: 3 },
     ],
   });
 
@@ -1218,8 +1219,8 @@ describe("wipe-board", () => {
   const bundle = fakeBundle({
     recipes: [
       R("dough", ["flour", "water"]),
-      { out: "bread", from: ["dough", "fire"], with: [], needs: [], evolved: [], all: ["dough", "fire"], lvl: 2, band: 2 },
-      { out: "feast", from: ["bread", "spice"], with: [], needs: [], evolved: [], all: ["bread", "spice"], lvl: 3, band: 3 },
+      { id: "test-bread", out: "bread", from: ["dough", "fire"], with: [], needs: [], evolved: [], all: ["dough", "fire"], lvl: 2, band: 2 },
+      { id: "test-feast", out: "feast", from: ["bread", "spice"], with: [], needs: [], evolved: [], all: ["bread", "spice"], lvl: 3, band: 3 },
     ],
   });
 

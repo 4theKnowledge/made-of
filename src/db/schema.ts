@@ -8,6 +8,7 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -57,6 +58,12 @@ export const sourceKindEnum = pgEnum("source_kind", [
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 
 export const combineScopeEnum = pgEnum("combine_scope", ["endless", "daily"]);
+
+// Reaction target discriminator. Lets one `reactions` table serve both item
+// and recipe thumbs without duplicating the row shape per target type. See
+// `reactions` below for the trade-off (no FK to the target; cleanup is
+// best-effort via triggers / periodic sweep).
+export const reactionTargetEnum = pgEnum("reaction_target", ["recipe", "item"]);
 
 export const changelogStatusEnum = pgEnum("changelog_status", ["draft", "live"]);
 export const changelogTypeEnum = pgEnum("changelog_type", [
@@ -601,6 +608,53 @@ export const codeRedemptions = pgTable(
     index("code_redemptions_user_idx").on(t.userId),
   ],
 );
+
+/* ========================================================================
+ * Reactions.
+ *
+ * Polymorphic user feedback on items and recipes: 👍 / 👎 with an optional
+ * `reason` text. One row per (user, target_kind, target_id); re-voting
+ * flips the value via ON CONFLICT DO UPDATE and a 0-value POST deletes
+ * the row (toggle-off).
+ *
+ * Why polymorphic rather than two tables: the UI primitive, hook, API
+ * route, and admin triage are identical regardless of target kind.
+ * Adding a third target (sources, kinds) later is just a new enum value.
+ * The trade-off is no FK into items/recipes — Postgres can't FK
+ * conditionally on an enum. Stale rows are harmless (a deleted
+ * item/recipe can't have its reactions queried through the normal UI);
+ * a periodic sweep or ON DELETE trigger can clean up when it matters.
+ * ====================================================================== */
+
+export const reactions = pgTable(
+  "reactions",
+  {
+    targetKind: reactionTargetEnum("target_kind").notNull(),
+    // Both items.id and recipes.id are UUIDs so a single column covers both.
+    // No FK: see table-level comment.
+    targetId: uuid("target_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => authUser.id, { onDelete: "cascade" }),
+    // Constrained to {-1, +1} by a CHECK constraint in the migration.
+    // 0 is not stored (a 0-value POST deletes the row).
+    value: smallint("value").notNull(),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.targetKind, t.targetId, t.userId] }),
+    index("reactions_target_idx").on(t.targetKind, t.targetId),
+    index("reactions_user_idx").on(t.userId),
+  ],
+);
+
+export type Reaction = typeof reactions.$inferSelect;
 
 export const reports = pgTable(
   "reports",

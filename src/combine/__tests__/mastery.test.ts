@@ -50,6 +50,7 @@ function fakeBundle(
 }
 
 const R = (out: string, all: string[]): CombineRecipe => ({
+  id: `test-${out}-${all.join("+")}`,
   out,
   from: all,
   with: [],

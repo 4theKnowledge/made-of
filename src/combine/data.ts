@@ -114,6 +114,7 @@ function recipesForTheme(
       if (partNodes.some((p) => !inCombineTheme(p, theme))) continue;
 
       out.push({
+        id: recipe.id,
         out: node.id,
         from,
         with: with_,
