@@ -2414,15 +2414,16 @@ a.btn.primary{color:var(--bg)}
   border: 1.5px solid var(--ink);
   border-radius: 3px;
   opacity: 0;
-  transform: scale(0.55);
-  animation: heroTree-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-  will-change: opacity, transform;
+  animation:
+    heroTree-fade 0.45s ease-out forwards,
+    heroTree-glow-soft 1.2s ease-out 0.45s;
+  will-change: opacity, filter;
 }
 .heroTree-tile.is-final {
   padding: 10px 14px 8px;
   animation:
-    heroTree-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
-    heroTree-glow 1.8s ease-out 0.6s;
+    heroTree-fade 0.5s ease-out forwards,
+    heroTree-glow 1.8s ease-out 0.5s;
 }
 .heroTree-tile-name {
   font-family: var(--mono);
@@ -2436,6 +2437,23 @@ a.btn.primary{color:var(--bg)}
 .heroTree-tile.is-final .heroTree-tile-name {
   font-size: 13px;
   font-weight: 600;
+}
+
+@media (max-width: 520px) {
+  .heroTree-run { max-width: 100%; }
+  .heroTree-row { gap: 4px; }
+  .heroTree-tile { padding: 5px 6px 4px; gap: 3px; }
+  .heroTree-tile.is-final { padding: 7px 10px 6px; }
+  .heroTree-tile-name { font-size: 10px; letter-spacing: 0.02em; }
+  .heroTree-tile.is-final .heroTree-tile-name { font-size: 12px; }
+  .heroTree-tile .ic { width: 36px !important; height: 36px !important; }
+  .heroTree-tile.is-final .ic { width: 52px !important; height: 52px !important; }
+  .heroTree-cell { min-height: 72px; }
+  .heroTree-final-cell { min-height: 92px; }
+  .heroTree-run {
+    grid-template-rows: auto 22px auto 36px auto;
+  }
+  .heroTree-converge { height: 36px; }
 }
 
 /* Vertical connectors raw → mid. One per column; animates height 0→100%. */
@@ -2490,10 +2508,14 @@ a.btn.primary{color:var(--bg)}
   pointer-events: none;
 }
 
-@keyframes heroTree-pop {
-  0% { opacity: 0; transform: scale(0.45); }
-  70% { opacity: 1; transform: scale(1.08); }
-  100% { opacity: 1; transform: scale(1); }
+@keyframes heroTree-fade {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes heroTree-glow-soft {
+  0%   { filter: drop-shadow(0 0 0 transparent); }
+  35%  { filter: drop-shadow(0 0 7px var(--accent, #ffb800)); }
+  100% { filter: drop-shadow(0 0 0 transparent); }
 }
 @keyframes heroTree-draw {
   0% { height: 0; opacity: 0; }
