@@ -20,10 +20,14 @@ export function AuthNavLink() {
   }
 
   if (session) {
+    const role = (session.user as { role?: string }).role;
     return (
-      <Link href="/account" title={session.user.email}>
-        Account
-      </Link>
+      <>
+        {role === "admin" && <Link href="/admin">Admin</Link>}
+        <Link href="/account" title={session.user.email}>
+          Account
+        </Link>
+      </>
     );
   }
   return <Link href="/sign-in">Sign in</Link>;
