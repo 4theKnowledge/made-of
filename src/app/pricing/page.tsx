@@ -34,12 +34,12 @@ export default async function PricingPage() {
           <span className="eyebrow">Pricing</span>
           <h2>Play free. Become a Patron.</h2>
           <p>
-            Every game on Made Of is free, with no account needed and no
-            ads. Combine is the one to play today — endless, fast and the
-            daily puzzle, all sharing a lifetime collection. Patrons back
-            the project and get early access to new items, extra Combine
-            collections to unlock, and deeper stats across every game.
-            Museums and foundations can sponsor sections of the map.
+            Every Made Of game is free to play, with no ads. Each one is
+            built on the same knowledge base and shares the same evidence.
+            Combine is the one to play today, with more games on the way.
+            Patrons back the project and get early access, extra
+            collections and deeper stats across every game. Museums and
+            foundations can sponsor sections of the map.
           </p>
         </section>
 
@@ -55,12 +55,9 @@ export default async function PricingPage() {
             </div>
             <ul className="ticks">
               <li>
-                <b>Combine</b> — endless, fast and the daily puzzle, all
-                with a shareable result
-              </li>
-              <li>
-                A lifetime collection of everything you&rsquo;ve
-                discovered, carried across runs
+                <b>Every Made Of game</b>, free to play and shareable —
+                starting with Combine (endless, fast and the daily
+                puzzle) and growing from there
               </li>
               <li>
                 Explore the full map of {itemCount} things, from the big
@@ -71,7 +68,12 @@ export default async function PricingPage() {
                 big bang, in one view
               </li>
               <li>Evidence and sources on {evCount} links</li>
-              <li>No account needed, no ads</li>
+              <li>Play anonymously — no account needed, no ads</li>
+              <li>
+                <b>Sign in (still free)</b> to keep your collections and
+                personal bests across devices, and to appear on
+                leaderboards
+              </li>
             </ul>
             <Link className="btn primary" href="/combine">
               Play Combine
@@ -95,8 +97,9 @@ export default async function PricingPage() {
                 everyone else
               </li>
               <li>
-                <b>Extra Combine collections</b> to unlock — patron-only
-                themes and harder challenge sets
+                <b>Extra collections to unlock</b> — patron-only Combine
+                themes and harder challenge sets today, more across every
+                game as they land
               </li>
               <li>
                 <b>Deeper stats across every game</b> — run history,
@@ -200,10 +203,11 @@ export default async function PricingPage() {
         <section className="faq">
           <h2>Questions</h2>
           <details>
-            <summary>Will the games stay free?</summary>
+            <summary>Will Made Of stay free?</summary>
             <p>
               Yes. Combine, the Explore map and every future game stay
-              free to play for everyone, no account needed.
+              free to play for everyone. Sign-in is also free; a Patron
+              subscription only adds extras on top.
             </p>
           </details>
           <details>
@@ -228,6 +232,16 @@ export default async function PricingPage() {
             </p>
           </details>
           <details>
+            <summary>Do I need to sign in?</summary>
+            <p>
+              No. You can play any Made Of game straight away without an
+              account. Signing in is free and lets you keep your
+              collections, personal bests and run history across devices,
+              and puts you on the leaderboards. Nothing about the
+              gameplay itself is gated behind sign-in.
+            </p>
+          </details>
+          <details>
             <summary>Is Made Of independent?</summary>
             <p>
               Yes. Sponsors and paying customers never decide what goes on
@@ -240,9 +254,9 @@ export default async function PricingPage() {
               What about parents, teachers or classrooms?
             </summary>
             <p>
-              Combine and Explore work in any classroom or at home today.
-              Dedicated tools for families and schools are being thought
-              through separately — expect more here later.
+              The games and the Explore map work in any classroom or at
+              home today. Dedicated tools for families and schools are
+              being thought through separately — expect more here later.
             </p>
           </details>
         </section>
