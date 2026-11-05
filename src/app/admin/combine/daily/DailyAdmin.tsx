@@ -150,69 +150,6 @@ export function DailyAdmin({
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <style>{`
-        .cb-daily-guest-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-        }
-        .cb-daily-actions {
-          display: flex;
-          gap: 8px;
-          align-items: center;
-          flex-wrap: wrap;
-        }
-        .cb-daily-actions button {
-          min-height: 36px;
-          padding: 6px 14px;
-          font-size: 13px;
-        }
-        .cb-daily-schedule-row {
-          display: table-row;
-        }
-        .cb-daily-schedule-cell-mobile {
-          display: none;
-        }
-        @media (max-width: 640px) {
-          .cb-daily-guest-grid {
-            grid-template-columns: 1fr;
-          }
-          .cb-daily-schedule-table {
-            display: none;
-          }
-          .cb-daily-schedule-list {
-            display: grid;
-            gap: 8px;
-          }
-          .cb-daily-schedule-card {
-            border: 1px solid var(--line);
-            border-radius: 4px;
-            padding: 8px 10px;
-            font-size: 12px;
-          }
-          .cb-daily-schedule-card.past {
-            opacity: 0.6;
-          }
-          .cb-daily-schedule-card .cb-day {
-            font-family: var(--mono, monospace);
-            font-weight: 600;
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            margin-bottom: 4px;
-          }
-          .cb-daily-schedule-card .cb-seed {
-            font-family: var(--mono, monospace);
-            font-size: 10px;
-            color: var(--muted);
-          }
-        }
-        @media (min-width: 641px) {
-          .cb-daily-schedule-list {
-            display: none;
-          }
-        }
-      `}</style>
       <section className="feat">
         <h3 style={{ marginTop: 0, fontSize: 16 }}>Active theme</h3>
         <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>

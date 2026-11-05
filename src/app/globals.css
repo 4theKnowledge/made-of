@@ -1966,3 +1966,305 @@ a.btn.primary{color:var(--bg)}
 .cbdebug-tilekind{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .cbdebug-tile:hover:not(:disabled) .cbdebug-tilekind{color:color-mix(in srgb, var(--bg) 70%, transparent)}
 .cbdebug-empty{padding:8px;color:var(--muted);font-style:italic;text-align:center}
+
+/* ============================================================================
+ * Admin /tree — mobile responsive rules. Everything is scoped to .tree-root
+ * so it can't bleed into other routes. Moved out of TreeList.tsx.
+ * ========================================================================== */
+@media (hover: none), (max-width: 600px) {
+  .tree-root .tree-row-btn {
+    min-height: 36px;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+  .tree-root .tree-row-chevron {
+    min-width: 20px !important;
+    min-height: 32px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .tree-root .tree-toolbar {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  .tree-root .tree-toolbar input[type="search"] {
+    max-width: none !important;
+    flex: 1 1 auto !important;
+  }
+  .tree-root .tree-toolbar-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .tree-root .tree-toolbar-drawer-filters {
+    display: none !important;
+  }
+  .tree-root .tree-toolbar-drawer-filters.is-open {
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 0 0;
+  }
+  .tree-root .tree-toolbar-drawer-filters.is-open select,
+  .tree-root .tree-toolbar-drawer-filters.is-open .tree-view-toggle {
+    width: 100%;
+    font-size: 14px !important;
+  }
+  .tree-root .tree-toolbar-drawer-filters.is-open .tree-view-toggle button {
+    flex: 1;
+    min-height: 36px;
+  }
+  .tree-root .tree-row-actions-inline,
+  .tree-root .tree-recipe-actions-inline {
+    display: none !important;
+  }
+  .tree-root .tree-row-actions-overflow,
+  .tree-root .tree-recipe-actions-overflow {
+    display: inline-flex !important;
+  }
+  .tree-root .tree-row,
+  .tree-root .tree-recipe-row {
+    flex-wrap: nowrap !important;
+    overflow: hidden;
+  }
+  .tree-root .tree-row-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tree-root .tree-row-kind,
+  .tree-root .tree-row-edge {
+    display: none !important;
+  }
+  .tree-root .tree-row,
+  .tree-root .tree-recipe-row {
+    gap: 4px !important;
+    padding: 3px 8px !important;
+  }
+  .tree-root .tree-row-tier {
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 10px !important;
+  }
+  .tree-root .tree-row-actions-overflow .tree-row-btn,
+  .tree-root .tree-recipe-actions-overflow .tree-row-btn {
+    min-height: 28px !important;
+    min-width: 28px !important;
+    padding: 4px 8px !important;
+  }
+  .tree-root .tree-row {
+    position: relative;
+  }
+  .tree-root .tree-row[data-depth="1"] { padding-left: 16px !important; }
+  .tree-root .tree-row[data-depth="2"] { padding-left: 24px !important; }
+  .tree-root .tree-row[data-depth="3"] { padding-left: 32px !important; }
+  .tree-root .tree-row[data-depth="4"] { padding-left: 40px !important; }
+  .tree-root .tree-row[data-depth="5"] { padding-left: 48px !important; }
+  .tree-root .tree-row[data-depth="6"] { padding-left: 56px !important; }
+  .tree-root .tree-row[data-depth="7"] { padding-left: 64px !important; }
+  .tree-root .tree-row[data-depth="8"] { padding-left: 72px !important; }
+  .tree-root .tree-row::before {
+    content: "";
+    position: absolute;
+    left: calc(8px + (var(--depth, 0) - 1) * 8px);
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--line);
+    display: var(--guide-display, block);
+  }
+  .tree-root .tree-row[data-depth="0"]::before { display: none; }
+  .tree-root .tree-form {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .tree-root .tree-form > * {
+    width: 100%;
+  }
+  .tree-root .tree-form select,
+  .tree-root .tree-form input {
+    font-size: 14px !important;
+    padding: 8px 10px !important;
+  }
+  .tree-root .tree-form button {
+    min-height: 36px;
+    font-size: 13px !important;
+  }
+}
+
+/* Tree edit modal: full-width centered dialog by default; bottom sheet on mobile. */
+@media (max-width: 600px) {
+  .tree-root-modal.cbover {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    top: auto !important;
+    transform: none !important;
+    max-height: 92vh;
+    max-width: none !important;
+    width: 100% !important;
+    overflow-y: auto;
+    border-radius: 12px 12px 0 0 !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    border-bottom: 0 !important;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15) !important;
+    animation: tree-sheet-up 180ms ease-out;
+  }
+  .tree-root-modal .modal-grid {
+    grid-template-columns: 1fr !important;
+    gap: 6px 0 !important;
+  }
+  .tree-root-modal .modal-grid > label {
+    margin-top: 6px;
+  }
+}
+
+@keyframes tree-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* Tree toolbar: show mobile filter trigger below 600px. */
+@media (max-width: 600px) {
+  .tree-toolbar-filters-desktop {
+    display: none !important;
+  }
+  .tree-toolbar-mobile-trigger {
+    display: inline-flex !important;
+  }
+}
+
+/* Tooltip used in the tree view (and anywhere else .t-tip appears). */
+.t-tip {
+  cursor: help;
+}
+.t-tip-pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 160px;
+  max-width: 260px;
+  padding: 7px 10px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 1.35;
+  font-family: var(--sans, inherit);
+  font-weight: 400;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 2px 2px 0 var(--ink);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.08s ease-in;
+  z-index: 20;
+}
+@media (hover: hover) {
+  .t-tip:hover .t-tip-pop,
+  .t-tip:focus-within .t-tip-pop {
+    opacity: 1;
+  }
+}
+.t-tip[data-tip-open="1"] .t-tip-pop {
+  opacity: 1;
+}
+
+/* Directory index rail — show on tablet+. */
+@media (min-width: 720px) {
+  .index-rail {
+    display: flex !important;
+  }
+}
+
+/* ItemSearch dropdown pop-in animation. */
+@keyframes itemsearch-slide {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .itemsearch-pop {
+    animation: none !important;
+  }
+}
+
+/* Admin daily combine — guest grid + schedule responsive rules. */
+.cb-daily-guest-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.cb-daily-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.cb-daily-actions button {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+.cb-daily-schedule-row {
+  display: table-row;
+}
+.cb-daily-schedule-cell-mobile {
+  display: none;
+}
+@media (max-width: 640px) {
+  .cb-daily-guest-grid {
+    grid-template-columns: 1fr;
+  }
+  .cb-daily-schedule-table {
+    display: none;
+  }
+  .cb-daily-schedule-list {
+    display: grid;
+    gap: 8px;
+  }
+  .cb-daily-schedule-card {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .cb-daily-schedule-card.past {
+    opacity: 0.6;
+  }
+  .cb-daily-schedule-card .cb-day {
+    font-family: var(--mono, monospace);
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .cb-daily-schedule-card .cb-seed {
+    font-family: var(--mono, monospace);
+    font-size: 10px;
+    color: var(--muted);
+  }
+}
+@media (min-width: 641px) {
+  .cb-daily-schedule-list {
+    display: none;
+  }
+}

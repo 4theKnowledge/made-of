@@ -247,25 +247,6 @@ export function ItemSearch({
           ))}
         </ul>
       )}
-
-      <style jsx>{`
-        @keyframes itemsearch-slide {
-          from {
-            opacity: 0;
-            transform: translateY(-4px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        /* Dampen the fancy animation for folks who ask us to. */
-        @media (prefers-reduced-motion: reduce) {
-          .itemsearch-pop {
-            animation: none !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }

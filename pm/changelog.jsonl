@@ -46,3 +46,4 @@
 {"id": "C-0046", "ts": "2026-11-05T20:49:35Z", "kind": "feature", "summary": "React error boundaries across the app: root + global-error + per-segment error.tsx for combine/craft/link/account/admin/i/[slug]/explore/[slug], plus a client ErrorBoundary around the Combine board", "refs": {"task": "T-0070"}}
 {"id": "C-0047", "ts": "2026-11-05T20:53:18Z", "kind": "feature", "summary": "Endless & fast Combine shares now render a rich OG preview with score, unlocks, and mode/theme (T-0099)", "refs": {"task": "T-0099"}}
 {"id": "C-0048", "ts": "2026-11-05T20:53:47Z", "kind": "feature", "summary": "/combine lands on today's daily when unfinished and no run is in flight (T-0097)", "refs": {"task": "T-0097"}}
+{"id": "C-0049", "ts": "2026-11-05T21:05:13Z", "kind": "refactor", "summary": "Retire styled-jsx from the 3 remaining sites (and 1 plain <style> tag); rules folded into globals.css (T-0102)", "refs": {"task": "T-0102"}}

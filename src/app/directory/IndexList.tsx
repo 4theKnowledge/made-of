@@ -258,14 +258,6 @@ export function IndexList({ entries }: { entries: IndexEntry[] }) {
           })}
         </nav>
       </div>
-
-      <style jsx>{`
-        @media (min-width: 720px) {
-          :global(.index-rail) {
-            display: flex !important;
-          }
-        }
-      `}</style>
     </section>
   );
 }

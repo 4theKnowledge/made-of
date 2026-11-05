@@ -161,201 +161,6 @@ function deriveViews(data: TreeData) {
 type Views = ReturnType<typeof deriveViews>;
 
 /* ========================================================================
- * Mobile styles. One global style block instead of scattering media queries.
- * Everything targets the .tree-root container so these styles only apply
- * inside this admin tree view, never bleeding to the rest of the site.
- * ====================================================================== */
-
-function TreeMobileStyles() {
-  return (
-    <style jsx global>{`
-      /* Larger tap targets on touch devices without blowing up the layout. */
-      @media (hover: none), (max-width: 600px) {
-        .tree-root .tree-row-btn {
-          min-height: 36px;
-          padding: 6px 10px !important;
-          font-size: 12px !important;
-        }
-        .tree-root .tree-row-chevron {
-          min-width: 20px !important;
-          min-height: 32px !important;
-          display: inline-flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-        }
-      }
-
-      @media (max-width: 600px) {
-        /* Toolbar reorganises: search gets full width, filters go behind a
-           button that reveals a drawer. */
-        .tree-root .tree-toolbar {
-          flex-direction: column;
-          align-items: stretch !important;
-          gap: 8px !important;
-        }
-        .tree-root .tree-toolbar input[type="search"] {
-          max-width: none !important;
-          flex: 1 1 auto !important;
-        }
-        .tree-root .tree-toolbar-row {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-          align-items: center;
-        }
-        .tree-root .tree-toolbar-drawer-filters {
-          display: none !important;
-        }
-        .tree-root .tree-toolbar-drawer-filters.is-open {
-          display: flex !important;
-          flex-direction: column;
-          gap: 8px;
-          padding: 10px 0 0;
-        }
-        .tree-root .tree-toolbar-drawer-filters.is-open select,
-        .tree-root .tree-toolbar-drawer-filters.is-open .tree-view-toggle {
-          width: 100%;
-          font-size: 14px !important;
-        }
-        .tree-root .tree-toolbar-drawer-filters.is-open .tree-view-toggle button {
-          flex: 1;
-          min-height: 36px;
-        }
-
-        /* Hide inline row actions behind the overflow menu. */
-        .tree-root .tree-row-actions-inline,
-        .tree-root .tree-recipe-actions-inline {
-          display: none !important;
-        }
-        .tree-root .tree-row-actions-overflow,
-        .tree-root .tree-recipe-actions-overflow {
-          display: inline-flex !important;
-        }
-
-        /* Clamp row content so action buttons stay in view. The item name is
-           the elastic middle; everything else keeps its natural width. */
-        .tree-root .tree-row,
-        .tree-root .tree-recipe-row {
-          flex-wrap: nowrap !important;
-          overflow: hidden;
-        }
-        .tree-root .tree-row-name {
-          min-width: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        /* Hide secondary chrome on mobile. The kind label is on the item page;
-           the edge indicator is in the Legend and Edit modal. Removing them
-           gives the name column the room it needs. */
-        .tree-root .tree-row-kind,
-        .tree-root .tree-row-edge {
-          display: none !important;
-        }
-
-        /* Compact everything: tighter gaps, smaller padding, shallower indent.
-           Depth eats width fastest, so we halve indent per level. */
-        .tree-root .tree-row,
-        .tree-root .tree-recipe-row {
-          gap: 4px !important;
-          padding: 3px 8px !important;
-        }
-        .tree-root .tree-row-tier {
-          width: 18px !important;
-          height: 18px !important;
-          font-size: 10px !important;
-        }
-        /* Compact ⋯ button — remove the big framed look. */
-        .tree-root .tree-row-actions-overflow .tree-row-btn,
-        .tree-root .tree-recipe-actions-overflow .tree-row-btn {
-          min-height: 28px !important;
-          min-width: 28px !important;
-          padding: 4px 8px !important;
-        }
-
-        /* Reduce indent, add lineage guide lines so ancestry stays readable. */
-        .tree-root .tree-row {
-          position: relative;
-        }
-        .tree-root .tree-row[data-depth="1"] { padding-left: 16px !important; }
-        .tree-root .tree-row[data-depth="2"] { padding-left: 24px !important; }
-        .tree-root .tree-row[data-depth="3"] { padding-left: 32px !important; }
-        .tree-root .tree-row[data-depth="4"] { padding-left: 40px !important; }
-        .tree-root .tree-row[data-depth="5"] { padding-left: 48px !important; }
-        .tree-root .tree-row[data-depth="6"] { padding-left: 56px !important; }
-        .tree-root .tree-row[data-depth="7"] { padding-left: 64px !important; }
-        .tree-root .tree-row[data-depth="8"] { padding-left: 72px !important; }
-
-        .tree-root .tree-row::before {
-          content: "";
-          position: absolute;
-          left: calc(8px + (var(--depth, 0) - 1) * 8px);
-          top: 0;
-          bottom: 0;
-          width: 1px;
-          background: var(--line);
-          display: var(--guide-display, block);
-        }
-        .tree-root .tree-row[data-depth="0"]::before { display: none; }
-
-        /* Forms stack vertically on mobile. */
-        .tree-root .tree-form {
-          flex-direction: column !important;
-          align-items: stretch !important;
-        }
-        .tree-root .tree-form > * {
-          width: 100%;
-        }
-        .tree-root .tree-form select,
-        .tree-root .tree-form input {
-          font-size: 14px !important;
-          padding: 8px 10px !important;
-        }
-        .tree-root .tree-form button {
-          min-height: 36px;
-          font-size: 13px !important;
-        }
-      }
-
-      /* Modal: full-width centered dialog by default; bottom sheet on mobile. */
-      @media (max-width: 600px) {
-        .tree-root-modal.cbover {
-          position: fixed !important;
-          left: 0 !important;
-          right: 0 !important;
-          bottom: 0 !important;
-          top: auto !important;
-          transform: none !important;
-          max-height: 92vh;
-          max-width: none !important;
-          width: 100% !important;
-          overflow-y: auto;
-          border-radius: 12px 12px 0 0 !important;
-          border-left: 0 !important;
-          border-right: 0 !important;
-          border-bottom: 0 !important;
-          padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-          box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15) !important;
-          animation: tree-sheet-up 180ms ease-out;
-        }
-        .tree-root-modal .modal-grid {
-          grid-template-columns: 1fr !important;
-          gap: 6px 0 !important;
-        }
-        .tree-root-modal .modal-grid > label {
-          margin-top: 6px;
-        }
-      }
-
-      @keyframes tree-sheet-up {
-        from { transform: translateY(100%); }
-        to { transform: translateY(0); }
-      }
-    `}</style>
-  );
-}
-
-/* ========================================================================
  * Toast — minimal error surface for failed mutations.
  * ====================================================================== */
 
@@ -1097,7 +902,6 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
 
   return (
     <div className="tree-root">
-      <TreeMobileStyles />
       <Toolbar
         query={query}
         setQuery={setQuery}
@@ -1395,16 +1199,6 @@ function Toolbar({
           {isFiltered ? `${matchCount} match` : `${totalCount} items`}
         </span>
       </div>
-      <style jsx>{`
-        @media (max-width: 600px) {
-          :global(.tree-toolbar-filters-desktop) {
-            display: none !important;
-          }
-          :global(.tree-toolbar-mobile-trigger) {
-            display: inline-flex !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }
@@ -1478,46 +1272,6 @@ function Tooltip({
           </>
         )}
       </span>
-      <style jsx>{`
-        .t-tip {
-          cursor: help;
-        }
-        .t-tip-pop {
-          position: absolute;
-          bottom: calc(100% + 8px);
-          left: 50%;
-          transform: translateX(-50%);
-          min-width: 160px;
-          max-width: 260px;
-          padding: 7px 10px;
-          background: var(--surface);
-          color: var(--ink);
-          border: 1.5px solid var(--ink);
-          border-radius: 3px;
-          font-size: 12px;
-          line-height: 1.35;
-          font-family: var(--sans, inherit);
-          font-weight: 400;
-          text-align: left;
-          white-space: normal;
-          box-shadow: 2px 2px 0 var(--ink);
-          opacity: 0;
-          pointer-events: none;
-          transition: opacity 0.08s ease-in;
-          z-index: 20;
-        }
-        /* Hover still works on devices with pointers. */
-        @media (hover: hover) {
-          .t-tip:hover .t-tip-pop,
-          .t-tip:focus-within .t-tip-pop {
-            opacity: 1;
-          }
-        }
-        /* Explicit tap-open overrides. */
-        .t-tip[data-tip-open="1"] .t-tip-pop {
-          opacity: 1;
-        }
-      `}</style>
     </span>
   );
 }
