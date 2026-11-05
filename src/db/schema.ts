@@ -458,6 +458,11 @@ export const combineThemes = pgTable(
     label: text("label").notNull(),
     description: text("description"),
     position: integer("position").notNull().default(0),
+    // Daily-mode overrides. Shape: { maxAges?: number, ageNeedScale?: number,
+    // guestIngredient?: { perRun: number, minBand: number } } — see
+    // src/combine/daily-config.ts for the normaliser and defaults. Null →
+    // daily uses the same config as endless.
+    dailyConfig: jsonb("daily_config"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

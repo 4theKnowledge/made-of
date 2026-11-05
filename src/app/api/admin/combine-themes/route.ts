@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { asc, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
+import { normaliseDailyConfig } from "@/combine/daily-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,16 @@ export async function POST(req: NextRequest) {
 
   const description = typeof body.description === "string" && body.description.trim() ? body.description.trim() : null;
 
+  let dailyConfig: ReturnType<typeof normaliseDailyConfig> = null;
+  try {
+    dailyConfig = normaliseDailyConfig(body.dailyConfig);
+  } catch (err) {
+    return NextResponse.json(
+      { error: "invalid_daily_config", message: err instanceof Error ? err.message : String(err) },
+      { status: 400 },
+    );
+  }
+
   const db = getDb();
   const existing = await db
     .select({ code: schema.combineThemes.code })
@@ -64,7 +75,7 @@ export async function POST(req: NextRequest) {
 
   const [inserted] = await db
     .insert(schema.combineThemes)
-    .values({ code, label, description, position })
+    .values({ code, label, description, position, dailyConfig })
     .returning();
 
   return NextResponse.json({ theme: inserted }, { status: 201 });

@@ -4,6 +4,7 @@
  */
 
 import type { ItemKind, Tier } from "../db/schema";
+import type { DailyConfig } from "./daily-config";
 
 export type ThemeKey = "everything";
 
@@ -108,4 +109,12 @@ export interface ThemeBundle {
   items: Map<string, CombineItem>;
   /** Minimum band (1..n) each output can be made in. */
   outBand: Map<string, number>;
+  /** When set, this bundle was built for a daily run and has already had
+   *  `dailyConfig.maxAges` applied (`theme.ages` and `recipes` are the
+   *  capped slice). Carried so the dealer and `ageNeed` can see the other
+   *  knobs (`ageNeedScale`, `guestIngredient`). */
+  dailyConfig?: DailyConfig | null;
+  /** Output ids eligible as guest-of-the-day tiles. Only populated on
+   *  daily bundles whose `dailyConfig.guestIngredient.perRun > 0`. */
+  guestPool?: string[];
 }

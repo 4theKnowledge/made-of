@@ -8,6 +8,7 @@
 
 import type { Snapshot } from "../graph/snapshot";
 import type { GraphNode } from "../graph/types";
+import type { DailyConfig } from "./daily-config";
 import { THEMES, inCombineTheme, themeAgePool } from "./filters";
 import { computeRefine } from "./levels";
 import type {
@@ -385,6 +386,7 @@ export function buildThemeBundle(
   theme: ThemeKey,
   prevNumAges: number = 0,
   mode: Mode = "classic",
+  dailyConfig: DailyConfig | null = null,
 ): ThemeBundle {
   const base_meta = THEMES[theme];
   let recipes = recipesForTheme(snapshot, theme);
@@ -396,16 +398,8 @@ export function buildThemeBundle(
     recipes = recipes.filter((r) => r.all.length <= 3);
   }
 
-  const outputs = new Set<string>(recipes.map((r) => r.out));
-  const ingredients = new Set<string>(recipes.flatMap((r) => r.all));
-  const tools = new Set<string>(recipes.flatMap((r) => r.with));
-  const baseIng = [...ingredients].filter((x) => !outputs.has(x));
-  const mid = [...ingredients].filter((x) => outputs.has(x));
-  const terminal = new Set<string>(
-    [...outputs].filter((x) => !ingredients.has(x)),
-  );
-
   let meta: typeof base_meta;
+  let guestPool: string[] | undefined;
   if (mode === "fast") {
     // Fast mode has no age progression — every recipe stays in band 1 and
     // the theme exposes a single age label so UI surfaces that render age
@@ -416,6 +410,7 @@ export function buildThemeBundle(
     }
     meta = { ...base_meta, ages: ["Fast"] };
   } else {
+    const preOutputs = new Set<string>(recipes.map((r) => r.out));
     const pool = themeAgePool(theme);
     const rawNumAges = deriveNumAges(recipes.length, prevNumAges);
     // Never exceed the authored name pool; a KB that outgrows it needs new
@@ -424,9 +419,48 @@ export function buildThemeBundle(
     // `assignAges` may merge sparse bands and return a smaller effective count.
     // The displayed age list reflects the merged layout — no "dead ages" with
     // too few recipes for the dealer to surface progression combos.
-    const effectiveNumAges = assignAges(snapshot, recipes, outputs, numAges);
+    let effectiveNumAges = assignAges(snapshot, recipes, preOutputs, numAges);
+    // Daily may cap the run short. When capped, recipes above the cap are
+    // dropped from the playable set (so the dealer never deals them and
+    // victory fires at the capped final age); outputs from above-cap bands
+    // are captured separately as the guest-ingredient pool.
+    if (dailyConfig?.maxAges != null && dailyConfig.maxAges < effectiveNumAges) {
+      effectiveNumAges = dailyConfig.maxAges;
+    }
     meta = { ...base_meta, ages: pool.slice(0, effectiveNumAges) };
+
+    if (dailyConfig?.maxAges != null && dailyConfig.guestIngredient && dailyConfig.guestIngredient.perRun > 0) {
+      const minBand = Math.max(dailyConfig.guestIngredient.minBand, dailyConfig.maxAges + 1);
+      // Guest = output whose *minimum* band is above the cap. If the same
+      // output has any below-cap recipe, players can make it normally and it
+      // shouldn't be a guest.
+      const minBandByOutput = new Map<string, number>();
+      for (const r of recipes) {
+        const cur = minBandByOutput.get(r.out);
+        if (cur == null || r.band < cur) minBandByOutput.set(r.out, r.band);
+      }
+      const pool: string[] = [];
+      for (const [out, minB] of minBandByOutput) {
+        if (minB >= minBand) pool.push(out);
+      }
+      guestPool = pool;
+    }
+
+    // Apply the daily age cap to the actual recipe set. Must happen AFTER
+    // guest-pool capture so above-cap outputs are still reachable as guests.
+    if (dailyConfig?.maxAges != null) {
+      recipes = recipes.filter((r) => r.band <= dailyConfig.maxAges!);
+    }
   }
+
+  const outputs = new Set<string>(recipes.map((r) => r.out));
+  const ingredients = new Set<string>(recipes.flatMap((r) => r.all));
+  const tools = new Set<string>(recipes.flatMap((r) => r.with));
+  const baseIng = [...ingredients].filter((x) => !outputs.has(x));
+  const mid = [...ingredients].filter((x) => outputs.has(x));
+  const terminal = new Set<string>(
+    [...outputs].filter((x) => !ingredients.has(x)),
+  );
 
   // Index recipes by every ingredient, biggest first.
   const byIngredient = new Map<string, CombineRecipe[]>();
@@ -492,6 +526,8 @@ export function buildThemeBundle(
     sameIngredients,
     items,
     outBand,
+    dailyConfig: dailyConfig ?? null,
+    guestPool,
   };
 }
 

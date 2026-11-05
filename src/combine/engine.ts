@@ -321,10 +321,17 @@ export function bandSize(age: number, bundle: ThemeBundle): number {
 /** Unique discoveries at the current age's band needed to leave each age.
  *  Only first-time makes of items whose minimum band is `age + 1` count —
  *  see `finishResolve`. Scales with band population so a mature KB demands
- *  more exploration; floors to the baseline so sparse bands stay playable. */
+ *  more exploration; floors to the baseline so sparse bands stay playable.
+ *
+ *  Daily bundles may set `dailyConfig.ageNeedScale` to shorten runs — the
+ *  scale multiplies both the scaled-by-band term *and* the baseline floor,
+ *  so a 0.5 scale actually halves the demand (otherwise the baseline would
+ *  pin small themes at an unshortened floor). */
 export function ageNeed(age: number, bundle: ThemeBundle): number {
-  const scaled = Math.round(bandSize(age, bundle) * UNLOCK_FRACTION);
-  return Math.max(baselineNeed(age), scaled);
+  const scale = bundle.dailyConfig?.ageNeedScale ?? 1;
+  const scaled = Math.round(bandSize(age, bundle) * UNLOCK_FRACTION * scale);
+  const floor = Math.max(1, Math.round(baselineNeed(age) * scale));
+  return Math.max(floor, scaled);
 }
 
 /** Helper grants per age. Each helper gets `floor(bandSize / divisor)`,

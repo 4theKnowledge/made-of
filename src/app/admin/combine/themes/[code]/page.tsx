@@ -4,8 +4,13 @@ import { eq, inArray } from "drizzle-orm";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { getDb, schema } from "@/db/client";
+import { getLiveSnapshot } from "@/graph/live";
+import { buildThemeBundle } from "@/combine/data";
+import type { DailyConfig } from "@/combine/daily-config";
+import type { ThemeKey } from "@/combine/types";
 import { Breadcrumb } from "../../../Breadcrumb";
 import { validateTheme, type ValidatorInput } from "../validator";
+import { DailyConfigEditor } from "./DailyConfigEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +91,18 @@ export default async function AdminCombineThemeDetailPage({
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const health = report.broken.length === 0 ? "ok" : "broken";
+
+  // Build a non-daily bundle just to surface the authored age count on the
+  // daily-config editor. Non-critical — if the live snapshot fails we hide
+  // the editor rather than crashing the page.
+  let totalAges: number | null = null;
+  try {
+    const live = await getLiveSnapshot();
+    totalAges = buildThemeBundle(live.snapshot, themeCode as ThemeKey).theme.ages.length;
+  } catch {
+    // keep null
+  }
+  const initialDaily = (theme.dailyConfig ?? null) as DailyConfig | null;
 
   return (
     <main className="wrap">
@@ -188,6 +205,17 @@ export default async function AdminCombineThemeDetailPage({
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {totalAges != null && (
+        <section className="feat">
+          <h3 style={{ marginTop: 0, fontSize: 16 }}>Daily config</h3>
+          <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
+            These knobs apply only when a player opens the daily puzzle for this theme.
+            Endless and fast modes are unaffected.
+          </p>
+          <DailyConfigEditor themeCode={themeCode} initial={initialDaily} totalAges={totalAges} />
         </section>
       )}
 

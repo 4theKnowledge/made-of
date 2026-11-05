@@ -1,0 +1,1 @@
+ALTER TABLE "combine_themes" ADD COLUMN "daily_config" jsonb;
