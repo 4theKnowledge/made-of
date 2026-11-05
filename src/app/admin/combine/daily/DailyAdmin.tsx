@@ -150,6 +150,69 @@ export function DailyAdmin({
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
+      <style>{`
+        .cb-daily-guest-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+        .cb-daily-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+        .cb-daily-actions button {
+          min-height: 36px;
+          padding: 6px 14px;
+          font-size: 13px;
+        }
+        .cb-daily-schedule-row {
+          display: table-row;
+        }
+        .cb-daily-schedule-cell-mobile {
+          display: none;
+        }
+        @media (max-width: 640px) {
+          .cb-daily-guest-grid {
+            grid-template-columns: 1fr;
+          }
+          .cb-daily-schedule-table {
+            display: none;
+          }
+          .cb-daily-schedule-list {
+            display: grid;
+            gap: 8px;
+          }
+          .cb-daily-schedule-card {
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            padding: 8px 10px;
+            font-size: 12px;
+          }
+          .cb-daily-schedule-card.past {
+            opacity: 0.6;
+          }
+          .cb-daily-schedule-card .cb-day {
+            font-family: var(--mono, monospace);
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 4px;
+          }
+          .cb-daily-schedule-card .cb-seed {
+            font-family: var(--mono, monospace);
+            font-size: 10px;
+            color: var(--muted);
+          }
+        }
+        @media (min-width: 641px) {
+          .cb-daily-schedule-list {
+            display: none;
+          }
+        }
+      `}</style>
       <section className="feat">
         <h3 style={{ marginTop: 0, fontSize: 16 }}>Active theme</h3>
         <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
@@ -228,7 +291,15 @@ export function DailyAdmin({
               placeholder="1.0"
             />
           </Field>
-          <fieldset style={{ border: "1px solid var(--line)", borderRadius: 3, padding: 10 }}>
+          <fieldset
+            style={{
+              border: "1px solid var(--line)",
+              borderRadius: 3,
+              padding: 10,
+              margin: 0,
+              minWidth: 0,
+            }}
+          >
             <legend style={{ fontSize: 12, color: "var(--muted)", padding: "0 6px" }}>
               Guest ingredient of the day (optional)
             </legend>
@@ -239,7 +310,7 @@ export function DailyAdmin({
               players discover rare items that normally live past the daily&apos;s age cap.
               Leave Per run at 0 to disable.
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div className="cb-daily-guest-grid">
               <Field
                 label="Per run"
                 hint={
@@ -289,21 +360,20 @@ export function DailyAdmin({
               </Field>
             </div>
           </fieldset>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div className="cb-daily-actions">
             <button
               type="button"
               className="btn"
               disabled={busy !== null || !themeCode}
               onClick={save}
-              style={smallBtn}
             >
               {busy === "save" ? "…" : "Save"}
             </button>
-            <button type="button" className="btn" disabled={busy !== null} onClick={clearConfig} style={smallBtn}>
+            <button type="button" className="btn" disabled={busy !== null} onClick={clearConfig}>
               Clear
             </button>
             {msg && (
-              <span style={{ fontSize: 12, color: msg.kind === "err" ? "#f85149" : "var(--good, #2a7a2a)" }}>
+              <span style={{ fontSize: 12, color: msg.kind === "err" ? "#f85149" : "var(--good, #2a7a2a)", flexBasis: "100%" }}>
                 {msg.text}
               </span>
             )}
@@ -319,13 +389,12 @@ export function DailyAdmin({
           days <em>after</em> today and rerolls with the saved config. Today&apos;s
           row is protected to avoid shifting guests under an in-flight run.
         </p>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+        <div className="cb-daily-actions" style={{ marginBottom: 10 }}>
           <button
             type="button"
             className="btn"
             disabled={busy !== null}
             onClick={regenerate}
-            style={smallBtn}
           >
             {busy === "regen" ? "…" : "Regenerate schedule"}
           </button>
@@ -361,7 +430,63 @@ export function DailyAdmin({
             No schedule yet. Save a config and click Regenerate.
           </p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <>
+          <div className="cb-daily-schedule-list">
+            {schedule.map((r, i) => {
+              const prev = i > 0 ? schedule[i - 1] : null;
+              const showTodayDivider = prev && prev.isPast && !r.isPast;
+              return (
+                <Fragment key={`m-${r.day}`}>
+                  {showTodayDivider && (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                        color: "var(--muted)",
+                        padding: "4px 0",
+                      }}
+                    >
+                      — Today —
+                    </div>
+                  )}
+                  <div className={`cb-daily-schedule-card${r.isPast ? " past" : ""}`}>
+                    <div className="cb-day">
+                      <span>
+                        {r.day}
+                        {r.isPast && (
+                          <span style={{ marginLeft: 6, fontSize: 10, color: "var(--muted)", fontWeight: 400 }}>
+                            served
+                          </span>
+                        )}
+                      </span>
+                      <span className="cb-seed">seed {r.payload.seed || "—"}</span>
+                    </div>
+                    {r.payload.guestOutputIds.length === 0 ? (
+                      <span style={{ opacity: 0.5 }}>—</span>
+                    ) : (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {r.payload.guestOutputIds.map((id) => (
+                          <span
+                            key={id}
+                            style={{
+                              border: "1px solid var(--line)",
+                              borderRadius: 10,
+                              padding: "1px 8px",
+                              fontSize: 11,
+                            }}
+                          >
+                            {itemNamesById[id] ?? id}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Fragment>
+              );
+            })}
+          </div>
+          <div className="cb-daily-schedule-table" style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
                 <tr style={{ textAlign: "left", borderBottom: "1px solid var(--line)" }}>
@@ -440,6 +565,7 @@ export function DailyAdmin({
               </tbody>
             </table>
           </div>
+          </>
         )}
       </section>
     </div>
@@ -469,14 +595,19 @@ function Field({
 }
 
 const input: React.CSSProperties = {
-  padding: "4px 8px",
-  fontSize: 13,
+  padding: "8px 10px",
+  fontSize: 14,
   border: "1px solid var(--line)",
   borderRadius: 3,
   background: "var(--card)",
   color: "var(--ink)",
   width: "100%",
+  // box-sizing: border-box is essential whenever width is 100% and the
+  // element has padding/border — otherwise the element overflows its
+  // container by the padding + border width. The project's global
+  // stylesheet doesn't set this universally (see docs/BANDS.html follow-up
+  // task), so set it inline here.
+  boxSizing: "border-box",
 };
 const th: React.CSSProperties = { padding: "6px 10px", fontSize: 11, color: "var(--muted)" };
 const td: React.CSSProperties = { padding: "6px 10px", verticalAlign: "top" };
-const smallBtn: React.CSSProperties = { fontSize: 12, padding: "4px 10px" };
