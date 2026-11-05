@@ -106,6 +106,12 @@ interface Props {
   fastBundles: {
     everything: SerialisedBundle;
   };
+  /** Daily-mode bundles. A theme without a dailyConfig serialises a bundle
+   *  identical to its endless one; a theme with a config gets a bundle with
+   *  capped ages, scaled ageNeed, and a guest-ingredient pool. */
+  dailyBundles: {
+    everything: SerialisedBundle;
+  };
   /** Server-provided admin flag. Only mounts the debug panel entry point.
    *  The reducer trusts the flag UI-side; real security is at the admin
    *  session check that produced this. */
@@ -123,6 +129,7 @@ const EMPTY_SIG_SET: ReadonlySet<string> = new Set();
 export function CombineBoard({
   bundles: serialised,
   fastBundles: fastSerialised,
+  dailyBundles: dailySerialised,
   admin = false,
   signedIn = false,
 }: Props) {
@@ -138,6 +145,22 @@ export function CombineBoard({
     }),
     [fastSerialised],
   );
+  const dailyBundles = useMemo<Record<ThemeKey, ThemeBundle>>(
+    () => ({
+      everything: hydrateBundle(dailySerialised.everything),
+    }),
+    [dailySerialised],
+  );
+  /** Bundle a game should run against given its target theme/mode/daily key.
+   *  Centralises the three-way pick so all call sites stay in sync. */
+  const pickBundle = useCallback(
+    (theme: ThemeKey, mode: Mode, daily: string | null): ThemeBundle => {
+      if (mode === "fast") return fastBundles[theme];
+      if (daily) return dailyBundles[theme];
+      return bundles[theme];
+    },
+    [bundles, fastBundles, dailyBundles],
+  );
   // The initial render must be deterministic across SSR and the first
   // client paint — read nothing that depends on window/localStorage here.
   // A deterministic 6×6 seed=42 game is used as the hydration target;
@@ -149,10 +172,10 @@ export function CombineBoard({
   );
 
   const [state, setState] = useState<GameState>(initial);
-  // Active bundle follows the current mode: fast runs use the 2-part
-  // projection; classic (endless/daily) uses the full age-banded bundle.
-  const bundle =
-    state.mode === "fast" ? fastBundles[state.theme] : bundles[state.theme];
+  // Active bundle follows mode + daily flag: fast uses the 2-part projection,
+  // daily uses the (potentially capped) dailyBundles, endless uses the full
+  // bundle. Daily and endless may be identical if the theme has no dailyConfig.
+  const bundle = pickBundle(state.theme, state.mode, state.daily);
   // Collection is partitioned by scope: endless (both endless themes share
   // one bucket) vs. daily (its own bucket so daily puzzles are a fair start,
   // not fed by endless grinding). See useCollection for the full contract.
@@ -217,11 +240,12 @@ export function CombineBoard({
     const deepLinkDay = sp?.get("d");
     if (deepLinkDay && deepLinkDay === todayKey()) {
       const day = deepLinkDay;
-      const saved = loadGame(bundles.everything, { daily: day });
+      const dailyBundle = dailyBundles.everything;
+      const saved = loadGame(dailyBundle, { daily: day });
       setState(
         saved
           ? hydrateGame(saved)
-          : newGame("everything", bundles.everything, {
+          : newGame("everything", dailyBundle, {
               daily: day,
               size: 6,
               seed: dailySeed(day),
@@ -233,7 +257,7 @@ export function CombineBoard({
     if (everythingSave) {
       setState(hydrateGame(everythingSave));
     }
-  }, [bundles.everything]);
+  }, [bundles.everything, dailyBundles.everything]);
   const [selectedSlot, setSelectedSlot] = useState<{
     source: "tray" | "hold";
     slot: number;
@@ -801,7 +825,7 @@ export function CombineBoard({
             age: r.state.age,
             daily: r.state.daily,
             mode: r.state.mode,
-            season: bundles[r.state.theme].theme.ages.length,
+            season: pickBundle(r.state.theme, r.state.mode, r.state.daily).theme.ages.length,
           }),
         }).catch(() => {});
         if (r.state.daily) {
@@ -966,7 +990,8 @@ export function CombineBoard({
     // If we read loadGame first we'd hydrate the stale finished state
     // instead of starting the fresh run the reset is meant to allow.
     const done = loadDailyDone(day);
-    const saved = loadGame(bundles.everything, { daily: day });
+    const dailyBundle = dailyBundles.everything;
+    const saved = loadGame(dailyBundle, { daily: day });
     if (saved) {
       saveGame(state);
       setState(hydrateGame(saved));
@@ -978,7 +1003,7 @@ export function CombineBoard({
     } else {
       saveGame(state);
       setState(
-        newGame("everything", bundles.everything, {
+        newGame("everything", dailyBundle, {
           daily: day,
           size: 6,
           seed: dailySeed(day),
@@ -986,7 +1011,7 @@ export function CombineBoard({
       );
     }
     resetTransient();
-  }, [bundles, state, resetTransient]);
+  }, [bundles, dailyBundles, state, resetTransient]);
 
   const shareDaily = useCallback(async () => {
     const dr = dailyDone;
@@ -1010,9 +1035,10 @@ export function CombineBoard({
       dr.shelf && dr.shelf > 0
         ? ` · ${dr.shelf} finished thing${dr.shelf > 1 ? "s" : ""}`
         : "";
+    const dailyAgeCount = dailyBundles.everything.theme.ages.length;
     const text =
       `Made Of · Daily Combine ${dr.key}\n` +
-      Array.from({ length: bundles.everything.theme.ages.length }, (_, k) =>
+      Array.from({ length: dailyAgeCount }, (_, k) =>
         k <= dr.age ? "🟩" : "⬜",
       ).join("") +
       ` reached Age ${dr.ageName}\n` +
@@ -1024,7 +1050,7 @@ export function CombineBoard({
       age: dr.age,
       made: dr.made,
       ageName: dr.ageName,
-      ageCount: bundles.everything.theme.ages.length,
+      ageCount: dailyAgeCount,
       best: topDisplay,
       found: dr.found,
       longest: dr.longest,
@@ -1035,7 +1061,7 @@ export function CombineBoard({
       text,
       url: `https://madeof.app/combine?${query}`,
     });
-  }, [dailyDone, bundles.everything]);
+  }, [dailyDone, bundles.everything, dailyBundles.everything]);
 
   const onCellTap = useCallback(
     (cell: number) => {

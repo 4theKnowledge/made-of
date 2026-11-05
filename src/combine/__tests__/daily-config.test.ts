@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { loadKnowledgeBase } from "../../data/load";
 import { toRows } from "../../data/rows";
 import { buildSnapshot } from "../../graph/snapshot";
-import { buildThemeBundle } from "../data";
+import { buildAllDailyBundles, buildThemeBundle } from "../data";
 import { normaliseDailyConfig } from "../daily-config";
-import { ageNeed } from "../engine";
+import { ageNeed, newGame } from "../engine";
+import { serialiseBundle, hydrateBundle } from "../serialise";
 
 describe("normaliseDailyConfig", () => {
   it("returns null for null / undefined / empty object", () => {
@@ -95,5 +96,44 @@ describe("buildThemeBundle with dailyConfig", () => {
       const unscaled = ageNeed(age, endless);
       expect(scaled).toBeLessThanOrEqual(unscaled);
     }
+  });
+
+  it("buildAllDailyBundles with null config returns an endless-shaped bundle", () => {
+    const d = buildAllDailyBundles(snapshot, {}, { everything: null });
+    expect(d.everything.theme.ages.length).toBe(endless.theme.ages.length);
+    expect(d.everything.guestPool).toBeUndefined();
+  });
+
+  it("buildAllDailyBundles with a config produces a capped bundle", () => {
+    const d = buildAllDailyBundles(
+      snapshot,
+      {},
+      { everything: { maxAges: 3, ageNeedScale: 0.5 } },
+    );
+    expect(d.everything.theme.ages.length).toBe(3);
+    expect(d.everything.dailyConfig?.maxAges).toBe(3);
+  });
+
+  it("serialising + hydrating a daily bundle preserves dailyConfig + guestPool", () => {
+    const daily = buildThemeBundle(snapshot, "everything", 0, "classic", {
+      maxAges: 4,
+      guestIngredient: { perRun: 2, minBand: 5 },
+    });
+    const rehydrated = hydrateBundle(serialiseBundle(daily));
+    expect(rehydrated.dailyConfig?.maxAges).toBe(4);
+    expect(rehydrated.guestPool).toEqual(daily.guestPool);
+  });
+
+  it("newGame on a capped daily bundle respects the cap (ages array)", () => {
+    const daily = buildThemeBundle(snapshot, "everything", 0, "classic", {
+      maxAges: 3,
+    });
+    const { state } = newGame("everything", daily, { daily: "2026-01-01", size: 6 });
+    // The game has access to the capped bundle's full age pool.
+    expect(daily.theme.ages.length).toBe(3);
+    // Starting age is always 0; what matters is that the engine can't climb
+    // above the cap because the dealer only sees band ≤ 3 recipes.
+    expect(state.age).toBe(0);
+    expect(daily.recipes.every((r) => r.band <= 3)).toBe(true);
   });
 });

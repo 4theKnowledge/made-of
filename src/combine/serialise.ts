@@ -6,6 +6,7 @@
  * reconstruct the full bundle on the client with one pass.
  */
 
+import type { DailyConfig } from "./daily-config";
 import type {
   CombineItem,
   CombineRecipe,
@@ -23,6 +24,8 @@ export interface SerialisedBundle {
   tools: string[];
   terminal: string[];
   items: CombineItem[];
+  dailyConfig?: DailyConfig | null;
+  guestPool?: string[];
 }
 
 export function serialiseBundle(bundle: ThemeBundle): SerialisedBundle {
@@ -36,6 +39,8 @@ export function serialiseBundle(bundle: ThemeBundle): SerialisedBundle {
     tools: [...bundle.tools],
     terminal: [...bundle.terminal],
     items: [...bundle.items.values()],
+    dailyConfig: bundle.dailyConfig ?? null,
+    guestPool: bundle.guestPool,
   };
 }
 
@@ -84,5 +89,7 @@ export function hydrateBundle(s: SerialisedBundle): ThemeBundle {
     sameIngredients,
     items,
     outBand,
+    dailyConfig: s.dailyConfig ?? null,
+    guestPool: s.guestPool,
   };
 }

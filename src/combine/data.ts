@@ -643,6 +643,29 @@ export function buildAllBundles(
   };
 }
 
+/** Build the per-theme daily bundles. A theme without a `dailyConfig` just
+ *  gets its endless bundle back (the daily plays the full-run shape). A
+ *  theme with a config gets a bundle with capped ages, filtered recipes,
+ *  optional ageNeedScale, and a guest-ingredient pool.
+ *
+ *  `dailyConfigs` is injected rather than loaded here so callers in server
+ *  components stay cacheable and tests can supply synthetic values. */
+export function buildAllDailyBundles(
+  snapshot: Snapshot,
+  prevNumAges: Partial<Record<ThemeKey, number>> = {},
+  dailyConfigs: Partial<Record<ThemeKey, DailyConfig | null>> = {},
+): Record<ThemeKey, ThemeBundle> {
+  return {
+    everything: buildThemeBundle(
+      snapshot,
+      "everything",
+      prevNumAges.everything ?? 0,
+      "classic",
+      dailyConfigs.everything ?? null,
+    ),
+  };
+}
+
 /** Build fast-mode bundles for every theme. Fast mode shares the endless
  *  collection scope, but projects a different recipe set (2-part only, single
  *  band) so the board stays combinable without the age-progression tax. */
