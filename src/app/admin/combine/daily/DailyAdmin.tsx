@@ -65,7 +65,8 @@ export function DailyAdmin({
     return Object.fromEntries(DOW_KEYS.map((k) => [k, src[k]?.toString() ?? ""]));
   });
   const [schedule, setSchedule] = useState<ScheduleRow[]>(initialSchedule);
-  const [busy, setBusy] = useState<"save" | "regen" | "clear" | null>(null);
+  const [busy, setBusy] = useState<"save" | "regen" | "clear" | "reset" | null>(null);
+  const [wipeResults, setWipeResults] = useState(false);
   const [msg, setMsg] = useState<{ text: string; kind: "ok" | "err" } | null>(null);
   const [unresolved, setUnresolved] = useState<string[]>([]);
 
@@ -145,6 +146,47 @@ export function DailyAdmin({
     }
   };
 
+  const resetToday = async () => {
+    const base =
+      "Reset today's daily? This invalidates every in-progress run save. " +
+      "Players currently in a run will lose their progress and need to start over.";
+    if (!confirm(base)) return;
+    if (wipeResults) {
+      if (!confirm("Also delete today's finished run records? This cannot be undone.")) return;
+    }
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const dayKey = `${y}-${m}-${d}`;
+
+    setBusy("reset");
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/combine/daily/reset-today", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ confirmDay: dayKey, wipeResults }),
+      });
+      const j = (await res.json()) as {
+        ok?: boolean;
+        deletedResults?: number;
+        error?: string;
+        message?: string;
+      };
+      if (!res.ok || !j.ok) {
+        throw new Error(j.message ?? j.error ?? `request_failed_${res.status}`);
+      }
+      const suffix = wipeResults ? ` Deleted ${j.deletedResults ?? 0} result(s).` : "";
+      setMsg({ text: `Today's daily reset.${suffix}`, kind: "ok" });
+      await refreshSchedule();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : String(e), kind: "err" });
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const clearConfig = async () => {
     if (!confirm("Clear daily config? Daily will still play on the chosen theme but with no cap or guests.")) return;
     setBusy("clear");
@@ -174,8 +216,9 @@ export function DailyAdmin({
         <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
           Which theme&apos;s recipes power today&apos;s daily. Endless and Fast are
           unaffected — they always use the player&apos;s chosen theme. Switching
-          here is safe at any time, but players mid-run on today&apos;s daily keep
-          the previous theme until the day rolls over (UTC midnight).
+          here is safe; players mid-run on today&apos;s daily keep the previous
+          theme until the day rolls over (UTC midnight), or until you reset
+          today&apos;s daily in the Danger zone below.
         </p>
         <select
           value={themeCode}
@@ -191,142 +234,14 @@ export function DailyAdmin({
       </section>
 
       <section className="feat">
-        <h3 style={{ marginTop: 0, fontSize: 16 }}>Daily config</h3>
-        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
-          Tune how long a daily run takes and how much rare content it surfaces.
-          A fresh run must finish in one sitting, so the goal is &ldquo;satisfying in
-          ~15 minutes&rdquo; for the median player — not a completionist marathon.
-        </p>
-        <div style={{ display: "grid", gap: 10, maxWidth: 520 }}>
-          <Field
-            label="Max ages"
-            hint={
-              <>
-                Caps the daily at this many ages (1 = only age I plays, no progression).{" "}
-                Blank → full theme (endless length), typically way too long for a single sitting.
-                <br />
-                <strong>Lower (3–5)</strong> = shorter, friendlier daily; players reach the end
-                and feel finished. <strong>Higher (6–8)</strong> = more content per day but
-                longer playtime and lower completion rate.{" "}
-                <em>Start at ~5 for the 15-minute target on Everything.</em>
-              </>
-            }
-          >
-            <input
-              type="number"
-              min={1}
-              max={30}
-              value={maxAges}
-              onChange={(e) => setMaxAges(e.target.value)}
-              style={input}
-              placeholder="no cap"
-            />
-          </Field>
-          <Field
-            label="Age-need scale"
-            hint={
-              <>
-                Multiplies how many unique on-band first-finds the player must make to leave
-                each age. 1.0 matches endless; lower values ask less.
-                <br />
-                <strong>&lt; 1.0 (e.g. 0.5)</strong> = faster age-ups, shorter run, less
-                exhaustive exploration. <strong>&gt; 1.0</strong> = more demanding age-ups
-                (rarely wanted for daily).{" "}
-                <em>0.4&ndash;0.6 pairs well with a 4&ndash;6 age cap.</em>
-              </>
-            }
-          >
-            <input
-              type="number"
-              step="0.05"
-              min={0.05}
-              max={2}
-              value={ageNeedScale}
-              onChange={(e) => setAgeNeedScale(e.target.value)}
-              style={input}
-              placeholder="1.0"
-            />
-          </Field>
-          <fieldset
-            style={{
-              border: "1px solid var(--line)",
-              borderRadius: 3,
-              padding: 10,
-              margin: 0,
-              minWidth: 0,
-            }}
-          >
-            <legend style={{ fontSize: 12, color: "var(--muted)", padding: "0 6px" }}>
-              Guest ingredient of the day (optional)
-            </legend>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
-              Each day, inject a deterministic set of above-cap recipes into the dealer.
-              Everyone sees the same guests; a rotation memory in the scheduler keeps a
-              given item out for ~one full cycle before it can repeat. This is what lets
-              players discover rare items that normally live past the daily&apos;s age cap.
-              Leave Per run at 0 to disable.
-            </div>
-            <div className="cb-daily-guest-grid">
-              <Field
-                label="Per run"
-                hint={
-                  <>
-                    How many guest recipes to inject each day.
-                    <br />
-                    <strong>0</strong> = disabled. <strong>1–2</strong> = a small daily surprise,
-                    collection drips in over months. <strong>3+</strong> = heavier — can feel
-                    noisy or make the daily harder to parse.{" "}
-                    <em>1 or 2 is a good default.</em>
-                  </>
-                }
-              >
-                <input
-                  type="number"
-                  min={0}
-                  max={10}
-                  value={guestPerRun}
-                  onChange={(e) => setGuestPerRun(e.target.value)}
-                  style={input}
-                  placeholder="0"
-                />
-              </Field>
-              <Field
-                label="Min band"
-                hint={
-                  <>
-                    Guests must live in this band or higher (1 = earliest, 14 = latest on
-                    Everything today). The game auto-raises this to at least &ldquo;cap + 1&rdquo;
-                    so guests never overlap the normal daily progression.
-                    <br />
-                    <strong>Just above the cap</strong> = adjacent rare items players nearly
-                    reached. <strong>Much higher</strong> = exotic late-game drops.{" "}
-                    <em>Try cap + 1 to start.</em>
-                  </>
-                }
-              >
-                <input
-                  type="number"
-                  min={1}
-                  max={30}
-                  value={guestMinBand}
-                  onChange={(e) => setGuestMinBand(e.target.value)}
-                  style={input}
-                  placeholder="1"
-                />
-              </Field>
-            </div>
-          </fieldset>
-        </div>
-      </section>
-
-      <section className="feat">
         <h3 style={{ marginTop: 0, fontSize: 16 }}>Daily length</h3>
         <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
-          Daily ends when the player hits N unique discoveries (win) or the
-          board runs out of moves (loss). Leaderboard sorts completions first,
-          then by turn count. Per-weekday overrides let you make weekdays
-          shorter or weekends longer. Admin must click <em>Regenerate schedule</em>{" "}
-          to apply changes to future days; today&apos;s row is protected.
+          This is what ends the daily run. Set it first.{" "}
+          Players win when they hit the target number of unique discoveries;
+          they lose if the board fills first. The leaderboard sorts completions
+          first, then by fewest turns. Changes apply to future days after you
+          click <em>Regenerate schedule</em>; today&apos;s row is protected until
+          you explicitly reset it in the Danger zone.
         </p>
         <div style={{ display: "grid", gap: 10, maxWidth: 520 }}>
           <Field
@@ -403,6 +318,142 @@ export function DailyAdmin({
               </span>
             )}
           </div>
+        </div>
+      </section>
+
+      <section className="feat">
+        <h3 style={{ marginTop: 0, fontSize: 16 }}>Daily shape</h3>
+        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
+          Controls what&apos;s in the deal — how deep the recipe pool goes and
+          what rare items drip in via guests. These don&apos;t change how long
+          the run is (the target does that); they change what the player
+          encounters along the way.
+        </p>
+        <div style={{ display: "grid", gap: 10, maxWidth: 520 }}>
+          <Field
+            label="Max ages"
+            hint={
+              <>
+                Caps the daily&apos;s recipe pool at this many ages. Blank → full
+                theme pool (the whole canon). Lower = tighter, more focused deal;
+                higher = more variety but more complexity on-screen.
+                <br />
+                <em>Start at ~5 on Everything.</em>
+              </>
+            }
+          >
+            <input
+              type="number"
+              min={1}
+              max={30}
+              value={maxAges}
+              onChange={(e) => setMaxAges(e.target.value)}
+              style={input}
+              placeholder="no cap"
+            />
+          </Field>
+          <fieldset
+            style={{
+              border: "1px solid var(--line)",
+              borderRadius: 3,
+              padding: 10,
+              margin: 0,
+              minWidth: 0,
+            }}
+          >
+            <legend style={{ fontSize: 12, color: "var(--muted)", padding: "0 6px" }}>
+              Guest ingredient of the day (optional)
+            </legend>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
+              Each day, inject a deterministic set of above-cap recipes into the dealer.
+              Everyone sees the same guests; a rotation memory in the scheduler keeps a
+              given item out for ~one full cycle before it can repeat. This is what lets
+              players discover rare items that normally live past the daily&apos;s age cap.
+              Leave Per run at 0 to disable.
+            </div>
+            <div className="cb-daily-guest-grid">
+              <Field
+                label="Per run"
+                hint={
+                  <>
+                    How many guest recipes to inject each day.
+                    <br />
+                    <strong>0</strong> = disabled. <strong>1–2</strong> = a small daily surprise,
+                    collection drips in over months. <strong>3+</strong> = heavier — can feel
+                    noisy or make the daily harder to parse.{" "}
+                    <em>1 or 2 is a good default.</em>
+                  </>
+                }
+              >
+                <input
+                  type="number"
+                  min={0}
+                  max={10}
+                  value={guestPerRun}
+                  onChange={(e) => setGuestPerRun(e.target.value)}
+                  style={input}
+                  placeholder="0"
+                />
+              </Field>
+              <Field
+                label="Min band"
+                hint={
+                  <>
+                    Guests must live in this band or higher (1 = earliest, 14 = latest on
+                    Everything today). The game auto-raises this to at least &ldquo;cap + 1&rdquo;
+                    so guests never overlap the normal daily progression.
+                    <br />
+                    <strong>Just above the cap</strong> = adjacent rare items players nearly
+                    reached. <strong>Much higher</strong> = exotic late-game drops.{" "}
+                    <em>Try cap + 1 to start.</em>
+                  </>
+                }
+              >
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={guestMinBand}
+                  onChange={(e) => setGuestMinBand(e.target.value)}
+                  style={input}
+                  placeholder="1"
+                />
+              </Field>
+            </div>
+          </fieldset>
+          <details style={{ fontSize: 12 }}>
+            <summary style={{ cursor: "pointer", color: "var(--muted)" }}>
+              Age-up pacing (advanced)
+            </summary>
+            <div style={{ marginTop: 10 }}>
+              <Field
+                label="Age-need scale"
+                hint={
+                  <>
+                    Cosmetic. Scales how many on-band first-finds the player
+                    must make before the age-up animation fires. 1.0 matches
+                    endless; lower values trigger age transitions sooner.
+                    <br />
+                    <strong>Daily runs end on the target, not on reaching the
+                    final age</strong> — so this doesn&apos;t change how long the
+                    run is, only how often the age-up fanfare interrupts play.
+                    <em> Leave at 1.0 unless pacing feels off.</em>
+                  </>
+                }
+              >
+                <input
+                  type="number"
+                  step="0.05"
+                  min={0.05}
+                  max={2}
+                  value={ageNeedScale}
+                  onChange={(e) => setAgeNeedScale(e.target.value)}
+                  style={input}
+                  placeholder="1.0"
+                />
+              </Field>
+            </div>
+          </details>
         </div>
       </section>
 
@@ -592,6 +643,54 @@ export function DailyAdmin({
           </div>
           </>
         )}
+      </section>
+
+      <section className="feat feat-danger">
+        <h3 style={{ marginTop: 0, fontSize: 16, color: "var(--warn, #a66400)" }}>
+          Danger zone
+        </h3>
+        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
+          Reset today&apos;s daily puzzle for every player. Use when a bad
+          config shipped or you need to swap the active theme mid-day.
+          The regenerate button above deliberately protects today&apos;s row;
+          this is the escape hatch.
+          <br />
+          <br />
+          <strong>What breaks:</strong> every in-progress run save for today
+          is invalidated — players lose their current board on refresh and
+          start over on the new puzzle. Collection discoveries are kept
+          (they&apos;re lifetime). Finished run records are kept unless you
+          tick the box below.
+        </p>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            color: "var(--ink)",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={wipeResults}
+            onChange={(e) => setWipeResults(e.target.checked)}
+          />
+          Also delete today&apos;s finished player results
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>
+            (clears today&apos;s leaderboard)
+          </span>
+        </label>
+        <div className="cb-daily-actions">
+          <button
+            type="button"
+            className="btn danger"
+            disabled={busy !== null}
+            onClick={resetToday}
+          >
+            {busy === "reset" ? "…" : "Reset today's daily"}
+          </button>
+        </div>
       </section>
     </div>
   );

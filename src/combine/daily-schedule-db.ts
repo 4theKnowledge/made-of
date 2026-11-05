@@ -9,6 +9,7 @@ import { getDb, schema } from "@/db/client";
 import type { Snapshot } from "../graph/snapshot";
 import { buildThemeBundle, type GuestRecipeExtension } from "./data";
 import {
+  buildDailyPayload,
   buildSchedule,
   cappedBuildableSet,
   type DailyPayload,
@@ -204,6 +205,100 @@ export async function scheduleActiveDaily(
     skipped,
     removed,
     unresolvedExamples: [...unresolvedExamples].slice(0, 20),
+  };
+}
+
+/** Overwrite today's `combine_dailies` row for the active daily theme.
+ *
+ *  Unlike `scheduleActiveDaily("regenerate")`, which deliberately protects
+ *  today's row, this function is the single escape hatch for the "Reset
+ *  today's daily" admin button. It:
+ *    1. Reads the current active daily config.
+ *    2. Rebuilds the full + capped bundles.
+ *    3. Replays the rotation state across all prior days to compute the
+ *       correct `recent` map for today.
+ *    4. Upserts a fresh payload for (themeCode, today).
+ *
+ *  It does NOT touch other days, player `progress` rows, or
+ *  `combine_discoveries`. The caller (admin API route) is responsible for
+ *  rate limiting, admin-auth, audit logging, and any optional progress
+ *  wipe.
+ *
+ *  Returns `null` when no active daily is configured. */
+export async function resetTodaySchedule(
+  snapshot: Snapshot,
+): Promise<{
+  themeCode: ThemeKey;
+  payload: DailyPayload;
+  unresolvedExamples: string[];
+} | null> {
+  const db = getDb();
+  const active = await getActiveDaily();
+  if (!active) return null;
+  const { themeCode, config: dailyConfig } = active;
+
+  const fullBundle = buildThemeBundle(snapshot, themeCode);
+  const cappedBundle = buildThemeBundle(
+    snapshot,
+    themeCode,
+    0,
+    "daily",
+    dailyConfig,
+  );
+
+  // Pull prior rows so rotation history advances correctly when we rebuild
+  // today. `buildSchedule` normally handles this; we inline the same
+  // walking map for a single-day build.
+  const priorRowsRaw = await db
+    .select({
+      day: schema.combineDailies.day,
+      payload: schema.combineDailies.payload,
+    })
+    .from(schema.combineDailies)
+    .where(eq(schema.combineDailies.themeCode, themeCode));
+  const today = UTC_TODAY();
+  // Only days strictly before today contribute to rotation state. Today's
+  // own prior payload is being overwritten and must not vote for itself.
+  const history = priorRowsRaw
+    .map((r) => ({ day: r.day, payload: r.payload as DailyPayload }))
+    .filter((r) => r.day < today)
+    .sort((a, b) => a.day.localeCompare(b.day));
+
+  const lastServed = new Map<string, string>();
+  for (const row of history) {
+    for (const id of row.payload.guestOutputIds) {
+      lastServed.set(id, row.day);
+    }
+  }
+  const recent = new Map<string, number>();
+  for (const [id, served] of lastServed) {
+    const a = new Date(`${served}T00:00:00Z`).getTime();
+    const b = new Date(`${today}T00:00:00Z`).getTime();
+    recent.set(id, Math.round((b - a) / 86_400_000));
+  }
+
+  const input: ScheduleInput = { theme: themeCode, fullBundle, dailyConfig };
+  const payload = buildDailyPayload(input, today, recent);
+
+  // Collect unresolved guests for the admin feedback card.
+  const { unresolved } = resolveGuestRecipes(
+    fullBundle,
+    cappedBundle,
+    payload.guestOutputIds,
+  );
+
+  await db
+    .insert(schema.combineDailies)
+    .values({ themeCode, day: today, payload })
+    .onConflictDoUpdate({
+      target: [schema.combineDailies.themeCode, schema.combineDailies.day],
+      set: { payload },
+    });
+
+  return {
+    themeCode,
+    payload,
+    unresolvedExamples: unresolved.slice(0, 20),
   };
 }
 

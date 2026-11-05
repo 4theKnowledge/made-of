@@ -106,6 +106,10 @@ export const limiters = {
   dailyResult: new RateLimiter({ limit: 10, windowMs: MINUTE }),
   scratch: new RateLimiter({ limit: 120, windowMs: MINUTE }),
   reports: new RateLimiter({ limit: 10, windowMs: HOUR }),
+  // Admin reset-today: destructive + rare. Cap at 2/min to catch
+  // double-clicks and panicked retries without actually blocking a
+  // deliberate second reset.
+  adminResetDaily: new RateLimiter({ limit: 2, windowMs: MINUTE }),
 };
 
 /** Reset every limiter — tests use this between runs. */

@@ -69,12 +69,9 @@ export function ExploreShell({ view: initial }: { view: ExploreView }) {
 
   return (
     <>
-      <section
-        className="panel"
-        style={{ padding: "10px 14px", marginBottom: 10 }}
-      >
+      <div style={{ marginBottom: 10 }}>
         <ItemSearch placeholder="Explore anything — type a name…" />
-      </section>
+      </div>
 
       <div ref={focusHeadRef} style={{ display: "contents" }}>
         <Bowtie view={view} mode="explore" onChipClick={onChipClick} />
