@@ -25,3 +25,4 @@
 {"id": "C-0025", "ts": "2026-11-05T05:56:20Z", "kind": "fix", "summary": "Combine Hold zone scrolls horizontally when held tiles overflow its width (T-0071).", "refs": {}}
 {"id": "C-0026", "ts": "2026-11-05T05:58:49Z", "kind": "fix", "summary": "Combine shelf/hold slots hold 30x30 aspect instead of squishing when overflowing (T-0072).", "refs": {}}
 {"id": "C-0027", "ts": "2026-11-05T11:51:10Z", "kind": "fix", "summary": "Combine: long-pressing a tile on mobile no longer selects page text", "refs": {"task": "T-0075"}}
+{"id": "C-0028", "ts": "2026-11-05T11:53:42Z", "kind": "fix", "summary": "Combine: \"Close call!\" now fires only on a genuine rescue (board was full; combine freed cells).", "refs": {"task": "T-0076"}}

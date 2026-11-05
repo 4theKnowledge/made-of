@@ -474,9 +474,12 @@ function finishResolve(
   );
   state.score += pts;
 
+  // Close call: the board was completely full the moment this combine
+  // resolved, and the chain freed ≥1 cell. That's a genuine rescue — the
+  // player's next tile had nowhere to land until this combine cleared space.
   const close =
-    cells.length - 1 >= 3 && fullBefore >= 0.8
-      ? Math.round(30 * (cells.length - 1) * (1 + (fullBefore - 0.8) * 5))
+    fullBefore === 1 && cells.length >= 2
+      ? Math.round(30 * (cells.length - 1) * 2)
       : 0;
   if (close) {
     state.score += close;
