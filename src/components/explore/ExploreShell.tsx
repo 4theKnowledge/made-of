@@ -80,20 +80,18 @@ export function ExploreShell({ view: initial }: { view: ExploreView }) {
         <Bowtie view={view} mode="explore" onChipClick={onChipClick} />
       </div>
 
-      <section
-        className="panel"
+      <div
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
           gap: 12,
           flexWrap: "wrap",
-          padding: "10px 14px",
+          padding: "8px 2px",
+          fontSize: 13,
+          color: "var(--muted)",
         }}
       >
-        <span style={{ fontSize: 13, color: "var(--muted)" }}>
-          Something off about {view.item.name}?
-        </span>
+        <span>Something off about {view.item.name}?</span>
         <ReportMistakeButton
           label="Report a mistake"
           className="btn"
@@ -103,7 +101,7 @@ export function ExploreShell({ view: initial }: { view: ExploreView }) {
             recipeInputs: [view.item.name],
           }}
         />
-      </section>
+      </div>
 
       {view.originChain.length > 1 && (
         <section className="panel">

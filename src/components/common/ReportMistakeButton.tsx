@@ -27,7 +27,6 @@ export function ReportMistakeButton({
         type="button"
         onClick={() => setOpen(true)}
         className={className}
-        style={{ alignSelf: "flex-start" }}
       >
         {label}
       </button>

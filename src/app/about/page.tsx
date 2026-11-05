@@ -327,7 +327,9 @@ export default async function AboutPage() {
             Spotted a mistake, or want to suggest something for the map?
             Send it through here &mdash; every report lands in our inbox.
           </p>
-          <ReportMistakeButton signedIn={signedIn} label="Send feedback" />
+          <div style={{ alignSelf: "flex-start" }}>
+            <ReportMistakeButton signedIn={signedIn} label="Send feedback" />
+          </div>
           <p style={{ marginTop: 16, color: "var(--muted)", fontSize: 14 }}>
             Dedicated contact details for teachers, parents and sponsors are
             coming soon.

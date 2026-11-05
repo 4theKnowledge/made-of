@@ -105,7 +105,9 @@ export default async function MethodPage() {
             Let us know &mdash; every report lands in our inbox and helps the
             map get more accurate.
           </p>
-          <ReportMistakeButton signedIn={signedIn} label="Report a mistake" />
+          <div style={{ alignSelf: "flex-start" }}>
+            <ReportMistakeButton signedIn={signedIn} label="Report a mistake" />
+          </div>
         </section>
       </div>
 
