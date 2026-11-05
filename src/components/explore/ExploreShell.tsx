@@ -82,7 +82,7 @@ export function ExploreShell({ view: initial }: { view: ExploreView }) {
 
       <div style={{ padding: "8px 2px" }}>
         <ReportMistakeButton
-          label={`Something off about ${view.item.name}?`}
+          label={`Something off about ${view.item.name}? Report it.`}
           className="btn"
           payload={{
             category: "item_wrong",

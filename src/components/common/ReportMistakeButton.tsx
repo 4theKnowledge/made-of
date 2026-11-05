@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { FeedbackSheet } from "./FeedbackSheet";
 
 export function ReportMistakeButton({
@@ -14,7 +14,8 @@ export function ReportMistakeButton({
    * to false so this component can render in static pages that don't read
    * the session. */
   signedIn?: boolean;
-  label?: string;
+  /** Button label. Accepts plain strings or JSX for richer content. */
+  label?: ReactNode;
   className?: string;
   /** Optional context passed through to the feedback payload (e.g. itemId,
    * slug, category) so admins can see what the user was looking at. */
