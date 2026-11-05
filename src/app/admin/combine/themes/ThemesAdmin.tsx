@@ -167,7 +167,14 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
           <tbody>
             {sorted.map((row) => (
               <tr key={row.code} style={{ borderBottom: "1px solid var(--line)" }}>
-                <td style={{ ...td, fontFamily: "var(--mono, monospace)", fontSize: 12 }}>{row.code}</td>
+                <td style={{ ...td, fontFamily: "var(--mono, monospace)", fontSize: 12 }}>
+                  <Link
+                    href={`/admin/combine/themes/${encodeURIComponent(row.code)}`}
+                    style={{ color: "var(--ink)", textDecoration: "underline" }}
+                  >
+                    {row.code}
+                  </Link>
+                </td>
                 <td style={td}>
                   {editing === row.code ? (
                     <EditRow
@@ -179,7 +186,12 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
                       }}
                     />
                   ) : (
-                    <span style={{ fontWeight: 500 }}>{row.label}</span>
+                    <Link
+                      href={`/admin/combine/themes/${encodeURIComponent(row.code)}`}
+                      style={{ fontWeight: 500, color: "var(--ink)", textDecoration: "none" }}
+                    >
+                      {row.label}
+                    </Link>
                   )}
                 </td>
                 <td style={{ ...td, color: "var(--muted)" }}>
@@ -189,8 +201,13 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
                 <td style={{ ...td, textAlign: "right" }}>
                   {editing === row.code ? null : (
                     <span style={{ display: "inline-flex", gap: 6 }}>
-                      <Link href={`/admin/combine/themes/${encodeURIComponent(row.code)}`} className="btn" style={smallBtn}>
-                        Validate
+                      <Link
+                        href={`/admin/combine/themes/${encodeURIComponent(row.code)}`}
+                        className="btn"
+                        style={smallBtn}
+                        title="Validator, daily config and schedule, members"
+                      >
+                        Open
                       </Link>
                       <button type="button" className="btn" style={smallBtn} onClick={() => setEditing(row.code)}>
                         Edit
