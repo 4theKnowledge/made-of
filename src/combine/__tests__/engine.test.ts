@@ -231,8 +231,9 @@ describe("ageMade counts only unique on-band first-finds (T-0051)", () => {
     s0.tray = ["flour", null, null];
     const after1 = reduce(s0, bundle, { type: "place", slot: 0, cell: 1 }).state;
     expect(after1.ageMade).toBe(1);
-    // `found` stays empty in fast mode — the collection isn't touched.
-    expect(after1.found).toEqual([]);
+    // `found` tracks run-local history (powers the shelf) in every mode.
+    // Lifetime-collection unlocks are gated separately and skipped in fast.
+    expect(after1.found.length).toBe(1);
 
     after1.board = Array(9).fill(null);
     after1.board[0] = "water";
@@ -1469,7 +1470,7 @@ describe("promote (1-input recipes)", () => {
     expect(events).toEqual([]);
   });
 
-it("promote in fast mode makes the tile but does not add to found", () => {
+it("promote in fast mode makes the tile and populates run-local history", () => {
     const b2 = fakeBundle({ recipes: [R("b", ["a"]), R("ab", ["a", "x"])] });
     const s = newGame("everything", b2, { seed: 1, size: 5 }).state;
     s.board.fill(null);
@@ -1481,10 +1482,13 @@ it("promote in fast mode makes the tile but does not add to found", () => {
     s.found = [];
     s.board[0] = "a";
     const { state } = reduce(s, b2, { type: "promote", cell: 0 });
-    // Tile transformed; collection stays untouched in fast mode.
+    // Tile transformed; run-local history is populated so the shelf
+    // renders. Lifetime collection (madeAtBand / discovery event) stays
+    // untouched in fast mode.
     expect(state.board[0]).toBe("b");
-    expect(state.found).not.toContain("b");
-    expect(state.howMade["b"]).toBeUndefined();
+    expect(state.found).toContain("b");
+    expect(state.howMade["b"]).toEqual(["a"]);
+    expect(state.madeAtBand["b"]).toBeUndefined();
   });
 
   it("promote scoring: 1-input yields the formula's 0.5× pair-match points", () => {

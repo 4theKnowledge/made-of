@@ -499,13 +499,16 @@ function finishResolve(
     state.closeCalls++;
   }
 
-  // Fast mode is score-only: no first-find tracking, no discovery events.
-  // Players still score and chain, but the collection stays untouched so
-  // classic progression is never shortcutted by combo-dense fast runs.
+  // Fast mode is score-only for the *lifetime collection*: no discovery
+  // events, no madeAtBand (there are no bands), so the collection stays
+  // untouched and classic progression isn't shortcutted by fast runs.
+  // `found` itself is run-local — it powers the on-board history tray
+  // and the picker's "fresh alternative" preference, both of which
+  // should work in fast mode too.
   const uniqueFind = !state.found.includes(recipe.out);
+  if (uniqueFind) state.found.push(recipe.out);
   const first = isClassic(state.mode) && uniqueFind;
   if (first) {
-    state.found.push(recipe.out);
     state.madeAtBand[recipe.out] = recipe.band;
     events.push({
       type: "discovery",
@@ -518,10 +521,9 @@ function finishResolve(
   // DetailCard renders every known variant of a recipe and highlights
   // this one; keeping it fresh means players see their latest path
   // marked even on items they'd previously made via another recipe.
-  // Fast mode still skips (collection stays untouched there).
-  if (isClassic(state.mode)) {
-    state.howMade[recipe.out] = recipe.all.slice();
-  }
+  // Run-local, so fast mode populates it too — it only powers the shelf
+  // info card, not the lifetime collection.
+  state.howMade[recipe.out] = recipe.all.slice();
   state.madeCounts[recipe.out] = (state.madeCounts[recipe.out] ?? 0) + 1;
   // Age progression: count unique first-time makes at the current age's band.
   // `ageNeed` is documented as "unique discoveries at the current age's band
