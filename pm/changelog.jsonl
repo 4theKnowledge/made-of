@@ -42,3 +42,4 @@
 {"id": "C-0042", "ts": "2026-11-05T14:24:29Z", "kind": "fix", "summary": "Combine fast mode now populates the on-board History tray and DetailCard \"how you made it\" (T-0093)", "refs": {"task": "T-0093"}}
 {"id": "C-0043", "ts": "2026-11-05T20:39:38Z", "kind": "fix", "summary": "Combine DetailCard: \"Full story in Explore\" and \"Back to the game\" now sit side-by-side in a ButtonGroup", "refs": {"task": "T-0095"}}
 {"id": "C-0044", "ts": "2026-11-05T20:41:25Z", "kind": "fix", "summary": "Combine fast runs persist across refresh (own localStorage slot) (T-0094)", "refs": {"task": "T-0094"}}
+{"id": "C-0045", "ts": "2026-11-05T20:42:27Z", "kind": "fix", "summary": "Combine fast mode: collection book + game-over summary no longer merge run-local finds into the lifetime figures", "refs": {"task": "T-0096"}}

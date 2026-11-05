@@ -33,13 +33,17 @@ export function GameOverCard({
     shelfCounts.set(id, (shelfCounts.get(id) ?? 0) + 1);
   }
   // "N of Y discovered so far" is a lifetime figure, so merge this run's
-  // new finds with the lifetime collection (mirrors CollectionBook).
+  // new finds with the lifetime collection (mirrors CollectionBook). Fast
+  // mode's finds never persist, so skip the merge there — the summary
+  // should reflect the untouched lifetime collection.
   const themeDiscoveredSet = new Set<string>();
   for (const id of collection.keys()) {
     if (bundle.outputs.has(id)) themeDiscoveredSet.add(id);
   }
-  for (const id of state.found) {
-    if (bundle.outputs.has(id)) themeDiscoveredSet.add(id);
+  if (state.mode !== "fast") {
+    for (const id of state.found) {
+      if (bundle.outputs.has(id)) themeDiscoveredSet.add(id);
+    }
   }
   const themeDiscovered = themeDiscoveredSet.size;
   const totalOutputs = bundle.outputs.size;

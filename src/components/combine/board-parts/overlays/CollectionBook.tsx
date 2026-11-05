@@ -58,18 +58,22 @@ export function CollectionBook({
   // Merge the current game's new discoveries with the lifetime collection
   // so a signed-out player's in-game progress still shows in the book even
   // if the collection map hasn't caught up yet (both are driven by the same
-  // record() call, but merging keeps the UI robust).
+  // record() call, but merging keeps the UI robust). Fast mode is
+  // score-only — its finds never persist — so skip the merge there and
+  // show only the true lifetime collection (read-only during a fast run).
   const findsForTheme = useMemo(() => {
     const now = Date.now();
     const merged = new Map<string, number>();
     for (const [id, t] of collection) {
       if (collectables.has(id)) merged.set(id, t);
     }
-    for (const id of state.found) {
-      if (!merged.has(id) && collectables.has(id)) merged.set(id, now);
+    if (state.mode !== "fast") {
+      for (const id of state.found) {
+        if (!merged.has(id) && collectables.has(id)) merged.set(id, now);
+      }
     }
     return merged;
-  }, [collection, state.found, collectables]);
+  }, [collection, state.found, state.mode, collectables]);
   const got = findsForTheme.size;
   const pct = Math.round((100 * got) / Math.max(1, total));
   // "Known" for mastery = everything in findsForTheme (lifetime + this-run
