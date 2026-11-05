@@ -137,6 +137,16 @@ function Cell({
 
   const inFuse = fx.fuse?.has(cell) ?? false;
   const inCrumble = fx.crumble?.has(cell) ?? false;
+  // Promote-badge: how many 1-input recipes use this live tile as their
+  // sole ingredient. Only counted on the actual board tile (not fx
+  // ghosts) and only when nothing else is happening on the cell.
+  const promoteCount =
+    id && !fuseGhostId && !popGhostId && !isShipped
+      ? (bundle.byIngredient.get(id) ?? []).reduce(
+          (n, r) => (r.all.length === 1 && r.all[0] === id ? n + 1 : n),
+          0,
+        )
+      : 0;
   const isPlaced = fx.placed === cell;
   const isNope = fx.nope === cell;
   const burst = fx.burst?.at === cell ? fx.burst : null;
@@ -175,6 +185,12 @@ function Cell({
 
   const ariaLabel = item
     ? `${cap(item.name)}${moving ? ", selected to move" : ""}${
+        promoteCount > 0 && !moving
+          ? promoteCount > 1
+            ? `, tap to make one of ${promoteCount} things`
+            : ", tap to transform"
+          : ""
+      }${
         shored
           ? ", shored: won't crumble"
           : crumbleTick > 0
@@ -234,6 +250,14 @@ function Cell({
       {isNope && <span className="pts nope">no recipe</span>}
       {isShipped && (
         <span className="pts ship">shipped +{fx.shipped!.bonus}</span>
+      )}
+      {promoteCount > 0 && (
+        <span className="pmk" aria-hidden="true">
+          <svg viewBox="0 0 10 10">
+            <path d="M5 8.5 L5 2 M2 4.5 L5 2 L8 4.5" />
+          </svg>
+          {promoteCount > 1 && <b>{promoteCount}</b>}
+        </span>
       )}
       {crumbleTick > 0 && !inCrumble && (
         <span className="crk" aria-hidden="true">

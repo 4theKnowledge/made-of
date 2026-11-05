@@ -28,20 +28,59 @@ export function DetailCard({
 }) {
   const item = bundle.items.get(tileId);
   if (!item) return null;
-  // Only reveal a recipe the player has earned the right to see — either
+  // Only reveal recipes the player has earned the right to see — either
   // because they made it this run, or because the output is already known
   // (previous run, lifetime collection, or raw starting item). Otherwise
   // hide ingredients so long-pressing a tile can't be used to peek at how
   // to craft an undiscovered item.
   const playerRecipe = howMade[tileId];
   const isKnown = known.has(tileId);
-  const bundleRecipe = isKnown
-    ? bundle.recipes.find((r) => r.out === tileId)
-    : undefined;
-  const loreRecipe = isKnown && item.lore ? { all: item.lore } : null;
+  // Gather every bundle recipe that produces this tile whose ingredients
+  // are all known to the player. "Known" here means in the player's
+  // lifetime collection or a raw ingredient — otherwise the card would
+  // leak a path the player hasn't earned.
+  const allKnownRecipes = isKnown
+    ? bundle.recipes.filter(
+        (r) =>
+          r.out === tileId &&
+          r.all.every((partId) => known.has(partId) || bundle.base.includes(partId)),
+      )
+    : [];
+  // Dedupe by sorted ingredient signature so the same recipe modelled as
+  // multiple edges (e.g. alternative orderings) collapses to one row.
+  const sigOf = (all: readonly string[]) => [...all].sort().join("+");
+  const recipeRows: { all: string[]; used: boolean }[] = [];
+  const seen = new Set<string>();
+  for (const r of allKnownRecipes) {
+    const sig = sigOf(r.all);
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    recipeRows.push({ all: r.all.slice(), used: false });
+  }
+  // Mark the path the player actually used this run. Add it defensively
+  // in case howMade recorded a recipe that isn't in the current bundle
+  // (data drift between runs), so it still shows up as "used this run".
+  if (playerRecipe) {
+    const sig = sigOf(playerRecipe);
+    const existing = recipeRows.find((row) => sigOf(row.all) === sig);
+    if (existing) existing.used = true;
+    else recipeRows.push({ all: playerRecipe.slice(), used: true });
+  }
+  // Lore fallback when no bundle / player recipe is visible — used for
+  // items whose only "made from" story lives in the item view.
+  const loreRecipe: { all: string[] } | null =
+    isKnown && item.lore && recipeRows.length === 0
+      ? { all: item.lore }
+      : null;
+  // For `canExplore` gating below, stay with the primary recipe (player
+  // first, else first bundle row, else lore). Explore reveals should
+  // only unlock when *at least one* complete path is visible, which the
+  // existing logic captures.
   const madeFrom: { all: string[] } | null = playerRecipe
     ? { all: playerRecipe }
-    : (bundleRecipe ?? loreRecipe);
+    : recipeRows[0]
+      ? { all: recipeRows[0].all }
+      : loreRecipe;
   // Goes into: recipes that use this tile as an ingredient.
   const goesInto = (bundle.byIngredient.get(tileId) ?? []).filter(
     (r) => r.out !== tileId,
@@ -74,9 +113,46 @@ export function DetailCard({
           <span className="pill cbinfo-kind">{KIND[item.kind]}</span>
         </div>
         <div className="nm">{cap(item.name)}</div>
-        {madeFrom ? (
+        {recipeRows.length > 0 ? (
+          recipeRows.map((row, rowIdx) => (
+            <div
+              key={sigOf(row.all)}
+              className={row.used ? "cbchip used" : "cbchip"}
+              aria-label={row.used ? "Made from (used this run)" : "Made from"}
+            >
+              {row.all.map((pid, k) => {
+                const p = bundle.items.get(pid);
+                if (!p) return null;
+                return (
+                  <React.Fragment key={`${rowIdx}-${pid}`}>
+                    <span>
+                      <Pictogram
+                        name={p.name}
+                        tier={p.tier}
+                        kind={p.kind}
+                        symbol={p.symbol}
+                      />
+                      {cap(p.name)}
+                    </span>
+                    {k < row.all.length - 1 && <i>+</i>}
+                  </React.Fragment>
+                );
+              })}
+              <i>=</i>
+              <span>
+                <Pictogram
+                  name={item.name}
+                  tier={item.tier}
+                  kind={item.kind}
+                  symbol={item.symbol}
+                />
+                {cap(item.name)}
+              </span>
+            </div>
+          ))
+        ) : loreRecipe ? (
           <div className="cbchip" aria-label="Made from">
-            {madeFrom.all.map((pid, k) => {
+            {loreRecipe.all.map((pid, k) => {
               const p = bundle.items.get(pid);
               if (!p) return null;
               return (
@@ -90,7 +166,7 @@ export function DetailCard({
                     />
                     {cap(p.name)}
                   </span>
-                  {k < madeFrom.all.length - 1 && <i>+</i>}
+                  {k < loreRecipe.all.length - 1 && <i>+</i>}
                 </React.Fragment>
               );
             })}

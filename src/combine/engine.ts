@@ -73,6 +73,13 @@ export interface ChoosingState {
   cells: number[];
   /** Chain multiplier at the time the group formed. */
   mult: number;
+  /** When true, the picker may be dismissed with `cancel-choice` and the
+   *  mutations that opened it are rolled back via `lastSnapshot`. Set for
+   *  the promote action (the source tile isn't consumed until the player
+   *  commits). Combine/place/drop-on/move leave this false: those paths
+   *  have already consumed the tray tile or moved the board tile, so
+   *  cancelling cleanly is non-trivial and the player must commit. */
+  cancellable?: boolean;
 }
 
 export interface GameState {
@@ -192,10 +199,12 @@ export type Action =
   | { type: "place"; slot: number; cell: number; source?: TileSource }
   | { type: "drop-on"; slot: number; cell: number; source?: TileSource }
   | { type: "choose"; outputIndex: number }
+  | { type: "cancel-choice" }
   | { type: "swap" }
   | { type: "clear"; cell: number }
   | { type: "hint" }
   | { type: "move"; from: number; to: number }
+  | { type: "promote"; cell: number }
   | { type: "shore"; cell: number }
   | { type: "hold"; slot: number }
   | { type: "pluck-hold"; cell: number }
@@ -244,7 +253,12 @@ function cloneState(s: GameState): GameState {
     shored: s.shored.slice(),
     recentTrays: s.recentTrays.map((t) => t.slice()),
     choosing: s.choosing
-      ? { options: [...s.choosing.options], cells: [...s.choosing.cells], mult: s.choosing.mult }
+      ? {
+          options: [...s.choosing.options],
+          cells: [...s.choosing.cells],
+          mult: s.choosing.mult,
+          cancellable: s.choosing.cancellable,
+        }
       : null,
     // Snapshots are frozen captures — pass the reference through. We
     // explicitly null their own `lastSnapshot` at capture time so this
@@ -467,9 +481,16 @@ function finishResolve(
   const first = state.mode !== "fast" && uniqueFind;
   if (first) {
     state.found.push(recipe.out);
-    state.howMade[recipe.out] = recipe.all.slice();
     state.madeAtBand[recipe.out] = recipe.band;
     events.push({ type: "discovery", out: recipe.out, recipe: recipe.all });
+  }
+  // `howMade` is the most recent recipe used, not just the first. The
+  // DetailCard renders every known variant of a recipe and highlights
+  // this one; keeping it fresh means players see their latest path
+  // marked even on items they'd previously made via another recipe.
+  // Fast mode still skips (collection stays untouched there).
+  if (state.mode !== "fast") {
+    state.howMade[recipe.out] = recipe.all.slice();
   }
   state.madeCounts[recipe.out] = (state.madeCounts[recipe.out] ?? 0) + 1;
   // Age progression: count unique first-time makes at the current age's band.
@@ -860,6 +881,25 @@ export function reduce(
       return { state, events };
     }
 
+    case "cancel-choice": {
+      // Back out of a cancellable picker (today: promote only). The
+      // promote handler captured `lastSnapshot` and bumped `moves` /
+      // `score` before opening the picker; restoring that snapshot rolls
+      // those mutations back cleanly — the source tile was never
+      // consumed, so no board state is lost.
+      if (!state.choosing || !state.choosing.cancellable) {
+        return { state: prev, events: [] };
+      }
+      if (!state.lastSnapshot) {
+        // Shouldn't happen for a cancellable picker (promote always
+        // captures one), but fall through gracefully: just drop the
+        // picker and leave other state alone.
+        state.choosing = null;
+        return { state, events };
+      }
+      return { state: state.lastSnapshot, events };
+    }
+
     case "place": {
       const src = action.source ?? "tray";
       const srcArr = src === "hold" ? state.hold : state.tray;
@@ -1039,6 +1079,48 @@ export function reduce(
         return { state, events };
       }
       // Move helpers skip the after-turn step (no crumble, no deal).
+      sealIfDiscovered(state, events);
+      return { state, events };
+    }
+
+    case "promote": {
+      // Transform a board tile via a 1-input recipe (e.g. star → supernova).
+      // Reachability fix: these recipes have no partner tile so they can't
+      // fire via placement or drop-on. Promote is a deliberate player
+      // action, costs a turn like a regular combine, and runs the full
+      // after-move cycle (crumble, deal). Multi-output 1-input recipes go
+      // through the normal `choosing` path.
+      const tile = state.board[action.cell];
+      if (tile == null) return { state: prev, events: [] };
+      const rs = (bundle.byIngredient.get(tile) ?? []).filter(
+        (r) => r.all.length === 1,
+      );
+      // All 1-input recipes for this tile are eligible — even if the
+      // player hasn't discovered the output yet. Promote is the only way
+      // to reveal these chains in-game (star → supernova → heavy
+      // elements), so gating on `found` creates a chicken-and-egg where
+      // the player can never discover them without the web. Known
+      // outputs are still used to **order** the ChoicePicker (already
+      // known first) via `orderChoosingOptions`, keeping surprise where
+      // it matters.
+      if (rs.length === 0) return { state: prev, events: [] };
+      state.lastSnapshot = snapshotState(prev);
+      state.moves++;
+      state.score += 1;
+      const seedRecipe = rs[0];
+      const cells = [action.cell];
+      if (rs.length === 1) {
+        finishResolve(state, bundle, seedRecipe, cells, 1, events);
+      } else {
+        state.choosing = {
+          options: orderChoosingOptions(state, rs),
+          cells,
+          mult: 1,
+          cancellable: true,
+        };
+        return { state, events };
+      }
+      afterMove(state, bundle, events);
       sealIfDiscovered(state, events);
       return { state, events };
     }

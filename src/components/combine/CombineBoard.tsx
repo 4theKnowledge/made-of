@@ -280,6 +280,10 @@ export function CombineBoard({
     overHold: boolean;
   } | null>(null);
   const [infoTile, setInfoTile] = useState<string | null>(null);
+  // When the info card was opened by tapping a board tile (not a shelf /
+  // tray / hold tile), carry the originating cell so we can expose a
+  // "promote" affordance scoped to that cell. Null for non-board sources.
+  const [infoCell, setInfoCell] = useState<number | null>(null);
   const [themeOpen, setThemeOpen] = useState(false);
   // Sound settings. Loaded on mount from localStorage, then applied to the
   // live audio graph. SoundMenu dispatches updates up to the parent so the
@@ -808,6 +812,7 @@ export function CombineBoard({
     setDiscovery(null);
     setAgeToast(null);
     setInfoTile(null);
+    setInfoCell(null);
     setSelectedSlot(null);
   }, []);
 
@@ -969,7 +974,10 @@ export function CombineBoard({
       // board is inert except for tapping a tile to open its info card.
       if (state.over) {
         const target = state.board[cell];
-        if (target != null) setInfoTile(target);
+        if (target != null) {
+          setInfoTile(target);
+          setInfoCell(cell);
+        }
         return;
       }
       // Clear mode: tap a full cell to remove it.
@@ -1039,12 +1047,17 @@ export function CombineBoard({
         setMoveMode(null);
         return;
       }
-      // No tray tile selected: tapping a full board tile opens its info
-      // card (per spec: tap a board tile with nothing selected). Empty
-      // cells with no selection do nothing.
+      // No tray tile selected: a bare tap on a full board tile promotes
+      // it (1-input recipes — star → supernova, etc.). Non-promotable
+      // tiles are inert on tap; long-press opens the info card instead,
+      // mirroring how the tray works (tap = act, long-press = inspect).
       if (selectedSlot == null) {
         const target = state.board[cell];
-        if (target != null) setInfoTile(target);
+        if (target == null) return;
+        const canPromote = (bundle.byIngredient.get(target) ?? []).some(
+          (r) => r.all.length === 1 && r.all[0] === target,
+        );
+        if (canPromote) act({ type: "promote", cell });
         return;
       }
       const target = state.board[cell];
@@ -1106,8 +1119,15 @@ export function CombineBoard({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // Cancellable picker (promote) → back out and restore via snapshot.
+      // Non-cancellable choosing stays modal.
+      if (state.choosing?.cancellable) {
+        act({ type: "cancel-choice" });
+        return;
+      }
       if (infoTile) {
         setInfoTile(null);
+        setInfoCell(null);
         return;
       }
       if (discovery) {
@@ -1172,6 +1192,8 @@ export function CombineBoard({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [
+    act,
+    state.choosing,
     infoTile,
     discovery,
     ageToast,
@@ -1383,47 +1405,94 @@ export function CombineBoard({
     [state.hold, state.tray, state.over],
   );
 
-  // Arms a tentative board drag when the move helper is active. The
-  // gesture promotes to a real drag once the pointer moves past threshold
-  // (see useEffect pointermove at `d.moved`). A bare tap falls through to
-  // `onCellTap`, which handles tap-select / tap-target.
+  // Board pointerdown handles two gestures:
   //
-  // We only arm when `moveMode.from == null`; after tap-select, further
-  // taps go through `onCellTap` as targets, with no drag path.
+  //  - Move helper: arms a tentative drag; promotes to a real drag once
+  //    the pointer moves past threshold (see useEffect pointermove at
+  //    `d.moved`). A bare tap falls through to `onCellTap`, which handles
+  //    tap-select / tap-target. Only armed when `moveMode.from == null`.
   //
-  // No long-press detail card here — the player is mid-helper.
+  //  - Idle board (no helper mode, no tray selection): arms a 450ms
+  //    long-press timer that opens the info card, mirroring the tray's
+  //    "tap = act, long-press = inspect" grammar. The trailing click is
+  //    suppressed so the promote in `onCellTap` doesn't also fire.
   const onCellPointerDown = useCallback(
     (cell: number, e: React.PointerEvent<HTMLButtonElement>) => {
-      if (!moveMode) return;
-      if (moveMode.from != null) return;
       if (state.over) return;
       const tile = state.board[cell];
       if (tile == null) return;
-      const rect = e.currentTarget.getBoundingClientRect();
+
+      if (moveMode) {
+        if (moveMode.from != null) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        suppressClick.current = false;
+        dragRef.current = {
+          slot: cell,
+          source: "board",
+          x0: e.clientX,
+          y0: e.clientY,
+          moved: false,
+          tileWidth: rect.width,
+          holdTimer: null,
+          overCell: null,
+          overHold: false,
+        };
+        setDrag({
+          slot: cell,
+          source: "board",
+          x: e.clientX,
+          y: e.clientY,
+          tileWidth: rect.width,
+          overCell: null,
+          overOk: false,
+          overHold: false,
+        });
+        return;
+      }
+
+      // Idle path: only arm long-press-for-info when nothing else is
+      // claiming the tap. Any helper mode or an active tray selection
+      // short-circuits above / via `onCellTap`.
+      if (clearMode || shoreMode || pluckMode) return;
+      if (selectedSlot != null) return;
       suppressClick.current = false;
-      dragRef.current = {
-        slot: cell,
-        source: "board",
-        x0: e.clientX,
-        y0: e.clientY,
-        moved: false,
-        tileWidth: rect.width,
-        holdTimer: null,
-        overCell: null,
-        overHold: false,
+      const x0 = e.clientX;
+      const y0 = e.clientY;
+      let armed = true;
+      const cancel = () => {
+        armed = false;
+        if (timerId != null) window.clearTimeout(timerId);
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", cancel);
+        window.removeEventListener("pointercancel", cancel);
       };
-      setDrag({
-        slot: cell,
-        source: "board",
-        x: e.clientX,
-        y: e.clientY,
-        tileWidth: rect.width,
-        overCell: null,
-        overOk: false,
-        overHold: false,
-      });
+      const onMove = (ev: PointerEvent) => {
+        if (!armed) return;
+        if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 7) cancel();
+      };
+      const timerId = window.setTimeout(() => {
+        if (!armed) return;
+        armed = false;
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", cancel);
+        window.removeEventListener("pointercancel", cancel);
+        setInfoTile(tile);
+        setInfoCell(cell);
+        suppressClick.current = true;
+      }, 450);
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", cancel);
+      window.addEventListener("pointercancel", cancel);
     },
-    [moveMode, state.board, state.over],
+    [
+      moveMode,
+      clearMode,
+      shoreMode,
+      pluckMode,
+      selectedSlot,
+      state.board,
+      state.over,
+    ],
   );
 
   const onChoose = useCallback(
@@ -1791,6 +1860,7 @@ export function CombineBoard({
             bundle={bundle}
             known={knownIds}
             onChoose={onChoose}
+            onCancel={() => act({ type: "cancel-choice" })}
           />
         )}
         {state.over && overCardOpen && (
@@ -1925,10 +1995,14 @@ export function CombineBoard({
             bundle={bundle}
             known={knownIds}
             howMade={state.howMade}
-            onDismiss={() => setInfoTile(null)}
+            onDismiss={() => {
+              setInfoTile(null);
+              setInfoCell(null);
+            }}
             onReport={() => {
               const id = infoTile;
               setInfoTile(null);
+              setInfoCell(null);
               const it = bundle.items.get(id);
               setFeedback({
                 type: "report",

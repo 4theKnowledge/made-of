@@ -1314,6 +1314,242 @@ describe("wipe-board", () => {
   });
 });
 
+describe("promote (1-input recipes)", () => {
+  // Minimal bundle with a 1-input chain (a → b → c) plus a sibling
+  // 1-input (a → d) so we can exercise the choosing path too. The
+  // dummy 2-input recipe at the end keeps ingredients from being
+  // empty — otherwise newGame would refuse to deal.
+  const bundle = fakeBundle({
+    recipes: [
+      R("b", ["a"]),
+      R("c", ["b"]),
+      R("d", ["a"]),
+      R("ab", ["a", "x"]),
+    ],
+  });
+
+  function seedState(): GameState {
+    const s = newGame("everything", bundle, { seed: 1, size: 5 }).state;
+    s.board.fill(null);
+    s.crumb.fill(null);
+    s.shored.fill(false);
+    s.tray.fill(null);
+    s.hold.fill(null);
+    s.found = [];
+    s.ageMade = 0;
+    s.score = 0;
+    s.moves = 0;
+    s.made = 0;
+    return s;
+  }
+
+  // Separate bundle with only ONE 1-input recipe for "c" so the
+  // immediate-fire + unknown-reveal cases exercise cleanly without being
+  // steered into `choosing`.
+  const bundleC = fakeBundle({
+    recipes: [R("y", ["c"]), R("ab", ["a", "x"])],
+  });
+  function seedStateC(): GameState {
+    const s = newGame("everything", bundleC, { seed: 1, size: 5 }).state;
+    s.board.fill(null);
+    s.crumb.fill(null);
+    s.shored.fill(false);
+    s.tray.fill(null);
+    s.hold.fill(null);
+    s.found = [];
+    s.ageMade = 0;
+    s.score = 0;
+    s.moves = 0;
+    s.made = 0;
+    return s;
+  }
+
+  it("fires a sole 1-input recipe even when the output is unknown (discovery via promote)", () => {
+    const s = seedStateC();
+    s.board[0] = "c";
+    // y is NOT in found — the player hasn't discovered it yet. Promote
+    // should still fire (option A: discovery via play).
+    const { state } = reduce(s, bundleC, { type: "promote", cell: 0 });
+    expect(state.board[0]).toBe("y");
+    // y should now be in `found` as a discovery.
+    expect(state.found).toContain("y");
+    expect(state.moves).toBe(1);
+  });
+
+  it("fires immediately when there's only one 1-input recipe (known or not)", () => {
+    const s = seedStateC();
+    s.board[0] = "c";
+    s.found.push("y"); // known this time — same outcome, no choosing.
+    const { state } = reduce(s, bundleC, { type: "promote", cell: 0 });
+    expect(state.board[0]).toBe("y");
+    expect(state.choosing).toBeNull();
+  });
+
+  it("multiple 1-input recipes → choosing state regardless of `found`", () => {
+    const s = seedState();
+    s.board[0] = "a";
+    // Neither b nor d are known; both are still offered (A: no gating).
+    const { state } = reduce(s, bundle, { type: "promote", cell: 0 });
+    expect(state.board[0]).toBe("a");
+    expect(state.choosing).not.toBeNull();
+    expect(state.choosing!.options.map((r) => r.out).sort()).toEqual([
+      "b",
+      "d",
+    ]);
+  });
+
+  it("no-op when the target cell is empty", () => {
+    const s = seedStateC();
+    const { state, events } = reduce(s, bundleC, { type: "promote", cell: 5 });
+    expect(state.board[5]).toBeNull();
+    expect(state.moves).toBe(0);
+    expect(events).toEqual([]);
+  });
+
+  it("no-op when the tile has no 1-input recipe", () => {
+    const s = seedState();
+    s.board[0] = "x"; // x has no 1-input recipe in `bundle`.
+    const { state, events } = reduce(s, bundle, { type: "promote", cell: 0 });
+    expect(state.board[0]).toBe("x");
+    expect(state.moves).toBe(0);
+    expect(events).toEqual([]);
+  });
+
+  it("howMade updates to the most recently used recipe, not just the first", () => {
+    // Bundle: two paths to `hg` — a 2-input (ng + w) and a 1-input (w).
+    // Mirrors water → hydrogen-gas in the real KB.
+    const b2 = fakeBundle({
+      recipes: [R("hg", ["ng", "w"]), R("hg", ["w"])],
+    });
+    let s = newGame("everything", b2, { seed: 1, size: 5 }).state;
+    s.board.fill(null);
+    s.crumb.fill(null);
+    s.shored.fill(false);
+    s.hold.fill(null);
+    s.tray = ["w", null, null];
+    s.board[1] = "ng";
+    // First make via 2-input: howMade = [ng, w].
+    s = reduce(s, b2, { type: "place", slot: 0, cell: 0 }).state;
+    expect(s.found).toContain("hg");
+    expect(s.howMade["hg"]?.sort()).toEqual(["ng", "w"]);
+    // Clear the board, put a `w` down, promote it: howMade should
+    // overwrite to [w] (the most recent path).
+    s.board.fill(null);
+    s.board[0] = "w";
+    s = reduce(s, b2, { type: "promote", cell: 0 }).state;
+    expect(s.howMade["hg"]).toEqual(["w"]);
+  });
+
+  it("promote picker is cancellable; cancel-choice rolls back cleanly", () => {
+    const s = seedState();
+    s.board[0] = "a";
+    const { state: paused } = reduce(s, bundle, { type: "promote", cell: 0 });
+    expect(paused.choosing?.cancellable).toBe(true);
+    expect(paused.moves).toBe(1); // bumped by promote
+    const { state: rolled } = reduce(paused, bundle, { type: "cancel-choice" });
+    // Restored to pre-promote state: tile still "a", moves reset, no picker.
+    expect(rolled.choosing).toBeNull();
+    expect(rolled.board[0]).toBe("a");
+    expect(rolled.moves).toBe(0);
+  });
+
+  it("promote is a no-op when the run is over", () => {
+    const s = seedState();
+    s.board[0] = "a";
+    s.over = true;
+    const before = { board: s.board.slice(), moves: s.moves };
+    const { state, events } = reduce(s, bundle, { type: "promote", cell: 0 });
+    expect(state.board).toEqual(before.board);
+    expect(state.moves).toBe(before.moves);
+    expect(events).toEqual([]);
+  });
+
+it("promote in fast mode makes the tile but does not add to found", () => {
+    const b2 = fakeBundle({ recipes: [R("b", ["a"]), R("ab", ["a", "x"])] });
+    const s = newGame("everything", b2, { seed: 1, size: 5 }).state;
+    s.board.fill(null);
+    s.crumb.fill(null);
+    s.shored.fill(false);
+    s.tray.fill(null);
+    s.hold.fill(null);
+    s.mode = "fast";
+    s.found = [];
+    s.board[0] = "a";
+    const { state } = reduce(s, b2, { type: "promote", cell: 0 });
+    // Tile transformed; collection stays untouched in fast mode.
+    expect(state.board[0]).toBe("b");
+    expect(state.found).not.toContain("b");
+    expect(state.howMade["b"]).toBeUndefined();
+  });
+
+  it("promote scoring: 1-input yields the formula's 0.5× pair-match points", () => {
+    // Points = round(20 * tier * mult * (1 + 0.5 * (len - 2))). Tier M
+    // is 2 (TIER_VALUE["M"] = 2); for a 1-input recipe at mult=1:
+    // 20 * 2 * 1 * 0.5 = 20. Plus the fixed +1 the promote action
+    // awards on start = 21.
+    const b2 = fakeBundle({
+      recipes: [R("b", ["a"])],
+      tiers: { a: "M", b: "M" },
+    });
+    const s = newGame("everything", b2, { seed: 1, size: 5 }).state;
+    s.board.fill(null);
+    s.crumb.fill(null);
+    s.shored.fill(false);
+    s.tray.fill(null);
+    s.hold.fill(null);
+    s.found = [];
+    s.score = 0;
+    s.board[0] = "a";
+    const { state } = reduce(s, b2, { type: "promote", cell: 0 });
+    expect(state.score).toBe(1 + 20);
+  });
+
+  it("cancel-choice is a no-op on non-cancellable pickers (place/drop-on)", () => {
+    // Using a 2-input recipe with alternatives to force a non-cancellable
+    // `choosing` state from `place`.
+    const b2 = fakeBundle({
+      recipes: [R("out1", ["p", "q"]), R("out2", ["p", "q"])],
+    });
+    const s = newGame("everything", b2, { seed: 1, size: 5 }).state;
+    s.board.fill(null);
+    s.crumb.fill(null);
+    s.shored.fill(false);
+    s.hold.fill(null);
+    s.tray = ["p", null, null];
+    s.board[1] = "q";
+    const { state: paused } = reduce(s, b2, {
+      type: "place",
+      slot: 0,
+      cell: 0,
+    });
+    expect(paused.choosing).not.toBeNull();
+    expect(paused.choosing!.cancellable).toBeFalsy();
+    const { state: after, events } = reduce(paused, b2, {
+      type: "cancel-choice",
+    });
+    // No change; picker stays up.
+    expect(after).toBe(paused);
+    expect(events).toEqual([]);
+  });
+});
+
+describe("1-input recipes don't auto-fire on placement (matchAt guard)", () => {
+  // `a` has a 1-input recipe to `b`. Placing `a` must NOT auto-transform
+  // to `b`; promote is the only path. Pair with `x` to make sure the
+  // tray deal has a legal move in a real-world setup.
+  const bundle = fakeBundle({
+    recipes: [R("b", ["a"]), R("ab", ["a", "x"])],
+  });
+
+  it("placing a 1-input tile on an empty cell leaves it as-is", () => {
+    const s = newGame("everything", bundle, { seed: 1, size: 5 }).state;
+    s.board.fill(null);
+    s.tray = ["a", null, null];
+    const { state } = reduce(s, bundle, { type: "place", slot: 0, cell: 0 });
+    expect(state.board[0]).toBe("a");
+  });
+});
+
 // Shallow clone utility used by the wipe tests — the engine's internal
 // `cloneState` isn't exported, and these tests only need a distinct
 // object to confirm `lastSnapshot` is cleared.

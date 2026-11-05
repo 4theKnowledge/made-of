@@ -10,11 +10,16 @@ export function ChoicePicker({
   bundle,
   known,
   onChoose,
+  onCancel,
 }: {
   state: GameState;
   bundle: ThemeBundle;
   known: Set<string>;
   onChoose: (outputIndex: number) => void;
+  /** Only passed when `state.choosing.cancellable` — today, that's the
+   *  promote picker. Shown as a Cancel button; the engine rolls back
+   *  the promote via `lastSnapshot`. */
+  onCancel?: () => void;
 }) {
   if (!state.choosing) return null;
   const found = (id: string) => known.has(id);
@@ -23,6 +28,7 @@ export function ChoicePicker({
   // daily puzzles stay identical across players). The shuffle stops
   // players muscle-memorising "?-slot 2 is always wood".
   const indexed = state.choosing.options.map((r, i) => ({ r, i }));
+  const cancellable = state.choosing.cancellable && onCancel != null;
   return (
     <div className="cbchoose" role="dialog" aria-label="Pick what to make">
       <div className="k">These make more than one thing. Pick one.</div>
@@ -60,6 +66,16 @@ export function ChoicePicker({
           );
         })}
       </div>
+      {cancellable && (
+        <button
+          type="button"
+          className="cbh"
+          onClick={onCancel}
+          aria-label="Cancel — don't make anything"
+        >
+          Cancel
+        </button>
+      )}
     </div>
   );
 }

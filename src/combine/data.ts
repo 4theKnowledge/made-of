@@ -24,6 +24,13 @@ import type {
  *  are treated as combinable ingredients: the player places them together
  *  on the board. The sets stay separate so the UI/debug can distinguish
  *  them, but matching only cares about the deduped `all`. */
+export function _recipeParts_FOR_TEST(
+  node: GraphNode,
+  recipeId: string,
+): ReturnType<typeof recipeParts> {
+  return recipeParts(node, recipeId);
+}
+
 function recipeParts(
   node: GraphNode,
   recipeId: string,
@@ -33,14 +40,25 @@ function recipeParts(
   needs: string[];
   evolved: string[];
   all: string[];
+  /** True if the raw edge list named this recipe's output as one of its
+   *  own parts (e.g. "recycled paper" from `paper + water`). We drop the
+   *  self-ref so recipes don't loop, but that collapses the ingredient
+   *  list and can produce spurious 1-input recipes ("water → paper"
+   *  looks nonsensical to players). Callers use this to reject such
+   *  collapses rather than surface them as promotes. */
+  hadSelfRef: boolean;
 } {
   const fromSet = new Set<string>();
   const withSet = new Set<string>();
   const needsSet = new Set<string>();
   const evolvedSet = new Set<string>();
+  let hadSelfRef = false;
   for (const e of node.up) {
     if (e.recipeId !== recipeId) continue;
-    if (e.id === node.id) continue;
+    if (e.id === node.id) {
+      hadSelfRef = true;
+      continue;
+    }
     if (e.type === "f") fromSet.add(e.id);
     else if (e.type === "w") withSet.add(e.id);
     else if (e.type === "n") needsSet.add(e.id);
@@ -58,6 +76,7 @@ function recipeParts(
     needs: [...needsSet],
     evolved: [...evolvedSet],
     all: [...all],
+    hadSelfRef,
   };
 }
 
@@ -69,9 +88,23 @@ function recipesForTheme(
   for (const node of snapshot.nodes.values()) {
     if (!inCombineTheme(node, theme)) continue;
     for (const recipe of node.recipes) {
-      const { from, with_, needs, evolved, all } = recipeParts(node, recipe.id);
-      if (all.length < 2 || all.length > 7) continue;
+      const { from, with_, needs, evolved, all, hadSelfRef } = recipeParts(
+        node,
+        recipe.id,
+      );
+      // 1-ingredient recipes are kept — they're unreachable via normal
+      // combining (nothing to "pair" with), so Combine surfaces them as an
+      // explicit "promote" action on the board. matchAt/matchOn skip them
+      // so a 1-input tile doesn't auto-fire on placement.
+      if (all.length < 1 || all.length > 7) continue;
       if (all.some((partId) => partId === node.id)) continue;
+      // Reject recipes where the raw input list referenced the output
+      // itself and that self-ref was the only thing keeping it from being
+      // ≤1-input (e.g. "recycled paper" from `paper + water` collapses
+      // to just `water` → paper, which reads as nonsense). Those authored
+      // recipes are still valid in Explore; they just don't belong in
+      // Combine as 1-input promotes.
+      if (hadSelfRef && all.length < 2) continue;
 
       const partNodes = all
         .map((id) => snapshot.nodes.get(id))

@@ -20,3 +20,4 @@
 {"id": "C-0020", "ts": "2026-11-04T22:48:43Z", "kind": "fix", "summary": "CI: stub DATABASE_URL for `next build` prerender", "refs": {"task": "T-0064", "commit": "01d4f60"}}
 {"id": "C-0021", "ts": "2026-11-04T23:05:28Z", "kind": "fix", "summary": "Docker: stub DATABASE_URL in build stage so /_not-found prerender succeeds", "refs": {"task": "T-0065", "commit": "6d89f04"}}
 {"id": "C-0022", "ts": "2026-11-05T00:40:27Z", "kind": "feature", "summary": "Combine Move helper gains tap-to-select + preview (parity with tray)", "refs": {"task": "T-0066"}}
+{"id": "C-0023", "ts": "2026-11-05T01:25:13Z", "kind": "feature", "summary": "Combine: tap-to-promote for 1-input recipes (star → supernova chain + heavy elements)", "refs": {"task": "T-0068"}}

@@ -77,6 +77,10 @@ export function matchAt(
   const rs = bundle.byIngredient.get(x);
   if (!rs) return null;
   for (const r of rs) {
+    // 1-input recipes don't auto-fire on placement — they're surfaced via
+    // the explicit `promote` action so the chain is a deliberate player
+    // moment (star → supernova → sulfur, etc.), not a hidden transform.
+    if (r.all.length < 2) continue;
     const need = r.all.filter((y) => y !== x);
     const got = grow(board, [i], need, size);
     if (got) return { recipe: r, cells: got };
@@ -101,6 +105,9 @@ export function matchOn(
   const rs = bundle.byIngredient.get(x);
   if (!rs) return null;
   for (const r of rs) {
+    // 1-input recipes don't participate in drop-on-top — they only fire
+    // through the explicit `promote` action (see matchAt note).
+    if (r.all.length < 2) continue;
     if (!r.all.includes(y)) continue;
     const need = r.all.filter((z) => z !== x && z !== y);
     const got = grow(board, [j], need, size);
