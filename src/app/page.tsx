@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import {
@@ -104,10 +103,6 @@ export default async function HomePage() {
     }
   }
 
-  // The secondary CTA deep-links into the first tree's final item so the
-  // user lands on something they just saw. Falls back to /explore/water.
-  const exploreTarget = trees[0]?.endSlug ?? "water";
-
   return (
     <main className="wrap">
       <Header current="home" />
@@ -122,15 +117,6 @@ export default async function HomePage() {
         </p>
 
         {trees.length > 0 && <HeroChain trees={trees} />}
-
-        <div className="homeCtas">
-          <Link href="/combine" className="btn primary">
-            Play today’s Combine
-          </Link>
-          <Link href={`/explore/${exploreTarget}`} className="btn">
-            Explore the map
-          </Link>
-        </div>
       </section>
 
       <ModeGrid />

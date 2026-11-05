@@ -5,6 +5,7 @@ interface Mode {
   title: string;
   blurb: string;
   cta: string;
+  primary?: boolean;
 }
 
 const MODES: Mode[] = [
@@ -13,7 +14,8 @@ const MODES: Mode[] = [
     title: "Combine",
     blurb:
       "Drag touching things together to make a third, and watch recipes chain. Endless, fast and daily modes, with a lifetime collection as you go.",
-    cta: "Play Combine",
+    cta: "Play today’s Combine",
+    primary: true,
   },
   {
     href: "/explore/water",
@@ -33,7 +35,7 @@ export function ModeGrid() {
           <p>{m.blurb}</p>
           <Link
             href={m.href}
-            className="btn"
+            className={`btn${m.primary ? " primary" : ""}`}
             style={{ alignSelf: "flex-start", marginTop: "auto" }}
           >
             {m.cta}
