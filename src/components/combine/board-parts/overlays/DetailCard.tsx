@@ -366,7 +366,7 @@ export function DetailCard({
           </div>
         )}
         {canExplore ? (
-          <ButtonGroup align="stretch">
+          <ButtonGroup align="stretch" style={{ marginTop: 12 }}>
             <a
               className="cbh"
               href={`/explore/${item.slug}`}
@@ -380,7 +380,12 @@ export function DetailCard({
             </button>
           </ButtonGroup>
         ) : (
-          <button type="button" className="cbh cbback" onClick={onDismiss}>
+          <button
+            type="button"
+            className="cbh cbback"
+            onClick={onDismiss}
+            style={{ marginTop: 12 }}
+          >
             Back to the game
           </button>
         )}
