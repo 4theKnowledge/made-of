@@ -115,7 +115,7 @@ describe("buildThemeBundle", () => {
   });
 
   it("water has no 1-input promote to paper or canvas-like self-ref outputs", () => {
-    const water = snapshot.bySlug.get("water")?.id!;
+    const water = snapshot.bySlug.get("water")!.id;
     // Any 1-input water promote must point to an output whose authored
     // recipe was truly 1-input (no self + water combo collapsed).
     const promotes = (everything.byIngredient.get(water) ?? []).filter(
