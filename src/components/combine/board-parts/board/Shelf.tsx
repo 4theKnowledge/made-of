@@ -9,11 +9,16 @@ export function Shelf({
   state,
   bundle,
   fx,
+  newUnlocks,
   onInfo,
 }: {
   state: GameState;
   bundle: ThemeBundle;
   fx: Fx;
+  /** Item ids the player just unlocked in their lifetime collection and
+   *  hasn't yet acknowledged (by opening the DetailCard). Each tile
+   *  flagged here renders a ★ badge. Omitted or empty = no badges. */
+  newUnlocks?: ReadonlySet<string>;
   onInfo: (id: string) => void;
 }) {
   // Every make shows here (ingredients-that-are-also-outputs, mids, and
@@ -61,17 +66,28 @@ export function Shelf({
           if (!item) return null;
           const n = state.madeCounts[id] ?? 1;
           const isNew = id === freshlyMade;
+          const isUnlocked = newUnlocks?.has(id) ?? false;
+          const classes: string[] = [];
+          if (isNew) classes.push("new");
+          if (isUnlocked) classes.push("unlock");
           return (
             <CombineTile
               key={id}
               variant="slot"
               item={item}
-              className={isNew ? "new" : undefined}
-              aria-label={`${cap(item.name)}${n > 1 ? `, ×${n}` : ""}. Show how it's made`}
+              className={classes.length ? classes.join(" ") : undefined}
+              aria-label={`${cap(item.name)}${n > 1 ? `, ×${n}` : ""}${
+                isUnlocked ? ", new in your collection" : ""
+              }. Show how it's made`}
               title={cap(item.name)}
               onClick={() => onInfo(id)}
             >
               {n > 1 && <b>{n}</b>}
+              {isUnlocked && (
+                <span className="cbunlock-star" aria-hidden="true">
+                  ★
+                </span>
+              )}
             </CombineTile>
           );
         })}

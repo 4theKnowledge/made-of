@@ -17,6 +17,7 @@ export type SfxKind =
   | "place"
   | "fuse"
   | "discover"
+  | "unlock"
   | "age"
   | "ship"
   | "nope"
@@ -48,6 +49,14 @@ export function fx(kind: SfxKind, arg?: number): void {
     }
     case "discover":
       [3, 5, 7, 9].forEach((s, k) => strikeOn(S[s], t + k * 0.12, 0.5, 1.2));
+      return;
+    case "unlock":
+      // Lifetime collection unlock — rarer than "discover" (age-find),
+      // so a longer, louder, more resonant arpeggio with a high tail.
+      // Six notes climbing instead of four, velocities ramped up.
+      [0, 3, 5, 7, 9, 9 + 2].forEach((s, k) =>
+        strikeOn(S[Math.min(S.length - 1, s)], t + k * 0.11, 0.65, 1.8),
+      );
       return;
     case "age":
       [0, 4, 6, 7, 8, 9].forEach((s, k) =>

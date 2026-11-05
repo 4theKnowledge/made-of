@@ -857,6 +857,12 @@ a.btn.primary{color:var(--bg)}
 .cbshelf-empty svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.7}
 .cbshelf-empty em{font-style:normal}
 .cbslot.cbslot-ph{background:transparent;border:1.5px dashed color-mix(in srgb, var(--ink) 25%, transparent);box-shadow:none;cursor:default;pointer-events:none}
+/* Lifetime-collection unlock badge — a persistent ★ in the top-left of
+ * a shelf tile until the player opens its DetailCard. Opposite side
+ * from the count badge (bottom-right) so they never collide. Accent
+ * outline on the tile itself as a secondary cue. */
+.cbslot.unlock{outline:2px solid var(--accent);outline-offset:2px}
+.cbslot .cbunlock-star{position:absolute;top:-6px;left:-6px;min-width:15px;height:15px;padding:0 3px;box-sizing:border-box;border-radius:8px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;line-height:15px;text-align:center;pointer-events:none}
 
 /* Hold zone reuses the shelf's dashed outline + chip sizing. Only adds a
  * highlight when a tray tile is being dragged over it, and a grab cursor

@@ -34,6 +34,9 @@ import {
   saveDailyDone,
   saveGame,
   saveSound,
+  loadNewUnlocks,
+  addNewUnlocks,
+  clearNewUnlock,
   type DailyResult,
   type MusicTrack,
 } from "@/combine/storage";
@@ -168,6 +171,7 @@ export function CombineBoard({
   // a one-time banner with the new age's label. Keyed by theme → label.
   const [newAgeBanner, setNewAgeBanner] = useState<Partial<Record<ThemeKey, string>>>({});
 
+
   // On mount: load best scores + today's daily result, and resume the
   // endless save if any (daily resume lives on the user's explicit tap
   // of the Daily button in ThemeMenu).
@@ -284,6 +288,36 @@ export function CombineBoard({
   // tray / hold tile), carry the originating cell so we can expose a
   // "promote" affordance scoped to that cell. Null for non-board sources.
   const [infoCell, setInfoCell] = useState<number | null>(null);
+  // Per-scope set of items the player unlocked recently and hasn't yet
+  // acknowledged. Mirrors localStorage; survives reloads. Items leave
+  // when the player opens their DetailCard or the Collection book.
+  const [newUnlocks, setNewUnlocks] = useState<Set<string>>(() => new Set());
+  const newUnlocksScopeRef = useRef<"endless" | "daily" | null>(null);
+
+  // Hydrate the per-scope "new unlocks" badge set from localStorage when
+  // the active scope changes (daily ↔ endless). Fast mode shares the
+  // endless scope's state but can't add new entries (sfx skip below).
+  useEffect(() => {
+    if (newUnlocksScopeRef.current === collectionScope) return;
+    newUnlocksScopeRef.current = collectionScope;
+    setNewUnlocks(loadNewUnlocks(collectionScope));
+  }, [collectionScope]);
+
+  // Opening the DetailCard counts as "seeing" the item, so clear its
+  // ★-new badge. Fast mode never adds badges, so the clear path is a
+  // no-op there.
+  useEffect(() => {
+    if (!infoTile) return;
+    if (!newUnlocks.has(infoTile)) return;
+    const changed = clearNewUnlock(collectionScope, infoTile);
+    if (!changed) return;
+    setNewUnlocks((prev) => {
+      if (!prev.has(infoTile)) return prev;
+      const next = new Set(prev);
+      next.delete(infoTile);
+      return next;
+    });
+  }, [infoTile, newUnlocks, collectionScope]);
   const [themeOpen, setThemeOpen] = useState(false);
   // Sound settings. Loaded on mount from localStorage, then applied to the
   // live audio graph. SoundMenu dispatches updates up to the parent so the
@@ -655,7 +689,13 @@ export function CombineBoard({
             firstLifetime,
           };
           discoveredOuts.add(e.out);
-          window.setTimeout(() => playFx("discover"), 250);
+          // Separate sound grammar: age-find plays "discover", lifetime
+          // unlock plays the louder "unlock" so the two moments feel
+          // different even before the modal toast appears.
+          window.setTimeout(
+            () => playFx(firstLifetime ? "unlock" : "discover"),
+            250,
+          );
         } else if (e.type === "age-up") {
           latestAgeUp = { age: e.age, sample: e.sample, grants: e.grants };
           playFx("age");
@@ -665,10 +705,29 @@ export function CombineBoard({
         }
       }
 
-      if (latestDiscovery) {
+      // Only surface the modal discovery toast for lifetime-new unlocks —
+      // these are the long-tail-progression moments. Age discoveries
+      // (first-this-run, already in lifetime collection) still fire the
+      // per-cell sparkle via `fx.discover` and bump the shelf; the toast
+      // was reading as a "new to your collection" moment to players even
+      // when it was just "you made this again in this run".
+      if (latestDiscovery && latestDiscovery.firstLifetime) {
         setDiscovery(latestDiscovery);
         const id = window.setTimeout(() => setDiscovery(null), 4600);
         timers.current.push(id);
+        // Persist a ★-new badge for this item (cleared when the player
+        // opens its DetailCard). Fast mode skips — its scope has no
+        // lifetime collection.
+        if (state.mode !== "fast") {
+          const added = addNewUnlocks(collectionScope, [latestDiscovery.out]);
+          if (added.length) {
+            setNewUnlocks((prev) => {
+              const next = new Set(prev);
+              for (const id of added) next.add(id);
+              return next;
+            });
+          }
+        }
       }
       if (latestAgeUp) {
         setAgeToast(latestAgeUp);
@@ -696,7 +755,7 @@ export function CombineBoard({
         timers.current.push(clearId);
       }
     },
-    [scheduleClear, collection, bundle.items],
+    [scheduleClear, collection, bundle.items, collectionScope, state.mode],
   );
 
   // Apply an action: run reduce once, update state, and route events.
@@ -1791,6 +1850,7 @@ export function CombineBoard({
           state={state}
           bundle={bundle}
           fx={fx}
+          newUnlocks={newUnlocks}
           onInfo={(id) => setInfoTile(id)}
         />
         <Board

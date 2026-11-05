@@ -458,6 +458,75 @@ export function clearFound(): void {
   }
 }
 
+/** "New to your collection" badge state — item ids the player has just
+ *  unlocked and hasn't yet acknowledged (by opening the DetailCard or
+ *  the Collection book for that item). Scoped `endless` | `daily` so
+ *  the two collections stay visually separate. Persists across reloads;
+ *  cleared per-id when the player views the item.
+ *
+ *  Not security-sensitive — purely a "what should sparkle next" hint.
+ *  OK to be lossy if localStorage is unavailable.
+ */
+const NEW_UNLOCKS_PREFIX = "madeof:cbnew:";
+
+export function loadNewUnlocks(scope: "endless" | "daily"): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(NEW_UNLOCKS_PREFIX + scope);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as string[];
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function saveNewUnlocks(
+  scope: "endless" | "daily",
+  ids: Set<string>,
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      NEW_UNLOCKS_PREFIX + scope,
+      JSON.stringify([...ids]),
+    );
+  } catch {
+    // ignore
+  }
+}
+
+/** Add new badge entries. Returns the ids that were actually added
+ *  (dedupe against the current set) so callers can decide whether to
+ *  fire a UI effect. */
+export function addNewUnlocks(
+  scope: "endless" | "daily",
+  ids: Iterable<string>,
+): string[] {
+  const cur = loadNewUnlocks(scope);
+  const added: string[] = [];
+  for (const id of ids) {
+    if (!cur.has(id)) {
+      cur.add(id);
+      added.push(id);
+    }
+  }
+  if (added.length) saveNewUnlocks(scope, cur);
+  return added;
+}
+
+/** Clear a specific id's new-unlock badge when the player acknowledges
+ *  it by viewing the item. Returns true if the set changed. */
+export function clearNewUnlock(
+  scope: "endless" | "daily",
+  id: string,
+): boolean {
+  const cur = loadNewUnlocks(scope);
+  if (!cur.delete(id)) return false;
+  saveNewUnlocks(scope, cur);
+  return true;
+}
+
 /** Add new discoveries to the stored collection, stamping each with `now`.
  *  Existing entries keep their original timestamp. */
 export function markFound(ids: Iterable<string>, now: number = Date.now()): void {
