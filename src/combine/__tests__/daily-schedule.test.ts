@@ -12,6 +12,7 @@ import {
   guestPoolFor,
   nextDay,
   pickGuests,
+  prevDay,
   reachableGuestRecipe,
   rotationWindow,
 } from "../daily-schedule";
@@ -22,6 +23,18 @@ describe("day math", () => {
     expect(nextDay("2026-12-31")).toBe("2027-01-01");
     expect(nextDay("2024-02-28")).toBe("2024-02-29"); // leap year
     expect(nextDay("2025-02-28")).toBe("2025-03-01");
+  });
+
+  it("prevDay crosses month and year boundaries", () => {
+    expect(prevDay("2026-02-01")).toBe("2026-01-31");
+    expect(prevDay("2027-01-01")).toBe("2026-12-31");
+    expect(prevDay("2024-03-01")).toBe("2024-02-29"); // leap year
+    expect(prevDay("2025-03-01")).toBe("2025-02-28");
+  });
+
+  it("nextDay and prevDay are inverses", () => {
+    expect(prevDay(nextDay("2026-11-06"))).toBe("2026-11-06");
+    expect(nextDay(prevDay("2026-11-06"))).toBe("2026-11-06");
   });
 
   it("dayRange produces N consecutive keys", () => {

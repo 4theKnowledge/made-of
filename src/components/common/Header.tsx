@@ -11,6 +11,7 @@ type Current =
   | "craft"
   | "explore"
   | "directory"
+  | "leaderboard"
   | "pricing"
   | "about"
   | "account";
@@ -20,6 +21,7 @@ function buildLinks(
 ): Array<{ href: string; label: string; key: Current }> {
   return [
     { href: "/combine", label: "Combine", key: "combine" },
+    { href: "/leaderboard", label: "Leaderboard", key: "leaderboard" },
     { href: exploreHref, label: "Explore", key: "explore" },
     { href: "/directory", label: "Directory", key: "directory" },
     { href: "/pricing", label: "Pricing", key: "pricing" },

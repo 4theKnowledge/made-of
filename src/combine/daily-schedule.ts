@@ -207,6 +207,16 @@ export function nextDay(day: string): string {
   return `${y}-${m}-${dd}`;
 }
 
+/** Walk a date-key back by one day. Mirror of `nextDay`. */
+export function prevDay(day: string): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
 /** Produce a sequence of day keys starting at `startDay` (inclusive) of
  *  length `count`. */
 export function dayRange(startDay: string, count: number): string[] {

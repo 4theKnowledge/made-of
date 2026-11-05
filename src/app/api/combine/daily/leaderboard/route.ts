@@ -16,6 +16,11 @@ const THEMES = new Set(["everything"] as const);
  * Each user appears once (their best attempt at the day). No userIds leak
  * — only the public handle is returned.
  *
+ * Submissions are auth-only: `/api/combine/result` requires a session, so
+ * every `progress` row with `kind='combine'` has a real `user_id`. The
+ * `INNER JOIN "user"` below makes that guarantee structural — any orphaned
+ * row (shouldn't exist but belt-and-suspenders) is silently dropped.
+ *
  * GET /api/combine/daily/leaderboard?day=YYYY-MM-DD&theme=everything
  */
 export async function GET(req: Request) {
@@ -46,7 +51,7 @@ export async function GET(req: Request) {
         COALESCE((p.result->>'turns')::int, 0) AS turns,
         COALESCE((p.result->>'score')::int, 0) AS score
       FROM progress p
-      LEFT JOIN "user" u ON u.id = p.user_id
+      INNER JOIN "user" u ON u.id = p.user_id
       WHERE p.kind = 'combine'
         AND p.ref = ${theme}
         AND p.result->>'daily' = ${day}
