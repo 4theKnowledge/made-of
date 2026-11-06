@@ -121,8 +121,10 @@ export default async function HomePage() {
       <Header current="home" />
 
       <section className="homeHero">
-        <span className="eyebrow">Made Of</span>
-        <h1>Everything is made of something.</h1>
+        <h1>
+          Everything is <span className="homeHero-mark">made of</span>{" "}
+          something.
+        </h1>
         <p>
           A shirt needs thread, thread needs cotton, cotton needs a plant, and
           the plant needs sunlight from a star. Made Of maps those connections,

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 interface Mode {
   href: string;
+  eyebrow: string;
   title: string;
   blurb: string;
   cta: string;
@@ -20,6 +21,7 @@ export function ModeGrid({
   const modes: Mode[] = [
     {
       href: "/combine",
+      eyebrow: "Game",
       title: "Combine",
       blurb:
         "Drag touching things together to make a third, and watch recipes chain. Endless, fast and daily modes, with a lifetime collection as you go.",
@@ -29,6 +31,7 @@ export function ModeGrid({
     },
     {
       href: "/explore/water",
+      eyebrow: "Browse",
       title: "Explore",
       blurb:
         "Pick anything and see what it takes and what it leads to. Follow a thread as far as you like.",
@@ -43,6 +46,7 @@ export function ModeGrid({
         <article key={m.href} className="feat modeCard">
           <div className="modeCard-head">
             <div className="modeCard-text">
+              <span className="eyebrow">{m.eyebrow}</span>
               <h3>{m.title}</h3>
               <p>{m.blurb}</p>
             </div>

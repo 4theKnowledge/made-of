@@ -2354,6 +2354,14 @@ a.btn.primary{color:var(--bg)}
   text-wrap: balance;
   max-width: 18ch;
 }
+.homeHero-mark {
+  color: var(--accent);
+  font-style: italic;
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.12em;
+  text-decoration-skip-ink: none;
+}
 .homeHero p {
   margin: 0;
   color: var(--muted);
@@ -2395,6 +2403,7 @@ a.btn.primary{color:var(--bg)}
   flex-direction: column;
   gap: 8px;
 }
+.modeCard-text .eyebrow { margin-bottom: -4px; }
 .modeCard-viz {
   flex: 0 0 auto;
   display: flex;

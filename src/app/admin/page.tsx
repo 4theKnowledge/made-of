@@ -7,6 +7,51 @@ import { Breadcrumb } from "./Breadcrumb";
 
 export const dynamic = "force-dynamic";
 
+type ToolGroup = {
+  title: string;
+  blurb: string;
+  tools: { href: string; label: string; download?: boolean }[];
+};
+
+const GROUPS: ToolGroup[] = [
+  {
+    title: "Content",
+    blurb: "Items, kinds, and bulk edits to the knowledge base.",
+    tools: [
+      { href: "/admin/tree", label: "Knowledge base" },
+      { href: "/admin/kinds", label: "Kinds" },
+      { href: "/admin/import", label: "Import JSON" },
+      { href: "/admin/bulk", label: "Bulk upload" },
+    ],
+  },
+  {
+    title: "Combine",
+    blurb: "Theme membership and the daily puzzle.",
+    tools: [
+      { href: "/admin/combine/themes", label: "Themes" },
+      { href: "/admin/combine/daily", label: "Daily" },
+    ],
+  },
+  {
+    title: "Media",
+    blurb: "Pictogram coverage and uploads.",
+    tools: [
+      { href: "/admin/pictograms", label: "Pictogram audit" },
+      { href: "/admin/pictograms/upload", label: "Pictogram upload" },
+    ],
+  },
+  {
+    title: "Ops",
+    blurb: "Access, changelog, feedback, and exports.",
+    tools: [
+      { href: "/admin/codes", label: "Invite codes" },
+      { href: "/admin/changelog", label: "Changelog" },
+      { href: "/admin/feedback", label: "Feedback" },
+      { href: "/api/admin/export", label: "Download export", download: true },
+    ],
+  },
+];
+
 export default async function AdminHome() {
   const db = getDb();
   const [[allItems], [draftItems], [reviewItems], [canaryLinks]] = await Promise.all([
@@ -15,6 +60,13 @@ export default async function AdminHome() {
     db.select({ n: count() }).from(schema.items).where(eq(schema.items.status, "review")),
     db.select({ n: count() }).from(schema.links).where(eq(schema.links.isCanary, true)),
   ]);
+
+  const stats = [
+    { label: "Items", value: allItems.n },
+    { label: "Drafts", value: draftItems.n },
+    { label: "In review", value: reviewItems.n },
+    { label: "Canary links", value: canaryLinks.n },
+  ];
 
   return (
     <main className="wrap">
@@ -27,35 +79,61 @@ export default async function AdminHome() {
 
       <section className="feat">
         <h3 style={{ marginTop: 0 }}>Overview</h3>
-        <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "8px 16px", margin: 0 }}>
-          <dt style={{ color: "var(--muted)" }}>Items</dt>
-          <dd style={{ margin: 0 }}>{allItems.n}</dd>
-          <dt style={{ color: "var(--muted)" }}>Drafts</dt>
-          <dd style={{ margin: 0 }}>{draftItems.n}</dd>
-          <dt style={{ color: "var(--muted)" }}>In review</dt>
-          <dd style={{ margin: 0 }}>{reviewItems.n}</dd>
-          <dt style={{ color: "var(--muted)" }}>Canary links</dt>
-          <dd style={{ margin: 0 }}>{canaryLinks.n}</dd>
-        </dl>
-      </section>
-
-      <section className="feat">
-        <h3 style={{ marginTop: 0 }}>Actions</h3>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-          <Link href="/admin/tree" className="btn">Knowledge base</Link>
-          <Link href="/admin/kinds" className="btn">Kinds</Link>
-          <Link href="/admin/combine/themes" className="btn">Combine themes</Link>
-          <Link href="/admin/combine/daily" className="btn">Combine daily</Link>
-          <Link href="/admin/pictograms" className="btn">Pictogram audit</Link>
-          <Link href="/admin/pictograms/upload" className="btn">Pictogram upload</Link>
-          <Link href="/admin/import" className="btn">Import JSON</Link>
-          <Link href="/admin/bulk" className="btn">Bulk upload</Link>
-          <Link href="/admin/codes" className="btn">Invite codes</Link>
-          <Link href="/admin/changelog" className="btn">Changelog</Link>
-          <Link href="/admin/feedback" className="btn">Feedback</Link>
-          <a href="/api/admin/export" className="btn" download>Download export</a>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            gap: 12,
+          }}
+        >
+          {stats.map((s) => (
+            <div
+              key={s.label}
+              style={{
+                border: "1px solid var(--line)",
+                borderRadius: 3,
+                padding: "12px 14px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
+              <div style={{ fontFamily: "var(--display)", fontWeight: 700, fontSize: 28, lineHeight: 1 }}>
+                {s.value}
+              </div>
+              <div style={{ color: "var(--muted)", fontSize: 13 }}>{s.label}</div>
+            </div>
+          ))}
         </div>
       </section>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+          gap: 16,
+        }}
+      >
+        {GROUPS.map((g) => (
+          <section key={g.title} className="feat">
+            <h3 style={{ marginTop: 0 }}>{g.title}</h3>
+            <p className="small">{g.blurb}</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: "auto" }}>
+              {g.tools.map((t) =>
+                t.download ? (
+                  <a key={t.href} href={t.href} className="btn" download>
+                    {t.label}
+                  </a>
+                ) : (
+                  <Link key={t.href} href={t.href} className="btn">
+                    {t.label}
+                  </Link>
+                ),
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
       <Footer />
     </main>
   );
