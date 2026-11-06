@@ -29,18 +29,13 @@ import type {
  * data without maintaining parallel allow-lists.
  */
 export type Tag =
-  // --- Combine themes ---
   /** Legacy marker from the Everyday theme (food, home, craft, clothes…).
    *  The theme has been retired; the tag is kept so item data still parses
    *  and so a future scoped theme can reuse it. */
   | "combine-everyday"
-  /** Never dealt or made in Combine. Covers the semiconductor fab chain and
-   *  the one surviving non-physical item (big bang). */
-  | "combine-exclude"
 
   // --- Reusable categories (available to any mode) ---
-  /** Part of the semiconductor fab chain — kept out of Combine, but useful
-   *  as a tag anyone else can read later. */
+  /** Part of the semiconductor fab chain. */
   | "fab-chain";
 
 /* -------------------------- hand-edited shapes --------------------------- */
@@ -74,6 +69,10 @@ export interface DataItem {
   recipes?: DataRecipe[];
   linksN?: string[];
   linksS?: string[];
+  /** When true, Combine never deals or makes this item regardless of theme
+   *  membership. Safety net for items in the graph that should never land
+   *  on the board (big bang, abstract placeholders). Omit for false. */
+  isCombineExcluded?: boolean;
   /** Membership markers (see Tag). Omit when empty. */
   tags?: Tag[];
 }
@@ -137,6 +136,8 @@ export interface LoadedItem {
   recipes: LoadedRecipe[];
   /** Item-level links. Only `n` and `s` are legal here. */
   itemLinks: { n: string[]; s: string[] };
+  /** Excluded from every Combine theme. Defaults to false. */
+  isCombineExcluded: boolean;
   /** Membership markers. Always present (empty array if none). */
   tags: Tag[];
 }

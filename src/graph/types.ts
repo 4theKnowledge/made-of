@@ -40,6 +40,10 @@ export interface GraphNode {
    *  responses — never on item pages, the sitemap, llms.txt, or the
    *  Index). */
   isCanary: boolean;
+  /** True to hide this item from every Combine theme regardless of
+   *  membership. Admin-set safety net; migrated from the legacy
+   *  `combine-exclude` tag in drizzle/0021. */
+  isCombineExcluded: boolean;
   /** All edges leading *up* (into the parents, i.e. what this item is made from). */
   up: GraphEdge[];
   /** All edges leading *down* (consumers of this item). */

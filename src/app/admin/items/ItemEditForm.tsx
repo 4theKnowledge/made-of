@@ -30,6 +30,7 @@ export function ItemEditForm({ item }: { item: Item }) {
   const [tagsText, setTagsText] = useState(item.tags.join(", "));
   const [status, setStatus] = useState<ItemStatus>(item.status);
   const [isCanary, setIsCanary] = useState(item.isCanary);
+  const [isCombineExcluded, setIsCombineExcluded] = useState(item.isCombineExcluded);
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
@@ -50,6 +51,7 @@ export function ItemEditForm({ item }: { item: Item }) {
           tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean),
           status,
           isCanary,
+          isCombineExcluded,
         }),
       });
       if (!res.ok) {
@@ -165,6 +167,18 @@ export function ItemEditForm({ item }: { item: Item }) {
         <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input type="checkbox" checked={isCanary} onChange={(e) => setIsCanary(e.target.checked)} />
           <span style={{ color: "var(--muted)", fontSize: 13 }}>Flag this item as a canary (not public).</span>
+        </label>
+
+        <label>Exclude from Combine</label>
+        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={isCombineExcluded}
+            onChange={(e) => setIsCombineExcluded(e.target.checked)}
+          />
+          <span style={{ color: "var(--muted)", fontSize: 13 }}>
+            Never deal or make in Combine, regardless of theme membership.
+          </span>
         </label>
       </div>
 

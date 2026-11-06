@@ -21,7 +21,7 @@ export const ITEMS: DataItem[] = [
     kind: "cosmic",
     firstAppeared: "13.8bya",
     fact: "The start of everything. Almost all the hydrogen and helium that exists was made in its first few minutes.",
-    tags: ["combine-exclude"],
+    isCombineExcluded: true,
   },
   {
     name: "hydrogen",
@@ -3914,6 +3914,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Apple trees grown from seed rarely taste like their parents, so every named apple variety is grafted from one original tree.",
+    recipes: [{ e: ["land plants"] }],
     tags: ["combine-everyday"],
   },
   {
@@ -3922,6 +3923,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Some olive trees still bearing fruit today are over 2,000 years old.",
+    recipes: [{ e: ["land plants"] }],
     tags: ["combine-everyday"],
   },
   {
@@ -3930,6 +3932,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "~-6000",
     fact: "Grapes were among the first fruits people farmed, about 8,000 years ago in the Caucasus.",
+    recipes: [{ e: ["land plants"] }],
     tags: ["combine-everyday"],
   },
   {
@@ -3938,6 +3941,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "~-7000",
     fact: "Rice feeds more people than any other crop. It grows best standing in flooded paddies.",
+    recipes: [{ e: ["land plants"] }],
     tags: ["combine-everyday"],
   },
   {
@@ -3946,6 +3950,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "~-6000",
     fact: "Potatoes were first farmed in the Andes about 8,000 years ago. Thousands of varieties still grow there.",
+    recipes: [{ e: ["land plants"] }],
     tags: ["combine-everyday"],
   },
   {
@@ -3954,6 +3959,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Soybean roots host bacteria that pull nitrogen from the air, so the plant fertilises its own soil.",
+    recipes: [{ e: ["land plants"] }],
     tags: ["combine-everyday"],
   },
   {
@@ -3962,6 +3968,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Green, black and oolong tea all come from the same plant. Only the processing is different.",
+    recipes: [{ e: ["land plants"] }],
     tags: ["combine-everyday"],
   },
   {
@@ -3970,6 +3977,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "~-7000",
     fact: "Maize was bred from a wild grass called teosinte in Mexico about 9,000 years ago.",
+    recipes: [{ e: ["land plants"] }],
     tags: ["combine-everyday"],
   },
   {
@@ -3978,6 +3986,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "~-8000",
     fact: "One of the first grains ever farmed, around 10,000 years ago in the Fertile Crescent.",
+    recipes: [{ e: ["land plants"] }],
     tags: ["combine-everyday"],
   },
   {
@@ -3986,6 +3995,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Lemons are a cross between a bitter orange and a citron.",
+    recipes: [{ e: ["land plants"] }],
     tags: ["combine-everyday"],
   },
   {
@@ -3994,6 +4004,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Black pepper was once so valuable it was used as money and paid as rent.",
+    recipes: [{ e: ["land plants"] }],
     tags: ["combine-everyday"],
   },
   {
@@ -4002,6 +4013,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Flax gives two things: fibres for linen from its stem, and linseed oil from its seeds.",
+    recipes: [{ e: ["land plants"] }],
     tags: ["combine-everyday"],
   },
   {
@@ -4010,6 +4022,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "?",
     fact: "Some bamboo grows almost a metre in a single day, faster than any other plant.",
+    recipes: [{ e: ["land plants"] }],
     tags: ["combine-everyday"],
   },
   {
@@ -4018,6 +4031,7 @@ export const ITEMS: DataItem[] = [
     kind: "living",
     firstAppeared: "~-7000",
     fact: "Pigs were domesticated from wild boar about 9,000 years ago.",
+    recipes: [{ e: ["mammals"] }],
     tags: ["combine-everyday"],
   },
   {

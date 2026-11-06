@@ -10,8 +10,9 @@
  *   - "orphan" — an item in the theme that nothing in the theme uses and
  *     which itself has no recipe. It can be dealt but doesn't participate.
  *     (Not an error; just a warning.)
- *   - "excluded" — an item in the theme that's also tagged combine-exclude.
- *     That's a contradiction; the game would skip it.
+
+ *   - "excluded" — an item in the theme that's also flagged
+ *     isCombineExcluded. That's a contradiction; the game would skip it.
  *
  * The validator runs over plain row-shaped input so it's trivially testable
  * without hitting the DB.
@@ -20,7 +21,7 @@
 export interface ValidatorItem {
   id: string;
   name: string;
-  tags: string[];
+  isCombineExcluded: boolean;
 }
 
 export interface ValidatorRecipe {
@@ -107,7 +108,7 @@ export function validateTheme(input: ValidatorInput): ValidatorResult {
     const item = itemById.get(itemId);
     if (!item) continue;
 
-    if (item.tags.includes("combine-exclude")) {
+    if (item.isCombineExcluded) {
       broken.push({ itemId, name: item.name, reason: { kind: "excluded-and-member" } });
       continue;
     }

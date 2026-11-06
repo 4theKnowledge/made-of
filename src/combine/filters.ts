@@ -6,9 +6,8 @@
  * `combineThemes: string[]`. This file holds the static per-theme metadata
  * (ages, display strings) that doesn't belong in the DB.
  *
- * Legacy: `isCombineExcluded` previously drove Everything membership via
- * the `combine-exclude` tag. It stays as a safety net — an item marked
- * exclude is treated as if it weren't in any theme even if the join table
+ * Safety net: `isCombineExcluded` is a first-class item column. When true,
+ * the item is treated as if it weren't in any theme even if the join table
  * says otherwise. The admin theme validator flags that contradiction.
  */
 
@@ -68,10 +67,12 @@ export function themeAgePool(theme: ThemeKey): string[] {
   return AGE_POOL[theme];
 }
 
-/** Never dealt or made in Combine (fab chain, big bang). Kept as a safety
- *  net; the join table is the source of truth for Everything membership. */
+/** Never dealt or made in Combine (fab chain, big bang). Safety net — the
+ *  join table is the source of truth for theme membership. Reads the
+ *  first-class column on the node; the previous `combine-exclude` tag was
+ *  migrated into this field by drizzle/0021. */
 export function isCombineExcluded(node: GraphNode): boolean {
-  return node.tags.includes("combine-exclude");
+  return node.isCombineExcluded;
 }
 
 /** True when the node belongs to the given Combine theme. Enforces the

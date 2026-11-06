@@ -17,6 +17,7 @@ const STATUSES: ItemStatus[] = ["draft", "review", "live"];
  *   patch: {
  *     status?: ItemStatus,
  *     isCanary?: boolean,
+ *     isCombineExcluded?: boolean,
  *     addTags?: string[],
  *     removeTags?: string[],
  *     setThemes?: { add?: string[], remove?: string[] },
@@ -52,6 +53,8 @@ export async function POST(req: NextRequest) {
   }
 
   const isCanary = typeof patch.isCanary === "boolean" ? patch.isCanary : undefined;
+  const isCombineExcluded =
+    typeof patch.isCombineExcluded === "boolean" ? patch.isCombineExcluded : undefined;
 
   const addTags = Array.isArray(patch.addTags)
     ? Array.from(new Set((patch.addTags as unknown[]).filter((x): x is string => typeof x === "string" && x.trim().length > 0)))
@@ -103,6 +106,7 @@ export async function POST(req: NextRequest) {
     updatedFields: {
       status: 0,
       isCanary: 0,
+      isCombineExcluded: 0,
       tags: 0,
       themesAdded: 0,
       themesRemoved: 0,
@@ -114,6 +118,9 @@ export async function POST(req: NextRequest) {
     const coreUpdate: Partial<typeof schema.items.$inferInsert> = { updatedAt: new Date() };
     if (status) coreUpdate.status = status;
     if (typeof isCanary === "boolean") coreUpdate.isCanary = isCanary;
+    if (typeof isCombineExcluded === "boolean") {
+      coreUpdate.isCombineExcluded = isCombineExcluded;
+    }
     const hasCore = Object.keys(coreUpdate).length > 1;
     if (hasCore) {
       const updated = await tx
@@ -123,6 +130,9 @@ export async function POST(req: NextRequest) {
         .returning({ id: schema.items.id });
       if (status) result.updatedFields.status = updated.length;
       if (typeof isCanary === "boolean") result.updatedFields.isCanary = updated.length;
+      if (typeof isCombineExcluded === "boolean") {
+        result.updatedFields.isCombineExcluded = updated.length;
+      }
     }
 
     // Tag add/remove using Postgres array operators. Both deduplicate and

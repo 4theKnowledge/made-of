@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
       kind: schema.items.kind,
       status: schema.items.status,
       isCanary: schema.items.isCanary,
+      isCombineExcluded: schema.items.isCombineExcluded,
       updatedAt: schema.items.updatedAt,
     })
     .from(schema.items)

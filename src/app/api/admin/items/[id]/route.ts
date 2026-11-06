@@ -75,6 +75,9 @@ export async function PATCH(
   if (Array.isArray(body.tags)) patch.tags = body.tags as string[];
   if (typeof body.status === "string") patch.status = body.status as ItemStatus;
   if (typeof body.isCanary === "boolean") patch.isCanary = body.isCanary;
+  if (typeof body.isCombineExcluded === "boolean") {
+    patch.isCombineExcluded = body.isCombineExcluded;
+  }
   if ("pictogram" in body) {
     const raw = body.pictogram as string | null;
     if (raw === null || (typeof raw === "string" && raw.trim() === "")) {

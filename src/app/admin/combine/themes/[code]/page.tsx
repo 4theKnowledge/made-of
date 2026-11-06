@@ -38,7 +38,7 @@ export default async function AdminCombineThemeDetailPage({
     .select({
       id: schema.items.id,
       name: schema.items.name,
-      tags: schema.items.tags,
+      isCombineExcluded: schema.items.isCombineExcluded,
     })
     .from(schema.items);
 
@@ -69,7 +69,7 @@ export default async function AdminCombineThemeDetailPage({
   }
 
   const input: ValidatorInput = {
-    items: items.map((i) => ({ id: i.id, name: i.name, tags: i.tags })),
+    items: items.map((i) => ({ id: i.id, name: i.name, isCombineExcluded: i.isCombineExcluded })),
     recipes: recipes.map((r) => ({
       id: r.id,
       itemId: r.itemId,
@@ -162,7 +162,7 @@ export default async function AdminCombineThemeDetailPage({
                         </span>
                       </>
                     ) : (
-                      <>Also tagged <code>combine-exclude</code>. The game would skip it; remove from this theme or drop the tag.</>
+                      <>Flagged <code>isCombineExcluded</code>. The game would skip it; either remove from this theme or clear the exclude flag on the item.</>
                     )}
                   </div>
                 </div>

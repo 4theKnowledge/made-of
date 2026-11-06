@@ -51,10 +51,12 @@ export function buildSnapshot(rows: SeedRows): Snapshot {
       // and the Combine tests don't need DB access.
       combineThemes: rows.combineThemesByItem
         ? rows.combineThemesByItem.get(it.id!) ?? []
-        : (it.tags ?? []).includes("combine-exclude")
+        : (it as { isCombineExcluded?: boolean }).isCombineExcluded
           ? []
           : ["everything"],
       isCanary: it.isCanary ?? false,
+      isCombineExcluded:
+        (it as { isCombineExcluded?: boolean }).isCombineExcluded ?? false,
       up: [],
       down: [],
       neighbours: [],

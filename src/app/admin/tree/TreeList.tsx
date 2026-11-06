@@ -479,6 +479,7 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
         fact: "",
         tags: [],
         isCanary: false,
+        isCombineExcluded: false,
         updatedAt: new Date().toISOString(),
       };
       await mutate(
@@ -499,7 +500,7 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
   const patchItem = useCallback(
     async (
       id: string,
-      input: Partial<Pick<ItemRow, "name" | "tier" | "kind" | "firstAppeared" | "symbol" | "fact" | "tags" | "status" | "isCanary">>,
+      input: Partial<Pick<ItemRow, "name" | "tier" | "kind" | "firstAppeared" | "symbol" | "fact" | "tags" | "status" | "isCanary" | "isCombineExcluded">>,
     ) => {
       await mutate(
         (d) => ({
@@ -596,8 +597,12 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
         (d) => {
           let next = d;
           const setIds = new Set(ids);
-          // Core fields (status, isCanary).
-          if (patch.status || typeof patch.isCanary === "boolean") {
+          // Core fields (status, isCanary, isCombineExcluded).
+          if (
+            patch.status ||
+            typeof patch.isCanary === "boolean" ||
+            typeof patch.isCombineExcluded === "boolean"
+          ) {
             next = {
               ...next,
               items: next.items.map((it) =>
@@ -606,6 +611,9 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
                       ...it,
                       ...(patch.status ? { status: patch.status } : {}),
                       ...(typeof patch.isCanary === "boolean" ? { isCanary: patch.isCanary } : {}),
+                      ...(typeof patch.isCombineExcluded === "boolean"
+                        ? { isCombineExcluded: patch.isCombineExcluded }
+                        : {}),
                       updatedAt: now,
                     }
                   : it,
@@ -2778,7 +2786,7 @@ function BulkActionsBar({
       {mode.kind === "add-tag" && (
         <BulkTagEditor
           busy={busy}
-          placeholder="tag to add (e.g. combine-exclude)"
+          placeholder="tag to add (e.g. fab-chain)"
           onCancel={() => setMode({ kind: "none" })}
           onApply={(tag) => run(() => onBulkPatch(selectedIds, { addTags: [tag] }))}
         />
@@ -3209,7 +3217,7 @@ function EditItemModal({
   combineThemes: { code: string; label: string }[];
   initialItemThemes: string[];
   onClose: () => void;
-  onSave: (patch: Partial<Pick<ItemRow, "name" | "tier" | "kind" | "firstAppeared" | "symbol" | "fact" | "tags" | "status" | "isCanary">>) => Promise<void>;
+  onSave: (patch: Partial<Pick<ItemRow, "name" | "tier" | "kind" | "firstAppeared" | "symbol" | "fact" | "tags" | "status" | "isCanary" | "isCombineExcluded">>) => Promise<void>;
   onPublish: () => Promise<void>;
   onUnpublish: () => Promise<void>;
   onSetThemes: (themes: string[]) => Promise<void>;
@@ -3226,6 +3234,7 @@ function EditItemModal({
   const [itemThemes, setItemThemesState] = useState<Set<string>>(new Set(initialItemThemes));
   const [themesDirty, setThemesDirty] = useState(false);
   const [isCanary, setIsCanary] = useState(item.isCanary);
+  const [isCombineExcluded, setIsCombineExcluded] = useState(item.isCombineExcluded);
   const [busy, setBusy] = useState<null | "save" | "publish" | "delete">(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -3254,6 +3263,7 @@ function EditItemModal({
         tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean),
         status,
         isCanary,
+        isCombineExcluded,
       });
       if (themesDirty) {
         await onSetThemes(Array.from(itemThemes));
@@ -3367,6 +3377,19 @@ function EditItemModal({
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
               <input type="checkbox" checked={isCanary} onChange={(e) => setIsCanary(e.target.checked)} />
               <span style={{ color: "var(--muted)" }}>Flag this item as a canary (not public).</span>
+            </label>
+
+            <label style={modalLabel}>Exclude from Combine</label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={isCombineExcluded}
+                onChange={(e) => setIsCombineExcluded(e.target.checked)}
+              />
+              <span style={{ color: "var(--muted)" }}>
+                Never deal or make in Combine, regardless of theme membership. Safety net
+                for items that shouldn&apos;t appear on the board (e.g. big bang).
+              </span>
             </label>
 
             <label style={modalLabel}>Combine themes</label>

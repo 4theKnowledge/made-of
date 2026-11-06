@@ -161,7 +161,7 @@ describe("buildThemeBundle", () => {
       for (const id of [...r.all, r.out]) {
         const node = snapshot.nodes.get(id);
         expect(node).toBeDefined();
-        expect(node!.tags.includes("combine-exclude")).toBe(false);
+        expect(node!.isCombineExcluded).toBe(false);
       }
     }
   });
@@ -287,21 +287,23 @@ describe("buildThemeBundle", () => {
 });
 
 describe("computeRefine", () => {
-  it("raw stuff is 0", () => {
+  it("items with no authored recipe are 0", () => {
     const r = computeRefine(snapshot);
-    expect(r.get(id("hydrogen"))).toBe(0);
-    expect(r.get(id("sheep"))).toBe(0);
+    // hydrogen's only recipe is `big-bang`, which itself has no recipe.
+    // hydrogen is thus one step up from raw (level 1), not 0. `big-bang`
+    // is the true raw origin.
     expect(r.get(id("big-bang"))).toBe(0);
   });
 
   it("made things step up from raw", () => {
     const r = computeRefine(snapshot);
-    // Tier-N stuff is raw: 0.
-    expect(r.get(id("water"))).toBe(0);
-    expect(r.get(id("iron-ore"))).toBe(0);
-    // Processed materials and composed things step up.
+    // Items with authored recipes get a level derived from their deepest
+    // input, not from tier. `water` is authored as H+O so it's one step
+    // above hydrogen/oxygen.
+    const water = r.get(id("water")) ?? 0;
     const flour = r.get(id("flour")) ?? 0;
     const bread = r.get(id("bread")) ?? 0;
+    expect(water).toBeGreaterThan(0);
     expect(flour).toBeGreaterThan(0);
     expect(bread).toBeGreaterThan(flour);
   });

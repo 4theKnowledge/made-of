@@ -180,6 +180,12 @@ export const items = pgTable(
     pictogram: text("pictogram"),
     status: itemStatusEnum("status").notNull().default("live"),
     isCanary: boolean("is_canary").notNull().default(false),
+    // True to hide this item from every Combine theme regardless of membership.
+    // Safety net for items that are in the graph but shouldn't appear on the
+    // board (e.g., big bang, abstract placeholders). Was previously a
+    // "combine-exclude" string in `tags`; promoted to a column so typos and
+    // free-form drift can't silently disable it.
+    isCombineExcluded: boolean("is_combine_excluded").notNull().default(false),
     // Membership markers (see src/data/types.ts Tag). Treated as a closed
     // set at the type level; stored as a plain text[] here so new tags can
     // land without a migration.

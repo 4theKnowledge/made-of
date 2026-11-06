@@ -21,6 +21,7 @@ export default async function AdminGraphPage() {
         fact: schema.items.fact,
         tags: schema.items.tags,
         isCanary: schema.items.isCanary,
+        isCombineExcluded: schema.items.isCombineExcluded,
         updatedAt: schema.items.updatedAt,
       })
       .from(schema.items),

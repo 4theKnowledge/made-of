@@ -9,9 +9,9 @@ describe("validateTheme", () => {
   it("accepts a theme where every item is reachable from base", () => {
     const result = run({
       items: [
-        { id: "a", name: "a", tags: [] },
-        { id: "b", name: "b", tags: [] },
-        { id: "c", name: "c", tags: [] },
+        { id: "a", name: "a", isCombineExcluded: false },
+        { id: "b", name: "b", isCombineExcluded: false },
+        { id: "c", name: "c", isCombineExcluded: false },
       ],
       recipes: [
         { id: "r1", itemId: "c", parts: ["a", "b"] },
@@ -26,9 +26,9 @@ describe("validateTheme", () => {
   it("flags an item whose recipe needs a non-theme ingredient", () => {
     const result = run({
       items: [
-        { id: "a", name: "a", tags: [] },
-        { id: "b", name: "b", tags: [] },
-        { id: "outside", name: "outside", tags: [] },
+        { id: "a", name: "a", isCombineExcluded: false },
+        { id: "b", name: "b", isCombineExcluded: false },
+        { id: "outside", name: "outside", isCombineExcluded: false },
       ],
       recipes: [
         { id: "r1", itemId: "b", parts: ["a", "outside"] },
@@ -47,10 +47,10 @@ describe("validateTheme", () => {
   it("prefers the recipe with the fewest missing deps for the error message", () => {
     const result = run({
       items: [
-        { id: "a", name: "a", tags: [] },
-        { id: "x", name: "x", tags: [] },
-        { id: "y", name: "y", tags: [] },
-        { id: "target", name: "target", tags: [] },
+        { id: "a", name: "a", isCombineExcluded: false },
+        { id: "x", name: "x", isCombineExcluded: false },
+        { id: "y", name: "y", isCombineExcluded: false },
+        { id: "target", name: "target", isCombineExcluded: false },
       ],
       recipes: [
         { id: "r1", itemId: "target", parts: ["x", "y"] },
@@ -69,9 +69,9 @@ describe("validateTheme", () => {
   it("closes transitively: a→b→c where each step is in-theme", () => {
     const result = run({
       items: [
-        { id: "a", name: "a", tags: [] },
-        { id: "b", name: "b", tags: [] },
-        { id: "c", name: "c", tags: [] },
+        { id: "a", name: "a", isCombineExcluded: false },
+        { id: "b", name: "b", isCombineExcluded: false },
+        { id: "c", name: "c", isCombineExcluded: false },
       ],
       recipes: [
         { id: "r1", itemId: "b", parts: ["a"] },
@@ -83,9 +83,9 @@ describe("validateTheme", () => {
     expect(result.buildableCount).toBe(3);
   });
 
-  it("flags an item that is both in the theme and tagged combine-exclude", () => {
+  it("flags an item that is both in the theme and isCombineExcluded", () => {
     const result = run({
-      items: [{ id: "a", name: "a", tags: ["combine-exclude"] }],
+      items: [{ id: "a", name: "a", isCombineExcluded: true }],
       recipes: [],
       themeMembers: new Set(["a"]),
     });
@@ -95,9 +95,9 @@ describe("validateTheme", () => {
   it("warns on an orphan base ingredient nothing in the theme uses", () => {
     const result = run({
       items: [
-        { id: "a", name: "a", tags: [] },
-        { id: "b", name: "b", tags: [] },
-        { id: "orphan", name: "orphan", tags: [] },
+        { id: "a", name: "a", isCombineExcluded: false },
+        { id: "b", name: "b", isCombineExcluded: false },
+        { id: "orphan", name: "orphan", isCombineExcluded: false },
       ],
       recipes: [
         { id: "r1", itemId: "b", parts: ["a"] },

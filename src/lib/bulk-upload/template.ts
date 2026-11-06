@@ -24,7 +24,8 @@ export const BULK_UPLOAD_TEMPLATE = {
       "Do not restate items that already exist. If you need to add a recipe to an existing item, include the item in `items` with just the new recipe — the planner will offer a merge.",
       "Legal `tier` values: F, N, M, C, P, S. Legal `kind` values are listed under _readme.vocab.kinds (fetch /api/admin/kinds for live list).",
       "Legal `confidence` values: established, strong, debated, hypothesis. Legal `stance` values: supports, contradicts.",
-      "Legal `tags`: combine-exclude (never dealt in Combine), combine-everyday (legacy marker), fab-chain. Omit when empty.",
+      "Set `isCombineExcluded: true` to keep an item out of every Combine theme (safety net for items in the graph that shouldn't appear on the board). Omit for false.",
+      "Legal `tags`: combine-everyday (legacy marker), fab-chain. Omit when empty.",
       "`pictogram` is an SVG inner-markup string (no outer <svg> tag). 32×32 viewBox, allowlisted elements and classes only. Download /api/admin/bulk/pictogram-style for the authoring rules and worked examples before writing one.",
       "To introduce a new `kind`, add it under top-level `kinds` with its fallback `pictogram`. Items can then reference it from `kind`.",
     ],
@@ -59,7 +60,7 @@ export const BULK_UPLOAD_TEMPLATE = {
         "place",
         "information",
       ],
-      tags: ["combine-exclude", "combine-everyday", "fab-chain"],
+      tags: ["combine-everyday", "fab-chain"],
     },
     firstAppearedFormat:
       "Year string. Use '13.8bya' (billions), '400mya' (millions), '12ka' (thousands), '1994' (CE year), '-3500' (BCE). Prefix with '~' for 'about'.",

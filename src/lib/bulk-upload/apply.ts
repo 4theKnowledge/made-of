@@ -5,7 +5,7 @@
  * reloads a fresh KbIndex inside the transaction, rebuilds the plan to
  * sanity-check nothing has changed under us, then inserts:
  *   - new items (status='live' to match the seeder)
- *   - everything-theme membership for items without `combine-exclude`
+ *   - everything-theme membership for items not flagged `isCombineExcluded`
  *   - new recipes/links for inserted items AND for merged items
  *   - new sources (skipping any whose code already exists)
  *   - evidence rows and evidence-source joins for the links we touched
@@ -202,6 +202,7 @@ export async function applyBulk(input: ApplyInput): Promise<ApplyResult> {
           pictogram: it.pictogram ?? null,
           status: "live" as const,
           isCanary: false,
+          isCombineExcluded: it.isCombineExcluded ?? false,
           tags: (it.tags ?? []) as string[],
         };
       });
@@ -209,9 +210,9 @@ export async function applyBulk(input: ApplyInput): Promise<ApplyResult> {
         await tx.insert(schema.items).values(newItemRows);
         stats.itemsInserted = newItemRows.length;
 
-        // Everything theme membership for new items without combine-exclude.
+        // Everything theme membership for new items that aren't excluded.
         const everythingMembers = newItemRows
-          .filter((r) => !r.tags.includes("combine-exclude"))
+          .filter((r) => !r.isCombineExcluded)
           .map((r) => ({ itemId: r.id, themeCode: "everything" }));
         if (everythingMembers.length > 0) {
           await tx

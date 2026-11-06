@@ -17,9 +17,7 @@ import type { GraphNode } from "../graph/types";
 const CACHE = new WeakMap<Snapshot, Map<string, number>>();
 
 function isRaw(node: GraphNode): boolean {
-  if (node.tier === "F" || node.tier === "N") return true;
-  if (!node.recipes.length) return true;
-  return false;
+  return node.recipes.length === 0;
 }
 
 /** `f + w` ids grouped by recipe id (deduped, self-excluded). */

@@ -105,10 +105,10 @@ async function main() {
     await bulkInsert(tx, schema.evidenceSources, rows.evidenceSources);
 
     // Everything theme membership. The 'everything' row itself is created
-    // by migration 0010. Every item goes in except those tagged
-    // combine-exclude (currently just big bang).
+    // by migration 0010. Every item goes in except those marked
+    // isCombineExcluded (currently just big bang).
     const everythingMembership = rows.items
-      .filter((it) => !(it.tags ?? []).includes("combine-exclude"))
+      .filter((it) => !it.isCombineExcluded)
       .map((it) => ({ itemId: it.id!, themeCode: "everything" }));
     if (everythingMembership.length > 0) {
       for (let i = 0; i < everythingMembership.length; i += 500) {

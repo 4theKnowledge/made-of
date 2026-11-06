@@ -27,6 +27,7 @@ export interface ItemRow {
   fact: string;
   tags: string[];
   isCanary: boolean;
+  isCombineExcluded: boolean;
   updatedAt: string;
 }
 
@@ -141,6 +142,7 @@ export const api = {
     patch: {
       status?: ItemStatus;
       isCanary?: boolean;
+      isCombineExcluded?: boolean;
       addTags?: string[];
       removeTags?: string[];
       setThemes?: { add?: string[]; remove?: string[] };

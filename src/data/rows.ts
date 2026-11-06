@@ -124,6 +124,7 @@ export function toRows(kb: LoadedKnowledgeBase): SeedRows {
       fact: item.fact,
       status: "live",
       isCanary: false,
+      isCombineExcluded: item.isCombineExcluded,
       tags: item.tags,
     });
   }
