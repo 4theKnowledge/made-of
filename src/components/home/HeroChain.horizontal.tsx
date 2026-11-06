@@ -329,7 +329,7 @@ export function HeroChain({ stages }: { stages: ChainStage[] }) {
             const gap = edgesByGap.get(ci);
             const toColIdx = ci + 1;
             const toCol = flat.columns[toColIdx];
-            const era = flat.eras[toColIdx];
+            const era = flat.eras[ci];
             const colSeen = ci <= revealedUpTo;
             const arrowSeen = toColIdx <= revealedUpTo;
 
@@ -337,6 +337,7 @@ export function HeroChain({ stages }: { stages: ChainStage[] }) {
               <div key={`seg-${ci}`} className="heroChainH-seg">
                 <Column
                   column={col}
+                  era={era}
                   seen={colSeen}
                   colRef={(node) => {
                     columnRefs.current[ci] = node;
@@ -347,7 +348,6 @@ export function HeroChain({ stages }: { stages: ChainStage[] }) {
                     edges={gap}
                     fromSize={col.items.length}
                     toSize={toCol.items.length}
-                    era={era}
                     pass={pass}
                     keyBase={`gap-${ci}`}
                     seen={arrowSeen}
@@ -400,10 +400,12 @@ export function HeroChain({ stages }: { stages: ChainStage[] }) {
 
 function Column({
   column,
+  era,
   seen,
   colRef,
 }: {
   column: Column;
+  era?: string;
   seen: boolean;
   colRef: (node: HTMLDivElement | null) => void;
 }) {
@@ -418,6 +420,7 @@ function Column({
         ["--n" as string]: column.items.length,
       } as React.CSSProperties}
     >
+      {era && <span className="heroChainH-era">{era}</span>}
       {column.items.map((it, idx) => (
         <span
           key={it.key}
@@ -437,7 +440,6 @@ function Arrow({
   edges,
   fromSize,
   toSize,
-  era,
   pass,
   keyBase,
   seen,
@@ -445,7 +447,6 @@ function Arrow({
   edges: Edge[];
   fromSize: number;
   toSize: number;
-  era?: string;
   pass: number;
   keyBase: string;
   seen: boolean;
@@ -503,7 +504,6 @@ function Arrow({
 
   return (
     <div className={`heroChainH-arrow${seen ? " is-seen" : ""}`}>
-      {era && <span className="heroChainH-era">{era}</span>}
       <svg
         className="heroChainH-converge"
         viewBox={`0 0 ${W} ${TRACK_H}`}

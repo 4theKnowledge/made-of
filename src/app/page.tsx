@@ -21,7 +21,7 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Made Of — what anything is made of",
   description:
-    "A shirt needs thread, thread needs cotton, cotton needs a plant, and the plant needs sunlight from a star. Made Of maps those connections for thousands of things.",
+    "Made Of turns learning how the world is built into a game. Trace anything, from the big bang to the internet.",
   alternates: { canonical: "/" },
 };
 
@@ -128,9 +128,8 @@ export default async function HomePage() {
           something.
         </h1>
         <p>
-          A shirt needs thread, thread needs cotton, cotton needs a plant, and
-          the plant needs sunlight from a star. Made Of maps those connections,
-          from the big bang to the internet.
+          Made Of turns learning how the world is built into a game. Trace
+          anything, from the big bang to the internet.
         </p>
 
         {stages.length > 0 && <HeroChain stages={stages} />}
