@@ -26,8 +26,21 @@ export default async function AdminItemEdit({ params }: { params: Promise<{ id: 
   const recipeLinks = recipeIds.length
     ? await db.select().from(schema.links).where(inArray(schema.links.recipeId, recipeIds))
     : [];
+  const inRecipeIds = Array.from(
+    new Set(inLinks.map((l) => l.recipeId).filter(Boolean) as string[]),
+  );
+  const inRecipes = inRecipeIds.length
+    ? await db.select().from(schema.recipes).where(inArray(schema.recipes.id, inRecipeIds))
+    : [];
+  const recipeOwnerById = Object.fromEntries(
+    inRecipes.map((r) => [r.id, { itemId: r.itemId, position: r.position, label: r.label }]),
+  );
   const allTargetIds = Array.from(
-    new Set([...recipeLinks, ...outLinks, ...inLinks].flatMap((l) => [l.targetItemId, l.itemId].filter(Boolean) as string[])),
+    new Set(
+      [...recipeLinks, ...outLinks, ...inLinks]
+        .flatMap((l) => [l.targetItemId, l.itemId].filter(Boolean) as string[])
+        .concat(inRecipes.map((r) => r.itemId)),
+    ),
   );
   const names = allTargetIds.length
     ? await db.select({ id: schema.items.id, name: schema.items.name }).from(schema.items).where(inArray(schema.items.id, allTargetIds))
@@ -56,6 +69,9 @@ export default async function AdminItemEdit({ params }: { params: Promise<{ id: 
 
       <section className="feat">
         <h3 style={{ marginTop: 0 }}>Recipes & outgoing links</h3>
+        <p style={{ color: "var(--muted)", marginTop: 0, fontSize: 13 }}>
+          Ways this item is made. Each recipe groups the links (made from, made with, evolved from) that produce it. Item-level links (needs, comes from) sit outside recipes.
+        </p>
         {recipes.length === 0 && <p style={{ color: "var(--muted)" }}>No recipes.</p>}
         {recipes
           .sort((a, b) => a.position - b.position)
@@ -96,13 +112,23 @@ export default async function AdminItemEdit({ params }: { params: Promise<{ id: 
 
       <section className="feat">
         <h3 style={{ marginTop: 0 }}>Incoming ({inLinks.length})</h3>
+        <p style={{ color: "var(--muted)", marginTop: 0, fontSize: 13 }}>
+          Other items that reference this one — either in their recipes or via item-level links. Follow any row to edit the parent.
+        </p>
         {inLinks.length === 0 && <p style={{ color: "var(--muted)" }}>Nothing links to this item yet.</p>}
         {inLinks.map((l) => {
-          const parentId = l.itemId ?? "";
+          const recipe = l.recipeId ? recipeOwnerById[l.recipeId] : null;
+          const parentId = l.itemId ?? recipe?.itemId ?? "";
           const parentName = nameById[parentId] ?? parentId;
+          const viaRecipe = recipe
+            ? ` (recipe ${recipe.position}${recipe.label ? ` · ${recipe.label}` : ""})`
+            : "";
           return (
             <div key={l.id} style={{ fontSize: 14, padding: "4px 0" }}>
-              <Link href={parentId ? `/admin/items/${encodeURIComponent(parentId)}` : "#"}>{parentName || "(recipe)"}</Link>
+              <Link href={parentId ? `/admin/items/${encodeURIComponent(parentId)}` : "#"}>{parentName || "(unknown)"}</Link>
+              {viaRecipe && (
+                <span style={{ color: "var(--muted)", fontSize: 12 }}>{viaRecipe}</span>
+              )}
               <span style={{ color: "var(--muted)" }}> {REL[l.type].up.toLowerCase()}</span>
               <span style={{ fontFamily: "var(--mono, monospace)", fontSize: 11, color: "var(--muted)", marginLeft: 8 }}>
                 {l.type} · {l.confidence}
@@ -112,9 +138,9 @@ export default async function AdminItemEdit({ params }: { params: Promise<{ id: 
         })}
       </section>
 
-      <section className="feat">
+      <div style={{ marginTop: 16 }}>
         <Link href="/admin/items" className="btn">← Back to items</Link>
-      </section>
+      </div>
       <Footer />
     </main>
   );

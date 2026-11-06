@@ -119,7 +119,7 @@ export function ItemEditForm({ item }: { item: Item }) {
 
   return (
     <form onSubmit={onSave}>
-      <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "10px 16px", alignItems: "center" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "140px minmax(0, 1fr)", gap: "10px 16px", alignItems: "center" }}>
         <label>Name</label>
         <input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
 
@@ -213,4 +213,6 @@ const inputStyle: React.CSSProperties = {
   fontFamily: "inherit",
   fontSize: 14,
   width: "100%",
+  boxSizing: "border-box",
+  minWidth: 0,
 };
