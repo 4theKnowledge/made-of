@@ -7,6 +7,24 @@ import { cap } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
 import { ReactionButtons } from "@/components/combine/board-parts/ReactionButtons";
 
+export function AgePromoToast({
+  ageName,
+  onDismiss,
+}: {
+  ageName: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="cbdisc cbagepromo" role="status" onClick={onDismiss}>
+      <div className="cbagebody">
+        <span className="k">New content · tap to close</span>
+        <b>Age {ageName} has emerged</b>
+        <p>New items are in the pool since you last played.</p>
+      </div>
+    </div>
+  );
+}
+
 export function AgeToast({
   toast,
   bundle,

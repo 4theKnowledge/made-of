@@ -75,6 +75,7 @@ import {
   OnboardingDemo,
 } from "@/components/combine/board-parts/onboarding";
 import {
+  AgePromoToast,
   AgeToast,
   DiscoveryToast,
   HintToast,
@@ -1904,21 +1905,6 @@ export function CombineBoard({
 
   return (
     <div className="cbwrap">
-      {activeAgeBanner && (
-        <div className="cbagebanner" role="status">
-          <span>
-            A new age has emerged — <b>{activeAgeBanner}</b>
-          </span>
-          <button
-            type="button"
-            className="cbagebanner-x"
-            onClick={dismissAgeBanner}
-            aria-label="Dismiss"
-          >
-            ×
-          </button>
-        </div>
-      )}
       <div id="cb" className={state.over ? "cbdone" : undefined}>
         <TopBar
           state={state}
@@ -2138,6 +2124,12 @@ export function CombineBoard({
             toast={ageToast}
             bundle={bundle}
             onDismiss={() => setAgeToast(null)}
+          />
+        )}
+        {!ageToast && activeAgeBanner && (
+          <AgePromoToast
+            ageName={activeAgeBanner}
+            onDismiss={dismissAgeBanner}
           />
         )}
         {discovery && (

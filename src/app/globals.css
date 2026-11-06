@@ -815,10 +815,6 @@ a.btn.primary{color:var(--bg)}
 @media (max-width: 600px){.cbwrap{gap:6px}}
 #cb{position:relative;display:flex;flex-direction:column;gap:10px;user-select:none;-webkit-user-select:none}
 
-.cbagebanner{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border:1px solid var(--ink);background:var(--paper);font-size:13px}
-.cbagebanner b{font-weight:600}
-.cbagebanner-x{background:none;border:none;cursor:pointer;font-size:18px;line-height:1;color:var(--muted);padding:0 4px}
-.cbagebanner-x:hover{color:var(--ink)}
 
 .cblastchance-sheet{border-color:var(--bad);box-shadow:5px 5px 0 var(--bad)}
 .cblastchance-finish{align-self:center;padding:6px 14px;border:1.5px dashed var(--bad);border-radius:4px;background:var(--bg);color:var(--bad);font-family:inherit;font-size:13px;font-weight:600;letter-spacing:0.01em;cursor:pointer}
@@ -1566,6 +1562,11 @@ a.btn.primary{color:var(--bg)}
 /* New-age toast — prototype line 1056–1059 */
 .cbdisc.cbagetoast{background:var(--fN)}
 .cbdisc.cbagetoast .cbchip{margin-top:6px}
+
+/* Age-promo toast — mount-time "new content since last visit" notice.
+   Calmer than cbagebig: paper surface, no sweep, no celebration. */
+.cbdisc.cbagepromo{background:var(--paper);border-width:1.5px;box-shadow:3px 3px 0 var(--ink)}
+.cbdisc.cbagepromo b{font-size:16px}
 
 /* Age-up: level-up feel. Bigger frame, thicker border, a bright colour ribbon
    that sweeps across once on open, and sample tiles that pop in staggered. */
