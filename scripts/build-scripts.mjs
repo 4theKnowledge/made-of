@@ -38,6 +38,11 @@ await Promise.all([
   }),
   build({
     ...common,
+    entryPoints: ["scripts/migrate-plant-origins.ts"],
+    outfile: "dist-scripts/migrate-plant-origins.js",
+  }),
+  build({
+    ...common,
     entryPoints: ["scripts/seed-if-empty.ts"],
     outfile: "dist-scripts/seed-if-empty.js",
     // seed-if-empty does a dynamic import("../src/db/seed") — rewrite that
