@@ -8,15 +8,24 @@
  */
 
 import { and, eq } from "drizzle-orm";
-import { getDb, schema } from "../db/client";
+import { getDb, schema, type Db } from "../db/client";
 import type { SeedRows } from "../data/rows";
+
+/** Drizzle's tx object exposes the same `.select()` surface as the top-level
+ *  db handle. We type the executor loosely so the audit helper can run the
+ *  same reads from inside a transaction (so uncommitted writes are visible
+ *  to the audit). */
+export type DbExecutor = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 export async function loadRowsFromDb(opts?: {
   /** Include only status='live' items and their links. Default true. */
   liveOnly?: boolean;
+  /** Executor to read through. Defaults to the global db handle. Pass a
+   *  `tx` to see uncommitted writes within a transaction. */
+  executor?: DbExecutor;
 }): Promise<SeedRows> {
   const liveOnly = opts?.liveOnly ?? true;
-  const db = getDb();
+  const db = opts?.executor ?? getDb();
 
   const items = liveOnly
     ? await db

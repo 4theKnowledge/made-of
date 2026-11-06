@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/session";
+import { AdminToastProvider } from "./_toast";
 
 export const dynamic = "force-dynamic";
 
@@ -19,5 +20,5 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   if (!session) redirect("/sign-in?next=/admin");
   const role = (session.user as { role?: string }).role;
   if (role !== "admin") redirect("/");
-  return <>{children}</>;
+  return <AdminToastProvider>{children}</AdminToastProvider>;
 }

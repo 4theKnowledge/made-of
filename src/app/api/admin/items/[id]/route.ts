@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { requireAdminApi } from "@/lib/admin";
+import {
+  requireAdminApi,
+  assertInvariants,
+  invariantResponse,
+  isInvariantViolation,
+} from "@/lib/admin";
 import { parseYear } from "@/data/load";
 import { sanitisePictogram } from "@/pictograms/sanitise";
 import type { ItemKind, ItemStatus, Tier } from "@/db/schema";
@@ -94,15 +99,35 @@ export async function PATCH(
     }
   }
 
-  const db = getDb();
-  const [updated] = await db
-    .update(schema.items)
-    .set(patch)
-    .where(eq(schema.items.id, id))
-    .returning();
-  if (!updated) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  // Scope the audit: only shape-affecting fields can regress invariants.
+  // Editorial fields (fact, pictogram, firstAppeared, symbol, tags, status,
+  // isCanary) can't orphan an item or create a dead-end raw, so skip the
+  // ~30ms snapshot rebuild for those.
+  const needsAudit =
+    "tier" in patch ||
+    "kind" in patch ||
+    "isCombineExcluded" in patch ||
+    "name" in patch;
 
-  return NextResponse.json({ item: updated });
+  const db = getDb();
+  try {
+    let updated: typeof schema.items.$inferSelect | undefined;
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(schema.items)
+        .set(patch)
+        .where(eq(schema.items.id, id))
+        .returning();
+      updated = row;
+      if (!row) return;
+      if (needsAudit) await assertInvariants(tx);
+    });
+    if (!updated) return NextResponse.json({ error: "not_found" }, { status: 404 });
+    return NextResponse.json({ item: updated });
+  } catch (err) {
+    if (isInvariantViolation(err)) return invariantResponse(err.audit);
+    throw err;
+  }
 }
 
 /** DELETE /api/admin/items/[id] — only allowed if nothing targets this item. */
@@ -127,7 +152,21 @@ export async function DELETE(
     );
   }
 
-  const [deleted] = await db.delete(schema.items).where(eq(schema.items.id, id)).returning();
-  if (!deleted) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  return NextResponse.json({ ok: true });
+  try {
+    let deleted: typeof schema.items.$inferSelect | undefined;
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .delete(schema.items)
+        .where(eq(schema.items.id, id))
+        .returning();
+      deleted = row;
+      if (!row) return;
+      await assertInvariants(tx);
+    });
+    if (!deleted) return NextResponse.json({ error: "not_found" }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (isInvariantViolation(err)) return invariantResponse(err.audit);
+    throw err;
+  }
 }

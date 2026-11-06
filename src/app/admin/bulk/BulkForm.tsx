@@ -17,6 +17,15 @@ import type { Plan, ItemDecision, ItemPlanEntry } from "@/lib/bulk-upload/types"
 
 type Step = "paste" | "review" | "done";
 
+interface AuditOffender {
+  name: string;
+}
+
+interface Audit {
+  orphans: Array<AuditOffender & { tier: string; kind: string }>;
+  deadEndRaws: Array<AuditOffender & { theme: string; outputs: string[] }>;
+}
+
 interface ApplyResponse {
   ok: boolean;
   dryRun: boolean;
@@ -32,6 +41,7 @@ interface ApplyResponse {
   };
   issues: Plan["issues"];
   errors: string[];
+  audit?: Audit;
   snapshotVersion?: number;
 }
 
@@ -481,7 +491,10 @@ function ApplyResultBlock({ result }: { result: ApplyResponse }) {
         <dt style={{ color: "var(--muted)" }}>Evidence</dt>
         <dd style={{ margin: 0 }}>{result.stats.evidenceInserted}</dd>
       </dl>
-      {result.errors.length > 0 && (
+      {result.audit && (
+        <AuditBlock audit={result.audit} />
+      )}
+      {result.errors.length > 0 && !result.audit && (
         <div style={{ marginTop: 10 }}>
           <div style={{ fontFamily: "var(--mono, monospace)", fontSize: 11, color: "var(--bad, #a62828)" }}>
             Errors
@@ -489,6 +502,54 @@ function ApplyResultBlock({ result }: { result: ApplyResponse }) {
           <ul style={{ margin: "4px 0 0 20px", fontSize: 13 }}>
             {result.errors.map((e, i) => (
               <li key={i}>{e}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AuditBlock({ audit }: { audit: Audit }) {
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div
+        style={{
+          fontFamily: "var(--mono, monospace)",
+          fontSize: 11,
+          color: "var(--bad, #a62828)",
+        }}
+      >
+        Graph invariants violated — pack rolled back
+      </div>
+      {audit.orphans.length > 0 && (
+        <div style={{ marginTop: 6 }}>
+          <div style={{ fontSize: 12, color: "var(--muted)" }}>
+            {audit.orphans.length} item(s) with no upstream path to “big bang”:
+          </div>
+          <ul style={{ margin: "4px 0 0 20px", fontSize: 13 }}>
+            {audit.orphans.map((o) => (
+              <li key={o.name}>
+                {o.name}{" "}
+                <span style={{ color: "var(--muted)" }}>
+                  ({o.tier}/{o.kind})
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {audit.deadEndRaws.length > 0 && (
+        <div style={{ marginTop: 6 }}>
+          <div style={{ fontSize: 12, color: "var(--muted)" }}>
+            {audit.deadEndRaws.length} dead-end raw item(s) in Combine themes:
+          </div>
+          <ul style={{ margin: "4px 0 0 20px", fontSize: 13 }}>
+            {audit.deadEndRaws.map((o) => (
+              <li key={`${o.theme}:${o.name}`}>
+                <span style={{ color: "var(--muted)" }}>[{o.theme}]</span>{" "}
+                {o.name} → {o.outputs.join(", ")}
+              </li>
             ))}
           </ul>
         </div>

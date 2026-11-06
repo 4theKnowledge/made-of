@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { requireAdminApi } from "@/lib/admin";
+import {
+  requireAdminApi,
+  assertInvariants,
+  invariantResponse,
+  isInvariantViolation,
+} from "@/lib/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,11 +50,19 @@ export async function POST(req: NextRequest) {
 
   let deletedCount = 0;
   if (deletable.length) {
-    const deleted = await db
-      .delete(schema.items)
-      .where(inArray(schema.items.id, deletable))
-      .returning({ id: schema.items.id });
-    deletedCount = deleted.length;
+    try {
+      await db.transaction(async (tx) => {
+        const deleted = await tx
+          .delete(schema.items)
+          .where(inArray(schema.items.id, deletable))
+          .returning({ id: schema.items.id });
+        deletedCount = deleted.length;
+        if (deletedCount > 0) await assertInvariants(tx);
+      });
+    } catch (err) {
+      if (isInvariantViolation(err)) return invariantResponse(err.audit);
+      throw err;
+    }
   }
 
   return NextResponse.json({

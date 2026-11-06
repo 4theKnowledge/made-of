@@ -8,6 +8,7 @@ import type { Confidence, ItemKind, ItemStatus, LinkType, Tier } from "@/db/sche
 import { REL } from "@/lib/rel";
 import { TIER, TIER_ORDER } from "@/lib/taxonomy";
 import { api, type ItemRow, type LinkRow, type RecipeRow } from "./treeApi";
+import { useAdminToast } from "../_toast";
 
 export interface TreeData {
   items: ItemRow[];
@@ -161,53 +162,6 @@ function deriveViews(data: TreeData) {
 type Views = ReturnType<typeof deriveViews>;
 
 /* ========================================================================
- * Toast — minimal error surface for failed mutations.
- * ====================================================================== */
-
-interface Toast {
-  id: number;
-  kind: "error" | "info";
-  text: string;
-}
-
-function Toasts({ list, dismiss }: { list: Toast[]; dismiss: (id: number) => void }) {
-  if (!list.length) return null;
-  return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 16,
-        right: 16,
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-        zIndex: 100,
-      }}
-    >
-      {list.map((t) => (
-        <div
-          key={t.id}
-          onClick={() => dismiss(t.id)}
-          style={{
-            background: t.kind === "error" ? "#f85149" : "var(--surface)",
-            color: t.kind === "error" ? "#fff" : "var(--ink)",
-            border: "1.5px solid var(--ink)",
-            borderRadius: 3,
-            boxShadow: "2px 2px 0 var(--ink)",
-            padding: "8px 12px",
-            fontSize: 13,
-            cursor: "pointer",
-            maxWidth: 320,
-          }}
-        >
-          {t.text}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ========================================================================
  * TreeContext — stable per-render state shared by every Row/RecipeGroup.
  *
  * We pull everything that isn't identity-specific out of props so Row can be
@@ -303,15 +257,9 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
     [persistExpanded],
   );
 
-  // Toasts.
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const toastSeq = useRef(0);
-  const toast = useCallback((text: string, kind: Toast["kind"] = "error") => {
-    const id = ++toastSeq.current;
-    setToasts((t) => [...t, { id, kind, text }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000);
-  }, []);
-  const dismissToast = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
+  // Toasts come from the admin-wide provider so every admin surface shares
+  // the same widget (and 422 audit messages render identically everywhere).
+  const { push: toast } = useAdminToast();
 
   // Mutation helper: optimistic update + rollback on error.
   const mutate = useCallback(
@@ -997,7 +945,6 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
         />
       )}
 
-      <Toasts list={toasts} dismiss={dismissToast} />
     </div>
   );
 }

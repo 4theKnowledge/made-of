@@ -40,7 +40,14 @@ async function send<T>(url: string, init: RequestInit): Promise<T> {
     let msg = `request_failed_${res.status}`;
     try {
       const body = await res.json();
-      if (body?.error) msg = body.error;
+      // 422 from a graph-shape audit failure: prefer the human message
+      // which lists offending items by name. Falls back to the code
+      // for anything else so parsing stays resilient.
+      if (res.status === 422 && typeof body?.message === "string") {
+        msg = body.message;
+      } else if (body?.error) {
+        msg = body.error;
+      }
     } catch {
       // ignore
     }

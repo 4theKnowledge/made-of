@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { Confidence, Link as LinkRow } from "@/db/schema";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { pushResponseError, useAdminToast } from "../_toast";
 
 const CONFIDENCES: Confidence[] = ["established", "strong", "debated", "hypothesis"];
 
@@ -24,15 +25,20 @@ export function LinkRow({
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const { push: toast } = useAdminToast();
 
   async function save() {
     setBusy(true);
     try {
-      await fetch(`/api/admin/links/${encodeURIComponent(link.id)}`, {
+      const res = await fetch(`/api/admin/links/${encodeURIComponent(link.id)}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ confidence, note: note || null, isCanary }),
       });
+      if (!res.ok) {
+        await pushResponseError(toast, res, "Save failed");
+        return;
+      }
       setEditing(false);
       router.refresh();
     } finally {
@@ -44,7 +50,13 @@ export function LinkRow({
     setConfirmOpen(false);
     setBusy(true);
     try {
-      await fetch(`/api/admin/links/${encodeURIComponent(link.id)}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/links/${encodeURIComponent(link.id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        await pushResponseError(toast, res, "Delete failed");
+        return;
+      }
       router.refresh();
     } finally {
       setBusy(false);

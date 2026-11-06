@@ -13,6 +13,7 @@ import { buildSnapshot, type Snapshot } from "./snapshot";
 import { buildCodeMap, type CodeMap } from "./codes";
 import { buildClosedSet } from "./link";
 import { applyPictogramOverrides } from "@/pictograms/Pictogram";
+import { auditGraph, formatAudit, isCleanAudit } from "@/data/invariants";
 
 export interface LiveSnapshot {
   snapshot: Snapshot;
@@ -87,6 +88,18 @@ async function buildLive(): Promise<LiveSnapshot> {
     loadKindPictograms(),
   ]);
   const snapshot = buildSnapshot(rows);
+
+  // Boot-time guardrail: if an out-of-band mutation (manual SQL, future
+  // untracked route) has sneaked an orphan or dead-end raw in, ops sees
+  // it in the logs rather than finding out when a user hits the failure.
+  // Doesn't block startup — the audit is advisory here.
+  const audit = auditGraph(snapshot);
+  if (!isCleanAudit(audit)) {
+    console.warn(
+      `[live snapshot] graph invariants violated:\n${formatAudit(audit)}`,
+    );
+  }
+
   const itemCodes = buildCodeMap(
     [...snapshot.nodes.values()].map((n) => n.slug),
     slot.codeSeed,

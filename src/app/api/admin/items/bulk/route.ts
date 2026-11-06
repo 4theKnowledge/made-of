@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { and, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { requireAdminApi } from "@/lib/admin";
+import {
+  requireAdminApi,
+  assertInvariants,
+  invariantResponse,
+  isInvariantViolation,
+} from "@/lib/admin";
 import type { ItemStatus } from "@/db/schema";
 
 export const runtime = "nodejs";
@@ -113,7 +118,8 @@ export async function POST(req: NextRequest) {
     },
   };
 
-  await db.transaction(async (tx) => {
+  try {
+    await db.transaction(async (tx) => {
     // Core field patch.
     const coreUpdate: Partial<typeof schema.items.$inferInsert> = { updatedAt: new Date() };
     if (status) coreUpdate.status = status;
@@ -195,7 +201,20 @@ export async function POST(req: NextRequest) {
         .returning({ itemId: schema.itemCombineThemes.itemId });
       result.updatedFields.themesRemoved = deleted.length;
     }
-  });
+
+    // Shape-affecting fields that can regress invariants: isCombineExcluded
+    // toggle and theme membership changes can both effectively orphan items
+    // from a Combine theme (dead-end-raws). Tag/status/isCanary edits can't.
+    const changesShape =
+      typeof isCombineExcluded === "boolean" ||
+      themeAdd.length > 0 ||
+      themeRemove.length > 0;
+    if (changesShape) await assertInvariants(tx);
+    });
+  } catch (err) {
+    if (isInvariantViolation(err)) return invariantResponse(err.audit);
+    throw err;
+  }
 
   return NextResponse.json(result);
 }

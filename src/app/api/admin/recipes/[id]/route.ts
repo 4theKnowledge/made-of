@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { requireAdminApi } from "@/lib/admin";
+import {
+  requireAdminApi,
+  assertInvariants,
+  invariantResponse,
+  isInvariantViolation,
+} from "@/lib/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,10 +69,21 @@ export async function DELETE(
   const { id } = await params;
 
   const db = getDb();
-  const [deleted] = await db
-    .delete(schema.recipes)
-    .where(eq(schema.recipes.id, id))
-    .returning();
-  if (!deleted) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  return NextResponse.json({ ok: true });
+  try {
+    let deleted: typeof schema.recipes.$inferSelect | undefined;
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .delete(schema.recipes)
+        .where(eq(schema.recipes.id, id))
+        .returning();
+      deleted = row;
+      if (!row) return;
+      await assertInvariants(tx);
+    });
+    if (!deleted) return NextResponse.json({ error: "not_found" }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (isInvariantViolation(err)) return invariantResponse(err.audit);
+    throw err;
+  }
 }

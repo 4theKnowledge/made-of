@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import type { Item, ItemKind, ItemStatus, Tier } from "@/db/schema";
 import { TIER } from "@/lib/taxonomy";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { pushResponseError, useAdminToast } from "../_toast";
 
 const KINDS: ItemKind[] = [
   "cosmic", "element", "mineral", "living", "substance", "food",
@@ -19,7 +20,7 @@ export function ItemEditForm({ item }: { item: Item }) {
   const [deleting, setDeleting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const { push: toast } = useAdminToast();
 
   const [name, setName] = useState(item.name);
   const [tier, setTier] = useState<Tier>(item.tier);
@@ -36,7 +37,6 @@ export function ItemEditForm({ item }: { item: Item }) {
     e.preventDefault();
     setSaving(true);
     setMsg(null);
-    setErr(null);
     try {
       const res = await fetch(`/api/admin/items/${encodeURIComponent(item.id)}`, {
         method: "PATCH",
@@ -55,11 +55,11 @@ export function ItemEditForm({ item }: { item: Item }) {
         }),
       });
       if (!res.ok) {
-        setErr(`Save failed: ${res.status}`);
-      } else {
-        setMsg("Saved.");
-        router.refresh();
+        await pushResponseError(toast, res, "Save failed");
+        return;
       }
+      setMsg("Saved.");
+      router.refresh();
     } finally {
       setSaving(false);
     }
@@ -68,16 +68,15 @@ export function ItemEditForm({ item }: { item: Item }) {
   async function onPublish() {
     setPublishing(true);
     setMsg(null);
-    setErr(null);
     try {
       const res = await fetch(`/api/admin/items/${encodeURIComponent(item.id)}/publish`, { method: "POST" });
       if (!res.ok) {
-        setErr(`Publish failed: ${res.status}`);
-      } else {
-        setStatus("live");
-        setMsg("Published. Snapshot reloaded.");
-        router.refresh();
+        await pushResponseError(toast, res, "Publish failed");
+        return;
       }
+      setStatus("live");
+      setMsg("Published. Snapshot reloaded.");
+      router.refresh();
     } finally {
       setPublishing(false);
     }
@@ -86,16 +85,15 @@ export function ItemEditForm({ item }: { item: Item }) {
   async function onUnpublish() {
     setPublishing(true);
     setMsg(null);
-    setErr(null);
     try {
       const res = await fetch(`/api/admin/items/${encodeURIComponent(item.id)}/unpublish`, { method: "POST" });
       if (!res.ok) {
-        setErr(`Unpublish failed: ${res.status}`);
-      } else {
-        setStatus("draft");
-        setMsg("Unpublished.");
-        router.refresh();
+        await pushResponseError(toast, res, "Unpublish failed");
+        return;
       }
+      setStatus("draft");
+      setMsg("Unpublished.");
+      router.refresh();
     } finally {
       setPublishing(false);
     }
@@ -105,15 +103,13 @@ export function ItemEditForm({ item }: { item: Item }) {
     setConfirmOpen(false);
     setDeleting(true);
     setMsg(null);
-    setErr(null);
     try {
       const res = await fetch(`/api/admin/items/${encodeURIComponent(item.id)}`, { method: "DELETE" });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
-        setErr(body.message ?? body.error ?? `Delete failed: ${res.status}`);
-      } else {
-        window.location.href = "/admin/items";
+        await pushResponseError(toast, res, "Delete failed");
+        return;
       }
+      window.location.href = "/admin/items";
     } finally {
       setDeleting(false);
     }
@@ -206,7 +202,6 @@ export function ItemEditForm({ item }: { item: Item }) {
         </button>
       </div>
       {msg && <p style={{ color: "var(--good, #2a7a2a)", marginTop: 10 }}>{msg}</p>}
-      {err && <p style={{ color: "var(--bad, #a62828)", marginTop: 10 }}>{err}</p>}
       <ConfirmDialog
         open={confirmOpen}
         title={`Delete "${item.name}"?`}

@@ -34,6 +34,12 @@ import type {
 import { buildPlan } from "./plan";
 import { loadKbIndex } from "./load-kb";
 import type { BulkPack, ItemDecision, Plan } from "./types";
+import {
+  auditDb,
+  isCleanAudit,
+  formatAudit,
+  type GraphAudit,
+} from "@/data/invariants";
 
 export interface ApplyResult {
   ok: boolean;
@@ -50,6 +56,10 @@ export interface ApplyResult {
   };
   issues: Plan["issues"];
   errors: string[];
+  /** Graph-shape audit of the post-apply state. When non-clean, the apply
+   *  is rolled back and `ok=false`; callers surface `audit` so the admin
+   *  sees which items the pack orphaned. */
+  audit?: GraphAudit;
 }
 
 export interface ApplyInput {
@@ -552,11 +562,28 @@ export async function applyBulk(input: ApplyInput): Promise<ApplyResult> {
         }
       }
 
+      // Audit the post-apply shape before commit (or before the dry-run
+      // rollback). If invariants fail, raise InvariantFailure to bubble
+      // up with the audit attached — the transaction rolls back either
+      // way, so dry-run and real-run both surface the same violations.
+      const audit = await auditDb(tx);
+      if (!isCleanAudit(audit)) throw new InvariantFailure(audit);
+
       if (input.dryRun) {
         throw new DryRunRollback();
       }
     });
   } catch (err) {
+    if (err instanceof InvariantFailure) {
+      return {
+        ok: false,
+        dryRun: input.dryRun,
+        stats: emptyStats,
+        issues: plan.issues,
+        errors: [formatAudit(err.audit)],
+        audit: err.audit,
+      };
+    }
     if (!(err instanceof DryRunRollback)) {
       return {
         ok: false,
@@ -581,5 +608,16 @@ class DryRunRollback extends Error {
   constructor() {
     super("dry-run rollback");
     this.name = "DryRunRollback";
+  }
+}
+
+/** Raised inside the apply transaction when the post-apply audit fails,
+ *  so the tx rolls back and the audit flows out with the result. */
+class InvariantFailure extends Error {
+  readonly audit: GraphAudit;
+  constructor(audit: GraphAudit) {
+    super("invariant_violation");
+    this.name = "InvariantFailure";
+    this.audit = audit;
   }
 }
