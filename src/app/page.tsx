@@ -3,8 +3,7 @@ import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import {
   HeroChain,
-  type Tree,
-  type TreeBranch,
+  type ChainStage,
   type TreeItem,
 } from "@/components/home/HeroChain";
 import { ModeGrid } from "@/components/home/ModeGrid";
@@ -25,45 +24,55 @@ export const metadata: Metadata = {
 };
 
 /**
- * Tree definitions. Each converging tree shows multiple raw inputs becoming
- * intermediates that become one final item. Every edge below is a verified
- * `f` (made-from) relation in the seed data — if a slug drifts, the tree
- * is dropped at render time so the hero never breaks.
+ * The epic chain: big bang → smartphone, as a six-stage sequence. Each stage
+ * converges a handful of real inputs into one final item; stages 3–6 carry
+ * the previous stage's final as their first input so the whole thing reads
+ * as one pipeline from the first atoms to a modern phone.
  *
- * Branches use `null` for `raw` when the mid-level item should be shown
- * as a leaf (e.g. water in lemonade).
+ * Every edge below is a verified `f` (made-from) relation in the seed data —
+ * if any slug drifts the stage is dropped and we fall back gracefully.
  */
-const TREE_DEFS: ReadonlyArray<{
+const CHAIN_DEFS: ReadonlyArray<{
   id: string;
+  era?: string;
   finalSlug: string;
-  branches: Array<{ rawSlug: string | null; midSlug: string }>;
+  inputSlugs: string[];
 }> = [
   {
-    id: "chocolate",
-    finalSlug: "chocolate",
-    branches: [
-      { rawSlug: "cacao-tree", midSlug: "cocoa" },
-      { rawSlug: "sugarcane", midSlug: "sugar" },
-      { rawSlug: "cow", midSlug: "milk" },
-    ],
+    id: "first-atoms",
+    era: "13.8 bya · the first atoms",
+    finalSlug: "star",
+    inputSlugs: ["hydrogen", "helium"],
   },
   {
-    id: "pancake",
-    finalSlug: "pancake",
-    branches: [
-      { rawSlug: "wheat", midSlug: "flour" },
-      { rawSlug: "chicken", midSlug: "egg" },
-      { rawSlug: "cow", midSlug: "milk" },
-    ],
+    id: "stardust",
+    era: "stars forge the elements",
+    finalSlug: "rock",
+    inputSlugs: ["silicon", "oxygen", "iron"],
   },
   {
-    id: "lemonade",
-    finalSlug: "lemonade",
-    branches: [
-      { rawSlug: "lemon-tree", midSlug: "lemon" },
-      { rawSlug: "sugarcane", midSlug: "sugar" },
-      { rawSlug: null, midSlug: "water" },
-    ],
+    id: "earth",
+    era: "a cooling planet",
+    finalSlug: "sand",
+    inputSlugs: ["rock", "quartz", "water"],
+  },
+  {
+    id: "glassmaking",
+    era: "~3500 bce · the first glass",
+    finalSlug: "glass",
+    inputSlugs: ["sand", "soda-ash", "limestone"],
+  },
+  {
+    id: "screen",
+    era: "the modern display",
+    finalSlug: "screen",
+    inputSlugs: ["glass", "plastic", "copper-wire"],
+  },
+  {
+    id: "phone",
+    era: "and finally…",
+    finalSlug: "smartphone",
+    inputSlugs: ["screen", "microchip", "battery"],
   },
 ];
 
@@ -83,27 +92,27 @@ export default async function HomePage() {
     };
   };
 
-  const trees: Tree[] = [];
-  for (const def of TREE_DEFS) {
+  const stages: ChainStage[] = [];
+  for (const def of CHAIN_DEFS) {
     const final = toTreeItem(def.finalSlug);
     if (!final) continue;
-    const branches: TreeBranch[] = [];
+    const inputs: TreeItem[] = [];
     let complete = true;
-    for (const b of def.branches) {
-      const mid = toTreeItem(b.midSlug);
-      if (!mid) {
+    for (const slug of def.inputSlugs) {
+      const t = toTreeItem(slug);
+      if (!t) {
         complete = false;
         break;
       }
-      const raw = b.rawSlug ? toTreeItem(b.rawSlug) : null;
-      if (b.rawSlug && !raw) {
-        complete = false;
-        break;
-      }
-      branches.push({ raw, mid });
+      inputs.push(t);
     }
     if (complete) {
-      trees.push({ id: def.id, endSlug: def.finalSlug, branches, final });
+      stages.push({
+        id: def.id,
+        era: def.era,
+        inputs,
+        final,
+      });
     }
   }
 
@@ -120,7 +129,7 @@ export default async function HomePage() {
           from the big bang to the internet.
         </p>
 
-        {trees.length > 0 && <HeroChain trees={trees} />}
+        {stages.length > 0 && <HeroChain stages={stages} />}
       </section>
 
       <ModeGrid

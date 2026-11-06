@@ -14,144 +14,214 @@ export interface TreeItem {
   pictogram: string | null;
 }
 
-export interface TreeBranch {
-  raw: TreeItem | null;
-  mid: TreeItem;
-}
-
-export interface Tree {
+/**
+ * One stage of the chain. Up to three inputs converge into one `final`.
+ * On non-first stages the first input is the previous stage's final — it
+ * animates in from the position the previous final finished at.
+ */
+export interface ChainStage {
   id: string;
-  endSlug: string;
-  branches: TreeBranch[];
+  era?: string;
+  inputs: TreeItem[];
   final: TreeItem;
 }
 
-/** How long (ms) a sequence takes from mount to fully drawn. Roughly:
- *  cols*0.28s stagger + 1.9s to final tile + 0.6s glow tail. Must stay in
- *  sync with the animationDelay calcs below. */
-const SEQUENCE_MS = 3600;
+/* ---------- Timing (seconds) ----------
+ * Each stage plays in-place inside the fixed-size container. One stage =
+ * inputs-in → converge → final-pop → dwell → outro. The outro collapses
+ * the non-carried inputs and translates the final tile up to the leftmost
+ * input slot, becoming the carry for the next stage.
+ */
+const T = {
+  inputStagger: 0.22,
+  inputFade: 0.4,
+  convergeDelay: 0.2,
+  convergeDur: 0.5,
+  finalDelay: 0.2,
+  finalDur: 0.5,
+  dwell: 0.7,
+  outro: 0.6,
+};
 
-export function HeroChain({ trees }: { trees: Tree[] }) {
+/** Pause on the finished smartphone before the chain auto-restarts. */
+const LOOP_PAUSE_MS = 4500;
+
+function stageDurationSec(nInputs: number): number {
+  const inputsEnd = nInputs * T.inputStagger + T.inputFade;
+  const converge = inputsEnd + T.convergeDelay + T.convergeDur;
+  const final = converge + T.finalDelay + T.finalDur;
+  return final + T.dwell + T.outro;
+}
+
+export function HeroChain({ stages }: { stages: ChainStage[] }) {
   const [idx, setIdx] = useState(0);
   const [nonce, setNonce] = useState(0);
   const [finished, setFinished] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // On each run (tree change OR same-tree replay via nonce), schedule a
-  // "finished" flip at the end of the sequence so the replay button shows.
+  // Depend only on primitives so re-renders with a new-reference `stages`
+  // array don't tear down and restart the active timers.
+  const nStages = stages.length;
+  const curInputCount = stages[Math.min(idx, nStages - 1)]?.inputs.length ?? 0;
+
   useEffect(() => {
-    setFinished(false);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setFinished(true), SEQUENCE_MS);
+    if (nStages === 0 || idx >= nStages) {
+      setFinished(true);
+      return;
+    }
+    const isLast = idx + 1 >= nStages;
+    const stageMs = stageDurationSec(curInputCount) * 1000;
+    const durMs = isLast ? stageMs + LOOP_PAUSE_MS : stageMs;
+    timerRef.current = setTimeout(() => {
+      if (isLast) {
+        setFinished(false);
+        setIdx(0);
+        setNonce((n) => n + 1);
+      } else {
+        setIdx(idx + 1);
+      }
+    }, durMs);
+    // On the last stage, flip the "finished" flag early so the replay
+    // button shows during the dwell, not only after the loop restart.
+    let finishFlagTimer: ReturnType<typeof setTimeout> | null = null;
+    if (isLast) {
+      finishFlagTimer = setTimeout(() => setFinished(true), stageMs);
+    }
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (finishFlagTimer) clearTimeout(finishFlagTimer);
     };
-  }, [idx, nonce]);
+  }, [idx, nonce, nStages, curInputCount]);
 
-  const advance = () => {
-    if (trees.length <= 1) {
-      // Replay the same tree by bumping the nonce (re-keys the inner div
-      // so CSS animations restart from frame 0).
-      setNonce((n) => n + 1);
-    } else {
-      setIdx((i) => (i + 1) % trees.length);
-    }
+  const replay = () => {
+    setFinished(false);
+    setIdx(0);
+    setNonce((n) => n + 1);
   };
 
-  const tree = trees[idx];
-  if (!tree) return null;
+  if (stages.length === 0) return null;
+  const stage = stages[Math.min(idx, stages.length - 1)];
+  const cols = stage.inputs.length;
+  const isFirst = idx === 0;
+  const isLast = idx === stages.length - 1;
 
-  const { branches, final } = tree;
-  const cols = branches.length;
+  // The final tile stays visible past its stage's dwell — we only animate
+  // it to the carried-slot position when there's a next stage. On the last
+  // stage it just stays glowing in the centre.
+  const stageDone = finished && isLast;
 
   return (
-    <div className="heroTree">
+    <div className="heroChain">
       <div
-        key={`${tree.id}-${nonce}`}
-        className="heroTree-run"
+        key={`stage-${idx}-${nonce}`}
+        className={`heroChain-stage${isFirst ? " is-first" : ""}${
+          stageDone ? " is-done" : ""
+        }`}
+        data-cols={cols}
         style={{ "--cols": cols } as React.CSSProperties}
         aria-hidden="true"
       >
-        <span className="heroTree-spark" />
+        {isFirst && <span className="heroChain-spark" />}
 
-        <div className="heroTree-row heroTree-row-raw">
-          {branches.map((b, i) => (
-            <div key={`raw-${i}`} className="heroTree-cell">
-              {b.raw && <TreeTile item={b.raw} delay={`${i * 0.28}s`} />}
-            </div>
-          ))}
-        </div>
+        {stage.era && <span className="heroChain-era">{stage.era}</span>}
 
-        <div className="heroTree-connectors heroTree-connectors-rm">
-          {branches.map((b, i) => (
-            <span
-              key={`crm-${i}`}
-              className={`heroTree-connector${b.raw ? "" : " is-hidden"}`}
-              style={{ animationDelay: `calc(${i * 0.28}s + 0.45s)` }}
-            />
-          ))}
-        </div>
-
-        <div className="heroTree-row heroTree-row-mid">
-          {branches.map((b, i) => (
-            <div key={`mid-${i}`} className="heroTree-cell">
-              <TreeTile item={b.mid} delay={`calc(${i * 0.28}s + 0.75s)`} />
-            </div>
-          ))}
-        </div>
-
-        {/* Mid → final converging lines. SVG so lines actually reach the
-            final tile regardless of column count. preserveAspect=none lets
-            the X-axis stretch with the grid cell. */}
-        <svg
-          className="heroTree-converge"
-          viewBox={`0 0 ${cols * 100} 44`}
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          {branches.map((_, i) => {
-            const x1 = (i + 0.5) * 100;
-            const x2 = (cols * 100) / 2;
+        <div className="heroChain-inputs">
+          {stage.inputs.map((item, i) => {
+            const isCarry = !isFirst && i === 0;
+            const delay = isCarry
+              ? "0s"
+              : `${i * T.inputStagger}s`;
             return (
-              <line
-                key={`cmf-${i}`}
-                x1={x1}
-                y1={0}
-                x2={x2}
-                y2={44}
-                style={{
-                  animationDelay: `calc(${cols * 0.28}s + 1.2s + ${i * 0.08}s)`,
-                }}
-              />
+              <div
+                key={`${stage.id}-in-${i}`}
+                className="heroChain-cell"
+                style={{ "--col": i } as React.CSSProperties}
+              >
+                <TreeTile
+                  item={item}
+                  delay={delay}
+                  variant={isCarry ? "carry" : "input"}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        <svg
+          className="heroChain-converge"
+          viewBox={`0 0 ${cols * 100} 72`}
+          preserveAspectRatio="none"
+        >
+          {/* Funnel curves + travelling pulse. Each curve is a cubic
+              bezier that drops straight from its input then bends inward
+              to meet at the final tile centre. A circle rides each path
+              via <animateMotion> so the energy visibly flows down. */}
+          {stage.inputs.map((_, i) => {
+            const inputsEnd = cols * T.inputStagger + T.inputFade;
+            const convergeStart = inputsEnd + T.convergeDelay;
+            const x1 = (i + 0.5) * 100;
+            const xC = (cols * 100) / 2;
+            const d = `M ${x1} 0 C ${x1} 36, ${xC} 42, ${xC} 72`;
+            const pathId = `heroChainPath-${stage.id}-${i}`;
+            return (
+              <g key={`path-${i}`}>
+                <path
+                  id={pathId}
+                  className="heroChain-beam"
+                  d={d}
+                  style={{
+                    animationDelay: `${convergeStart + i * 0.04}s`,
+                  }}
+                />
+                <circle className="heroChain-pulse" r="2.4" opacity="0">
+                  <set
+                    attributeName="opacity"
+                    to="1"
+                    begin={`${convergeStart + 0.15 + i * 0.04}s`}
+                  />
+                  <set
+                    attributeName="opacity"
+                    to="0"
+                    begin={`${convergeStart + 0.15 + i * 0.04 + 0.55}s`}
+                  />
+                  <animateMotion
+                    begin={`${convergeStart + 0.15 + i * 0.04}s`}
+                    dur="0.55s"
+                    fill="freeze"
+                    rotate="auto"
+                  >
+                    <mpath href={`#${pathId}`} />
+                  </animateMotion>
+                </circle>
+              </g>
             );
           })}
         </svg>
 
-        <div className="heroTree-row heroTree-row-final">
-          <div className="heroTree-cell heroTree-final-cell">
-            <TreeTile
-              item={final}
-              delay={`calc(${cols * 0.28}s + 1.9s)`}
-              isFinal
-            />
-          </div>
+        <div className="heroChain-final">
+          <TreeTile
+            item={stage.final}
+            delay={`${
+              cols * T.inputStagger +
+              T.inputFade +
+              T.convergeDelay +
+              T.convergeDur +
+              T.finalDelay
+            }s`}
+            variant={isLast ? "finale" : "final"}
+          />
         </div>
       </div>
 
-      <div className="heroTree-controls">
+      <div className="heroChain-controls">
         <button
           type="button"
-          className="heroTree-replay"
-          onClick={advance}
+          className="heroChain-replay"
+          onClick={replay}
           data-ready={finished ? "" : undefined}
-          aria-label={trees.length > 1 ? "Show the next recipe" : "Replay the animation"}
+          aria-label="Replay the animation"
         >
-          <svg
-            viewBox="0 0 16 16"
-            width="12"
-            height="12"
-            aria-hidden="true"
-          >
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
             <path
               d="M 2 8 A 6 6 0 1 1 8 14 M 2 8 L 5 5 M 2 8 L 5 11"
               fill="none"
@@ -161,22 +231,24 @@ export function HeroChain({ trees }: { trees: Tree[] }) {
               strokeLinejoin="round"
             />
           </svg>
-          <span>{trees.length > 1 ? "Next recipe" : "Replay"}</span>
+          <span>Replay</span>
         </button>
       </div>
 
       <span className="sr-only">
-        {branches
-          .map((b) => (b.raw ? `${b.raw.name} to ${b.mid.name}` : b.mid.name))
-          .join(", ") + ` to ${final.name}`}
+        {stages
+          .map(
+            (s) =>
+              s.inputs.map((i) => i.name).join(" and ") +
+              " become " +
+              s.final.name,
+          )
+          .join("; ") + "."}
       </span>
     </div>
   );
 }
 
-/** Adapt a TreeItem to the CombineItem shape CombineTile expects. Only the
- *  fields the tray variant reads (name, tier, kind, symbol) need to be real;
- *  the rest are harmless stubs so TS is happy. */
 function toCombineItem(t: TreeItem): CombineItem {
   return {
     id: t.slug,
@@ -192,23 +264,29 @@ function toCombineItem(t: TreeItem): CombineItem {
 function TreeTile({
   item,
   delay,
-  isFinal,
+  variant,
 }: {
   item: TreeItem;
   delay: string;
-  isFinal?: boolean;
+  variant: "input" | "carry" | "final" | "finale";
 }) {
+  const cls =
+    variant === "finale"
+      ? "heroChain-slot is-final is-finale"
+      : variant === "final"
+        ? "heroChain-slot is-final"
+        : variant === "carry"
+          ? "heroChain-slot is-carry"
+          : "heroChain-slot";
   return (
     <span
-      className={`heroTree-slot${isFinal ? " is-final" : ""}`}
-      style={{ animationDelay: delay }}
+      className={cls}
+      style={{
+        animationDelay: delay,
+        ["--delay" as string]: delay,
+      } as React.CSSProperties}
     >
-      <CombineTile
-        item={toCombineItem(item)}
-        variant="tray"
-        label
-        as="span"
-      />
+      <CombineTile item={toCombineItem(item)} variant="tray" label as="span" />
     </span>
   );
 }

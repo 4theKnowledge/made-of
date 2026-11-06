@@ -35,7 +35,12 @@
 
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
-.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:20px 56px;display:flex;flex-direction:column;gap:20px}
+/* Viewport-authoritative horizontal extent: prevents any page's wide content
+   (long unbreakable strings, admin tables, etc.) from stretching <main>
+   past the viewport and pushing the mobile nav hamburger offscreen. Use
+   `clip` not `hidden` so position:sticky and scroll-anchoring still work. */
+html,body{overflow-x:clip}
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:20px 56px;display:flex;flex-direction:column;gap:20px;min-width:0}
 /* Game-page wrap: tighter vertical rhythm so the play surface fits above
    the fold on common phones. Only touches vertical padding / inter-row gap. */
 .wrap-combine{padding-block:8px 20px;gap:10px}
@@ -2455,61 +2460,247 @@ a.btn.primary{color:var(--bg)}
   .modeCard-viz { display: none; }
 }
 
-/* ===== Hero branching tree animation ===== */
+/* ===== Hero epic chain: big bang → smartphone =====
+   A single fixed-size stage plays a chain reaction, cycling through N
+   stages one at a time. Each stage: inputs fade in (staggered), lines
+   converge, final tile pops. After a dwell the whole stage remounts with
+   the next stage's items — the previous final becomes the carried input
+   on the left (reusing the CarouselTile look the Combine theme uses).
 
-.heroTree {
-  padding: 24px 0 12px;
+   Layout: 3 fixed-width columns up top for inputs; one bigger tile below
+   for the final; converge SVG between. Container height stays constant.
+*/
+
+.heroChain {
+  padding: 24px 0 8px;
   position: relative;
   overflow: visible;
-}
-.heroTree-run {
-  display: grid;
-  grid-template-rows: auto 28px auto 44px auto;
-  justify-items: center;
-  gap: 0;
   width: 100%;
-  max-width: 560px;
+  max-width: 480px;
   margin-inline: auto;
-  position: relative;
+  container-type: inline-size;
+  container-name: hero;
 }
-.heroTree-row {
+
+.heroChain-stage {
   display: grid;
-  grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
-  width: 100%;
-  gap: 8px;
-}
-.heroTree-row-final {
+  grid-template-rows: 18px 96px 72px 124px;
   grid-template-columns: 1fr;
   justify-items: center;
+  align-items: flex-start;
+  width: 100%;
+  position: relative;
 }
-.heroTree-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  min-height: 84px;
-}
-.heroTree-final-cell { min-height: 108px; }
 
-/* Wrapper slot that handles the fade-in / glow animation. The inner tile
-   itself (`.cbp` from Combine) carries the tier fill, border, and label
-   typography — reused so the hero reads as the same visual grammar. */
-/* Replay / next-recipe control. Tiny muted text link, invisible until the
-   sequence finishes, then softly fades in. Sits centred under the tree. */
-.heroTree-controls {
+.heroChain-era {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--muted);
+  opacity: 0;
+  animation: heroChain-eraFade 0.6s ease-out forwards;
+  white-space: nowrap;
+}
+
+.heroChain-inputs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: 100%;
+  gap: 8px;
+  align-items: flex-start;
+  justify-items: center;
+}
+.heroChain-cell {
   display: flex;
   justify-content: center;
-  padding-top: 8px;
-  min-height: 24px; /* reserves space so layout doesn't jump on reveal */
+  align-items: flex-start;
+  min-height: 84px;
+  width: 100%;
 }
-.heroTree-replay {
+/* When a stage has fewer than 3 inputs, we centre them visually by
+   offsetting the grid with margin-inline on the first/last cells. CSS
+   `has()` would be cleanest but we use the `--cols` custom prop. */
+.heroChain-stage[data-cols="2"] .heroChain-inputs,
+.heroChain-stage[data-cols="2"] .heroChain-converge {
+  max-width: 66%;
+  margin-inline: auto;
+}
+.heroChain-stage[data-cols="2"] .heroChain-inputs {
+  grid-template-columns: 1fr 1fr;
+}
+.heroChain-stage[data-cols="1"] .heroChain-inputs,
+.heroChain-stage[data-cols="1"] .heroChain-converge {
+  max-width: 33%;
+  margin-inline: auto;
+}
+.heroChain-stage[data-cols="1"] .heroChain-inputs {
+  grid-template-columns: 1fr;
+}
+
+.heroChain-final {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100%;
+}
+
+/* ---- Tiles ---- */
+.heroChain-slot {
+  display: inline-block;
+  opacity: 0;
+  position: relative;
+  animation:
+    heroChain-fade 0.4s ease-out forwards,
+    heroChain-glow-soft 1.1s ease-out 0.4s;
+  will-change: opacity, filter, transform;
+}
+.heroChain-slot.is-carry {
+  animation:
+    heroChain-carryDrop 0.75s cubic-bezier(.22,.9,.3,1) forwards,
+    heroChain-glow-soft 1.1s ease-out 0.75s;
+}
+.heroChain-slot.is-carry::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 6px;
+  border: 1.5px dashed var(--accent, #ffb800);
+  opacity: 0;
+  animation: heroChain-carryRing 1.3s ease-out forwards;
+  animation-delay: inherit;
+  pointer-events: none;
+}
+.heroChain-slot.is-final {
+  animation:
+    heroChain-pop 0.55s cubic-bezier(.2,1.2,.3,1) forwards,
+    heroChain-glow 1.6s ease-out 0.55s;
+}
+.heroChain-slot.is-final::before {
+  content: "";
+  position: absolute;
+  inset: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  border: 2px solid var(--accent, #ffb800);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: heroChain-shock 1s ease-out forwards;
+  animation-delay: inherit;
+  pointer-events: none;
+}
+
+/* Finale: the last stage gets a second, bigger shockwave on a slight
+   delay (reads as "ta-da") plus a lingering glow instead of fading off. */
+.heroChain-slot.is-finale::after {
+  content: "";
+  position: absolute;
+  inset: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  border: 2px solid var(--accent, #ffb800);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: heroChain-shockBig 1.6s ease-out forwards;
+  animation-delay: calc(var(--delay, 0s) + 0.25s);
+  pointer-events: none;
+}
+.heroChain-slot.is-finale {
+  animation:
+    heroChain-pop 0.55s cubic-bezier(.2,1.2,.3,1) forwards,
+    heroChain-glowLinger 2.6s ease-out 0.55s forwards;
+}
+
+.heroChain-slot .cbp {
+  cursor: default;
+  max-width: none;
+  width: 84px;
+  height: 84px;
+  aspect-ratio: auto;
+}
+.heroChain-slot.is-final .cbp {
+  width: 112px;
+  height: 112px;
+}
+
+/* ---- Converging lines ---- */
+.heroChain-converge {
+  width: 100%;
+  height: 72px;
+  display: block;
+  pointer-events: none;
+  overflow: visible;
+}
+/* Funnel beam — appears all at once as a soft guide rail. The
+   directional energy is carried by the travelling pulse, not by the
+   line itself, so the line never "unfolds" onto the target. */
+.heroChain-beam {
+  fill: none;
+  stroke: var(--accent, #ffb800);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  filter: drop-shadow(0 0 5px var(--accent, rgba(255,184,0,0.5)));
+  animation: heroChain-beam 0.4s ease-out forwards;
+}
+
+/* Bright pulse that rides the beam into the final tile. The motion
+   itself is driven by SVG <animateMotion>; this rule just handles the
+   look (color + halo) and ensures the dot stays visible after it lands. */
+.heroChain-pulse {
+  fill: var(--accent, #ffb800);
+  filter: drop-shadow(0 0 6px var(--accent, rgba(255,184,0,0.9)));
+}
+
+/* ---- Big-bang spark (first stage only) ---- */
+.heroChain-spark {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%) scale(0);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent, #ffb800);
+  box-shadow:
+    0 0 24px 8px var(--accent, rgba(255, 184, 0, 0.55)),
+    0 0 48px 20px rgba(255, 184, 0, 0.15);
+  opacity: 0;
+  animation: heroChain-bang 1.1s ease-out forwards;
+  pointer-events: none;
+  z-index: 2;
+}
+.heroChain-spark::after {
+  content: "";
+  position: absolute;
+  inset: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  border: 2px solid var(--accent, #ffb800);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: heroChain-bangRing 1.1s ease-out forwards;
+}
+
+/* ---- Replay control ---- */
+.heroChain-controls {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+  min-height: 28px;
+}
+.heroChain-replay {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 8px;
+  padding: 4px 10px;
   background: transparent;
-  border: 0;
-  border-radius: 2px;
+  border: 1px solid var(--line, rgba(0,0,0,0.12));
+  border-radius: 999px;
   color: var(--muted);
   font-family: var(--mono);
   font-size: 11px;
@@ -2517,150 +2708,129 @@ a.btn.primary{color:var(--bg)}
   text-transform: lowercase;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.25s ease-out, color 0.15s;
+  transform: translateY(4px);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out,
+    color 0.15s, border-color 0.15s;
   pointer-events: none;
 }
-.heroTree-replay[data-ready] {
-  opacity: 0.75;
+.heroChain-replay[data-ready] {
+  opacity: 0.85;
+  transform: translateY(0);
   pointer-events: auto;
 }
-.heroTree-replay:hover { color: var(--ink); opacity: 1; }
-.heroTree-replay svg { opacity: 0.8; }
-
-/* Wrapper that handles the fade/glow animation. .cbp inside is forced to
-   an explicit size — .cbp's own width:100%+aspect-ratio:1 gets confused
-   inside a flex parent on the 1fr final row, so we pin dimensions here. */
-.heroTree-slot {
-  display: inline-block;
-  opacity: 0;
-  animation:
-    heroTree-fade 0.45s ease-out forwards,
-    heroTree-glow-soft 1.2s ease-out 0.45s;
-  will-change: opacity, filter;
+.heroChain-replay:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+  opacity: 1;
 }
-.heroTree-slot.is-final {
-  animation:
-    heroTree-fade 0.5s ease-out forwards,
-    heroTree-glow 1.8s ease-out 0.5s;
-}
-.heroTree-slot .cbp {
-  cursor: default;
-  max-width: none;
-  width: 84px;
-  height: 84px;
-  aspect-ratio: auto;
-}
-.heroTree-slot.is-final .cbp {
-  width: 112px;
-  height: 112px;
-}
+.heroChain-replay svg { opacity: 0.8; }
 
 @media (max-width: 520px) {
-  .heroTree-run { max-width: 100%; }
-  .heroTree-row { gap: 4px; }
-  .heroTree-slot .cbp { width: 68px; height: 68px; }
-  .heroTree-slot.is-final .cbp { width: 92px; height: 92px; }
-  .heroTree-cell { min-height: 80px; }
-  .heroTree-final-cell { min-height: 100px; }
-  .heroTree-run {
-    grid-template-rows: auto 22px auto 36px auto;
+  .heroChain { max-width: 100%; }
+  .heroChain-inputs { gap: 4px; }
+  .heroChain-slot .cbp { width: 60px; height: 60px; }
+  .heroChain-slot.is-final .cbp { width: 84px; height: 84px; }
+  .heroChain-cell { min-height: 68px; }
+  .heroChain-stage { grid-template-rows: 16px 72px 56px 96px; }
+  .heroChain-converge { height: 56px; }
+  .heroChain-era { font-size: 10px; }
+  @keyframes heroChain-carryDrop {
+    0%   { opacity: 0.2; transform: translate(33cqw, 128px) scale(1.33); }
+    25%  { opacity: 1; }
+    100% { opacity: 1; transform: translate(0, 0) scale(1); }
   }
-  .heroTree-converge { height: 36px; }
 }
 
-/* Vertical connectors raw → mid. One per column; animates height 0→100%. */
-.heroTree-connectors {
-  display: grid;
-  grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
-  width: 100%;
-  position: relative;
-  pointer-events: none;
+/* ---- Keyframes ---- */
+@keyframes heroChain-fade {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
-.heroTree-connector {
-  justify-self: center;
-  width: 1.5px;
-  height: 0;
-  background: var(--ink);
-  opacity: 0.35;
-  animation: heroTree-draw 0.35s ease-out forwards;
-}
-.heroTree-connectors-rm .heroTree-connector { align-self: start; }
-.heroTree-connector.is-hidden { display: none; }
-
-/* Mid → final converging SVG. Spans the grid row like a .heroTree-row so
-   its X-axis maps to the same column grid; lines originate at each column
-   centre (top) and meet at the row centre (bottom). */
-.heroTree-converge {
-  width: 100%;
-  height: 44px;
-  display: block;
-  pointer-events: none;
-}
-.heroTree-converge line {
-  stroke: var(--ink);
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
-  opacity: 0;
-  animation: heroTree-converge 0.45s ease-out forwards;
-}
-
-/* Big-bang spark at the top-centre of the tree, pulsing once per cycle. */
-.heroTree-spark {
-  position: absolute;
-  top: -12px;
-  left: 50%;
-  transform: translateX(-50%) scale(0);
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent, #ffb800);
-  box-shadow: 0 0 24px 8px var(--accent, rgba(255, 184, 0, 0.6));
-  opacity: 0;
-  animation: heroTree-bang 0.9s ease-out forwards;
-  pointer-events: none;
-}
-
-@keyframes heroTree-fade {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
-}
-@keyframes heroTree-glow-soft {
+@keyframes heroChain-glow-soft {
   0%   { filter: drop-shadow(0 0 0 transparent); }
-  35%  { filter: drop-shadow(0 0 7px var(--accent, #ffb800)); }
+  35%  { filter: drop-shadow(0 0 8px var(--accent, #ffb800)); }
   100% { filter: drop-shadow(0 0 0 transparent); }
 }
-@keyframes heroTree-draw {
-  0% { height: 0; opacity: 0; }
-  100% { height: 100%; opacity: 0.35; }
+/* Carry drops in from above where the previous stage's final tile sat
+   (centre-bottom of the container) and lands in the first input slot.
+   The transform is heuristic — slides from roughly where the previous
+   final tile was centred down to this tile's natural position. */
+/* The carry starts where the previous stage's final tile ended (centred
+   below) and slides up+left into the first input slot. X offset is one
+   column width (33cqw) so it tracks container width across breakpoints;
+   Y offset is roughly the inputs row + converge row height. */
+@keyframes heroChain-carryDrop {
+  0%   { opacity: 0.2; transform: translate(33cqw, 168px) scale(1.33); }
+  25%  { opacity: 1; }
+  100% { opacity: 1; transform: translate(0, 0) scale(1); }
 }
-@keyframes heroTree-converge {
-  0% { opacity: 0; }
-  100% { opacity: 0.35; }
+@keyframes heroChain-carryRing {
+  0%   { opacity: 0; transform: scale(0.85); }
+  40%  { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.15); }
 }
-@keyframes heroTree-bang {
+@keyframes heroChain-pop {
+  0%   { opacity: 0; transform: scale(0.6); }
+  60%  { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes heroChain-beam {
+  0%   { opacity: 0; }
+  100% { opacity: 0.55; }
+}
+@keyframes heroChain-shock {
+  0%   { opacity: 0; width: 0; height: 0; border-width: 2px; }
+  20%  { opacity: 0.9; }
+  100% { opacity: 0; width: 200px; height: 200px; border-width: 0.5px; }
+}
+@keyframes heroChain-shockBig {
+  0%   { opacity: 0; width: 0; height: 0; border-width: 3px; }
+  15%  { opacity: 1; }
+  100% { opacity: 0; width: 320px; height: 320px; border-width: 0.5px; }
+}
+@keyframes heroChain-glowLinger {
+  0%   { filter: drop-shadow(0 0 0 transparent); }
+  25%  { filter: drop-shadow(0 0 24px var(--accent, #ffb800)); }
+  80%  { filter: drop-shadow(0 0 18px var(--accent, #ffb800)); }
+  100% { filter: drop-shadow(0 0 10px var(--accent, #ffb800)); }
+}
+@keyframes heroChain-bang {
   0%   { opacity: 0; transform: translateX(-50%) scale(0); }
-  25%  { opacity: 1; transform: translateX(-50%) scale(1.4); }
-  60%  { opacity: 0.6; transform: translateX(-50%) scale(2.2); }
-  100% { opacity: 0; transform: translateX(-50%) scale(3); }
+  15%  { opacity: 1; transform: translateX(-50%) scale(1.6); }
+  60%  { opacity: 0.6; transform: translateX(-50%) scale(2.4); }
+  100% { opacity: 0; transform: translateX(-50%) scale(3.4); }
 }
-@keyframes heroTree-glow {
+@keyframes heroChain-bangRing {
+  0%   { opacity: 0; width: 0; height: 0; border-width: 2px; }
+  25%  { opacity: 0.9; }
+  100% { opacity: 0; width: 120px; height: 120px; border-width: 0; }
+}
+@keyframes heroChain-glow {
   0%   { filter: drop-shadow(0 0 0 transparent); }
-  40%  { filter: drop-shadow(0 0 16px var(--accent, #ffb800)); }
+  30%  { filter: drop-shadow(0 0 22px var(--accent, #ffb800)); }
   100% { filter: drop-shadow(0 0 0 transparent); }
+}
+@keyframes heroChain-eraFade {
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 0.7; transform: translateY(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .heroTree-slot,
-  .heroTree-connector,
-  .heroTree-converge line,
-  .heroTree-spark {
+  .heroChain-slot,
+  .heroChain-beam,
+  .heroChain-pulse,
+  .heroChain-spark,
+  .heroChain-era {
     animation: none !important;
     opacity: 1;
     transform: none;
   }
-  .heroTree-connector { height: 100%; opacity: 0.35; }
-  .heroTree-converge line { opacity: 0.35; }
-  .heroTree-spark { display: none; }
+  .heroChain-beam { opacity: 0.5; }
+  .heroChain-pulse { display: none; }
+  .heroChain-slot.is-final::before,
+  .heroChain-slot.is-carry::before,
+  .heroChain-spark::after { display: none; }
+  .heroChain-spark { display: none; }
 }
 
 .sr-only {
