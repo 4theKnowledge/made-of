@@ -2864,3 +2864,242 @@ a.btn.primary{color:var(--bg)}
   white-space: nowrap;
   border: 0;
 }
+
+/* ===== Horizontal HeroChain =====
+   A continuous horizontal track of columns connected by arrow segments.
+   Each stage's final tile is shared with the next stage, so the chain reads
+   as one unbroken spine: [H, He] → Star — [Si, O, Fe] → Rock — [Rock,
+   Quartz, Water] → Sand → ... Columns and arrows reveal individually as
+   they scroll into view. */
+
+.heroChainH {
+  position: relative;
+  width: 100%;
+  margin-top: 16px;
+}
+.heroChainH-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 4px 20px;
+  outline: none;
+  /* Hide scrollbar across browsers while keeping scroll functionality. */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge legacy */
+}
+.heroChainH-scroll::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, newer Edge */
+  width: 0;
+  height: 0;
+}
+.heroChainH-track {
+  display: flex;
+  align-items: stretch;
+  /* Generous side padding so the first and last columns can be centered in
+     the viewport by the step-pan animation. 50vw ensures col 0 can sit
+     dead-center on first mount, and the final column can too at the end. */
+  padding-inline: 50vw;
+  width: max-content;
+  height: var(--trackH, 360px);
+}
+
+/* A segment pairs one column with its outgoing arrow. */
+.heroChainH-seg {
+  display: flex;
+  align-items: stretch;
+}
+
+/* ---- Column ----
+   Tiles sit on a fixed pitch so arrow endpoints can be computed
+   deterministically. The column is vertically centered within the track. */
+.heroChainH-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding-inline: 4px;
+}
+.heroChainH-col .heroChainH-slot {
+  width: 72px;
+  height: var(--pitch, 88px);
+}
+
+/* ---- Arrow (convergence / fan-out) ---- */
+.heroChainH-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 140px;
+  position: relative;
+}
+.heroChainH-era {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--muted);
+  white-space: nowrap;
+  text-align: center;
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 2px 8px;
+  background: var(--bg);
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+.heroChainH-arrow.is-seen .heroChainH-era {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  transition-delay: 0.1s;
+}
+.heroChainH-converge {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ---- Tiles ---- */
+.heroChainH-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.45s ease-out, transform 0.45s ease-out;
+  transition-delay: calc(var(--i, 0) * 0.08s);
+}
+.heroChainH-col.is-seen .heroChainH-slot {
+  opacity: 1;
+  transform: translateY(0);
+}
+.heroChainH-slot.is-final {
+  opacity: 0;
+  transform: scale(0.8);
+  transition:
+    opacity 0.5s cubic-bezier(.2,1.2,.3,1),
+    transform 0.5s cubic-bezier(.2,1.2,.3,1);
+}
+.heroChainH-col.is-final.is-seen .heroChainH-slot.is-final {
+  opacity: 1;
+  transform: scale(1);
+  transition-delay: 0.3s;
+  animation: heroChainH-finalPulse 1.4s ease-out 0.3s;
+}
+.heroChainH-col.is-finale.is-seen .heroChainH-slot.is-finale {
+  animation: heroChainH-finaleGlow 1.8s ease-out 0.4s forwards;
+}
+.heroChainH-slot .cbp { width: 72px; height: 72px; }
+
+/* ---- Beams ----
+   Beams fade in when the arrow is seen, then pulse brighter in sync with the
+   target tile's pop so energy visibly "flows into" the created thing. */
+.heroChainH-beam {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  opacity: 0;
+  transition: opacity 0.4s ease-out;
+}
+.heroChainH-arrow.is-seen .heroChainH-beam {
+  opacity: 0.85;
+  animation: heroChainH-beamFlow 1.4s ease-out 0.1s forwards;
+}
+
+.heroChainH-edgeL,
+.heroChainH-edgeR {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  pointer-events: none;
+  z-index: 2;
+}
+.heroChainH-edgeL {
+  left: 0;
+  background: linear-gradient(to right, var(--bg), transparent);
+}
+.heroChainH-edgeR {
+  right: 0;
+  background: linear-gradient(to left, var(--bg), transparent);
+}
+
+.heroChainH-controls {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+}
+.heroChainH-replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+.heroChainH-replay:hover,
+.heroChainH-replay[data-ready] { opacity: 1; }
+.heroChainH-replay svg { opacity: 0.8; }
+
+@media (max-width: 520px) {
+  .heroChainH-track { height: 280px; }
+  .heroChainH-arrow { width: 128px; }
+  .heroChainH-col .heroChainH-slot { width: 60px; height: 72px; }
+  .heroChainH-slot .cbp { width: 60px; height: 60px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroChainH-slot,
+  .heroChainH-slot.is-final,
+  .heroChainH-slot.is-finale,
+  .heroChainH-era {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .heroChainH-beam {
+    opacity: 0.9 !important;
+    transition: none !important;
+  }
+}
+
+@keyframes heroChainH-finaleGlow {
+  0%   { filter: drop-shadow(0 0 0 transparent); }
+  30%  { filter: drop-shadow(0 0 14px var(--accent)); }
+  100% { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 40%, transparent)); }
+}
+@keyframes heroChainH-beamFlow {
+  0%   { opacity: 0; stroke-width: 1.5; filter: none; }
+  25%  { opacity: 0.6; stroke-width: 1.5; }
+  55%  {
+    opacity: 1;
+    stroke-width: 2.4;
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 70%, transparent));
+  }
+  100% {
+    opacity: 0.75;
+    stroke-width: 1.5;
+    filter: none;
+  }
+}
+@keyframes heroChainH-finalPulse {
+  0%   { filter: drop-shadow(0 0 0 transparent); }
+  40%  { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 80%, transparent)); }
+  100% { filter: drop-shadow(0 0 0 transparent); }
+}

@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
+// Horizontal auto-scrolling variant. To revert to the vertical per-stage
+// animation, swap this import to "@/components/home/HeroChain.vertical".
 import {
   HeroChain,
   type ChainStage,
   type TreeItem,
-} from "@/components/home/HeroChain";
+} from "@/components/home/HeroChain.horizontal";
 import { ModeGrid } from "@/components/home/ModeGrid";
 import {
   CombineVisual,
