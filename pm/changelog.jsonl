@@ -72,3 +72,5 @@
 {"id": "C-0072", "ts": "2026-11-06T21:44:10Z", "kind": "fix", "summary": "combine-dailies-cron: switch to curlimages/curl image, drop runtime apk, guard empty WEB_URL", "refs": {"task": "T-0132", "deployment": "a4b8bdda-0e81-4b34-a89d-a4149dfcd6c3"}}
 {"id": "C-0073", "ts": "2026-11-06T21:44:15Z", "kind": "fix", "summary": "admin item page: Incoming now resolves recipe-scoped links to their owning item (T-0150)", "refs": {"task": "T-0150"}}
 {"id": "C-0074", "ts": "2026-11-06T21:46:54Z", "kind": "fix", "summary": "admin/items/[id]: contain overflowing inputs, drop btn container, add section helper text (T-0151)", "refs": {"task": "T-0151"}}
+{"id": "C-0075", "ts": "2026-11-06T22:06:34Z", "kind": "fix", "summary": "KB: author plant/pig origins + promote combine-exclude tag to first-class column + mechanical guardrails (every item must chain to big bang).", "refs": {"task": "T-0153", "commit": "ba83bd3"}}
+{"id": "C-0076", "ts": "2026-11-06T22:12:41Z", "kind": "refactor", "summary": "Remove dead combine-everyday + fab-chain tags from seed data, Tag union, bulk-upload template, and admin UI; delete one-shot backfill-tags script", "refs": {"task": "T-0155"}}

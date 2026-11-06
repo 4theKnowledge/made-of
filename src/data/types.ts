@@ -18,26 +18,6 @@ import type {
   Tier,
 } from "../db/schema";
 
-/* --------------------------------- tags --------------------------------- */
-
-/**
- * Membership markers on items. Tags are closed (not freeform) so the compiler
- * catches typos, grep finds every use, and renaming a tag is one Edit away.
- *
- * Membership lives *on the item* — this is what lets different modes
- * (Combine themes, future classroom/kitchen modes, etc.) all read the same
- * data without maintaining parallel allow-lists.
- */
-export type Tag =
-  /** Legacy marker from the Everyday theme (food, home, craft, clothes…).
-   *  The theme has been retired; the tag is kept so item data still parses
-   *  and so a future scoped theme can reuse it. */
-  | "combine-everyday"
-
-  // --- Reusable categories (available to any mode) ---
-  /** Part of the semiconductor fab chain. */
-  | "fab-chain";
-
 /* -------------------------- hand-edited shapes --------------------------- */
 
 export interface DataRecipe {
@@ -73,8 +53,8 @@ export interface DataItem {
    *  membership. Safety net for items in the graph that should never land
    *  on the board (big bang, abstract placeholders). Omit for false. */
   isCombineExcluded?: boolean;
-  /** Membership markers (see Tag). Omit when empty. */
-  tags?: Tag[];
+  /** Membership markers (free-form strings). Omit when empty. */
+  tags?: string[];
 }
 
 export interface DataEvidenceEntry {
@@ -139,7 +119,7 @@ export interface LoadedItem {
   /** Excluded from every Combine theme. Defaults to false. */
   isCombineExcluded: boolean;
   /** Membership markers. Always present (empty array if none). */
-  tags: Tag[];
+  tags: string[];
 }
 
 export interface LoadedEvidenceEntry {

@@ -1,5 +1,4 @@
 import type { Confidence, ItemKind, LinkType, Tier } from "../db/schema";
-import type { Tag } from "../data/types";
 
 export interface GraphEdge {
   /** The other end of the edge (always the slug/id). */
@@ -33,7 +32,7 @@ export interface GraphNode {
   pictogram: string | null;
   recipes: Array<{ id: string; label: string | null; position: number }>;
   /** Membership markers. Empty array if none. */
-  tags: Tag[];
+  tags: string[];
   /** Combine theme codes this item belongs to. Empty array if none. */
   combineThemes: string[];
   /** True when the item is a canary (seeded fake, visible only in API

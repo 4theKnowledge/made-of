@@ -19,7 +19,6 @@ import type {
   DataItem,
   DataRecipe,
   DataSource,
-  Tag,
 } from "@/data/types";
 
 export interface AdminExportKind {
@@ -113,7 +112,7 @@ export async function exportAll(): Promise<AdminExport> {
     if (itemRecipes.length) d.recipes = itemRecipes;
     if (linksN.length) d.linksN = linksN;
     if (linksS.length) d.linksS = linksS;
-    if (i.tags.length) d.tags = i.tags as Tag[];
+    if (i.tags.length) d.tags = i.tags;
     return d;
   });
 

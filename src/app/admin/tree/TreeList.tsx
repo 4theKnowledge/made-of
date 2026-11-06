@@ -2786,7 +2786,7 @@ function BulkActionsBar({
       {mode.kind === "add-tag" && (
         <BulkTagEditor
           busy={busy}
-          placeholder="tag to add (e.g. fab-chain)"
+          placeholder="tag to add"
           onCancel={() => setMode({ kind: "none" })}
           onApply={(tag) => run(() => onBulkPatch(selectedIds, { addTags: [tag] }))}
         />
