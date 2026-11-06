@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 interface ActiveBanner {
@@ -11,14 +12,24 @@ interface ActiveBanner {
 
 const DISMISS_PREFIX = "site-banner-dismissed:";
 
+// Routes where the top banner would eat vertical budget the mode can't spare.
+// Combine's wrap-combine is tuned to fit the board above the fold on phones;
+// a persistent strip above it clips the tray row.
+const SUPPRESS_PREFIXES = ["/combine"];
+
 /** Fetches the currently-live site banner (if any) and renders it above
  *  the page. Audience filtering happens on the server; this component just
  *  renders whatever the API returns. */
 export function SiteBanner() {
+  const pathname = usePathname();
+  const suppressed = pathname
+    ? SUPPRESS_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))
+    : false;
   const [banner, setBanner] = useState<ActiveBanner | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
+    if (suppressed) return;
     let cancelled = false;
     (async () => {
       try {
@@ -40,9 +51,9 @@ export function SiteBanner() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [suppressed]);
 
-  if (!banner || dismissed) return null;
+  if (suppressed || !banner || dismissed) return null;
 
   const onDismiss = () => {
     if (banner.dismissible && typeof window !== "undefined") {
