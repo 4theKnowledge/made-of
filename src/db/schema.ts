@@ -73,6 +73,26 @@ export const changelogTypeEnum = pgEnum("changelog_type", [
   "note",
 ]);
 
+// Site-wide banner taxonomy. Many banners can be authored; at most one is
+// `live` at a time (enforced by a partial unique index on the table).
+// `archived` holds spent banners so audit history survives after unpublish.
+export const siteBannerStatusEnum = pgEnum("site_banner_status", [
+  "draft",
+  "live",
+  "archived",
+]);
+export const siteBannerSeverityEnum = pgEnum("site_banner_severity", [
+  "info",
+  "warn",
+  "critical",
+]);
+export const siteBannerAudienceEnum = pgEnum("site_banner_audience", [
+  "everyone",
+  "signed_in",
+  "signed_out",
+  "admins_only",
+]);
+
 // User-feedback taxonomy. `suggest_item` and `suggest_recipe` grow the KB;
 // `report` is "something broken" (may carry a recipe id or item id in the
 // payload); `other` is the catch-all. Statuses are a light workflow for the
@@ -783,6 +803,43 @@ export const changelogEntries = pgTable(
 );
 
 /* ========================================================================
+ * Site banners.
+ *
+ * Admin-authored app-wide notices rendered above the page chrome. Many can
+ * be drafted; a partial unique index pins at most one to `status = 'live'`.
+ * `startsAt`/`endsAt` are optional soft bounds checked at read time, so an
+ * admin can schedule a live banner to show only during a window without
+ * bouncing back to draft. `audience` controls visibility by auth state.
+ * ====================================================================== */
+
+export const siteBanners = pgTable(
+  "site_banners",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    body: text("body").notNull().default(""),
+    severity: siteBannerSeverityEnum("severity").notNull().default("info"),
+    status: siteBannerStatusEnum("status").notNull().default("draft"),
+    audience: siteBannerAudienceEnum("audience").notNull().default("everyone"),
+    dismissible: boolean("dismissible").notNull().default(true),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("site_banners_status_idx").on(t.status),
+    uniqueIndex("site_banners_one_live_idx")
+      .on(t.status)
+      .where(sql`${t.status} = 'live'`),
+  ],
+);
+
+/* ========================================================================
  * Feedback.
  *
  * User-submitted feedback routed to /admin/feedback for triage. One row per
@@ -900,6 +957,11 @@ export type ChangelogStatus = (typeof changelogStatusEnum.enumValues)[number];
 export type ChangelogType = (typeof changelogTypeEnum.enumValues)[number];
 export type ChangelogEntry = typeof changelogEntries.$inferSelect;
 export type NewChangelogEntry = typeof changelogEntries.$inferInsert;
+export type SiteBannerStatus = (typeof siteBannerStatusEnum.enumValues)[number];
+export type SiteBannerSeverity = (typeof siteBannerSeverityEnum.enumValues)[number];
+export type SiteBannerAudience = (typeof siteBannerAudienceEnum.enumValues)[number];
+export type SiteBanner = typeof siteBanners.$inferSelect;
+export type NewSiteBanner = typeof siteBanners.$inferInsert;
 export type FeedbackType = (typeof feedbackTypeEnum.enumValues)[number];
 export type FeedbackStatus = (typeof feedbackStatusEnum.enumValues)[number];
 export type Feedback = typeof feedback.$inferSelect;

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import { Suspense } from "react";
 import { PostHogProvider } from "@/components/analytics/PostHogProvider";
+import { SiteBanner } from "@/components/common/SiteBanner";
 import { resolveEnv } from "@/lib/analytics/env";
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <Suspense fallback={null}>
           <PostHogProvider phKey={phKey} phHost={phHost} env={resolveEnv()} />
         </Suspense>
+        <SiteBanner />
         {children}
       </body>
     </html>

@@ -42,9 +42,10 @@ const GROUPS: ToolGroup[] = [
   },
   {
     title: "Ops",
-    blurb: "Access, changelog, feedback, and exports.",
+    blurb: "Access, announcements, feedback, and exports.",
     tools: [
       { href: "/admin/codes", label: "Invite codes" },
+      { href: "/admin/banners", label: "Site banners" },
       { href: "/admin/changelog", label: "Changelog" },
       { href: "/admin/feedback", label: "Feedback" },
       { href: "/api/admin/export", label: "Download export", download: true },
