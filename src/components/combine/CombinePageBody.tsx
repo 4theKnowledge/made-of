@@ -1,6 +1,5 @@
 import { getLiveSnapshot } from "@/graph/live";
 import { Footer } from "@/components/common/Footer";
-import { Header } from "@/components/common/Header";
 import {
   buildAllBundles,
   buildAllDailyBundles,
@@ -115,8 +114,7 @@ export async function CombinePageBody() {
   const dailyEnabled = dailyFlagOn() || admin;
 
   return (
-    <main className="wrap">
-      <Header current="combine" />
+    <main className="wrap wrap-combine">
       <CombineBoard
         bundles={serialised}
         fastBundles={fastSerialised}

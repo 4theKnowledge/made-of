@@ -34,9 +34,14 @@ function buildLinks(
 export function Header({
   current,
   exploreHref = "/explore/water",
+  compact = false,
 }: {
   current?: Current;
   exploreHref?: string;
+  /** Compact header for game pages: hides the brand subtitle and tightens
+   *  vertical rhythm so the play surface sits closer to the top of the
+   *  viewport. Nav remains intact. */
+  compact?: boolean;
 }) {
   const links = buildLinks(exploreHref);
   const [open, setOpen] = useState(false);
@@ -62,12 +67,12 @@ export function Header({
   }, [open]);
 
   return (
-    <header>
+    <header className={compact ? "compact" : undefined}>
       <div className="brand">
         <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
           <h1>Made Of</h1>
         </Link>
-        <span>Everything is made of something.</span>
+        {!compact && <span>Everything is made of something.</span>}
       </div>
       <nav className="tabs" aria-label="Modes">
         {links.map((l) => (

@@ -1932,6 +1932,8 @@ export function CombineBoard({
           shoreMode={shoreMode}
           pluckMode={pluckMode}
           soundOn={sound.music !== "off" || sound.sfxPack !== "off"}
+          signedIn={signedIn}
+          isAdmin={admin}
           onToggleHelpers={() => {
             // If a mode is active, the button is Cancel: exit the mode.
             if (clearMode) {

@@ -36,6 +36,14 @@
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
 .wrap{max-width:1280px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:20px 56px;display:flex;flex-direction:column;gap:20px}
+/* Game-page wrap: tighter vertical rhythm so the play surface fits above
+   the fold on common phones. Only touches vertical padding / inter-row gap. */
+.wrap-combine{padding-block:8px 20px;gap:10px}
+@media (max-width: 600px){.wrap-combine{padding-block:4px 12px;gap:6px}}
+/* Compact header for game routes: smaller brand, nav kept. */
+header.compact .brand h1{font-size:22px}
+header.compact{gap:8px 14px}
+@media (max-width: 760px){header.compact .brand h1{font-size:20px}}
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
@@ -799,6 +807,7 @@ a.btn.primary{color:var(--bg)}
    mystery/hint/clearable states, book/sound menus and daily/sum variants. */
 
 .cbwrap{max-width:460px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+@media (max-width: 600px){.cbwrap{gap:6px}}
 #cb{position:relative;display:flex;flex-direction:column;gap:10px;user-select:none;-webkit-user-select:none}
 
 .cbagebanner{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border:1px solid var(--ink);background:var(--paper);font-size:13px}
@@ -1353,8 +1362,9 @@ a.btn.primary{color:var(--bg)}
   .cbsnd svg{width:16px;height:16px}
   .cbhelp{gap:5px}
   .cbtop{flex-wrap:nowrap;gap:6px}
-  .cbscore b{font-size:22px}
-  .cbscore span{font-size:11px}
+  .cbscore{display:inline-flex;align-items:baseline;gap:6px;min-width:0}
+  .cbscore b{display:inline;font-size:22px;line-height:1}
+  .cbscore span{font-size:11px;white-space:nowrap}
   .cbtip{display:none}
   .cbshelf{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;min-height:28px;padding:3px 8px 3px 5px}
   .cbboard{margin:0 auto;width:100%;box-sizing:border-box}
@@ -1385,7 +1395,7 @@ a.btn.primary{color:var(--bg)}
 .cbhelpmenu{position:fixed;left:50%;right:auto;top:50%;transform:translate(-50%,-50%);z-index:81;width:min(360px, calc(100vw - 28px));max-height:calc(100dvh - 28px);overflow:auto;display:flex;flex-direction:column;padding:10px 12px 10px;border:2.5px solid var(--ink);border-radius:4px;background:var(--bg);box-shadow:5px 5px 0 var(--ink);animation:cbovin .25s ease-out}
 .cbhelpscrim{display:block}
 .cbhelptitle{display:block;align-self:center;margin:2px 0 6px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--ink)}
-.cbhm{display:flex;align-items:center;gap:10px;width:100%;padding:9px 8px;border:0;border-radius:3px;background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.cbhm{display:flex;align-items:center;gap:10px;width:100%;padding:9px 8px;border:0;border-radius:3px;background:transparent;color:var(--ink);font:inherit;text-align:left;text-decoration:none;cursor:pointer;box-sizing:border-box}
 .cbhm + .cbhm{border-top:1px solid var(--line)}
 .cbhm:hover:not(:disabled){background:var(--soft)}
 .cbhm:disabled{opacity:.4;cursor:default}

@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { WIPE_UNLOCK_AGE, type GameState } from "@/combine/engine";
 import type { Fx } from "@/components/combine/board-parts/types";
 import { formatDailyLabel } from "@/components/combine/board-parts/util";
@@ -25,6 +26,8 @@ export function TopBar({
   shoreMode,
   pluckMode,
   soundOn,
+  signedIn,
+  isAdmin,
   onToggleHelpers,
   onToggleMore,
   onHelper,
@@ -45,6 +48,8 @@ export function TopBar({
   shoreMode: boolean;
   pluckMode: boolean;
   soundOn: boolean;
+  signedIn: boolean;
+  isAdmin: boolean;
   onToggleHelpers: () => void;
   onToggleMore: () => void;
   onHelper: (which: HelperKey) => void;
@@ -364,6 +369,20 @@ export function TopBar({
           className="cbmoremenu cbhelpmenu"
         >
           <span className="k cbhelptitle">More</span>
+              <Link
+                href="/"
+                className="cbhm"
+                aria-label="Back to home"
+                onClick={onToggleMore}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10" />
+                </svg>
+                <span className="nm">
+                  <b className="t">Home</b>
+                  <em>Back to the Made Of home</em>
+                </span>
+              </Link>
               <button
                 type="button"
                 className="cbhm"
@@ -441,6 +460,41 @@ export function TopBar({
                   <em>Suggest items, recipes, or flag issues</em>
                 </span>
               </button>
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className="cbhm"
+                  aria-label="Open admin"
+                  onClick={onToggleMore}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3l9 4-9 4-9-4 9-4zM3 11l9 4 9-4M3 15l9 4 9-4" />
+                  </svg>
+                  <span className="nm">
+                    <b className="t">Admin</b>
+                    <em>Content, themes, debug</em>
+                  </span>
+                </Link>
+              )}
+              <Link
+                href={signedIn ? "/account" : "/sign-in"}
+                className="cbhm"
+                aria-label={signedIn ? "Account" : "Sign in"}
+                onClick={onToggleMore}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 21c1.5-4 5-6 8-6s6.5 2 8 6" />
+                </svg>
+                <span className="nm">
+                  <b className="t">{signedIn ? "Account" : "Sign in"}</b>
+                  <em>
+                    {signedIn
+                      ? "Settings, stats, sign out"
+                      : "Sync your scores + collection"}
+                  </em>
+                </span>
+              </Link>
         </ResponsiveSheet>
       </div>
     </div>
