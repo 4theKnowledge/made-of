@@ -34,7 +34,7 @@
   --tF:#B3A0F5; --tN:#93D284; --tM:#EDBE5E; --tC:#7DD3CE; --tP:#F49A85; --tS:#9DB0EC; color-scheme:dark}
 
 [hidden]{display:none!important}
-body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
 /* Viewport-authoritative horizontal extent: prevents any page's wide content
    (long unbreakable strings, admin tables, etc.) from stretching <main>
    past the viewport and pushing the mobile nav hamburger offscreen. Use
