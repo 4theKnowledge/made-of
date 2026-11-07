@@ -59,6 +59,21 @@ export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 
 export const combineScopeEnum = pgEnum("combine_scope", ["endless", "daily"]);
 
+// Owner discriminator for server-authoritative Combine runs. Anonymous play
+// keeps a signed-cookie id (`madeof_anon`); signed-in players use their
+// Better Auth user id. Anon rows are migrated to a user id on sign-in.
+export const combineRunOwnerKindEnum = pgEnum("combine_run_owner_kind", ["user", "anon"]);
+
+// Lifecycle for a server-side run. `active` is the resume target; `ended`
+// means the player finished (or forfeited) and the result landed in
+// `progress`. `invalidated` is the admin reset lever — bumped by epoch on
+// the row, forcing the client to discard and restart.
+export const combineRunStatusEnum = pgEnum("combine_run_status", [
+  "active",
+  "ended",
+  "invalidated",
+]);
+
 // Reaction target discriminator. Lets one `reactions` table serve both item
 // and recipe thumbs without duplicating the row shape per target type. See
 // `reactions` below for the trade-off (no FK to the target; cleanup is
@@ -670,6 +685,67 @@ export const combineDiscoveries = pgTable(
 );
 
 /* ========================================================================
+ * Combine server-authoritative runs (T-0175).
+ *
+ * Mid-run state for every Combine mode. The client runs the reducer
+ * locally for optimistic UX, but this table is the source of truth: the
+ * server mints seeds, validates events on checkpoint, and computes final
+ * scores at finish. See `src/combine/server-engine.ts` for the replay
+ * logic and `docs/COMBINE-RUNS.md` for the wire protocol.
+ *
+ * `ownerKind` + `ownerId` identify the player: either a Better Auth user
+ * id or an HMAC-signed anonymous cookie id (see `src/lib/anon-session.ts`).
+ * No FK to `authUser` — anon rows wouldn't resolve, and on sign-in we
+ * UPDATE rows from (anon, X) to (user, Y) via a merge hook.
+ *
+ * `stateJson` is the authoritative `GameState` projection last accepted
+ * by the server (same shape as `StoredGame` in storage.ts, minus the
+ * client-side migration fields). `eventCount` is the number of events
+ * applied; the client ships only events after this count on each
+ * checkpoint, so a stale client gets a 409 before posting junk.
+ *
+ * `epoch` is the invalidation lever — bump to force clients to discard
+ * local state and refetch (admin reset, content migration, etc.).
+ *
+ * A partial unique index pins at most one `active` run per
+ * (owner, mode, dailyKey). Finishing or invalidating a run frees the
+ * slot. Endless/fast use `dailyKey=''` (empty string, not null — a
+ * partial unique index treats NULLs as distinct on Postgres).
+ * ====================================================================== */
+
+export const combineRuns = pgTable(
+  "combine_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerKind: combineRunOwnerKindEnum("owner_kind").notNull(),
+    ownerId: text("owner_id").notNull(),
+    mode: text("mode").notNull(), // 'endless' | 'fast' | 'daily'
+    theme: text("theme").notNull(),
+    dailyKey: text("daily_key").notNull().default(""),
+    seed: integer("seed").notNull(),
+    stateJson: jsonb("state_json").notNull(),
+    eventCount: integer("event_count").notNull().default(0),
+    status: combineRunStatusEnum("status").notNull().default("active"),
+    epoch: integer("epoch").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("combine_runs_owner_idx").on(t.ownerKind, t.ownerId),
+    // At most one active run per (owner, mode, dailyKey). Finishing /
+    // invalidating moves status off `active` and frees the slot.
+    uniqueIndex("combine_runs_active_unique_idx")
+      .on(t.ownerKind, t.ownerId, t.mode, t.dailyKey)
+      .where(sql`status = 'active'`),
+  ],
+);
+
+/* ========================================================================
  * Access codes.
  *
  * Soft-launch invite gate plus a header for future promo codes. `code` is
@@ -971,6 +1047,10 @@ export type NewKind = typeof kinds.$inferInsert;
 export type CombineTheme = typeof combineThemes.$inferSelect;
 export type NewCombineTheme = typeof combineThemes.$inferInsert;
 export type ItemCombineTheme = typeof itemCombineThemes.$inferSelect;
+export type CombineRun = typeof combineRuns.$inferSelect;
+export type NewCombineRun = typeof combineRuns.$inferInsert;
+export type CombineRunOwnerKind = (typeof combineRunOwnerKindEnum.enumValues)[number];
+export type CombineRunStatus = (typeof combineRunStatusEnum.enumValues)[number];
 export type ItemStatus = (typeof itemStatusEnum.enumValues)[number];
 export type LinkType = (typeof linkTypeEnum.enumValues)[number];
 export type Confidence = (typeof confidenceEnum.enumValues)[number];

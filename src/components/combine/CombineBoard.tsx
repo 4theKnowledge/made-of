@@ -43,6 +43,7 @@ import {
   type SfxPack,
 } from "@/combine/storage";
 import { useCollection } from "@/combine/useCollection";
+import { useCombineRun } from "@/combine/useCombineRun";
 import { useReactions } from "@/combine/useReactions";
 import {
   dailyShareQuery,
@@ -230,6 +231,10 @@ export function CombineBoard({
     isPending: collectionPending,
     record: recordDiscoveries,
   } = useCollection(collectionScope);
+  // Server-authoritative run lifecycle. Opt-in via COMBINE_SERVER_RUNS;
+  // when the flag is off, `serverBacked` stays false and every call is
+  // a no-op (local reducer + localStorage remains source of truth).
+  const run = useCombineRun();
   // Per-theme best scores + today's daily result. Loaded in an effect so
   // SSR/hydration stay deterministic. Fast mode keeps its own best record
   // so the two score curves don't contaminate each other.
@@ -244,9 +249,15 @@ export function CombineBoard({
   // On mount: load best scores + today's daily result, and resume the
   // endless save if any (daily resume lives on the user's explicit tap
   // of the Daily button in ThemeMenu).
+  //
+  // When server runs are on, we wait for `run.ready` before deciding —
+  // if the server has an active run for this slot, it wins over the
+  // local path. When the flag is off, `run.ready` flips true with no
+  // server context and we fall through to the localStorage flow.
   const didResume = useRef(false);
   useEffect(() => {
     if (didResume.current) return;
+    if (!run.ready) return;
     didResume.current = true;
     setBest({ [activeTheme]: loadBest(activeTheme) });
     setFastBest({ [activeTheme]: loadBest(activeTheme, "fast") });
@@ -359,7 +370,37 @@ export function CombineBoard({
             }).state,
       );
     }
-  }, [activeTheme, initialMode, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyTarget, dailyPayloadSeed, dailyEnabled]);
+  }, [activeTheme, initialMode, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyTarget, dailyPayloadSeed, dailyEnabled, run.ready]);
+
+  // Server run alignment. Each time the local state settles on a fresh
+  // (mode, theme, dailyKey) slot, register a matching server run. The
+  // start endpoint is resume-by-default — if the server already has an
+  // active run for the slot, we adopt its state; otherwise it mints a
+  // new row. When the feature flag is off, start() returns null and
+  // nothing changes. We intentionally use state.mode/theme/daily (not
+  // the URL params) so a switchTheme / startFast call lines up with
+  // the server slot it just moved to.
+  //
+  // Guard with didResume so we don't fire before the mount-time resume
+  // has run; also skip over/fresh-initial states (seed=42) since those
+  // aren't "the player's run" yet.
+  const serverSlotRef = useRef<string>("");
+  useEffect(() => {
+    if (!didResume.current) return;
+    if (state.over) return;
+    // Deterministic SSR placeholder: don't register that.
+    if (state.rng.rs === 42 && state.score === 0 && state.moves === 0) return;
+    const mode: "endless" | "fast" | "daily" = state.mode;
+    const slot = `${mode}|${state.theme}|${state.daily ?? ""}`;
+    if (serverSlotRef.current === slot) return;
+    serverSlotRef.current = slot;
+    void run.start({ mode, theme: state.theme, dailyKey: state.daily });
+    // We don't adopt the server's returned state here — the local state
+    // is already what the player sees, and start() returns the server's
+    // view (which may be an empty resume on a fresh slot). If the server
+    // has drift, /checkpoint returns 409 and the hook reconciles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.mode, state.theme, state.daily, state.over]);
   const [selectedSlot, setSelectedSlot] = useState<{
     source: "tray" | "hold";
     slot: number;
@@ -901,6 +942,10 @@ export function CombineBoard({
       setState(r.state);
       applyEvents(r.events);
       setSelectedSlot(null);
+      // Mirror the action to the server if a run is active. The server
+      // runs the same reducer on its side at checkpoint time and
+      // validates the state matches. No-op when the feature is off.
+      run.push(action);
 
       // If the game just ended, write best + daily done. Fast mode has its
       // own best bucket — see storage.saveBest.
@@ -918,24 +963,33 @@ export function CombineBoard({
           }
           r.state.newBest = true;
         }
-        // Fire-and-forget: record the finished run in the user's account
-        // stats. Signed-out users just skip this with a 401; we don't care.
-        fetch("/api/combine/result", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            theme: r.state.theme,
-            score: r.state.score,
-            made: r.state.made,
-            age: r.state.age,
-            daily: r.state.daily,
-            mode: r.state.mode,
-            season: pickBundle(r.state.theme, r.state.mode, r.state.daily).theme.ages.length,
-            turns: r.state.moves,
-            found: r.state.found.length,
-            target: r.state.target ?? 0,
-          }),
-        }).catch(() => {});
+        // When server-backed, the /finish route writes the progress row
+        // server-side using the validated event-log replay. That's the
+        // path that closes the client-can-forge-scores exploit. Falls
+        // back to the legacy /result endpoint when the server run isn't
+        // active (feature flag off, or an anon guest + no server run yet).
+        if (run.serverBacked) {
+          void run.finish();
+        } else {
+          // Fire-and-forget: record the finished run in the user's account
+          // stats. Signed-out users just skip this with a 401; we don't care.
+          fetch("/api/combine/result", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              theme: r.state.theme,
+              score: r.state.score,
+              made: r.state.made,
+              age: r.state.age,
+              daily: r.state.daily,
+              mode: r.state.mode,
+              season: pickBundle(r.state.theme, r.state.mode, r.state.daily).theme.ages.length,
+              turns: r.state.moves,
+              found: r.state.found.length,
+              target: r.state.target ?? 0,
+            }),
+          }).catch(() => {});
+        }
         if (r.state.daily) {
           const bestShelfId =
             [...r.state.shelf].sort((a, b) => {

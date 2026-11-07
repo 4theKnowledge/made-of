@@ -46,6 +46,29 @@ function takePendingInvite(email: string): string | null {
   return entry.code;
 }
 
+// Pending anon id for Combine-run merge (T-0175). Same shape + lifecycle
+// as pendingInvites: stashed by /api/sign-in/request when the requester
+// has a `madeof_anon` cookie, drained by the user-create hook below so
+// any in-flight Combine runs follow the player into their user id.
+const pendingAnonMerges = new Map<string, { anonId: string; expiresAt: number }>();
+
+export function stashPendingAnonMerge(email: string, anonId: string): void {
+  const key = email.trim().toLowerCase();
+  pendingAnonMerges.set(key, {
+    anonId,
+    expiresAt: Date.now() + INVITE_TTL_MS,
+  });
+}
+
+function takePendingAnonMerge(email: string): string | null {
+  const key = email.trim().toLowerCase();
+  const entry = pendingAnonMerges.get(key);
+  if (!entry) return null;
+  pendingAnonMerges.delete(key);
+  if (entry.expiresAt < Date.now()) return null;
+  return entry.anonId;
+}
+
 // Invite gate: when true, new users must present a valid invite code at
 // sign-in. Returning users (already in `authUser`) are never gated. Flip
 // off by unsetting the env var.
@@ -133,14 +156,30 @@ function buildAuth() {
           // under-count a redemption than block a legitimate sign-up.
           after: async (user) => {
             const code = takePendingInvite(user.email);
-            if (!code) return;
-            try {
-              await redeemInvite(code, user.id);
-            } catch (err) {
-              console.error(
-                `[auth] redeemInvite failed for ${user.email}:`,
-                err,
-              );
+            if (code) {
+              try {
+                await redeemInvite(code, user.id);
+              } catch (err) {
+                console.error(
+                  `[auth] redeemInvite failed for ${user.email}:`,
+                  err,
+                );
+              }
+            }
+            // Carry in-flight Combine runs across the sign-in boundary.
+            // Missing anon id = user signed in without ever playing as a
+            // guest, which is fine.
+            const anonId = takePendingAnonMerge(user.email);
+            if (anonId) {
+              try {
+                const { mergeAnonRuns } = await import("@/combine/run-merge");
+                await mergeAnonRuns(anonId, user.id);
+              } catch (err) {
+                console.error(
+                  `[auth] mergeAnonRuns failed for ${user.email}:`,
+                  err,
+                );
+              }
             }
           },
         },

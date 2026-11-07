@@ -4,9 +4,11 @@ import { getDb, schema } from "@/db/client";
 import {
   getAuth,
   invitesRequired,
+  stashPendingAnonMerge,
   stashPendingInvite,
 } from "@/lib/auth";
 import { checkInvite, normalizeCode } from "@/lib/invites";
+import { readAnonId } from "@/lib/anon-session";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -60,6 +62,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: msg }, { status: 400 });
     }
     stashPendingInvite(email, invite);
+  }
+
+  // If the requester has an anon cookie, stash the mapping so the
+  // user-create hook can carry mid-run Combine state across to the new
+  // user id. Only matters for brand-new users; the hook is a no-op for
+  // returning users (user-create doesn't fire on repeat sign-in).
+  if (isNewUser) {
+    const anonId = await readAnonId();
+    if (anonId) stashPendingAnonMerge(email, anonId);
   }
 
   const auth = getAuth();

@@ -86,3 +86,4 @@
 {"id": "C-0086", "ts": "2026-11-07T08:48:31Z", "kind": "feature", "summary": "Admin → Debug: button to test-fire the update-available toast without a deploy", "refs": {"task": "T-0178"}}
 {"id": "C-0087", "ts": "2026-11-07T08:52:42Z", "kind": "fix", "summary": "Combine top-bar: stack \"best\" under score on small screens, shrink score font (T-0179)", "refs": {"task": "T-0179"}}
 {"id": "C-0088", "ts": "2026-11-07T08:53:29Z", "kind": "fix", "summary": "Combine top-bar: larger primary score on small screens, tighter gap to \"best\" (T-0179)", "refs": {"task": "T-0179"}}
+{"id": "C-0089", "ts": "2026-11-07T11:05:09Z", "kind": "feature", "summary": "combine: server-authoritative run state behind COMBINE_SERVER_RUNS flag — closes client-forge-scores exploit", "refs": {"task": "T-0175"}}
