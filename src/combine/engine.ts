@@ -119,6 +119,14 @@ export interface GameState {
    *  Age-II work doesn't visually land under Age I just because an alt
    *  recipe for the same item exists at a lower band. */
   madeAtBand: Record<string, number>;
+  /** 1-based chapter index the player was in when each item was first
+   *  discovered. Only used by soft-mode progression (T-0170); banded mode
+   *  reads `madeAtBand` instead. Written once per item on first-find
+   *  before `state.found` is appended, so a Chapter-1 discovery lands at
+   *  `1` even though it pushes `found.length` to the Chapter-2 threshold.
+   *  Missing entries are treated as Chapter 0 — graceful for pre-v2
+   *  saves. */
+  discoveredAtChapter: Record<string, number>;
   swaps: number;
   clears: number;
   hints: number;
@@ -277,6 +285,7 @@ function cloneState(s: GameState): GameState {
     madeCounts: { ...s.madeCounts },
     howMade: { ...s.howMade },
     madeAtBand: { ...s.madeAtBand },
+    discoveredAtChapter: { ...s.discoveredAtChapter },
     shelf: [...s.shelf],
     hold: s.hold.slice(),
     crumb: cloneCrumb(s.crumb),
@@ -858,6 +867,7 @@ export function newGame(
     madeCounts: {},
     howMade: {},
     madeAtBand: {},
+    discoveredAtChapter: {},
     swaps: 0,
     clears: 0,
     hints: 0,

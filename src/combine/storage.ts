@@ -84,6 +84,7 @@ export interface StoredGame {
   madeCounts?: Record<string, number>;
   howMade?: Record<string, string[]>;
   madeAtBand?: Record<string, number>;
+  discoveredAtChapter?: Record<string, number>;
   swaps: number;
   clears: number;
   hints: number;
@@ -147,6 +148,7 @@ function toStored(state: GameState): StoredGame {
     madeCounts: { ...state.madeCounts },
     howMade: { ...state.howMade },
     madeAtBand: { ...state.madeAtBand },
+    discoveredAtChapter: { ...state.discoveredAtChapter },
     swaps: state.swaps,
     clears: state.clears,
     hints: state.hints,
@@ -317,6 +319,7 @@ export function hydrateGame(s: StoredGame, opts: { target?: number | null } = {}
       : Object.fromEntries(s.found.map((id) => [id, 1])),
     howMade: s.howMade ? { ...s.howMade } : {},
     madeAtBand: s.madeAtBand ? { ...s.madeAtBand } : {},
+    discoveredAtChapter: s.discoveredAtChapter ? { ...s.discoveredAtChapter } : {},
     swaps: s.swaps,
     clears: s.clears,
     hints: s.hints,
