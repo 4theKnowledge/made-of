@@ -16,7 +16,7 @@
  * replay what they already know.
  */
 
-import { ageSets } from "./data";
+import { softPool } from "./progression";
 import { type Board, matchAt, matchOn } from "./match";
 import type { ThemeBundle } from "./types";
 
@@ -161,13 +161,17 @@ function scanOneMove(
 
 function teach(
   bundle: ThemeBundle,
-  age: number,
+  _chapter: number,
   sources: string[],
   found: Set<string>,
 ): HintResult | null {
-  const A = ageSets(bundle, age);
+  const sp = softPool(bundle, [...found]);
+  // Prefer recipes the player is close to firing; fall back to any recipe
+  // so sparse bundles (tests, early game with no `base`) still return
+  // something rather than silently giving up on the hint tier.
+  const pool = sp.reachableRecipes.length ? sp.reachableRecipes : bundle.recipes;
   const has = new Set(sources);
-  const scored = A.recipes
+  const scored = pool
     .map((r) => {
       const touches = r.all.some((x) => has.has(x));
       const unfound = !found.has(r.out);

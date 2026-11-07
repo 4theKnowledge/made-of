@@ -11,7 +11,7 @@
 import { loadKnowledgeBase } from "../../data/load";
 import { toRows } from "../../data/rows";
 import { buildSnapshot } from "../../graph/snapshot";
-import { ageSets, buildThemeBundle } from "../data";
+import { buildThemeBundle } from "../data";
 import {
   newGame,
   reduce,

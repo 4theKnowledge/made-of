@@ -15,7 +15,7 @@
  * tried in an earlier design and removed.
  */
 
-import { ageSets, buildThemeBundle } from "./data";
+import { buildThemeBundle } from "./data";
 import { getGpOverrides } from "./gp-overrides";
 import {
   chapterIndex,
@@ -841,14 +841,12 @@ export function newGame(
       ? [7, 8, 10, 13, 15, 16, 19, 20, 22, 25, 27, 28]
       : [6, 7, 8, 11, 13, 16, 17, 18];
   const spots = shuffle(state.rng, candidateCells).slice(0, seedCount);
-  const A0 = ageSets(bundle, 0);
   const seedTiles: string[] = [];
   const events: Event[] = [];
   // Top up with random base tiles until we have enough, bounded so a tiny
-  // age-0 set doesn't lock us in a loop. We only want up to `spots.length`
-  // seed tiles and the base pool is small.
+  // base pool doesn't lock us in a loop.
   for (let k = 0; seedTiles.length < spots.length && k < 50; k++) {
-    const x = pick(state.rng, A0.BASE);
+    const x = pick(state.rng, bundle.base);
     if (x && !seedTiles.includes(x) && !bundle.tools.has(x)) {
       seedTiles.push(x);
     }
@@ -1311,17 +1309,11 @@ export function reduce(
         recentTrays: state.recentTrays,
         found: state.found,
       });
-      const A = ageSets(bundle, target);
-      const sample = [
-        ...new Set(
-          A.recipes.filter((r) => r.band === target + 1).map((r) => r.out),
-        ),
-      ].slice(0, 4);
-      // Debug jump mirrors a real age-up's grants so the UI toast renders
-      // normally; admin-only path, never reached in prod play.
+      // Debug jump mirrors a real chapter-up's grants so the UI toast
+      // renders normally; admin-only path, never reached in prod play.
       const grants = helperGrants(target);
       applyHelperGrants(state, grants);
-      events.push({ type: "age-up", age: target, sample, grants });
+      events.push({ type: "age-up", age: target, sample: [], grants });
       events.push({ type: "dealt" });
       return { state, events };
     }

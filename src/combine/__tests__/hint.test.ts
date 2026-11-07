@@ -344,15 +344,8 @@ describe("findHint — tier 3: teach", () => {
     expect(h?.cells).toBeUndefined();
   });
 
-  it("returns null when the current age has no recipes", () => {
-    const h = findHint(bundle, {
-      board: empty(),
-      size,
-      tray: [null, null, null],
-      hold: [],
-      age: 5, // past all bands
-      found: new Set(),
-    });
-    expect(h).toBeNull();
-  });
+  // Removed: "returns null when the current age has no recipes" asserted
+  // banded semantics. In soft mode teach picks from the reachable pool
+  // regardless of chapter; the null-tier is now reserved for truly empty
+  // bundles (covered implicitly by hint.ts's bundle.recipes fallback).
 });
