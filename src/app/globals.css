@@ -1426,6 +1426,15 @@ a.btn.primary{color:var(--bg)}
 .cbhm .nm .t{font-size:14px}
 .cbhm .nm em{font-style:normal;font-size:12px;color:var(--muted);line-height:1.25}
 .cbhm .c{flex:none;font-family:var(--mono);font-size:15px;min-width:22px;text-align:right}
+@media (max-width: 600px){
+  .cbhelpmenu{padding:6px 10px 8px}
+  .cbhelptitle{margin:0 0 4px;font-size:10px}
+  .cbhm{gap:8px;padding:5px 6px}
+  .cbhm svg{width:16px;height:16px}
+  .cbhm .nm .t{font-size:12.5px;line-height:1.15}
+  .cbhm .nm em{font-size:11px;line-height:1.2}
+  .cbhm .c{font-size:13px;min-width:18px}
+}
 
 /* Discovery toast. */
 .cbdisc{position:absolute;left:0;right:0;top:52%;z-index:5;display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:2.5px solid var(--pk);border-radius:4px;background:var(--fM);color:#111417;box-shadow:4px 4px 0 var(--pk);cursor:pointer;animation:mdin .25s ease-out}
