@@ -12,7 +12,7 @@ type Row = {
 /** Public leaderboard view for today's Combine daily plus the past 6 days.
  *
  *  Data source: `/api/combine/daily/leaderboard`. The API is public but
- *  submissions behind it are auth-only (see `/api/combine/result`), so
+ *  submissions behind it are auth-only (see `/api/combine/runs/[id]/finish`), so
  *  every row surfaces a real signed-in user's best attempt. */
 export function DailyLeaderboard({
   theme,

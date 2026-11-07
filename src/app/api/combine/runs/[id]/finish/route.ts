@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { getRunOwner, serverRunsEnabled } from "@/lib/anon-session";
 import { isAdmin, getSession } from "@/lib/session";
+import { limiters, visitorKey, withRateLimit } from "@/api/rate-limit";
 import {
   bundleForRun,
   isEngineVersionCurrent,
@@ -33,17 +34,15 @@ interface FinishBody {
  * a `finish`), then writes the authoritative result to `progress`.
  *
  * Importantly, the `progress` row is written using the server's
- * computed totals — not anything the client sends alongside. This
- * closes the "client posts a fake score" exploit that the legacy
- * `/api/combine/result` endpoint accepted.
+ * computed totals — not anything the client sends alongside. This is
+ * the single path to the Combine leaderboard; the legacy
+ * `/api/combine/result` route was retired in T-0195.
  *
  * Only signed-in users have a `progress` row written (guest anon runs
- * end cleanly but don't get a leaderboard entry, which matches the
- * pre-T-0175 behaviour where anonymous play produced no progress
- * rows either).
+ * end cleanly but don't get a leaderboard entry).
  */
 export async function POST(
-  req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   if (!serverRunsEnabled()) {
@@ -54,6 +53,16 @@ export async function POST(
     return NextResponse.json({ error: "no identity" }, { status: 401 });
   }
   const { id } = await params;
+  // Rate-limit the write-path. Shares the `combineRun` bucket with
+  // /checkpoint so a hostile client can't dodge by alternating
+  // endpoints.
+  const limited = await withRateLimit(
+    req,
+    limiters.combineRun,
+    `${id}:${visitorKey(req)}`,
+    () => null,
+  );
+  if (limited instanceof Response) return limited;
 
   let body: FinishBody;
   try {
@@ -167,8 +176,7 @@ export async function POST(
   await endRun(run.id);
 
   // Write to `progress` (only for signed-in users — anon runs just
-  // end). Mirrors the legacy /api/combine/result shape so dashboards
-  // keep working. All numbers are server-computed.
+  // end). All numbers are server-computed.
   const session = await getSession();
   const userId = session?.user?.id;
   if (userId) {

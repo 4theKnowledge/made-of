@@ -16,7 +16,7 @@ const THEMES = new Set(["everything"] as const);
  * Each user appears once (their best attempt at the day). No userIds leak
  * — only the public handle is returned.
  *
- * Submissions are auth-only: `/api/combine/result` requires a session, so
+ * Submissions are auth-only: `/api/combine/runs/[id]/finish` requires a session, so
  * every `progress` row with `kind='combine'` has a real `user_id`. The
  * `INNER JOIN "user"` below makes that guarantee structural — any orphaned
  * row (shouldn't exist but belt-and-suspenders) is silently dropped.

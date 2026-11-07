@@ -110,6 +110,13 @@ export const limiters = {
   // double-clicks and panicked retries without actually blocking a
   // deliberate second reset.
   adminResetDaily: new RateLimiter({ limit: 2, windowMs: MINUTE }),
+  // Combine run write-path (/runs/[id]/checkpoint and /finish). A real
+  // player pushes one batch every ~1.5s (useCombineRun flushMs) +
+  // visibility flushes; 60/min covers a very active session with
+  // headroom. Hostile clients that hammer get 429s before they can run
+  // up DB cost. Keyed on runId so one run can't starve another on the
+  // same IP.
+  combineRun: new RateLimiter({ limit: 60, windowMs: MINUTE }),
 };
 
 /** Reset every limiter — tests use this between runs. */

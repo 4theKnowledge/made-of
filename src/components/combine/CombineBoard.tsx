@@ -962,32 +962,12 @@ export function CombineBoard({
           }
           r.state.newBest = true;
         }
-        // When server-backed, the /finish route writes the progress row
-        // server-side using the validated event-log replay. That's the
-        // path that closes the client-can-forge-scores exploit. Falls
-        // back to the legacy /result endpoint when the server run isn't
-        // active (feature flag off, or an anon guest + no server run yet).
+        // /finish writes the progress row server-side using the
+        // replay-validated event log. Anon runs (no server-backed
+        // context) just end locally — a signed-out player's best is
+        // still kept in localStorage via the saveBest() call above.
         if (run.serverBacked) {
           void run.finish();
-        } else {
-          // Fire-and-forget: record the finished run in the user's account
-          // stats. Signed-out users just skip this with a 401; we don't care.
-          fetch("/api/combine/result", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              theme: r.state.theme,
-              score: r.state.score,
-              made: r.state.made,
-              age: r.state.chapter,
-              daily: r.state.daily,
-              mode: r.state.mode,
-              season: pickBundle(r.state.theme, r.state.mode, r.state.daily).theme.ages.length,
-              turns: r.state.moves,
-              found: r.state.found.length,
-              target: r.state.target ?? 0,
-            }),
-          }).catch(() => {});
         }
         if (r.state.daily) {
           const bestShelfId =

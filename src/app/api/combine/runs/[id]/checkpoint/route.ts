@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { getRunOwner, serverRunsEnabled } from "@/lib/anon-session";
 import { getSession, isAdmin } from "@/lib/session";
 import { bundleForRun, isEngineVersionCurrent, replayActions, ReplayError, validateActionShape, type ServerMode } from "@/combine/server-engine";
 import { getRunForOwner, saveRunCheckpoint } from "@/combine/run-store";
 import { writeDiscoveriesFromState } from "@/combine/discoveries-writer";
+import { limiters, visitorKey, withRateLimit } from "@/api/rate-limit";
 import type { Action, GameState } from "@/combine/engine";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ interface CheckpointBody {
  * reconcile (drop its optimistic buffer and replay from truth).
  */
 export async function POST(
-  req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   if (!serverRunsEnabled()) {
@@ -37,6 +38,16 @@ export async function POST(
     return NextResponse.json({ error: "no identity" }, { status: 401 });
   }
   const { id } = await params;
+  // Rate-limit the write-path. Keyed on runId + IP so one hostile run
+  // can't throttle a legitimate one on the same egress IP, and a
+  // hostile IP can't starve a different user's run id.
+  const limited = await withRateLimit(
+    req,
+    limiters.combineRun,
+    `${id}:${visitorKey(req)}`,
+    () => null,
+  );
+  if (limited instanceof Response) return limited;
 
   let body: CheckpointBody;
   try {
