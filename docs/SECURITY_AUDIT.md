@@ -46,7 +46,7 @@ Counts: **0 Critical**, **3 High**, **4 Medium**, **5 Low/Info**.
 - **Fix**: Make `/api/combine/collection` read-only, and move discovery writes behind the server-run replay path. `/api/combine/runs/[id]/finish` already computes `final.found` via replay (`src/app/api/combine/runs/[id]/finish/route.ts:138-145`); that list should be the authoritative input to `combine_discoveries`. Checkpoint-time writes are also fine for faster feedback. Client keeps optimistic UI; the server is the write arbiter. Depends on H3's `COMBINE_SERVER_RUNS=1` prerequisite.
 
 ### H3c. Server run replay does not pin engine/bundle version
-- **Status**: **Resolved** — T-0195. `combine_runs.engine_version` is stamped at `/start`; `/checkpoint` and `/finish` reject replay with 409 + `engineVersionMismatch` on drift. Discipline note added to CLAUDE.md.
+- **Status**: **Resolved** — T-0195 + T-0201. `combine_runs.engine_version` is stamped at `/start`; `/checkpoint` and `/finish` reject replay with 409 + `engineVersionMismatch` on drift. `progress.result.engineVersion` is also stamped at `/finish` so finished leaderboard rows carry which reducer scored them. Discipline note in CLAUDE.md.
 - **Severity**: High (integrity, not confidentiality).
 - **File**: `src/db/schema.ts` (`combine_runs` table, no `engineVersion` column); `src/combine/server-engine.ts:149-174` (`replayActions`).
 - **What's wrong**: Stored runs carry `seed`, `stateJson`, `eventCount`, and `epoch`, but no reducer-version or bundle-hash field. Any reducer change that alters scoring, dealer bias, or recipe resolution silently re-scores every in-flight run on next replay. Candy Crush's 2015 postmortem calls this out specifically.

@@ -15,7 +15,7 @@ import { endRun, getRunForOwner, saveRunCheckpoint } from "@/combine/run-store";
 import { getDb, schema } from "@/db/client";
 import { loadSeason } from "@/combine/season";
 import { writeDiscoveriesFromState } from "@/combine/discoveries-writer";
-import type { Action, GameState } from "@/combine/engine";
+import { ENGINE_VERSION, type Action, type GameState } from "@/combine/engine";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -181,12 +181,18 @@ export async function POST(
   const userId = session?.user?.id;
   if (userId) {
     const season = await loadSeason(run.theme);
+    // `engineVersion` travels with the progress row so a future
+    // ENGINE_VERSION bump doesn't silently mix rows scored under
+    // different reducers on the same leaderboard. Mirror of the
+    // `combine_runs.engine_version` column. See SECURITY_AUDIT H3c /
+    // T-0195 / T-0201.
     const base = {
       score: final.score,
       made: final.made,
       chapter: final.chapter,
       season,
       mode: run.mode,
+      engineVersion: ENGINE_VERSION,
     };
     const resultValue =
       run.mode === "daily"
