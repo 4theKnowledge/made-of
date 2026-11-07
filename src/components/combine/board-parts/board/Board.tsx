@@ -1,6 +1,8 @@
 import React from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
+import { getGpOverrides } from "@/combine/gp-overrides";
+import { CRUMBLE_INACTIVITY_MOVES } from "@/combine/soft-bands";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import type { Fx, Preview } from "@/components/combine/board-parts/types";
@@ -35,6 +37,7 @@ export function Board({
   onCellPointerDown: (cell: number, e: React.PointerEvent<HTMLButtonElement>) => void;
 }) {
   const size = state.n;
+  const softModeActive = getGpOverrides().mode === "soft";
   return (
     <div
       className={"cbboard" + (lastChance ? " cbboard-lastchance" : "")}
@@ -43,8 +46,14 @@ export function Board({
       aria-label="Board"
     >
       {state.board.map((v, i) => {
-        const crumbleTick =
+        const rawTick =
           v && state.crumb[i]?.id === v ? state.crumb[i]!.n : 0;
+        // Only show the "crumbling" visual when the tile is in the warning
+        // window (last ~3 ticks before TTL), not the entire TTL. In soft
+        // mode the TTL is 20 moves so every tile would otherwise show as
+        // crumbling from move 2 onward.
+        const crumbleWarn = softModeActive ? CRUMBLE_INACTIVITY_MOVES - 3 : 0;
+        const crumbleTick = rawTick >= crumbleWarn ? rawTick : 0;
         const over =
           dragOver && dragOver.cell === i
             ? dragOver.ok
