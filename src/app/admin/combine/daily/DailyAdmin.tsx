@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useState } from "react";
 import { DEFAULT_TARGET_DISCOVERIES, type DailyConfig } from "@/combine/daily-config";
 import type { DailyPayload } from "@/combine/daily-schedule";
+import { useConfirm } from "@/components/common/useConfirm";
 
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const DOW_KEYS = ["0", "1", "2", "3", "4", "5", "6"] as const;
@@ -97,6 +98,8 @@ export function DailyAdmin({
     setSchedule(j.schedule);
   }, []);
 
+  const { confirm, dialog: confirmDialog } = useConfirm();
+
   const save = async () => {
     setBusy("save");
     setMsg(null);
@@ -119,7 +122,15 @@ export function DailyAdmin({
   };
 
   const regenerate = async () => {
-    if (!confirm("Wipe days ≥ today and reroll the next 30 days?")) return;
+    if (
+      !(await confirm({
+        title: "Regenerate schedule?",
+        body: "Wipe days ≥ today and reroll the next 30 days.",
+        confirmLabel: "Regenerate",
+        destructive: true,
+      }))
+    )
+      return;
     setBusy("regen");
     setMsg(null);
     setUnresolved([]);
@@ -147,12 +158,26 @@ export function DailyAdmin({
   };
 
   const resetToday = async () => {
-    const base =
-      "Reset today's daily? This invalidates every in-progress run save. " +
-      "Players currently in a run will lose their progress and need to start over.";
-    if (!confirm(base)) return;
+    if (
+      !(await confirm({
+        title: "Reset today's daily?",
+        body:
+          "This invalidates every in-progress run save. Players currently in a run will lose their progress and need to start over.",
+        confirmLabel: "Reset today",
+        destructive: true,
+      }))
+    )
+      return;
     if (wipeResults) {
-      if (!confirm("Also delete today's finished run records? This cannot be undone.")) return;
+      if (
+        !(await confirm({
+          title: "Also delete today's finished run records?",
+          body: "This cannot be undone.",
+          confirmLabel: "Delete results",
+          destructive: true,
+        }))
+      )
+        return;
     }
     const today = new Date();
     const y = today.getFullYear();
@@ -188,7 +213,15 @@ export function DailyAdmin({
   };
 
   const clearConfig = async () => {
-    if (!confirm("Clear daily config? Daily will still play on the chosen theme but with no cap or guests.")) return;
+    if (
+      !(await confirm({
+        title: "Clear daily config?",
+        body: "Daily will still play on the chosen theme but with no cap or guests.",
+        confirmLabel: "Clear",
+        destructive: true,
+      }))
+    )
+      return;
     setBusy("clear");
     setMsg(null);
     try {
@@ -692,6 +725,7 @@ export function DailyAdmin({
           </button>
         </div>
       </section>
+      {confirmDialog}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useConfirm } from "@/components/common/useConfirm";
 
 export interface KindRow {
   code: string;
@@ -57,6 +58,7 @@ export function KindsAdmin({ initial }: { initial: KindRow[] }) {
   const toastSeq = useRef(0);
   const [editing, setEditing] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const toast = useCallback((text: string, kind: Toast["kind"] = "error") => {
     const id = ++toastSeq.current;
@@ -262,7 +264,14 @@ export function KindsAdmin({ initial }: { initial: KindRow[] }) {
                         disabled={row.usage > 0}
                         title={row.usage > 0 ? `${row.usage} item(s) still use this kind` : "Delete this kind"}
                         onClick={async () => {
-                          if (!confirm(`Delete kind "${row.code}"?`)) return;
+                          if (
+                            !(await confirm({
+                              title: `Delete kind "${row.code}"?`,
+                              confirmLabel: "Delete",
+                              destructive: true,
+                            }))
+                          )
+                            return;
                           await deleteKind(row.code);
                         }}
                       >
@@ -317,6 +326,7 @@ export function KindsAdmin({ initial }: { initial: KindRow[] }) {
           ))}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

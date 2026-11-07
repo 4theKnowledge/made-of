@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/components/common/useConfirm";
 
 interface CodeRow {
   code: string;
@@ -27,6 +28,7 @@ export function CodesManager({ initial }: { initial: CodeRow[] }) {
   const [expiresAt, setExpiresAt] = useState("");
   const [note, setNote] = useState("");
   const [explicit, setExplicit] = useState("");
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   async function mint(e: React.FormEvent) {
     e.preventDefault();
@@ -73,7 +75,14 @@ export function CodesManager({ initial }: { initial: CodeRow[] }) {
   }
 
   async function remove(code: string) {
-    if (!confirm(`Delete code "${code}"? Any redemption rows will also go.`))
+    if (
+      !(await confirm({
+        title: `Delete code "${code}"?`,
+        body: "Any redemption rows will also go.",
+        confirmLabel: "Delete",
+        destructive: true,
+      }))
+    )
       return;
     setBusy(true);
     setError(null);
@@ -346,6 +355,7 @@ export function CodesManager({ initial }: { initial: CodeRow[] }) {
           </table>
         </div>
       )}
+      {confirmDialog}
     </>
   );
 }

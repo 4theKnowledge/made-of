@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
+import { useConfirm } from "@/components/common/useConfirm";
 
 export interface ThemeRow {
   code: string;
@@ -59,6 +60,7 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
   const toastSeq = useRef(0);
   const [editing, setEditing] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const toast = useCallback((text: string, kind: Toast["kind"] = "error") => {
     const id = ++toastSeq.current;
@@ -255,7 +257,14 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
                         disabled={row.itemCount > 0}
                         title={row.itemCount > 0 ? `${row.itemCount} item(s) still in this theme` : "Delete this theme"}
                         onClick={async () => {
-                          if (!confirm(`Delete theme "${row.code}"?`)) return;
+                          if (
+                            !(await confirm({
+                              title: `Delete theme "${row.code}"?`,
+                              confirmLabel: "Delete",
+                              destructive: true,
+                            }))
+                          )
+                            return;
                           await deleteTheme(row.code);
                         }}
                       >
@@ -310,6 +319,7 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
           ))}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

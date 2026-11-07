@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { FeedbackStatus, FeedbackType } from "@/db/schema";
+import { useConfirm } from "@/components/common/useConfirm";
 
 export interface FeedbackRow {
   id: string;
@@ -64,6 +65,7 @@ export function FeedbackAdmin({ initial }: { initial: FeedbackRow[] }) {
   const [typeFilter, setTypeFilter] = useState<FeedbackType | "all">("all");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastSeq = useRef(0);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const toast = useCallback((text: string, kind: Toast["kind"] = "error") => {
     const id = ++toastSeq.current;
@@ -88,6 +90,14 @@ export function FeedbackAdmin({ initial }: { initial: FeedbackRow[] }) {
 
   const deleteRow = useCallback(
     async (id: string) => {
+      if (
+        !(await confirm({
+          title: "Delete this feedback row?",
+          confirmLabel: "Delete",
+          destructive: true,
+        }))
+      )
+        return;
       const prev = rows;
       setRows((r) => r.filter((x) => x.id !== id));
       try {
@@ -97,7 +107,7 @@ export function FeedbackAdmin({ initial }: { initial: FeedbackRow[] }) {
         toast(`Delete failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
-    [rows, toast],
+    [rows, toast, confirm],
   );
 
   const visible = useMemo(
@@ -210,6 +220,7 @@ export function FeedbackAdmin({ initial }: { initial: FeedbackRow[] }) {
           ))}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }
@@ -328,10 +339,7 @@ function Row({
           type="button"
           className="btn"
           style={{ ...smallBtn, color: "#f85149" }}
-          onClick={() => {
-            if (!confirm("Delete this feedback row?")) return;
-            onDelete();
-          }}
+          onClick={onDelete}
         >
           Delete
         </button>

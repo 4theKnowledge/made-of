@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useConfirm } from "@/components/common/useConfirm";
 import type {
   SiteBannerAudience,
   SiteBannerSeverity,
@@ -108,6 +109,7 @@ export function BannersAdmin({ initial }: { initial: BannerRow[] }) {
   const toastSeq = useRef(0);
   const [editing, setEditing] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const toast = useCallback((text: string, kind: Toast["kind"] = "error") => {
     const id = ++toastSeq.current;
@@ -256,7 +258,14 @@ export function BannersAdmin({ initial }: { initial: BannerRow[] }) {
                 onPublish={() => patchBanner(row.id, { status: "live" })}
                 onUnpublish={() => patchBanner(row.id, { status: "archived" })}
                 onDelete={async () => {
-                  if (!confirm(`Delete this banner?`)) return;
+                  if (
+                    !(await confirm({
+                      title: "Delete this banner?",
+                      confirmLabel: "Delete",
+                      destructive: true,
+                    }))
+                  )
+                    return;
                   await deleteBanner(row.id);
                 }}
               />
@@ -298,6 +307,7 @@ export function BannersAdmin({ initial }: { initial: BannerRow[] }) {
           ))}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

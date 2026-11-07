@@ -13,6 +13,7 @@
 import React, { useMemo, useState } from "react";
 import type { Mode } from "@/combine/types";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
+import { useConfirm } from "@/components/common/useConfirm";
 import { Pictogram } from "@/pictograms/Pictogram";
 import type { Tier } from "@/db/schema";
 
@@ -115,6 +116,7 @@ export function ModeThemePicker({
         }`;
 
   const canConfirm = mode === "daily" || themes.some((t) => t.code === theme);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   return (
     <ResponsiveSheet
@@ -289,8 +291,15 @@ export function ModeThemePicker({
         <button
           type="button"
           className="cbh"
-          onClick={() => {
-            if (confirm("Restart this run? Score and board will be lost.")) {
+          onClick={async () => {
+            if (
+              await confirm({
+                title: "Restart this run?",
+                body: "Score and board will be lost.",
+                confirmLabel: "Restart",
+                destructive: true,
+              })
+            ) {
               onRestart();
             }
           }}
@@ -318,6 +327,7 @@ export function ModeThemePicker({
       >
         Close
       </button>
+      {confirmDialog}
     </ResponsiveSheet>
   );
 }

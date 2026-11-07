@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { ChangelogStatus, ChangelogType } from "@/db/schema";
+import { useConfirm } from "@/components/common/useConfirm";
 
 export interface ChangelogRow {
   id: string;
@@ -71,6 +72,7 @@ export function ChangelogAdmin({ initial }: { initial: ChangelogRow[] }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastSeq = useRef(0);
   const [editing, setEditing] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [showAdd, setShowAdd] = useState(false);
 
   const toast = useCallback((text: string, kind: Toast["kind"] = "error") => {
@@ -217,7 +219,14 @@ export function ChangelogAdmin({ initial }: { initial: ChangelogRow[] }) {
                   })
                 }
                 onDelete={async () => {
-                  if (!confirm(`Delete "${row.title}"?`)) return;
+                  if (
+                    !(await confirm({
+                      title: `Delete "${row.title}"?`,
+                      confirmLabel: "Delete",
+                      destructive: true,
+                    }))
+                  )
+                    return;
                   await deleteEntry(row.id);
                 }}
               />
@@ -259,6 +268,7 @@ export function ChangelogAdmin({ initial }: { initial: ChangelogRow[] }) {
           ))}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

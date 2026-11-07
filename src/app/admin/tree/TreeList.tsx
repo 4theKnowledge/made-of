@@ -9,6 +9,7 @@ import { REL } from "@/lib/rel";
 import { TIER, TIER_ORDER } from "@/lib/taxonomy";
 import { api, type ItemRow, type LinkRow, type RecipeRow } from "./treeApi";
 import { useAdminToast } from "../_toast";
+import { useConfirm } from "@/components/common/useConfirm";
 
 export interface TreeData {
   items: ItemRow[];
@@ -261,6 +262,8 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
   // the same widget (and 422 audit messages render identically everywhere).
   const { push: toast } = useAdminToast();
 
+  const { confirm, dialog: confirmDialog } = useConfirm();
+
   // Mutation helper: optimistic update + rollback on error.
   const mutate = useCallback(
     async <T,>(
@@ -367,6 +370,14 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
 
   const deleteLink = useCallback(
     async (id: string) => {
+      if (
+        !(await confirm({
+          title: "Delete this link?",
+          confirmLabel: "Delete",
+          destructive: true,
+        }))
+      )
+        return;
       await mutate(
         (d) => ({ ...d, links: d.links.filter((l) => l.linkId !== id) }),
         () => api.deleteLink(id),
@@ -374,7 +385,7 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
         "Delete link failed",
       );
     },
-    [mutate],
+    [mutate, confirm],
   );
 
   const createRecipe = useCallback(
@@ -400,6 +411,19 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
 
   const deleteRecipe = useCallback(
     async (id: string) => {
+      const recipe = data.recipes.find((r) => r.id === id);
+      const label = recipe
+        ? `recipe #${recipe.position}${recipe.label ? ` (${recipe.label})` : ""}`
+        : "this recipe";
+      if (
+        !(await confirm({
+          title: `Delete ${label}?`,
+          body: "All its links will be deleted too.",
+          confirmLabel: "Delete recipe",
+          destructive: true,
+        }))
+      )
+        return;
       await mutate(
         (d) => ({
           ...d,
@@ -412,7 +436,7 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
         "Delete recipe failed",
       );
     },
-    [mutate],
+    [mutate, confirm, data.recipes],
   );
 
   const createItem = useCallback(
@@ -755,7 +779,7 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
       .map((it) => it.id);
   }, [matches, data.items]);
 
-  const expandAll = useCallback(() => {
+  const expandAll = useCallback(async () => {
     // Hard caps keep this safe as the KB grows: without them, "expand all" on
     // a dense graph can mount tens of thousands of rows and lock the tab.
     const MAX_DEPTH = 8;
@@ -781,15 +805,16 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
       walk(r, r, 0, new Set());
     }
     if (aborted) {
-      const proceed = confirm(
-        `Expanding would show ${MAX_EXPANSIONS}+ branches. Expand the first ${all.size}? ` +
-          `Narrow with search/filters first for better results.`,
-      );
+      const proceed = await confirm({
+        title: `Expand ${all.size} branches?`,
+        body: `Expanding would show ${MAX_EXPANSIONS}+ branches. Narrow with search/filters first for better results.`,
+        confirmLabel: "Expand",
+      });
       if (!proceed) return;
     }
     setExpanded(all);
     persistExpanded(all);
-  }, [views, persistExpanded]);
+  }, [views, persistExpanded, confirm]);
 
   const collapseAll = useCallback(() => {
     setExpanded(new Set());
@@ -945,6 +970,7 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
         />
       )}
 
+      {confirmDialog}
     </div>
   );
 }
@@ -985,7 +1011,7 @@ function Toolbar({
   availableTags: string[];
   view: "tree" | "flat";
   setView: (v: "tree" | "flat") => void;
-  expandAll: () => void;
+  expandAll: () => void | Promise<void>;
   collapseAll: () => void;
   expandedCount: number;
   matchCount: number;
@@ -1664,7 +1690,6 @@ const Row = memo(function Row(props: RowProps) {
                 className="btn tree-row-btn"
                 style={{ ...rowBtn, color: "#f85149" }}
                 onClick={async () => {
-                  if (!confirm("Delete this link?")) return;
                   await onDeleteLink(edge.linkId);
                 }}
                 title="Delete this link"
@@ -1697,7 +1722,6 @@ const Row = memo(function Row(props: RowProps) {
             onEditLink={() => edge && setEditingLink(edge.linkId)}
             onDeleteLink={async () => {
               if (!edge) return;
-              if (!confirm("Delete this link?")) return;
               await onDeleteLink(edge.linkId);
             }}
             onEditItem={() => onEditItem(item.id)}
@@ -2172,8 +2196,6 @@ const RecipeGroup = memo(function RecipeGroup(props: RecipeGroupProps) {
             className="btn"
             style={{ ...rowBtn, color: "#f85149" }}
             onClick={async () => {
-              if (!confirm(`Delete recipe #${recipe.position}${recipe.label ? ` (${recipe.label})` : ""} and all its links?`))
-                return;
               await onDeleteRecipe(recipe.id);
             }}
           >
@@ -2192,12 +2214,6 @@ const RecipeGroup = memo(function RecipeGroup(props: RecipeGroupProps) {
               setShowAddChild(true);
             }}
             onDeleteRecipe={async () => {
-              if (
-                !confirm(
-                  `Delete recipe #${recipe.position}${recipe.label ? ` (${recipe.label})` : ""} and all its links?`,
-                )
-              )
-                return;
               await onDeleteRecipe(recipe.id);
             }}
           />
