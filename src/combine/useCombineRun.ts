@@ -6,7 +6,10 @@
  *
  *   - Starting / resuming a run server-side on mount.
  *   - Buffering actions and debounce-flushing them to /checkpoint.
- *   - Reconciling when the server returns 409 (event count drift).
+ *   - Reconciling when the server returns 409 (event count drift,
+ *     engine-version mismatch, or run-ended). Reconciliation hands
+ *     the caller the server's authoritative `state` so the local
+ *     reducer can swap to it — see `opts.onReconcile` (T-0181).
  *   - Finishing the run when the engine terminates.
  *
  * The hook is a no-op when `COMBINE_SERVER_RUNS` is off (the start
@@ -64,12 +67,77 @@ async function postJSON<T>(url: string, body: unknown): Promise<T | null> {
   }
 }
 
+/** Why the server returned 409. The caller treats all four as "drop
+ *  local optimistic state and adopt the server's truth" — only the
+ *  rendering branch differs (an ended run needs a fresh `start()`,
+ *  the others can keep the same run id). */
+export type ReconcileReason =
+  | "event-count"
+  | "engine-version"
+  | "run-ended"
+  | "run-invalidated";
+
+export interface ReconcileEvent {
+  reason: ReconcileReason;
+  /** The server's authoritative state at the moment of the 409.
+   *  Null only when the run is no longer active (ended / invalidated)
+   *  and the server didn't ship a state body — caller should trigger
+   *  a fresh `start()`. */
+  state: GameState | null;
+  /** Server's event count; null when `state` is null. Callers mirror
+   *  this into their run context so the next /checkpoint carries the
+   *  correct base. */
+  eventCount: number | null;
+  epoch: number | null;
+}
+
+/** Map a 409 response body to a `ReconcileEvent`. Exported for
+ *  testing; the hook calls it inline. The three 409 shapes the server
+ *  emits are documented in `src/app/api/combine/runs/[id]/checkpoint/
+ *  route.ts`. Anything not recognised falls back to `event-count` —
+ *  safer default than throwing, since the caller will still rewind to
+ *  the server's event count if one is present. */
+export function parseReconcile(body: {
+  error?: unknown;
+  engineVersionMismatch?: unknown;
+  serverEventCount?: unknown;
+  state?: unknown;
+  epoch?: unknown;
+}): ReconcileEvent {
+  const errText = typeof body.error === "string" ? body.error : "";
+  const isEnded = errText === "run not active";
+  const isEngineVer = body.engineVersionMismatch === true;
+  const reason: ReconcileReason = isEnded
+    ? "run-ended"
+    : isEngineVer
+      ? "engine-version"
+      : "event-count";
+  const serverState = (body.state as GameState | undefined) ?? null;
+  const serverEventCount =
+    typeof body.serverEventCount === "number" ? body.serverEventCount : null;
+  const serverEpoch = typeof body.epoch === "number" ? body.epoch : null;
+  return {
+    reason,
+    state: serverState,
+    eventCount: serverEventCount,
+    epoch: serverEpoch,
+  };
+}
+
 export interface UseCombineRunOpts {
   /** Flush debounce (ms). The hook sends buffered actions this long
    *  after the last dispatch. */
   flushMs?: number;
   /** Also flush when the buffer reaches this many events. */
   flushAt?: number;
+  /** Fires when the server returned a 409 the hook can't silently
+   *  recover from. The caller replaces its local `GameState` with
+   *  `event.state` (if non-null) and clears any derived UI state
+   *  (fx, toasts, choose dialog) so the swap looks clean. Called
+   *  from inside the checkpoint flight — the hook has already
+   *  updated its own `context.eventCount`/`epoch` by the time this
+   *  fires. Not called for the happy path. */
+  onReconcile?: (event: ReconcileEvent) => void;
 }
 
 export interface UseCombineRunApi {
@@ -96,6 +164,11 @@ export interface UseCombineRunApi {
   /** Close the run server-side. Flushes the buffer first, then calls
    *  /finish with any trailing actions. */
   finish: (trailingActions?: Action[]) => Promise<GameState | null>;
+  /** Register (or replace) the reconcile callback at any point in
+   *  render. Useful when the hook has to be called early (e.g. for
+   *  `ready`), but the reconcile closure depends on state declared
+   *  further down the component. Pass `null` to clear. */
+  setOnReconcile: (fn: ((event: ReconcileEvent) => void) | null) => void;
 }
 
 /** Owns a single server run across its lifetime. */
@@ -110,6 +183,11 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contextRef = useRef<RunContext | null>(null);
   contextRef.current = context;
+  // Keep the latest onReconcile in a ref so the flush closure doesn't
+  // need to be rebuilt every render when the caller passes a fresh
+  // function. React-standard "stable callback" pattern.
+  const onReconcileRef = useRef<UseCombineRunOpts["onReconcile"]>(undefined);
+  onReconcileRef.current = opts.onReconcile;
 
   const start = useCallback(
     async (args: StartArgs): Promise<StartResult | null> => {
@@ -200,9 +278,16 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
         | {
             __error: true;
             status: number;
+            error?: string;
             serverEventCount?: number;
             state?: GameState;
             epoch?: number;
+            engineVersionMismatch?: boolean;
+            // `status` field on the 409 body (distinct from HTTP status)
+            // identifies ended/invalidated runs — the server sends
+            // `status: 'ended' | 'invalidated'` at runtime even though
+            // `postJSON` collides the top-level `status` with the HTTP
+            // code. See runStatus below for the runtime-level read.
           }
       >(`/api/combine/runs/${ctx.runId}/checkpoint`, {
         baseEventCount: ctx.eventCount,
@@ -215,14 +300,30 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
         return;
       }
       if ("__error" in res) {
-        // 409 → server has newer truth; the caller hasn't wired full
-        // reconciliation yet, but the epoch + state are available for
-        // a future iteration. For now, drop the batch to avoid a
-        // retry storm and let the next start() pull fresh state.
-        if (res.status === 409 && typeof res.serverEventCount === "number") {
-          setContext((cur) =>
-            cur ? { ...cur, eventCount: res.serverEventCount!, epoch: res.epoch ?? cur.epoch } : cur,
-          );
+        // Server returned a non-2xx. Reconcile on 409 (drift / engine
+        // version / ended run); drop silently on anything else so a
+        // single bad batch doesn't tombstone the run. See
+        // `parseReconcile` for the wire-shape mapping.
+        if (res.status === 409) {
+          const event = parseReconcile(res);
+          // For ended/invalidated runs, drop the context so the caller
+          // can `start()` a fresh one. For the drift/version cases the
+          // run id is still valid — just rewind our event count to the
+          // server's truth and let the caller swap state.
+          if (event.reason === "run-ended") {
+            setContext(null);
+          } else if (event.eventCount !== null) {
+            setContext((cur) =>
+              cur
+                ? {
+                    ...cur,
+                    eventCount: event.eventCount!,
+                    epoch: event.epoch ?? cur.epoch,
+                  }
+                : cur,
+            );
+          }
+          onReconcileRef.current?.(event);
         }
         return;
       }
@@ -324,6 +425,13 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
     };
   }, [flush]);
 
+  const setOnReconcile = useCallback(
+    (fn: ((event: ReconcileEvent) => void) | null) => {
+      onReconcileRef.current = fn ?? undefined;
+    },
+    [],
+  );
+
   return {
     ready,
     context,
@@ -332,6 +440,7 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
     push,
     flush,
     finish,
+    setOnReconcile,
   };
 }
 

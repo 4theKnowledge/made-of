@@ -43,7 +43,7 @@ import {
   type SfxPack,
 } from "@/combine/storage";
 import { useCollection } from "@/combine/useCollection";
-import { useCombineRun } from "@/combine/useCombineRun";
+import { useCombineRun, type ReconcileEvent } from "@/combine/useCombineRun";
 import { useReactions } from "@/combine/useReactions";
 import {
   dailyShareQuery,
@@ -414,6 +414,9 @@ export function CombineBoard({
     if (state.over) return;
     // Deterministic SSR placeholder: don't register that.
     if (state.rng.rs === 42 && state.score === 0 && state.moves === 0) return;
+    // Tutorial / other non-persisted modes don't register server runs —
+    // the server route only accepts endless | fast | daily.
+    if (state.mode !== "endless" && state.mode !== "fast" && state.mode !== "daily") return;
     const mode: "endless" | "fast" | "daily" = state.mode;
     const slot = `${mode}|${state.theme}|${state.daily ?? ""}`;
     if (serverSlotRef.current === slot) return;
@@ -1080,6 +1083,35 @@ export function CombineBoard({
     setInfoCell(null);
     setSelectedSlot(null);
   }, []);
+
+  // T-0181: register the reconcile callback once setState + the
+  // transient-UI setters are in scope. Fires when the server returns
+  // a 409 (drift, engine version mismatch, or run-ended). The server's
+  // state is authoritative; we swap it in and clear any UI that
+  // depended on the pre-reconcile reducer state (fx animations,
+  // discovery toast, choose dialog). The run alignment effect below
+  // picks up the fresh (mode, theme, daily) tuple and re-registers
+  // with the server on the next tick.
+  //
+  // `setOnReconcile` is stable (useCallback-wrapped in the hook), but
+  // `run` itself isn't — depend on the method directly to avoid
+  // re-registering every render.
+  const setOnReconcile = run.setOnReconcile;
+  useEffect(() => {
+    const onReconcile = (event: ReconcileEvent) => {
+      if (event.state) {
+        setState(event.state);
+        resetTransient();
+      }
+      // For run-ended / run-invalidated the hook already dropped its
+      // context; the slot-alignment effect will call run.start() again
+      // the next time state settles, which is enough to resync.
+    };
+    setOnReconcile(onReconcile);
+    return () => {
+      setOnReconcile(null);
+    };
+  }, [setOnReconcile, resetTransient]);
 
   const switchTheme = useCallback(
     (which: ThemeKey) => {
