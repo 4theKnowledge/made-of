@@ -51,6 +51,10 @@ export interface DealerView {
    *  many `pickMaybeWeighted` calls a single tray may make (soft mode
    *  only; banded mode never reads this). */
   _foundSet?: Set<string>;
+  /** Internal: lazily-computed soft-pool reachability. Built once per
+   *  dealTray in soft mode (iterates all recipes, expensive for 439-item
+   *  themes), shared across the ~180+ pickOne calls per deal retry loop. */
+  _softPool?: SoftPool;
 }
 
 /** Count how many of each in-age, non-tool tile are on the board. */
@@ -58,10 +62,13 @@ function tallyBoard(view: DealerView): Map<string, number> {
   const mode = getGpOverrides().mode;
   // In soft mode, all known/reachable tiles are "in use" for pile-detection
   // purposes. In banded mode, use the age window's USE set.
-  const inUse: Set<string> =
-    mode === "soft" && view.found
-      ? softPool(view.bundle, view.found).pool
-      : ageSets(view.bundle, view.age).USE;
+  let inUse: Set<string>;
+  if (mode === "soft" && view.found) {
+    if (!view._softPool) view._softPool = softPool(view.bundle, view.found);
+    inUse = view._softPool.pool;
+  } else {
+    inUse = ageSets(view.bundle, view.age).USE;
+  }
   const counts = new Map<string, number>();
   for (const v of view.board) {
     if (!v) continue;
@@ -136,7 +143,8 @@ export function pickOne(view: DealerView): string | null {
   let MID: string[];
   let recipes;
   if (mode === "soft" && view.found) {
-    const sp = softPool(view.bundle, view.found);
+    if (!view._softPool) view._softPool = softPool(view.bundle, view.found);
+    const sp = view._softPool;
     ING = sp.pool;
     BASE = sp.basePool;
     MID = sp.midPool;
@@ -315,10 +323,13 @@ function shouldDiversify(
  * tray array see the changes), then returns the same array.
  */
 export function dealTray(view: DealerView): Array<string | null> {
-  // Build the found-set once per tray so subsequent pickOne spreads (which
-  // shallow-copy the view) share the same Set reference instead of
-  // rebuilding it per pick. Only relevant in soft mode; harmless in banded.
+  // Build the found-set + soft pool once per tray so subsequent pickOne
+  // spreads (which shallow-copy the view) share the same references
+  // instead of rebuilding them per pick. Only relevant in soft mode.
   if (view.found && !view._foundSet) view._foundSet = new Set(view.found);
+  if (getGpOverrides().mode === "soft" && view.found && !view._softPool) {
+    view._softPool = softPool(view.bundle, view.found);
+  }
   const writeTray = (next: Array<string | null>): Array<string | null> => {
     for (let i = 0; i < view.tray.length; i++) view.tray[i] = next[i];
     return view.tray;
