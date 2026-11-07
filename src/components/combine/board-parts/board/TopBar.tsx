@@ -81,9 +81,12 @@ export function TopBar({
     ? "Daily"
     : state.mode === "fast"
       ? "Fast"
-      : "Endless";
+      : state.mode === "tutorial"
+        ? "Tutorial"
+        : "Endless";
   const dailyLabel = state.daily ? formatDailyLabel(state.daily) : null;
   const fast = state.mode === "fast";
+  const tutorial = state.mode === "tutorial";
   const bestDisplay = Math.max(best, state.over ? state.score : 0);
   const modeActive = clearMode || moveMode || shoreMode || pluckMode;
   return (
@@ -103,12 +106,21 @@ export function TopBar({
         </span>
       ) : null}
       <button
-        className={`cbh cbtheme${fast ? " cbtheme-fast" : ""}`}
+        className={`cbh cbtheme${fast ? " cbtheme-fast" : ""}${tutorial ? " cbtheme-tutorial" : ""}`}
         type="button"
         aria-label={`Theme: ${themeName}${dailyLabel ? `, ${dailyLabel}` : ""}. Change theme`}
         onClick={onTheme}
       >
-        {fast ? (
+        {tutorial ? (
+          <svg
+            className="cbtheme-mode cbtheme-book"
+            viewBox="0 0 32 32"
+            aria-hidden="true"
+          >
+            <path d="M4 7v18l12-3 12 3V7l-12 3z" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+            <path d="M16 10v18" fill="none" stroke="currentColor" strokeWidth={2} />
+          </svg>
+        ) : fast ? (
           <svg
             className="cbtheme-mode cbtheme-bolt"
             viewBox="0 0 16 16"
@@ -457,14 +469,14 @@ export function TopBar({
                 type="button"
                 className="cbhm"
                 onClick={onIntro}
-                aria-label="Show intro"
+                aria-label="Replay tutorial"
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M8 5v14l11-7z" />
                 </svg>
                 <span className="nm">
-                  <b className="t">Show intro</b>
-                  <em>Replay the welcome demo</em>
+                  <b className="t">Replay tutorial</b>
+                  <em>Walk through the basics again</em>
                 </span>
               </button>
               <button

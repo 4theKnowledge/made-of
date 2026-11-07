@@ -28,7 +28,7 @@ export function ChapterBar({
     ? `Chapter ${chapter + 1}. ${nextThreshold - foundCount} more unique finds to reach Chapter ${chapter + 2}. Tap for details.`
     : `Chapter ${chapter + 1} — open-ended. Tap for details.`;
   return (
-    <div className="cbage">
+    <div className="cbage" data-tour="chapter">
       <button
         type="button"
         className="cbageinfo"

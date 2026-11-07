@@ -49,6 +49,7 @@ export function Board({
       style={{ "--cbn": size } as React.CSSProperties}
       role="grid"
       aria-label="Board"
+      data-tour="board"
     >
       {state.board.map((v, i) => {
         const rawTick =

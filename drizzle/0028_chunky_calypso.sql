@@ -1,0 +1,1 @@
+ALTER TABLE "user" ADD COLUMN "has_seen_combine_tutorial" boolean DEFAULT false NOT NULL;

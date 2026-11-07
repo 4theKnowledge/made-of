@@ -80,6 +80,7 @@ export function Hold({
       ref={holdRef}
       className={classes.join(" ")}
       data-cbholdzone="1"
+      data-tour="hold"
       aria-label="Hold — drag or tap a tile here to save for later. Held tiles crumble when the age moves past them."
       onClick={(e) => {
         if (selected?.source !== "tray") return;

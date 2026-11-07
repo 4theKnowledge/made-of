@@ -50,6 +50,13 @@ export interface DealerView {
    *  dealTray (iterates all recipes, expensive for 439-item themes),
    *  shared across the ~180+ pickOne calls per deal retry loop. */
   _softPool?: SoftPool;
+  /** Scripted dealer queue (tutorial mode). When present, `dealTray` shifts
+   *  from the front of this array to fill tray slots and skips the normal
+   *  reachability / anti-pile / playsInOne heuristics entirely. The caller
+   *  owns the array and mutates it in place (shift). Once empty, the dealer
+   *  falls back to the normal flow — so a tutorial that outlives the script
+   *  degrades into a regular run instead of hanging. */
+  scripted?: string[];
 }
 
 /** Count how many of each reachable non-tool tile are on the board. */
@@ -274,6 +281,20 @@ function shouldDiversify(
  * tray array see the changes), then returns the same array.
  */
 export function dealTray(view: DealerView): Array<string | null> {
+  // Scripted dealer (tutorial): consume from the front of the queue and
+  // skip every heuristic. If the queue runs out mid-tray, top up the
+  // remaining slots with `pickOne` so the tutorial degrades gracefully
+  // instead of handing the player a half-empty tray.
+  if (view.scripted && view.scripted.length > 0) {
+    for (let i = 0; i < view.tray.length; i++) {
+      if (view.scripted.length > 0) {
+        view.tray[i] = view.scripted.shift() ?? null;
+      } else {
+        view.tray[i] = pickOne(view);
+      }
+    }
+    return view.tray;
+  }
   // Build the found-set + soft pool once per tray so subsequent pickOne
   // spreads (which shallow-copy the view) share the same references
   // instead of rebuilding them per pick.

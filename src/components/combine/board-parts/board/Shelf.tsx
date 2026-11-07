@@ -59,6 +59,7 @@ export function Shelf({
       ref={shelfRef}
       className={`cbshelf${empty ? " none" : ""}${overflow.left ? " ov-l" : ""}${overflow.right ? " ov-r" : ""}`}
       aria-label={`Made this run: ${ids.length}`}
+      data-tour="shelf"
     >
       <span className="cbshelf-slots">
         {ids.map((id) => {

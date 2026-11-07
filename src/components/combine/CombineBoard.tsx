@@ -46,6 +46,15 @@ import { useCollection } from "@/combine/useCollection";
 import { useCombineRun, type ReconcileEvent } from "@/combine/useCombineRun";
 import { useReactions } from "@/combine/useReactions";
 import {
+  type TutorialStepId,
+  hasSeenTutorialLocal,
+  markTutorialSeenLocal,
+  nextStep as tutorialNextStep,
+  resolveTutorialDeck,
+  tutorialPlayableOn,
+} from "@/combine/tutorial";
+import { TutorialOverlay } from "@/components/combine/TutorialOverlay";
+import {
   dailyShareQuery,
   dailyShareText,
   endlessShareText,
@@ -163,6 +172,11 @@ interface Props {
     description: string | null;
     pictogram: string | null;
   }>;
+  /** Server-read `authUser.hasSeenCombineTutorial` for signed-in users.
+   *  When false, the Combine landing shows a dismissible "Try the
+   *  tutorial" nudge; when true, the nudge is suppressed. Anon users get
+   *  a localStorage fallback (`madeof:cbtut`). */
+  userHasSeenTutorial?: boolean;
 }
 
 // Shared empty set for the DetailCard's `madeSignatures` prop so the common
@@ -184,6 +198,7 @@ export function CombineBoard({
   themeFromUrl = false,
   dailyHostTheme = "everything",
   publishedThemes = [],
+  userHasSeenTutorial = false,
 }: Props) {
   const bundles = useMemo<Record<ThemeKey, ThemeBundle>>(() => {
     const out: Record<ThemeKey, ThemeBundle> = {};
@@ -331,6 +346,26 @@ export function CombineBoard({
         setState(newGame(activeTheme, fastBundles[activeTheme], { mode: "fast", size: 6 }).state);
       }
       return;
+    }
+    if (initialMode === "tutorial") {
+      // Deep-link into the tutorial. Spawns a fresh scripted run on the
+      // endless bundle and primes the step FSM at "welcome". Never
+      // resumed — tutorial saves aren't persisted.
+      const b = bundles[activeTheme];
+      const deck = b ? resolveTutorialDeck(b) : [];
+      if (b && tutorialPlayableOn(b) && deck.length > 0) {
+        setState(
+          newGame(activeTheme, b, {
+            mode: "tutorial",
+            size: 6,
+            scripted: deck,
+          }).state,
+        );
+        setTutorialStep("welcome");
+        setTutorialNudgeOpen(false);
+        return;
+      }
+      // Data drift: fall through to the normal resume path.
     }
     const today = todayKey();
     if (themeFromUrl) {
@@ -611,21 +646,37 @@ export function CombineBoard({
   const [soundOpen, setSoundOpen] = useState(false);
   const [experimentsOpen, setExperimentsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  // First-run onboarding: a non-interactive ghost-hand demo overlay shown
-  // once per device. Replayable from the "..." menu. Separate from
-  // HowToPlay which is the reference modal.
+  // First-run onboarding: a non-interactive ghost-hand demo overlay. Kept
+  // around as a "watch it again" affordance from the "..." menu, but no
+  // longer auto-opens on first visit — the guided tutorial (below) is the
+  // new first-run path. Players who want the old animated walkthrough can
+  // still summon it via setOnboardOpen(true) from the More menu.
   const [onboardOpen, setOnboardOpen] = useState(false);
+  // Guided tutorial state. `tutorialStep` is non-null while the tutorial
+  // run is active; it advances in `act` after every reducer tick. The
+  // `tutorialNudgeOpen` flag controls the dismissible landing chip shown
+  // to first-time players (signed-in: gated by server-read flag; anon:
+  // localStorage fallback).
+  const [tutorialStep, setTutorialStep] = useState<TutorialStepId | null>(null);
+  const [tutorialNudgeOpen, setTutorialNudgeOpen] = useState(false);
+  // Display name of the most recent combine output — threaded into
+  // tutorial step 3's copy so it reads truthfully even when the picker
+  // resolves hydrogen+helium to sun instead of star.
+  const [tutorialLastOutName, setTutorialLastOutName] = useState<string | null>(null);
   useEffect(() => {
+    // Suppress on server-first paint; also suppress if a run is already
+    // scripted (e.g. deep-linked ?m=tutorial — handled separately below).
     if (typeof window === "undefined") return;
-    try {
-      if (!window.localStorage.getItem("madeof:cbonboarded")) {
-        setOnboardOpen(true);
-        window.localStorage.setItem("madeof:cbonboarded", "1");
-      }
-    } catch {
-      // ignore — Safari private mode etc.
-    }
-  }, []);
+    if (userHasSeenTutorial) return;
+    if (hasSeenTutorialLocal()) return;
+    // Don't surface the nudge mid-run — only when the player lands on a
+    // fresh board / finished state. The deterministic SSR seed=42 counts
+    // as fresh; so does `over`.
+    const fresh =
+      state.moves === 0 || state.over || (state.rng.rs === 42 && state.score === 0);
+    if (!fresh) return;
+    setTutorialNudgeOpen(true);
+  }, [userHasSeenTutorial, state.moves, state.over, state.rng.rs, state.score]);
   const [agesOpen, setAgesOpen] = useState(false);
   // Game-over summary card. Opens automatically when the run ends; the
   // player can dismiss it to review the final board (especially useful for
@@ -963,20 +1014,90 @@ export function CombineBoard({
   );
 
   // Apply an action: run reduce once, update state, and route events.
+  // Kick off a guided tutorial run: swap state for a fresh tutorial-mode
+  // GameState on the current endless bundle, armed with the scripted deck.
+  // The tutorial never touches save slots or the server run endpoints — it
+  // behaves like a debug session in that regard. Can be triggered from
+  // the landing nudge or the More menu.
+  const startTutorial = useCallback(() => {
+    // Tutorial always runs on the default "everything" bundle so the
+    // scripted hydrogen+helium→star chain is guaranteed to exist,
+    // regardless of which theme the player currently has selected.
+    // If "everything" isn't loaded (admin disabled it), fall back to
+    // the active bundle.
+    const b = bundles["everything"] ?? bundles[activeTheme] ?? bundle;
+    const theme = bundles["everything"] ? "everything" : activeTheme;
+    const deck = b ? resolveTutorialDeck(b) : [];
+    if (!b || !tutorialPlayableOn(b) || deck.length === 0) {
+      // Data drift killed the tutorial deck's required tiles — fall
+      // through to the old onboarding demo instead of trapping the
+      // player in a broken tutorial.
+      setOnboardOpen(true);
+      setTutorialNudgeOpen(false);
+      return;
+    }
+    const r = newGame(theme, b, {
+      mode: "tutorial",
+      size: 6,
+      scripted: deck,
+    });
+    setState(r.state);
+    setTutorialStep("welcome");
+    setTutorialNudgeOpen(false);
+  }, [bundles, activeTheme, bundle]);
+
+  // Dismiss the landing nudge and record the "seen" flag so it doesn't
+  // reappear on refresh / future visits. Anon → localStorage; signed-in
+  // → server endpoint (best-effort; failures are silently ignored since
+  // the UX degradation is just "nudge shows again next time").
+  const dismissTutorialNudge = useCallback(() => {
+    setTutorialNudgeOpen(false);
+    markTutorialSeenLocal();
+    if (signedIn) {
+      void fetch("/api/combine/tutorial-seen", { method: "POST" }).catch(() => {
+        // ignore — localStorage fallback keeps the UX reasonable
+      });
+    }
+  }, [signedIn]);
+
   const act = useCallback(
     (action: Action) => {
       const r = reduce(state, bundle, action);
       setState(r.state);
       applyEvents(r.events);
       setSelectedSlot(null);
+      // Tutorial progression — advance the step FSM on real events, and
+      // record the seen flag when we reach `done`. Skip when we aren't in
+      // a tutorial run (`tutorialStep === null`).
+      if (tutorialStep && r.state.mode === "tutorial") {
+        // Capture the latest combine's output name so dynamic step copy
+        // can reference what the player actually made (not what we
+        // assumed they'd make). Walks the batch so a single rapid drop
+        // that both places and combines still updates the name.
+        for (const e of r.events) {
+          if (e.type === "combine") {
+            const name = bundle.items.get(e.out)?.name ?? null;
+            if (name) setTutorialLastOutName(name);
+          }
+        }
+        const next = tutorialNextStep(tutorialStep, r.events, r.state);
+        if (next !== tutorialStep) {
+          setTutorialStep(next);
+          if (next === "done") dismissTutorialNudge();
+        }
+      }
       // Mirror the action to the server if a run is active. The server
       // runs the same reducer on its side at checkpoint time and
-      // validates the state matches. No-op when the feature is off.
-      run.push(action);
+      // validates the state matches. No-op when the feature is off, and
+      // also no-op for tutorial runs (they're purely local).
+      if (r.state.mode !== "tutorial") {
+        run.push(action);
+      }
 
       // If the game just ended, write best + daily done. Fast mode has its
-      // own best bucket — see storage.saveBest.
-      if (r.state.over && !state.over) {
+      // own best bucket — see storage.saveBest. Tutorial runs are
+      // disposable; never write their score or server-finish them.
+      if (r.state.over && !state.over && r.state.mode !== "tutorial") {
         const isFast = r.state.mode === "fast";
         const prevBest = isFast
           ? fastBest[r.state.theme] ?? 0
@@ -1041,7 +1162,7 @@ export function CombineBoard({
       // but `combine` event inputs would still leak base ingredients into
       // the lifetime collection without this gate. Classic progression must
       // never be shortcutted by combo-dense fast runs.
-      if (r.state.mode !== "fast") {
+      if (r.state.mode !== "fast" && r.state.mode !== "tutorial") {
         // Two record kinds: `make` (combine event → tag with signature so
         // mastery can track which variant was used), and `unlock-only`
         // (base-ingredient leak from combine inputs → no signature, since
@@ -1064,7 +1185,7 @@ export function CombineBoard({
         if (records.length) recordDiscoveries(records);
       }
     },
-    [state, bundle, applyEvents, best, fastBest, bundles, recordDiscoveries],
+    [state, bundle, applyEvents, best, fastBest, bundles, recordDiscoveries, run, tutorialStep, dismissTutorialNudge],
   );
 
   // Save after every settled state transition. Skip while a choice is open
@@ -2101,7 +2222,9 @@ export function CombineBoard({
           }}
           onIntro={() => {
             setMoreOpen(false);
-            setOnboardOpen(true);
+            // Prefer the playable guided tutorial (startTutorial falls
+            // back to setOnboardOpen if data drift killed the deck).
+            startTutorial();
           }}
           onFeedback={() => {
             setMoreOpen(false);
@@ -2325,6 +2448,8 @@ export function CombineBoard({
             themes={publishedThemes}
             dailyDone={!!dailyDone}
             onShareDaily={shareDaily}
+            onStartTutorial={startTutorial}
+            tutorialSeen={userHasSeenTutorial || hasSeenTutorialLocal()}
             onRestart={() => {
               setThemeOpen(false);
               restartTheme(state.theme, state.mode);
@@ -2496,6 +2621,58 @@ export function CombineBoard({
         {onboardOpen && (
           <OnboardingDemo onDismiss={() => setOnboardOpen(false)} />
         )}
+        {tutorialNudgeOpen && !tutorialStep && (
+          <div className="cbtut-nudge" role="status">
+            <div className="cbtut-nudge-inner">
+              <span className="cbtut-nudge-body">
+                New to Combine? Play a short guided tutorial.
+              </span>
+              <div className="cbtut-nudge-actions">
+                <button
+                  type="button"
+                  className="cbh cbh-primary"
+                  onClick={startTutorial}
+                >
+                  Try it
+                </button>
+                <button
+                  type="button"
+                  className="cbh"
+                  onClick={dismissTutorialNudge}
+                  aria-label="Dismiss tutorial nudge"
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <TutorialOverlay
+          tutorialStep={tutorialStep}
+          lastOutName={tutorialLastOutName}
+          paused={
+            // Pause only for genuinely blocking / high-z modals that
+            // own the player's full attention. Lightweight overlays
+            // like the ChoicePicker (state.choosing) and DetailCard
+            // (infoTile) are part of normal gameplay — keeping the
+            // tutorial visible underneath so the player sees step 2 /
+            // step 3 copy as they resolve the picker is the whole
+            // point of the tour.
+            bookOpen ||
+            soundOpen ||
+            experimentsOpen ||
+            helpOpen ||
+            agesOpen ||
+            onboardOpen ||
+            wipeConfirm ||
+            overCardOpen ||
+            feedback !== null
+          }
+          onExit={() => {
+            setTutorialStep(null);
+            dismissTutorialNudge();
+          }}
+        />
         <FeedbackSheet
           open={feedback !== null}
           onDismiss={() => setFeedback(null)}

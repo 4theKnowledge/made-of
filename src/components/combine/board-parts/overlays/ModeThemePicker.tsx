@@ -84,6 +84,15 @@ interface Props {
    *  the daily is actually done. */
   onShareDaily?: () => void;
   dailyDone?: boolean;
+  /** Launch the guided tutorial. Unlike the other modes, the tutorial
+   *  card bypasses the confirm flow — tapping it dismisses the sheet and
+   *  starts a fresh scripted run on the "everything" bundle immediately,
+   *  because the tutorial is cross-theme and single-shot. */
+  onStartTutorial?: () => void;
+  /** Whether the player has already finished the tutorial. Only affects
+   *  the card's subtitle copy ("New? Learn the basics." vs "Replay the
+   *  tutorial."). */
+  tutorialSeen?: boolean;
 }
 
 export function ModeThemePicker({
@@ -97,6 +106,8 @@ export function ModeThemePicker({
   onRestart,
   onShareDaily,
   dailyDone,
+  onStartTutorial,
+  tutorialSeen = false,
 }: Props) {
   const initialMode: PickerMode = currentDaily ? "daily" : currentMode === "fast" ? "fast" : "endless";
   const [mode, setMode] = useState<PickerMode>(initialMode);
@@ -202,6 +213,16 @@ export function ModeThemePicker({
           margin-top: 14px;
           width: 100%;
         }
+        /* Tutorial card accent: matches the amber glow used by the live
+           tutorial overlay (see .cbtut-overlay-spotlight in globals.css),
+           so the "Learn" surface reads as the same visual language. */
+        .cbmtp .cbmtpTutorial {
+          border-color: var(--accent, #ffb800);
+          box-shadow: 3px 3px 0 var(--accent, #ffb800);
+        }
+        .cbmtp .cbmtpTutorial:hover {
+          box-shadow: 4px 4px 0 var(--accent, #ffb800);
+        }
       `}</style>
 
       <span className="k">Mode</span>
@@ -229,6 +250,35 @@ export function ModeThemePicker({
           );
         })}
       </div>
+
+      {onStartTutorial && (
+        <>
+          <span className="k">Learn</span>
+          <div className="cbmtpModeRow" style={{ ["--cbmtpModeCount" as string]: 1 }}>
+            <button
+              type="button"
+              className="cbmtpTile cbmtpTileFit cbmtpTutorial"
+              onClick={() => {
+                onStartTutorial();
+                onDismiss();
+              }}
+              aria-label={tutorialSeen ? "Replay tutorial" : "Start tutorial"}
+            >
+              <Pictogram
+                name="mode:tutorial"
+                tier="M"
+                kind="object"
+                // Open book pictogram.
+                pictogram={`<path class="b" d="M4 7v18l12-3 12 3V7l-12 3z"/><path class="l" d="M16 10v18"/>`}
+              />
+              <b>Tutorial</b>
+              <span className="t">
+                {tutorialSeen ? "Replay the tutorial." : "New? Learn the basics."}
+              </span>
+            </button>
+          </div>
+        </>
+      )}
 
       <span className="k">
         Theme

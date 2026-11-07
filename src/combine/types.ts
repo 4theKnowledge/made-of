@@ -15,21 +15,26 @@ export type ThemeKey = string;
  *  (legacy URLs, missing config) and as the publish-gate seed. */
 export const DEFAULT_THEME: ThemeKey = "everything";
 
-/** Combine play mode. Three first-class modes:
+/** Combine play mode. Four first-class modes:
  *  - `endless` — chapter-based progression, long-running, score+collection.
  *  - `daily` — chapter-based progression tuned by a theme's `dailyConfig`
  *    (capped ages, guest-of-the-day). Separate collection scope.
  *  - `fast` — 2-part recipes only, single band, score-only. Shares the
  *    endless collection scope at the DB level but does not add to it.
+ *  - `tutorial` — guided, scripted-deck run on the endless bundle. Never
+ *    persists to save slots, never posts to the server, never writes to
+ *    the lifetime collection. Reuses the endless reducer paths so the
+ *    player learns on the same board behaviour they'll see in endless.
  *
- *  `endless` and `daily` share the same reducer paths (see `isClassic`);
- *  the mode is kept distinct for UI, admin, leaderboards, and stats. */
-export type Mode = "endless" | "daily" | "fast";
+ *  `endless`, `daily` and `tutorial` share the same reducer paths (see
+ *  `isClassic`); the mode is kept distinct for UI, admin, leaderboards,
+ *  and stats. */
+export type Mode = "endless" | "daily" | "fast" | "tutorial";
 
 /** True when the mode uses the chapter-based "classic" reducer paths
- *  (endless + daily). Fast is the only non-classic mode today. The engine
- *  historically used `mode === "classic"` for this; the predicate keeps
- *  that logic working after the mode rename. */
+ *  (endless + daily + tutorial). Fast is the only non-classic mode today.
+ *  The engine historically used `mode === "classic"` for this; the
+ *  predicate keeps that logic working after the mode rename. */
 export function isClassic(mode: Mode): boolean {
   return mode !== "fast";
 }

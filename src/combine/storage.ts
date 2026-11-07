@@ -185,6 +185,10 @@ export function saveGame(state: GameState): void {
   // player's real endless save, and on reload we want to hydrate the
   // real save instead of the debug one.
   if (state.debug) return;
+  // Tutorial sessions never persist. They're a one-shot guided run; on
+  // reload the player should land back in their real mode (fast/endless/
+  // daily), not resume halfway through the tutorial.
+  if (state.mode === "tutorial") return;
   try {
     const key = keyForMode(state);
     if (state.over && !state.daily) {

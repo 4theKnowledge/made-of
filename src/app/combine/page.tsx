@@ -80,4 +80,6 @@ export default async function CombinePage({
   const theme = pick(sp, "t") ?? undefined;
   const mode = pick(sp, "m") ?? undefined;
   return <CombinePageBody theme={theme} mode={mode} />;
+  // CombinePageBody only honours "fast" and "tutorial" from ?m=; other
+  // values fall through to the normal resume logic.
 }

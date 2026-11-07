@@ -147,7 +147,25 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
   const signedIn = !!session?.user?.id;
   const dailyEnabled = dailyFlagOn() || admin;
 
-  const initialMode = modeParam === "fast" ? "fast" : undefined;
+  // Read the user's tutorial-seen flag so CombineBoard can hide the
+  // "try the tutorial" nudge on repeat visits. Anon players fall back to
+  // a localStorage check in-component.
+  let userHasSeenTutorial = false;
+  if (signedIn && session?.user?.id) {
+    const [row] = await db
+      .select({ seen: schema.authUser.hasSeenCombineTutorial })
+      .from(schema.authUser)
+      .where(eq(schema.authUser.id, session.user.id))
+      .limit(1);
+    userHasSeenTutorial = row?.seen === true;
+  }
+
+  const initialMode =
+    modeParam === "fast"
+      ? "fast"
+      : modeParam === "tutorial"
+        ? "tutorial"
+        : undefined;
 
   return (
     <main className="wrap wrap-combine">
@@ -165,6 +183,7 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
         themeFromUrl={themeFromUrl}
         dailyHostTheme={dailyHostTheme}
         publishedThemes={publishedThemes}
+        userHasSeenTutorial={userHasSeenTutorial}
       />
       <Footer compactOnMobile />
     </main>

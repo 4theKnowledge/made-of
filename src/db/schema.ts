@@ -388,6 +388,13 @@ export const authUser = pgTable(
     // transient blank window during the create hook isn't a hard failure.
     handle: text("handle"),
     handleLockedAt: timestamp("handle_locked_at", { withTimezone: true }),
+    // Set once the player finishes (or dismisses) the Combine guided
+    // tutorial on any device. The landing nudge hides when this is true,
+    // so returning signed-in players aren't re-prompted every login.
+    // Anon fallback lives in localStorage under `madeof:cbtut`.
+    hasSeenCombineTutorial: boolean("has_seen_combine_tutorial")
+      .notNull()
+      .default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

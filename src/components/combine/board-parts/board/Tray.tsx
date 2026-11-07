@@ -24,7 +24,7 @@ export function Tray({
   const isSel = (slot: number) =>
     selected?.source === "tray" && selected.slot === slot;
   return (
-    <div className="cbtray" aria-label="Tray">
+    <div className="cbtray" aria-label="Tray" data-tour="tray">
       {state.tray.map((id, slot) => {
         if (id == null) {
           return (

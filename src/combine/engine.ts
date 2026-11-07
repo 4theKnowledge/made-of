@@ -200,6 +200,11 @@ export interface GameState {
    *  leave this null. Stamped onto saves so a resume after admin reset-today
    *  can detect the seed mismatch and drop the stale save. */
   initialSeed: number | null;
+  /** Scripted dealer queue (tutorial mode only). When present and non-empty,
+   *  `dealTray` shifts from the front of this array to fill tray slots and
+   *  skips every reachability / playsInOne heuristic. Not serialised —
+   *  tutorial runs never hit any save slot, so persistence isn't needed. */
+  scripted?: string[];
 }
 
 /* Events — fire-and-forget notifications for the UI/audio layer. */
@@ -316,6 +321,7 @@ function cloneState(s: GameState): GameState {
     // explicitly null their own `lastSnapshot` at capture time so this
     // never nests more than one level deep.
     lastSnapshot: s.lastSnapshot,
+    scripted: s.scripted ? s.scripted.slice() : undefined,
   };
 }
 
@@ -667,6 +673,7 @@ function afterMove(
       rng: state.rng,
       recentTrays: state.recentTrays,
       found: state.found,
+      scripted: state.scripted,
     });
     events.push({ type: "dealt" });
   }
@@ -770,7 +777,18 @@ export function hasAnyLegalAction(state: GameState, bundle: ThemeBundle): boolea
 export function newGame(
   theme: ThemeKey,
   bundle: ThemeBundle,
-  opts: { mode?: Mode; daily?: string | null; size?: number; seed?: number; target?: number | null } = {},
+  opts: {
+    mode?: Mode;
+    daily?: string | null;
+    size?: number;
+    seed?: number;
+    target?: number | null;
+    /** Scripted dealer queue — tutorial mode only. Copied into
+     *  `state.scripted`; consumed from the front on every `dealTray`.
+     *  Tiles must exist in the bundle or the dealer will insert `null`
+     *  slots and the reducer will treat them as empty (safe but boring). */
+    scripted?: string[];
+  } = {},
 ): ReduceResult {
   const daily = opts.daily ?? null;
   // Default mode from presence of a day key: daily → "daily", else
@@ -821,6 +839,7 @@ export function newGame(
     debug: false,
     target,
     initialSeed: mode === "daily" ? seed : null,
+    scripted: opts.scripted ? opts.scripted.slice() : undefined,
   };
 
   // Initial helpers scale to age-0's band population — see HELPER_PER_ITEMS.
@@ -831,7 +850,12 @@ export function newGame(
   // the game RNG instead so endless runs don't always start with the same
   // tray layout. Daily stays deterministic because the RNG is seeded from
   // the day key — same shuffle every time for the same day.
-  const seedCount = size === 6 ? 5 : 4;
+  //
+  // Tutorial: skip seeding entirely. An empty board means every combine
+  // the player makes is one they explicitly set up, and random seed
+  // tiles can't accidentally auto-combine with the scripted deck
+  // (e.g. a seeded "water" fighting the deck's rock+water story).
+  const seedCount = mode === "tutorial" ? 0 : size === 6 ? 5 : 4;
   // Candidate cells: interior-ish positions, avoiding edges that touch each
   // other too tightly. These are a superset of the prototype's hardcoded
   // picks for each board size, so starts stay visually "spread out".
@@ -866,6 +890,7 @@ export function newGame(
     rng: state.rng,
     recentTrays: state.recentTrays,
     found: state.found,
+    scripted: state.scripted,
   });
   events.push({ type: "dealt" });
 
@@ -1029,6 +1054,7 @@ export function reduce(
         rng: state.rng,
         recentTrays: state.recentTrays,
         found: state.found,
+        scripted: state.scripted,
       });
       events.push({ type: "dealt" });
       return { state, events };
@@ -1228,6 +1254,7 @@ export function reduce(
         rng: state.rng,
         recentTrays: state.recentTrays,
         found: state.found,
+        scripted: state.scripted,
       });
       events.push({ type: "dealt" });
       return { state, events };
@@ -1305,6 +1332,7 @@ export function reduce(
         rng: state.rng,
         recentTrays: state.recentTrays,
         found: state.found,
+        scripted: state.scripted,
       });
       // Debug jump mirrors a real chapter-up's grants so the UI toast
       // renders normally; admin-only path, never reached in prod play.
