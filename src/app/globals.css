@@ -1378,15 +1378,14 @@ a.btn.primary{color:var(--bg)}
 }
 
 @media (max-width: 600px){
-  .cbscore b{font-size:26px}
   .cbh{height:34px;padding:0 9px;font-size:12px}
   .cbsnd{width:34px;height:34px}
   .cbsnd svg{width:16px;height:16px}
   .cbhelp{gap:5px}
   .cbtop{flex-wrap:nowrap;gap:6px}
-  .cbscore{display:inline-flex;align-items:baseline;gap:6px;min-width:0}
-  .cbscore b{display:inline;font-size:22px;line-height:1}
-  .cbscore span{font-size:11px;white-space:nowrap}
+  .cbscore{min-width:0;line-height:1}
+  .cbscore b{line-height:1;margin-bottom:1px}
+  .cbscore span{font-size:11px;line-height:1;white-space:nowrap}
   .cbtip{display:none}
   .cbshelf{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;min-height:28px;padding:3px 8px 3px 5px}
   .cbboard{margin:0 auto;width:100%;box-sizing:border-box}
@@ -1398,7 +1397,8 @@ a.btn.primary{color:var(--bg)}
   .cbh{padding:0 8px;gap:3px;height:32px}
   .cbsnd{width:32px;height:32px}
   .cbsnd svg{width:14px;height:14px}
-  .cbscore span{white-space:nowrap}
+  .cbscore b{font-size:26px}
+  .cbscore span{font-size:10px;white-space:nowrap}
   .cbh.cbtheme span{max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
   .cbh.cbtheme .cbtheme-day{font-size:10px}
   .cbh.cbtheme{padding:0 5px 0 8px}
