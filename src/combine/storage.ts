@@ -15,13 +15,15 @@ import type { CrumbleCounter, GameState } from "./engine";
 import type { Mode, ThemeBundle, ThemeKey } from "./types";
 
 /** Bump when the StoredGame shape changes so older saves fall through to
- *  a fresh game instead of hydrating into a broken state. v5: derived
- *  ages + sparse-band merge changed the band layout and age count. A
- *  pre-v5 save at age=4 under 9 ages can't be hydrated into a 6-age
- *  bundle without warping to "Final age" nonsense.
- *  v7: fast runs now persist to their own slot. Added `mode` to the
- *  stored shape so hydrate doesn't have to infer from `daily`. */
-const SAVE_VERSION = 7;
+ *  a fresh game instead of hydrating into a broken state.
+ *  v5: derived ages + sparse-band merge changed the band layout.
+ *  v7: fast runs persist to their own slot; `mode` added to stored shape.
+ *  v8 (T-0187): soft bands became the sole mechanic. `age` renamed to
+ *     `chapter`; `ageMade` + `madeAtBand` removed; `discoveredAtChapter`
+ *     added. Pre-v8 in-progress saves fail hydration and the player
+ *     starts fresh — lifetime `combine_discoveries` collection (DB) is
+ *     untouched by this version bump. */
+const SAVE_VERSION = 8;
 
 /** Bump to force every player who has already finished today's daily to
  *  be able to play it again. Stamped into DailyResult + the review save
