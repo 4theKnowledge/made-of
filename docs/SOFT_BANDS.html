@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Combine · soft bands (reachability progression)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #F2F3EF; --surface: #FFFFFF; --ink: #111417; --muted: #4A4F55;
+    --line: #B9BCB4; --soft: #E3E5DF; --accent: #2B3FB5; --good: #2C7A36;
+    --warn: #9A6A08; --bad: #B0352B;
+    --known: #c9e6cf; --hop: #fff2c2; --unreach: #e7e9e1;
+    --tF: #5A3EAD; --tN: #357030; --tM: #94630A;
+    --tC: #0D6E77; --tP: #B03B2F; --tS: #33528F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121416; --surface: #1B1E21; --ink: #ECEDE8; --muted: #A4A8A0;
+      --line: #3B3F43; --soft: #25282B; --accent: #A9B6FF; --good: #86CC7C;
+      --warn: #E6B552; --bad: #F38C80;
+      --known: #2f4a3a; --hop: #4a4328; --unreach: #2a2c30;
+      --tF: #B3A0F5; --tN: #93D284; --tM: #EDBE5E;
+      --tC: #7DD3CE; --tP: #F49A85; --tS: #9DB0EC;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: "Chivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+    padding: 40px 24px 64px;
+  }
+  main { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 20px; margin: 32px 0 8px; letter-spacing: -0.01em; }
+  h3 { font-size: 16px; margin: 20px 0 6px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  p, li { color: var(--ink); }
+  p.lede { color: var(--muted); margin: 0 0 20px; font-size: 16px; max-width: 70ch; }
+  code, kbd {
+    font-family: "Chivo Mono", "SF Mono", Menlo, monospace;
+    font-size: 0.92em; background: var(--soft); padding: 1px 6px; border-radius: 4px;
+  }
+  .panel {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 20px 22px; margin: 16px 0;
+  }
+  .note {
+    background: var(--soft); border-left: 3px solid var(--accent);
+    padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0;
+  }
+  .note.warn { border-left-color: var(--warn); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-size: 12px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: "Chivo Mono", monospace; }
+  .graph {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; padding: 18px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 8px; margin: 12px 0;
+    flex-wrap: wrap;
+  }
+  .tile {
+    width: 54px; height: 54px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12px; text-align: center;
+    border: 1px solid var(--line); line-height: 1.1;
+  }
+  .tile.known { background: var(--known); }
+  .tile.hop { background: var(--hop); }
+  .tile.unreach { background: var(--unreach); color: var(--muted); }
+  .arrow { color: var(--muted); font-size: 18px; }
+  .legend { display: flex; gap: 14px; margin: 12px 0; font-size: 13px; flex-wrap: wrap; }
+  .legend .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--line); vertical-align: middle; margin-right: 4px; }
+  .sparkline {
+    height: 100px; width: 100%;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    margin: 12px 0;
+  }
+  .sparkline text { font-family: "Chivo Mono", monospace; font-size: 10px; fill: var(--muted); }
+  .sparkline .line { fill: none; stroke: var(--accent); stroke-width: 2; }
+  .sparkline .dot { fill: var(--accent); }
+  .sparkline .axis { stroke: var(--line); stroke-width: 1; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; column-gap: 18px; row-gap: 4px; }
+  .kv dt { color: var(--muted); font-weight: 600; }
+  .kv dd { margin: 0; font-family: "Chivo Mono", monospace; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Combine · soft bands</h1>
+<p class="lede">
+  The progression system used in Combine's soft-bands mode
+  (<code>?gp_override=mode=soft</code>). Replaces the fixed age-banded
+  ladder with a reachability pool that grows with the player's discoveries,
+  log-scaled chapters measured against cumulative finds, and crumble that
+  tightens as the board fills.
+</p>
+
+<section class="panel">
+  <h2>The core idea</h2>
+  <p>
+    In banded mode the dealer samples from a fixed age window
+    (<code>ageSets(age)</code> → recipes whose band is <code>age</code> or
+    <code>age+1</code>). That window is static per age. If band 1 only has
+    two viable 2-input combines, the dealer is stuck re-dealing them until
+    you age up.
+  </p>
+  <p>
+    In soft mode the dealer samples from a pool that <em>expands with the
+    player's discoveries</em>. Early on the pool is just base ingredients
+    plus recipes you could fire right now; as you discover things, each
+    new find unlocks the next hop of the recipe graph.
+  </p>
+
+  <h3>Pool definition</h3>
+  <div class="kv">
+    <dt>known</dt><dd>base ingredients ∪ items the player has discovered this run</dd>
+    <dt>reachable recipes</dt><dd>recipes whose entire ingredient list is in <code>known</code></dd>
+    <dt>one-hop-out</dt><dd>ingredients of recipes where ≥1 input is already in <code>known</code></dd>
+    <dt>pool</dt><dd>known ∪ reachable-recipe outputs ∪ one-hop-out ingredients</dd>
+  </div>
+
+  <p>The dealer only deals tiles from <code>pool</code>. Everything else is invisible until the frontier grows.</p>
+</section>
+
+<section class="panel">
+  <h2>How the pool grows</h2>
+  <p>Walking through the first few moves of an Everything run:</p>
+
+  <h3>Move 0 — just base ingredients</h3>
+  <div class="graph">
+    <div class="tile known">H</div>
+    <div class="tile known">He</div>
+    <div class="tile unreach">star</div>
+    <div class="tile unreach">sun</div>
+    <div class="tile unreach">supernova</div>
+    <div class="tile unreach">carbon</div>
+    <div class="tile unreach">…</div>
+  </div>
+  <p>Only H and He are in <code>known</code>. H+He→star is a reachable recipe, so <strong>star</strong> is in the pool too. Nothing else is visible yet.</p>
+
+  <h3>Move 3 — player makes star</h3>
+  <div class="graph">
+    <div class="tile known">H</div>
+    <div class="tile known">He</div>
+    <div class="tile known">star</div>
+    <div class="tile hop">supernova</div>
+    <div class="tile hop">carbon</div>
+    <div class="tile hop">oxygen</div>
+    <div class="tile unreach">water</div>
+    <div class="tile unreach">…</div>
+  </div>
+  <p>star joins <code>known</code>. Every 1-input promote recipe whose source is star (<code>star→supernova</code>, <code>star→carbon</code>, …) becomes one-hop-out — the outputs are now <em>candidates to introduce</em>. Water (needs oxygen + hydrogen) is still invisible because oxygen hasn't been discovered.</p>
+
+  <h3>Move 8 — player promotes star into oxygen + carbon</h3>
+  <div class="graph">
+    <div class="tile known">H</div>
+    <div class="tile known">He</div>
+    <div class="tile known">star</div>
+    <div class="tile known">O</div>
+    <div class="tile known">C</div>
+    <div class="tile hop">water</div>
+    <div class="tile hop">CO₂</div>
+    <div class="tile hop">methane</div>
+    <div class="tile unreach">…</div>
+  </div>
+  <p>Oxygen and carbon are now <code>known</code>. The pool jumps: water becomes reachable (H+O), CO₂ (C+O), methane (CH₄). The dealer can start dealing those partners.</p>
+
+  <div class="legend">
+    <span><span class="sw" style="background:var(--known);"></span>Known — discovered or base</span>
+    <span><span class="sw" style="background:var(--hop);"></span>One-hop-out — can be dealt</span>
+    <span><span class="sw" style="background:var(--unreach);"></span>Not yet visible</span>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Chapters — log-scaled progression</h2>
+  <p>
+    Ages in banded mode were thematic eras (Big Bang, Formation, Life …) tied
+    to recipe bands. Soft mode has no fixed bands, so "age" becomes a
+    discovery milestone: <strong>Chapter N</strong> starts at a cumulative
+    find count.
+  </p>
+
+  <h3>Threshold curve</h3>
+  <p><code>threshold(k) = floor(10 × 1.8<sup>k-1</sup>)</code> — exponential ramp. Chapter N always takes ~N finds regardless of KB size.</p>
+
+  <table>
+    <tr><th>Chapter</th><th>Finds needed</th><th>Span</th></tr>
+    <tr><td>1</td><td class="num">0</td><td class="num">10</td></tr>
+    <tr><td>2</td><td class="num">10</td><td class="num">8</td></tr>
+    <tr><td>3</td><td class="num">18</td><td class="num">14</td></tr>
+    <tr><td>4</td><td class="num">32</td><td class="num">26</td></tr>
+    <tr><td>5</td><td class="num">58</td><td class="num">47</td></tr>
+    <tr><td>6</td><td class="num">105</td><td class="num">84</td></tr>
+    <tr><td>7</td><td class="num">189</td><td class="num">151</td></tr>
+    <tr><td>8</td><td class="num">340</td><td class="num">272</td></tr>
+    <tr><td>9</td><td class="num">612</td><td class="num">489</td></tr>
+    <tr><td>10+</td><td class="num">1101…</td><td class="num">open</td></tr>
+  </table>
+
+  <div class="note">
+    <strong>KB-size invariant.</strong> Fractions-of-KB thresholds break at
+    large KBs — 40 000 items × 4% = 1 600 finds for Chapter 1. Log-scaled
+    thresholds don't care how big the KB is: a 400-item theme and a 40 000-item
+    theme both reach Chapter 5 after 58 finds. Chapters only get
+    <em>deeper</em> (more remains to find past the last chapter) as the KB
+    grows, not slower.
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Helper milestones</h2>
+  <p>
+    Helpers (swap, clear, hint, shore, pluck, move) are granted at discovery
+    milestones with the same curve as chapters but offset by ~50% so
+    helpers fire <em>mid-chapter</em>. One grant mid-chapter, one at the next
+    chapter boundary, repeat.
+  </p>
+  <p><code>helperThreshold(k) = floor(5 × 1.8<sup>k-1</sup>)</code></p>
+  <table>
+    <tr><th>Milestone</th><th>Finds</th><th>Fires around</th></tr>
+    <tr><td>1</td><td class="num">5</td><td>mid-Chapter 1</td></tr>
+    <tr><td>2</td><td class="num">9</td><td>near Chapter 2</td></tr>
+    <tr><td>3</td><td class="num">16</td><td>mid-Chapter 3</td></tr>
+    <tr><td>4</td><td class="num">29</td><td>near Chapter 4</td></tr>
+    <tr><td>5</td><td class="num">52</td><td>mid-Chapter 5</td></tr>
+    <tr><td>6</td><td class="num">94</td><td>near Chapter 6</td></tr>
+    <tr><td>7</td><td class="num">170</td><td>mid-Chapter 7</td></tr>
+  </table>
+</section>
+
+<section class="panel">
+  <h2>Dealer temperature</h2>
+  <p>
+    Already-discovered tiles get a weight of <code>0.2</code> in the sampler;
+    undiscovered tiles weight <code>1.0</code>. Discovered tiles aren't
+    removed from the pool — they're still valid ingredients for
+    undiscovered recipes — but they appear ~80% less often so fresh
+    discoveries get the airtime.
+  </p>
+  <p>
+    Effect: the dealer feels like it's "showing you new things" even in
+    late-game, rather than endlessly re-serving the same five tiles that
+    were useful early.
+  </p>
+</section>
+
+<section class="panel">
+  <h2>Crumble — occupancy-scaled TTL</h2>
+  <p>
+    In banded mode crumble was "a tile outside the age window dies after 3
+    ticks." Soft mode has no age window, so crumble becomes a function of
+    <strong>board occupancy</strong>: idle tiles die faster as the board
+    fills up.
+  </p>
+
+  <h3>Formula</h3>
+  <p>
+    <code>occ = filled / total</code><br>
+    <code>t = max(0, (occ − 0.3) / 0.7)</code><br>
+    <code>ttl = 60 − (60 − 20) × min(1, t)</code>
+  </p>
+
+  <h3>Behaviour on a 6×6 board</h3>
+  <table>
+    <tr><th>Board occupancy</th><th>Filled cells</th><th>TTL (moves)</th><th>Feel</th></tr>
+    <tr><td class="num">0%</td><td class="num">0</td><td class="num">60</td><td>Very lenient — hoard freely</td></tr>
+    <tr><td class="num">30%</td><td class="num">11</td><td class="num">60</td><td>Pressure begins</td></tr>
+    <tr><td class="num">50%</td><td class="num">18</td><td class="num">43</td><td>Half full, half fast</td></tr>
+    <tr><td class="num">70%</td><td class="num">25</td><td class="num">26</td><td>Tiles dying noticeably</td></tr>
+    <tr><td class="num">100%</td><td class="num">36</td><td class="num">20</td><td>Tight — declutter or lose stuff</td></tr>
+  </table>
+
+  <div class="note">
+    <strong>Why occupancy, not time.</strong> A fixed timer punishes sparse
+    boards (no reason to pressure the player) and under-pressures dense
+    boards (player already overloaded). Scaling with occupancy means the
+    game's pressure matches your actual situation — the player who's
+    hoarding gets the squeeze, the player who's playing clean doesn't.
+  </div>
+
+  <h3>Interaction with shore</h3>
+  <p>
+    Shore marks a tile as crumble-exempt until its cell changes. Under
+    occupancy-scaled crumble, shore becomes more valuable in high-occupancy
+    play — you can preserve 1-2 key tiles while the rest of the board
+    churns. This creates genuine strategic choice: do you keep this
+    hard-won ingredient for a future recipe, or let it ride?
+  </p>
+</section>
+
+<section class="panel">
+  <h2>What this fixes vs. banded</h2>
+  <div class="cols">
+    <div>
+      <h3>Before (banded)</h3>
+      <ul>
+        <li>Band 1 has 26 outputs but only 2 real 2-input combines (H+He→star, H+He→sun).</li>
+        <li>24 outputs gated behind 1-input promote.</li>
+        <li>Dealer cycles H/He/star endlessly.</li>
+        <li>Sim: 29% of collection reachable in 50 plays. 70% unreachable.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>After (soft)</h3>
+      <ul>
+        <li>Pool grows each discovery — no artificial scarcity.</li>
+        <li>Progress feels earned ("I made X, now Y-making tiles appear").</li>
+        <li>Dealer temperature keeps variety high through the run.</li>
+        <li>Sim: 59–62% of collection reachable in 50 plays (roughly 2× banded).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>What stays the same</h2>
+  <ul>
+    <li><strong>Catalogue groupings</strong> — still show thematic eras (Big Bang, Formation, …) so the collection view reads chronologically. Soft mode changes the <em>progression</em> UI, not the collection UI.</li>
+    <li><strong>Scoring</strong> — tier values, chain multipliers, close-call bonuses unchanged.</li>
+    <li><strong>Fast mode</strong> — unaffected.</li>
+    <li><strong>Daily mode</strong> — still target-list ending (<code>state.target</code>); soft sampler would apply if daily switched to it but current daily is independent.</li>
+    <li><strong>Hold capacity</strong> — scales with <code>state.age</code> as before. In soft mode <code>state.age</code> advances on chapter thresholds, so capacity still grows naturally.</li>
+  </ul>
+</section>
+
+<section class="panel">
+  <h2>Tunable constants</h2>
+  <p>All the knobs live in <code>src/combine/soft-bands.ts</code>:</p>
+  <div class="kv">
+    <dt>CHAPTER_A, CHAPTER_B</dt><dd>a=10, b=1.8 → threshold = floor(a·b<sup>k</sup>)</dd>
+    <dt>HELPER_C, HELPER_B</dt><dd>c=5, b=1.8 → helper milestone threshold</dd>
+    <dt>DISCOVERED_WEIGHT</dt><dd>0.2 — dealer weight for already-found tiles</dd>
+    <dt>CRUMBLE_TTL_MAX</dt><dd>60 moves — TTL at empty board</dd>
+    <dt>CRUMBLE_TTL_MIN</dt><dd>20 moves — TTL at full board</dd>
+    <dt>CRUMBLE_OCCUPANCY_START</dt><dd>0.3 — occupancy at which crumble pressure begins</dd>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Related docs</h2>
+  <ul>
+    <li><a href="BANDS.html">BANDS.html</a> — the original banded-mode slicing (still used as the production mode until soft is promoted).</li>
+    <li><a href="COMBINE_PACING.md">COMBINE_PACING.md</a> — investigation history, sim results, playtest notes, open questions.</li>
+  </ul>
+</section>
+
+</main>
+</body>
+</html>
