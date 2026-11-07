@@ -2,6 +2,8 @@ import React, { useMemo } from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import { ageNeed } from "@/combine/engine";
 import type { GameState } from "@/combine/engine";
+import { getGpOverrides } from "@/combine/gp-overrides";
+import { chapterIndex, chapterThreshold } from "@/combine/soft-bands";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { AGE_CHAINS } from "@/components/combine/board-parts/types";
@@ -20,10 +22,20 @@ export function AgesSheet({
   onDismiss: () => void;
 }) {
   const ages = bundle.theme.ages;
+  const softMode = getGpOverrides().mode === "soft";
   const current = state.age;
   const last = current >= ages.length - 1;
-  const need = ageNeed(current, bundle);
-  const left = Math.max(0, need - state.ageMade);
+  // Banded: "unique on-band makes" counter. Soft: chapter progress against
+  // cumulative discoveries. The two use the same visual slot (header + "N
+  // more to unlock…") but back different counters.
+  const foundCount = state.found.length;
+  const softChapter = softMode ? chapterIndex(foundCount) : 0;
+  const softNextThreshold = softMode ? chapterThreshold(softChapter + 1) : Number.POSITIVE_INFINITY;
+  const softCurrentThreshold = softMode ? chapterThreshold(softChapter) : 0;
+  const need = softMode ? softNextThreshold : ageNeed(current, bundle);
+  const left = softMode
+    ? Math.max(0, softNextThreshold - foundCount)
+    : Math.max(0, need - state.ageMade);
   // Group this run's discoveries by the age the player actually made them
   // in (recipe.band at make time), falling back to the item's canonical
   // min-band for older saves that predate `madeAtBand`.
@@ -66,17 +78,29 @@ export function AgesSheet({
       ariaLabel="Ages"
       className="cbagesheet"
     >
-      <span className="k">Ages</span>
+      <span className="k">{softMode ? "Journey" : "Ages"}</span>
         <h3>
-          Age {ages[current]} — step {current + 1} of {ages.length}
+          {softMode
+            ? `Chapter ${softChapter + 1} — ${foundCount} discoveries`
+            : `Age ${ages[current]} — step ${current + 1} of ${ages.length}`}
         </h3>
         <p>
-          Make combos at Age {ages[current]} to advance. Each successful
-          Age-{ages[current]} combo counts — chains and makes at earlier
-          ages don&apos;t.
-          {last
-            ? " You're on the final step — keep combining to push your score higher."
-            : ` ${left} more Age-${ages[current]} combo${left === 1 ? "" : "s"} and you unlock ${ages[current + 1]}.`}
+          {softMode ? (
+            isFinite(softNextThreshold) ? (
+              <>Keep discovering. {left} more unique find{left === 1 ? "" : "s"} and you reach Chapter {softChapter + 2}.</>
+            ) : (
+              <>You&apos;re deep into the collection — keep making new things to push your score higher.</>
+            )
+          ) : (
+            <>
+              Make combos at Age {ages[current]} to advance. Each successful
+              Age-{ages[current]} combo counts — chains and makes at earlier
+              ages don&apos;t.
+              {last
+                ? " You're on the final step — keep combining to push your score higher."
+                : ` ${left} more Age-${ages[current]} combo${left === 1 ? "" : "s"} and you unlock ${ages[current + 1]}.`}
+            </>
+          )}
         </p>
         {chain.length >= 2 && (
           <div className="cbageex">
@@ -114,17 +138,27 @@ export function AgesSheet({
         )}
         <ol className="cbagelist">
           {ages.map((name, i) => {
-            const isNow = i === current;
-            const isPast = i < current;
+            const isNow = !softMode && i === current;
+            const isPast = !softMode && i < current;
             const metaNeed = ageNeed(i, bundle);
             const finds = foundByBand.get(i + 1) ?? [];
-            const meta = isNow
-              ? last
-                ? "Final"
-                : `${state.ageMade}/${metaNeed}`
-              : isPast
-                ? `Done (${finds.length}/${metaNeed})`
-                : `Needs ${metaNeed}`;
+            // In soft mode the thematic row is purely a collection grouping —
+            // no "needs X" counter, no on/past highlight. Show the band name
+            // + what you've found there. In banded mode keep the full ladder.
+            const meta = softMode
+              ? finds.length > 0
+                ? `${finds.length} found`
+                : ""
+              : isNow
+                ? last
+                  ? "Final"
+                  : `${state.ageMade}/${metaNeed}`
+                : isPast
+                  ? `Done (${finds.length}/${metaNeed})`
+                  : `Needs ${metaNeed}`;
+            // Soft mode: skip rows that have zero finds AND zero collection
+            // relevance to avoid a 14-row empty ladder. Banded shows all.
+            if (softMode && finds.length === 0) return null;
             return (
               <li
                 key={name}

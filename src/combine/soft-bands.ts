@@ -79,19 +79,95 @@ export function softPool(bundle: ThemeBundle, found: string[]): SoftPool {
   return { known, reachableRecipes, pool, basePool, midPool };
 }
 
-/** Thresholds for soft-bands age-up, scaled to the theme size. Each age
- *  demands a fraction of the total collection discovered so far. Monotonic;
- *  the final age never completes (open-ended by design). */
-export function softAgeThresholds(totalItems: number): number[] {
-  // Rough shape: 4% / 10% / 20% / 35% / 55% / 80% / 100%.
-  // At 397 items that's ~16 / 40 / 79 / 139 / 218 / 318 / 397.
-  const fractions = [0.04, 0.1, 0.2, 0.35, 0.55, 0.8, 1.0];
-  return fractions.map((f) => Math.max(1, Math.ceil(f * totalItems)));
+/**
+ * KB-size-invariant chapter thresholds for soft-bands progression.
+ *
+ * Replaces the earlier fraction-of-KB scheme (`softAgeThresholds`) which
+ * broke at large KBs — at 40k items the first chapter would demand 1600
+ * finds. Log-scaling is independent of KB size: chapter N always takes
+ * ~N finds, so early-game dopamine stays steady regardless of content
+ * volume. See T-0167.
+ *
+ *   threshold(k) = floor(a * b^k), a=10, b=1.8
+ *   → [10, 18, 32, 58, 105, 189, 340, 612, 1101, 1983, ...]
+ *
+ * Chapters are open-ended; the caller treats "past the last computed
+ * threshold" as `Infinity` (same open-ended semantics as the prior flat
+ * variant).
+ */
+const CHAPTER_A = 10;
+const CHAPTER_B = 1.8;
+const CHAPTER_DEPTH = 12; // precompute 12 chapters; past that → Infinity
+
+const CHAPTER_THRESHOLDS: readonly number[] = (() => {
+  const xs: number[] = [];
+  for (let k = 0; k < CHAPTER_DEPTH; k++) xs.push(Math.floor(CHAPTER_A * CHAPTER_B ** k));
+  return xs;
+})();
+
+/** Cumulative unique-find count required to enter chapter `k` (0-based).
+ *  Chapter 0 entry threshold is 0 (always true). Past `CHAPTER_DEPTH`,
+ *  returns Infinity (open-ended tail). */
+export function chapterThreshold(k: number): number {
+  if (k <= 0) return 0;
+  const idx = k - 1;
+  return CHAPTER_THRESHOLDS[idx] ?? Number.POSITIVE_INFINITY;
 }
 
-/** How many unique discoveries to leave age `age`? Returns Infinity past
- *  the last threshold (treats final age as open-ended). */
-export function softNeed(age: number, totalItems: number): number {
-  const thresholds = softAgeThresholds(totalItems);
-  return thresholds[age] ?? Number.POSITIVE_INFINITY;
+/** Highest chapter index achievable with `finds` cumulative discoveries.
+ *  Returns 0 for finds < threshold(1). */
+export function chapterIndex(finds: number): number {
+  let k = 0;
+  for (let i = 0; i < CHAPTER_THRESHOLDS.length; i++) {
+    if (finds >= CHAPTER_THRESHOLDS[i]) k = i + 1;
+    else break;
+  }
+  return k;
 }
+
+/** Legacy accessor (kept so engine.ts doesn't break; forwards to chapters). */
+export function softNeed(age: number, _totalItems: number): number {
+  return chapterThreshold(age + 1);
+}
+
+/**
+ * Helper-grant milestones. Same curve shape as chapters, offset by 50% so
+ * helpers fire mid-chapter. Players get a reward every few discoveries
+ * early on, with intervals widening as they progress.
+ *
+ *   helperThreshold(k) = floor(c * b^k), c=5, b=1.8
+ *   → [5, 9, 16, 29, 52, 94, 170, 306, ...]
+ */
+const HELPER_C = 5;
+const HELPER_B = 1.8;
+const HELPER_DEPTH = 14;
+
+const HELPER_THRESHOLDS: readonly number[] = (() => {
+  const xs: number[] = [];
+  for (let k = 0; k < HELPER_DEPTH; k++) xs.push(Math.floor(HELPER_C * HELPER_B ** k));
+  return xs;
+})();
+
+/** Cumulative discoveries required to earn helper milestone `k` (0-based).
+ *  Milestone 0 is always granted (initial game setup). */
+export function helperMilestoneThreshold(k: number): number {
+  if (k <= 0) return 0;
+  const idx = k - 1;
+  return HELPER_THRESHOLDS[idx] ?? Number.POSITIVE_INFINITY;
+}
+
+/** Highest helper milestone achieved at `finds` cumulative discoveries. */
+export function helperMilestoneIndex(finds: number): number {
+  let k = 0;
+  for (let i = 0; i < HELPER_THRESHOLDS.length; i++) {
+    if (finds >= HELPER_THRESHOLDS[i]) k = i + 1;
+    else break;
+  }
+  return k;
+}
+
+/** Number of moves of inactivity before a tile crumbles. Applies in all
+ *  modes (T-0167) — replaces the band-local USE check that turned crumble
+ *  off in soft mode. "Touch" = tile placed, moved, dropped-on, or
+ *  combined-into. Shore still exempts a tile until its cell changes. */
+export const CRUMBLE_INACTIVITY_MOVES = 20;

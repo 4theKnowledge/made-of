@@ -17,7 +17,11 @@
 
 import { ageSets, buildThemeBundle } from "./data";
 import { getGpOverrides } from "./gp-overrides";
-import { softNeed } from "./soft-bands";
+import {
+  CRUMBLE_INACTIVITY_MOVES,
+  helperMilestoneIndex,
+  softNeed,
+} from "./soft-bands";
 import {
   edgeNeighbours,
   matchAt,
@@ -615,7 +619,12 @@ function afterMove(
     state.age++;
     state.ageMade = 0;
     state.score += 100 * state.age;
-    const grants = helperGrants(state.age, bundle);
+    // In soft mode, helper grants track discovery milestones (log-scaled),
+    // not banded age. In banded, keep the existing `bandSize(age)`-indexed
+    // grants. Both call `helperGrants` with an integer index; the function
+    // doesn't care whether the index came from a band or a milestone count.
+    const grantIdx = softMode ? helperMilestoneIndex(state.found.length) : state.age;
+    const grants = helperGrants(grantIdx, bundle);
     applyHelperGrants(state, grants);
     const A = ageSets(bundle, state.age);
     const sample = [...new Set(A.recipes.filter((r) => r.band === state.age + 1).map((r) => r.out))].slice(0, 4);
@@ -639,25 +648,29 @@ function afterMove(
     return;
   }
 
-  // 2. Crumble.
+  // 2. Crumble. Time-based (T-0167): every occupied cell ages one tick per
+  //    move, regardless of band or mode. A cell's counter resets when its
+  //    tile changes (combine, place, move, drop-on). This replaces the
+  //    older band-local `A.USE` gate, which turned crumble off entirely in
+  //    soft mode (nothing is "out of band" when the pool is reachability-
+  //    defined). Shore still exempts a tile until the cell changes.
   const A = ageSets(bundle, state.age);
   const gone: number[] = [];
+  const ttl = softMode ? CRUMBLE_INACTIVITY_MOVES : CRUMBLE_TTL;
   for (let i = 0; i < state.board.length; i++) {
     const v = state.board[i];
-    if (!v || A.USE.has(v)) {
-      state.crumb[i] = null;
-      continue;
-    }
+    if (!v) { state.crumb[i] = null; continue; }
     // Shored tiles are permanently exempt from crumble until the tile at
     // this cell changes (which clears the flag at the mutation site).
-    if (state.shored[i]) {
-      state.crumb[i] = null;
-      continue;
-    }
+    if (state.shored[i]) { state.crumb[i] = null; continue; }
+    // Banded mode keeps the old "useful across age window" short-circuit
+    // for compatibility — on-band tiles never crumble. Soft mode has no
+    // concept of "in band," so every tile is counted.
+    if (!softMode && A.USE.has(v)) { state.crumb[i] = null; continue; }
     const cur = state.crumb[i];
     const c = cur && cur.id === v ? cur : (state.crumb[i] = { id: v, n: 0 });
     c.n++;
-    if (c.n > CRUMBLE_TTL) gone.push(i);
+    if (c.n > ttl) gone.push(i);
   }
   if (gone.length) {
     events.push({ type: "crumble", cells: gone.slice() });
