@@ -71,7 +71,8 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
 
   // Resolve active theme: URL param wins if it's published; else default.
   const publishedCodes = new Set(publishedThemes.map((t) => t.code));
-  const activeTheme: ThemeKey = themeParam && publishedCodes.has(themeParam) ? themeParam : DEFAULT_THEME;
+  const themeFromUrl = Boolean(themeParam && publishedCodes.has(themeParam));
+  const activeTheme: ThemeKey = themeFromUrl ? (themeParam as ThemeKey) : DEFAULT_THEME;
 
   // Build bundles only for the active theme. Daily uses its own configured
   // host theme regardless of what the player picked.
@@ -161,6 +162,7 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
         signedIn={signedIn}
         activeTheme={activeTheme}
         initialMode={initialMode}
+        themeFromUrl={themeFromUrl}
         dailyHostTheme={dailyHostTheme}
         publishedThemes={publishedThemes}
       />

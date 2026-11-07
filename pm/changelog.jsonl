@@ -88,3 +88,4 @@
 {"id": "C-0088", "ts": "2026-11-07T08:53:29Z", "kind": "fix", "summary": "Combine top-bar: larger primary score on small screens, tighter gap to \"best\" (T-0179)", "refs": {"task": "T-0179"}}
 {"id": "C-0089", "ts": "2026-11-07T11:05:09Z", "kind": "feature", "summary": "combine: server-authoritative run state behind COMBINE_SERVER_RUNS flag — closes client-forge-scores exploit", "refs": {"task": "T-0175"}}
 {"id": "C-0090", "ts": "2026-11-07T11:26:42Z", "kind": "refactor", "summary": "Replace all native window.confirm() dialogs with styled ConfirmDialog via useConfirm hook", "refs": {"task": "T-0185"}}
+{"id": "C-0091", "ts": "2026-11-07T12:39:00Z", "kind": "fix", "summary": "Combine: honour ?t= theme selection over stale lastMode=daily/fast on mount", "refs": {"task": "T-0197"}}

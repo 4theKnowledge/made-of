@@ -145,6 +145,11 @@ interface Props {
    *  other values are ignored and the normal resume logic runs. Lets a
    *  theme-switch nav land directly in the right mode. */
   initialMode?: Mode;
+  /** True when ?t= was present and resolved to a published theme. Signals
+   *  that the player explicitly asked for this theme (via the theme-menu
+   *  reload), so the mount-time resume logic must honour it and not
+   *  hijack the board into a stale lastMode="daily"/"fast" slot. */
+  themeFromUrl?: boolean;
   /** Theme hosting today's daily puzzle. May differ from `activeTheme` —
    *  daily is always the admin-configured host regardless of what the
    *  player picked for endless/fast. Defaults to "everything" so legacy
@@ -176,6 +181,7 @@ export function CombineBoard({
   signedIn = false,
   activeTheme = "everything",
   initialMode,
+  themeFromUrl = false,
   dailyHostTheme = "everything",
   publishedThemes = [],
 }: Props) {
@@ -305,13 +311,18 @@ export function CombineBoard({
     // Resume priority on plain /combine:
     //   1. If ?m=fast was set in the URL, prefer a fast run (resume save
     //      if any, else start fresh). Lets theme-switch nav land in fast.
-    //   2. `lastMode` pointer (saveGame writes it on every tick) — hydrate
+    //   2. If ?t= resolved to a published theme (themeFromUrl), the player
+    //      explicitly picked that theme in endless via the theme menu —
+    //      resume its endless save or start fresh. Must beat the lastMode
+    //      checks below so a stale daily/fast pointer can't hijack the
+    //      user's selection.
+    //   3. `lastMode` pointer (saveGame writes it on every tick) — hydrate
     //      whichever slot the player was actually in before the refresh.
     //      Prevents a stale fast save from hijacking a player who moved
     //      on to endless or daily.
-    //   3. Fallback priority for first-ever visits / pre-pointer players:
+    //   4. Fallback priority for first-ever visits / pre-pointer players:
     //      fast → endless → today's daily.
-    //   4. Fall through to the deterministic fresh endless in `initial`.
+    //   5. Fall through to the deterministic fresh endless in `initial`.
     if (initialMode === "fast") {
       const fastSave = loadGame(fastBundles[activeTheme], { daily: null, mode: "fast" });
       if (fastSave) {
@@ -322,6 +333,20 @@ export function CombineBoard({
       return;
     }
     const today = todayKey();
+    if (themeFromUrl) {
+      const endlessSave = loadGame(bundles[activeTheme], { daily: null });
+      if (endlessSave && endlessSave.theme === activeTheme) {
+        setState(hydrateGame(endlessSave));
+      } else {
+        setState(
+          newGame(activeTheme, bundles[activeTheme], {
+            seed: freshEndlessSeed(),
+            size: 6,
+          }).state,
+        );
+      }
+      return;
+    }
     const lastMode = loadLastMode();
     if (lastMode === "daily" && dailyEnabled && !loadDailyDone(today)) {
       const dailyBundle = dailyBundles[dailyHostTheme];
@@ -369,7 +394,7 @@ export function CombineBoard({
             }).state,
       );
     }
-  }, [activeTheme, initialMode, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyTarget, dailyPayloadSeed, dailyEnabled, run.ready]);
+  }, [activeTheme, initialMode, themeFromUrl, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyTarget, dailyPayloadSeed, dailyEnabled, run.ready]);
 
   // Server run alignment. Each time the local state settles on a fresh
   // (mode, theme, dailyKey) slot, register a matching server run. The
