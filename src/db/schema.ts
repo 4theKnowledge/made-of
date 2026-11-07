@@ -728,6 +728,11 @@ export const combineRuns = pgTable(
     eventCount: integer("event_count").notNull().default(0),
     status: combineRunStatusEnum("status").notNull().default("active"),
     epoch: integer("epoch").notNull().default(1),
+    // Pinned engine version. Replay rejects mismatches so a reducer edit
+    // can't silently re-score an in-flight run — see `ENGINE_VERSION` in
+    // `src/combine/engine.ts`. Bump the constant in the same commit as any
+    // scoring-affecting reducer change.
+    engineVersion: integer("engine_version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

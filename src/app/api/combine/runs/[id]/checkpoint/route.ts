@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getRunOwner, serverRunsEnabled } from "@/lib/anon-session";
-import { isAdmin } from "@/lib/session";
-import { bundleForRun, replayActions, ReplayError, validateActionShape, type ServerMode } from "@/combine/server-engine";
+import { getSession, isAdmin } from "@/lib/session";
+import { bundleForRun, isEngineVersionCurrent, replayActions, ReplayError, validateActionShape, type ServerMode } from "@/combine/server-engine";
 import { getRunForOwner, saveRunCheckpoint } from "@/combine/run-store";
+import { writeDiscoveriesFromState } from "@/combine/discoveries-writer";
 import type { Action, GameState } from "@/combine/engine";
 
 export const dynamic = "force-dynamic";
@@ -86,6 +87,22 @@ export async function POST(
       { status: 409 },
     );
   }
+  // Reject replay against a stored run that predates the running reducer.
+  // Replaying would silently produce a different score. Client treats
+  // `engineVersionMismatch` the same as the ordinary 409 reconcile path —
+  // drop local state and start a fresh run.
+  if (!isEngineVersionCurrent(run.engineVersion)) {
+    return NextResponse.json(
+      {
+        error: "engine version mismatch",
+        engineVersionMismatch: true,
+        serverEventCount: run.eventCount,
+        state: run.stateJson,
+        epoch: run.epoch,
+      },
+      { status: 409 },
+    );
+  }
   if (baseCount !== run.eventCount) {
     // Client is ahead or behind the server. Return server truth so the
     // client can reconcile (reset its local buffer, re-render from the
@@ -137,6 +154,19 @@ export async function POST(
   );
   if (!saved) {
     return NextResponse.json({ error: "save failed" }, { status: 500 });
+  }
+
+  // Grow the lifetime collection mid-run (H3b). Replay already produced
+  // `result.state.found`; the write is scoped per `state.daily`. Guest
+  // runs don't write — only signed-in users. Non-fatal — a failure here
+  // delays unlock visibility but doesn't block the checkpoint.
+  const session = await getSession();
+  if (session?.user?.id) {
+    try {
+      await writeDiscoveriesFromState(session.user.id, result.state);
+    } catch (err) {
+      console.error("[runs/checkpoint] discovery write failed:", err);
+    }
   }
 
   return NextResponse.json({

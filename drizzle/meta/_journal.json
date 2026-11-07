@@ -190,6 +190,13 @@
       "when": 1794052800000,
       "tag": "0026_drop_daily_max_ages",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1794054697049,
+      "tag": "0027_happy_eternals",
+      "breakpoints": true
     }
   ]
 }

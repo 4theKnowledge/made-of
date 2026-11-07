@@ -48,6 +48,23 @@ export const TIER_VALUE: Record<string, number> = {
   S: 5,
 };
 
+/**
+ * Pinned reducer version. Stamped onto every server run at `/start` and
+ * verified on every `/checkpoint` / `/finish` replay. A mismatch means
+ * the stored run was created under a different reducer than the one
+ * running now, and replaying would silently re-score the player's run —
+ * see T-0195 / `docs/SECURITY_AUDIT.md` H3c.
+ *
+ * **Bump this whenever you change** any file under `src/combine/` that
+ * affects state transitions or scoring: this file, `deal.ts`,
+ * `match.ts`, `progression.ts`, `data.ts`. The server rejects mismatched
+ * runs with a 409 so clients drop local state and start fresh.
+ *
+ * It is fine (and expected) to skip bumping for pure refactors that
+ * leave the reducer's output-for-input identical.
+ */
+export const ENGINE_VERSION = 1;
+
 /** Baseline hold-zone capacity at chapter 0. */
 const HOLD_CAPACITY_BASE = 2;
 /** Each chapter adds this many hold slots. */

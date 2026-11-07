@@ -4,6 +4,7 @@ import { getRunOwner, serverRunsEnabled } from "@/lib/anon-session";
 import { isAdmin, getSession } from "@/lib/session";
 import {
   bundleForRun,
+  isEngineVersionCurrent,
   replayActions,
   ReplayError,
   validateActionShape,
@@ -12,6 +13,7 @@ import {
 import { endRun, getRunForOwner, saveRunCheckpoint } from "@/combine/run-store";
 import { getDb, schema } from "@/db/client";
 import { loadSeason } from "@/combine/season";
+import { writeDiscoveriesFromState } from "@/combine/discoveries-writer";
 import type { Action, GameState } from "@/combine/engine";
 
 export const dynamic = "force-dynamic";
@@ -94,6 +96,21 @@ export async function POST(
       eventCount: run.eventCount,
       alreadyEnded: true,
     });
+  }
+  // Reject replay against a stored run that predates the running reducer.
+  // Replaying would silently produce a different score. Client treats
+  // `engineVersionMismatch` the same as the ordinary 409 reconcile path —
+  // drop local state and start a fresh run.
+  if (!isEngineVersionCurrent(run.engineVersion)) {
+    return NextResponse.json(
+      {
+        error: "engine version mismatch",
+        engineVersionMismatch: true,
+        serverEventCount: run.eventCount,
+        state: run.stateJson,
+      },
+      { status: 409 },
+    );
   }
   if (baseCount !== run.eventCount) {
     return NextResponse.json(
@@ -186,6 +203,16 @@ export async function POST(
     } catch (err) {
       // Non-fatal — the run is ended, the player sees their score.
       console.error("[runs/finish] progress insert failed:", err);
+    }
+    // Write discoveries from the server-replayed state. H3b: the client
+    // used to POST these to `/api/combine/collection` with no
+    // cross-check; now the server is the sole writer. Non-fatal — a
+    // failure here drops this run's unlocks but doesn't break the
+    // score write above.
+    try {
+      await writeDiscoveriesFromState(userId, final);
+    } catch (err) {
+      console.error("[runs/finish] discovery write failed:", err);
     }
   }
 

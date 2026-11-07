@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "@/lib/auth-client";
-import { clearFound, loadFound, markFound } from "./storage";
+import { markFound } from "./storage";
 
 export type CollectionScope = "endless" | "daily";
 
@@ -26,12 +26,10 @@ export interface DiscoveryRecord {
  *
  * Signed-in users:
  *   - Source of truth is `/api/combine/collection?scope=...` (Postgres).
- *   - On mount, hydrate from the server; also seed any pre-sign-in
- *     localStorage finds into the endless scope so nothing's lost from the
- *     pre-scope era, then clear the local cache. Daily never pulls from the
- *     local cache — it's a fair-start space.
- *   - On new discovery, optimistically add locally and POST to the server
- *     under the current scope.
+ *   - On mount, hydrate from the server (`GET /api/combine/collection`).
+ *   - On new discovery, optimistically add locally. The server-side
+ *     write happens via replay in `/api/combine/runs/[id]/{checkpoint,finish}`
+ *     — this hook never POSTs. See T-0195 / SECURITY_AUDIT H3b.
  *
  * Signed-out users:
  *   - Collection is in-memory only, per scope. It accumulates within the
@@ -50,10 +48,6 @@ export function useCollection(scope: CollectionScope) {
   const didHydrate = useRef(false);
   const lastAuthed = useRef<boolean | null>(null);
   const lastScope = useRef<CollectionScope | null>(null);
-  // Only migrate the pre-scope localStorage cache into the endless scope once
-  // per browser lifetime — we don't want to re-migrate on every scope flip.
-  const migratedLocal = useRef(false);
-
   useEffect(() => {
     if (isPending) return;
     if (
@@ -77,29 +71,6 @@ export function useCollection(scope: CollectionScope) {
 
     let cancelled = false;
     (async () => {
-      // One-time migration: old localStorage finds (pre-scope era) belong in
-      // the endless collection. Only run when the active scope is endless so
-      // we don't accidentally seed daily.
-      if (!migratedLocal.current && scope === "endless") {
-        migratedLocal.current = true;
-        const local = loadFound();
-        if (local.size > 0) {
-          try {
-            await fetch("/api/combine/collection", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({
-                ids: [...local.keys()],
-                scope: "endless",
-              }),
-            });
-          } catch {
-            // Non-fatal; next discovery POST retries.
-          }
-          clearFound();
-        }
-      }
-
       try {
         const res = await fetch(
           `/api/combine/collection?scope=${scope}`,
@@ -167,29 +138,11 @@ export function useCollection(scope: CollectionScope) {
         }
         return changed ? next : prev;
       });
-      if (authed) {
-        const ids = normalised.map((r) => r.id);
-        const sigPayload: Record<string, string[]> = {};
-        for (const r of normalised) {
-          if (!r.signature) continue;
-          (sigPayload[r.id] ??= []).push(r.signature);
-        }
-        const body: {
-          ids: string[];
-          scope: CollectionScope;
-          signatures?: Record<string, string[]>;
-        } = { ids, scope };
-        if (Object.keys(sigPayload).length > 0) body.signatures = sigPayload;
-        void fetch("/api/combine/collection", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
-        }).catch(() => {
-          // Client state is still consistent; a reload refetches.
-        });
-      }
+      // No network write. The server derives discoveries from the
+      // replay-validated game state in /api/combine/runs/[id]/{checkpoint,finish}
+      // (H3b). This hook is now purely an optimistic UI mirror.
     },
-    [authed, scope],
+    [],
   );
 
   return { collection, signatures, authed, isPending, record } as const;

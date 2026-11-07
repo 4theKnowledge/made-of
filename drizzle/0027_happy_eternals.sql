@@ -1,0 +1,1 @@
+ALTER TABLE "combine_runs" ADD COLUMN "engine_version" integer DEFAULT 1 NOT NULL;

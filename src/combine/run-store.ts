@@ -10,7 +10,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import type { CombineRun, CombineRunOwnerKind } from "@/db/schema";
-import type { GameState } from "./engine";
+import { ENGINE_VERSION, type GameState } from "./engine";
 import type { ServerMode } from "./server-engine";
 
 export interface RunOwnerKey {
@@ -44,6 +44,7 @@ export async function createRun(args: CreateRunArgs): Promise<CombineRun> {
       seed: args.seed,
       stateJson: args.state as unknown as object,
       eventCount: 0,
+      engineVersion: ENGINE_VERSION,
     })
     .returning();
   return row;

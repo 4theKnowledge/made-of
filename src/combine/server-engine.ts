@@ -29,9 +29,20 @@ import { getActiveDaily } from "./daily-config-db";
 import { getDailyPayload, resolveGuestRecipes } from "./daily-schedule-db";
 import { loadAllSeasons } from "./season";
 import { getLiveSnapshot } from "@/graph/live";
-import { newGame, reduce, type Action, type Event, type GameState } from "./engine";
+import { ENGINE_VERSION, newGame, reduce, type Action, type Event, type GameState } from "./engine";
 import { dailySeed } from "./rng";
 import type { ThemeBundle, ThemeKey, Mode } from "./types";
+
+/** Does a stored run's engine version match the one running now?
+ *  Routes should reject a mismatch with 409 + state so the client can
+ *  drop its local buffer and start fresh — a mismatch means the stored
+ *  state would re-score under a different reducer. See T-0195 /
+ *  SECURITY_AUDIT H3c. */
+export function isEngineVersionCurrent(stored: number): boolean {
+  return stored === ENGINE_VERSION;
+}
+
+export { ENGINE_VERSION };
 
 export type ServerMode = "endless" | "fast" | "daily";
 
