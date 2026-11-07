@@ -16,6 +16,8 @@
  */
 
 import { ageSets, buildThemeBundle } from "./data";
+import { getGpOverrides } from "./gp-overrides";
+import { softNeed } from "./soft-bands";
 import {
   edgeNeighbours,
   matchAt,
@@ -604,7 +606,12 @@ function afterMove(
 
   // 1. Age up?
   const totalAges = bundle.theme.ages.length;
-  if (state.age < totalAges - 1 && state.ageMade >= ageNeed(state.age, bundle)) {
+  const mode = getGpOverrides().mode;
+  const softMode = mode === "soft";
+  const ageUp = softMode
+    ? state.age < totalAges - 1 && state.found.length >= softNeed(state.age, bundle.items.size)
+    : state.age < totalAges - 1 && state.ageMade >= ageNeed(state.age, bundle);
+  if (ageUp) {
     state.age++;
     state.ageMade = 0;
     state.score += 100 * state.age;
@@ -617,6 +624,7 @@ function afterMove(
     // feeling like a transition instead of just a label swap.
     state.tray.fill(null);
   } else if (
+    !softMode &&
     state.mode !== "daily" &&
     state.age === totalAges - 1 &&
     state.ageMade >= ageNeed(state.age, bundle)
@@ -704,6 +712,7 @@ function afterMove(
       age: state.age,
       rng: state.rng,
       recentTrays: state.recentTrays,
+      found: state.found,
     });
     events.push({ type: "dealt" });
   }
@@ -828,7 +837,7 @@ export function newGame(
     n: size,
     rng: makeRng(seed),
     board: Array(size * size).fill(null),
-    tray: [null, null, null],
+    tray: Array(getGpOverrides().traySize).fill(null),
     score: 0,
     made: 0,
     longest: 0,
@@ -906,6 +915,7 @@ export function newGame(
     age: state.age,
     rng: state.rng,
     recentTrays: state.recentTrays,
+    found: state.found,
   });
   events.push({ type: "dealt" });
 
@@ -1069,6 +1079,7 @@ export function reduce(
         age: state.age,
         rng: state.rng,
         recentTrays: state.recentTrays,
+        found: state.found,
       });
       events.push({ type: "dealt" });
       return { state, events };
@@ -1269,6 +1280,7 @@ export function reduce(
         age: state.age,
         rng: state.rng,
         recentTrays: state.recentTrays,
+        found: state.found,
       });
       events.push({ type: "dealt" });
       return { state, events };
@@ -1347,6 +1359,7 @@ export function reduce(
         age: state.age,
         rng: state.rng,
         recentTrays: state.recentTrays,
+        found: state.found,
       });
       const A = ageSets(bundle, target);
       const sample = [

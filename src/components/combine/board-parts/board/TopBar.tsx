@@ -34,6 +34,7 @@ export function TopBar({
   onTheme,
   onBook,
   onSound,
+  onPlaytest,
   onHelp,
   onIntro,
   onFeedback,
@@ -56,6 +57,9 @@ export function TopBar({
   onTheme: () => void;
   onBook: () => void;
   onSound: () => void;
+  /** Open the playtest-experiments sheet. Caller should only pass this when
+   *  `NEXT_PUBLIC_COMBINE_PLAYTEST=1`; the menu row renders iff passed. */
+  onPlaytest?: () => void;
   onHelp: () => void;
   onIntro: () => void;
   onFeedback: () => void;
@@ -416,6 +420,23 @@ export function TopBar({
                   <em>{soundOn ? "On" : "Off"}</em>
                 </span>
               </button>
+              {onPlaytest && (
+                <button
+                  type="button"
+                  className="cbhm"
+                  onClick={onPlaytest}
+                  aria-label="Experimental gameplay settings"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 3h4v6l5 11a3 3 0 0 1-3 4H8a3 3 0 0 1-3-4l5-11V3H6z" />
+                    <path d="M9 3h6" />
+                  </svg>
+                  <span className="nm">
+                    <b className="t">Experiments</b>
+                    <em>Playtest variants (dev)</em>
+                  </span>
+                </button>
+              )}
               <button
                 type="button"
                 className="cbhm"

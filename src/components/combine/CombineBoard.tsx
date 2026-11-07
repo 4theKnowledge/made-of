@@ -89,7 +89,9 @@ import { ChoicePicker } from "@/components/combine/board-parts/overlays/ChoicePi
 import { CollectionBook } from "@/components/combine/board-parts/overlays/CollectionBook";
 import { DetailCard } from "@/components/combine/board-parts/overlays/DetailCard";
 import { GameOverCard } from "@/components/combine/board-parts/overlays/GameOverCard";
+import { PlaytestMenu } from "@/components/combine/board-parts/overlays/PlaytestMenu";
 import { SoundMenu } from "@/components/combine/board-parts/overlays/SoundMenu";
+import { isPlaytestEnabled } from "@/combine/gp-overrides";
 import { ThemeMenu } from "@/components/combine/board-parts/overlays/ThemeMenu";
 import { AgeBar } from "@/components/combine/board-parts/board/AgeBar";
 import { Board } from "@/components/combine/board-parts/board/Board";
@@ -493,6 +495,7 @@ export function CombineBoard({
   }, [sound, state.age]);
   const [bookOpen, setBookOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
+  const [playtestOpen, setPlaytestOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   // First-run onboarding: a non-interactive ghost-hand demo overlay shown
   // once per device. Replayable from the "..." menu. Separate from
@@ -1952,6 +1955,14 @@ export function CombineBoard({
             setMoreOpen(false);
             setSoundOpen(true);
           }}
+          onPlaytest={
+            isPlaytestEnabled()
+              ? () => {
+                  setMoreOpen(false);
+                  setPlaytestOpen(true);
+                }
+              : undefined
+          }
           onHelp={() => {
             setMoreOpen(false);
             setHelpOpen(true);
@@ -2301,6 +2312,9 @@ export function CombineBoard({
             }}
             onDismiss={() => setSoundOpen(false)}
           />
+        )}
+        {playtestOpen && (
+          <PlaytestMenu onDismiss={() => setPlaytestOpen(false)} />
         )}
         <HowToPlay
           open={helpOpen}

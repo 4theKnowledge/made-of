@@ -15,8 +15,10 @@
  */
 
 import { ageSets } from "./data";
+import { getGpOverrides } from "./gp-overrides";
 import { matchAt, playsInOne, playsInTwo, type Board } from "./match";
 import { pick, rand, type RngState } from "./rng";
+import { softPool, type SoftPool } from "./soft-bands";
 import type { ThemeBundle } from "./types";
 
 /** How many tools may sit on the board at once. The prototype's limit at
@@ -38,6 +40,9 @@ export interface DealerView {
   /** Short memory of recent trays as sorted multisets, newest first. The
    *  caller owns this array; `dealTray` reads and mutates it in place. */
   recentTrays?: string[][];
+  /** Items the player has discovered this run. Threaded through for the
+   *  soft-bands sampler (T-0163); banded-mode ignores it. */
+  found?: string[];
   /** Internal: non-null when the current pick should avoid partners of
    *  this piled tile. Set by the escape hatch. */
   _diversifyAway?: string | null;
@@ -45,12 +50,18 @@ export interface DealerView {
 
 /** Count how many of each in-age, non-tool tile are on the board. */
 function tallyBoard(view: DealerView): Map<string, number> {
-  const A = ageSets(view.bundle, view.age);
+  const mode = getGpOverrides().mode;
+  // In soft mode, all known/reachable tiles are "in use" for pile-detection
+  // purposes. In banded mode, use the age window's USE set.
+  const inUse: Set<string> =
+    mode === "soft" && view.found
+      ? softPool(view.bundle, view.found).pool
+      : ageSets(view.bundle, view.age).USE;
   const counts = new Map<string, number>();
   for (const v of view.board) {
     if (!v) continue;
     if (view.bundle.tools.has(v)) continue;
-    if (!A.USE.has(v)) continue;
+    if (!inUse.has(v)) continue;
     counts.set(v, (counts.get(v) ?? 0) + 1);
   }
   return counts;
@@ -70,7 +81,28 @@ function heaviestPile(view: DealerView): { tile: string; count: number } | null 
 /** Pick ONE tile for the tray. Prefers tiles that fit the board; falls
  *  through weighted strategies on each roll. */
 export function pickOne(view: DealerView): string | null {
-  const A = ageSets(view.bundle, view.age);
+  const mode = getGpOverrides().mode;
+  // Mode selects the sampling universe. Banded (default) uses age-indexed
+  // ING/BASE/MID; soft uses the reachability pool from soft-bands; both
+  // hand the dealer the same shape so the layers below don't branch.
+  let ING: Set<string>;
+  let BASE: string[];
+  let MID: string[];
+  let recipes;
+  if (mode === "soft" && view.found) {
+    const sp = softPool(view.bundle, view.found);
+    ING = sp.pool;
+    BASE = sp.basePool;
+    MID = sp.midPool;
+    recipes = sp.reachableRecipes.length ? sp.reachableRecipes : view.bundle.recipes;
+  } else {
+    const banded = ageSets(view.bundle, view.age);
+    ING = banded.ING;
+    BASE = banded.BASE;
+    MID = banded.MID;
+    recipes = banded.recipes;
+  }
+  const A = { ING, BASE, MID, recipes }; // shape-compat for layers below
   const onBoard = new Set(view.board.filter((v): v is string => Boolean(v)));
   const inTray = new Set(
     view.tray.filter((v): v is string => Boolean(v)),
