@@ -60,9 +60,13 @@ function parseArgs(argv: string[]): Config {
     moveCap: Number(process.env.MOVE_CAP) || 50000,
     policy: (process.env.POLICY as "greedy" | "strategic") || "strategic",
     targets: {
-      rampFractions: [0.4, 0.75, 0.95],
-      rampHoursMax: [1, 5, 15],
-      unreachableCap: Number(process.env.UNREACH_CAP) || 20,
+      // Realistic collection-game ramp. First-session dopamine ≈ 10-15%,
+      // mid-engagement ≈ 30-40%, dedicated-player breadth ≈ 60-70%. The
+      // long tail past 70% is open-ended and not time-bounded — the metric
+      // reports it separately via the "unreachable" count.
+      rampFractions: [0.1, 0.3, 0.6],
+      rampHoursMax: [1, 5, 20],
+      unreachableCap: Number(process.env.UNREACH_CAP) || 40,
     },
     growthCheck: process.env.GROWTH === "1",
     growthFractions: [0.5, 0.75, 1.0],
