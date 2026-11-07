@@ -9,6 +9,7 @@ export interface ThemeRow {
   description: string | null;
   position: number;
   itemCount: number;
+  isPublished: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -95,7 +96,14 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
     async (input: { code: string; label: string; description: string | null }) => {
       const now = new Date().toISOString();
       const position = rows.length ? Math.max(...rows.map((r) => r.position)) + 1 : 0;
-      const optimistic: ThemeRow = { ...input, position, itemCount: 0, createdAt: now, updatedAt: now };
+      const optimistic: ThemeRow = {
+        ...input,
+        position,
+        itemCount: 0,
+        isPublished: false,
+        createdAt: now,
+        updatedAt: now,
+      };
       await mutate(
         (prev) => [...prev, optimistic],
         () => api.create(input),
@@ -161,6 +169,7 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
               <th style={th}>Label</th>
               <th style={th}>Description</th>
               <th style={{ ...th, textAlign: "right" }}>Items</th>
+              <th style={th}>Status</th>
               <th style={th}></th>
             </tr>
           </thead>
@@ -198,6 +207,33 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
                   {editing === row.code ? null : row.description || <span style={{ opacity: 0.5 }}>—</span>}
                 </td>
                 <td style={{ ...td, textAlign: "right", fontFamily: "var(--mono, monospace)" }}>{row.itemCount}</td>
+                <td style={td}>
+                  {row.isPublished ? (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        padding: "2px 8px",
+                        borderRadius: 10,
+                        background: "var(--good)",
+                        color: "var(--bg)",
+                      }}
+                    >
+                      Published
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        padding: "2px 8px",
+                        borderRadius: 10,
+                        border: "1px solid var(--line)",
+                        color: "var(--muted)",
+                      }}
+                    >
+                      Draft
+                    </span>
+                  )}
+                </td>
                 <td style={{ ...td, textAlign: "right" }}>
                   {editing === row.code ? null : (
                     <span style={{ display: "inline-flex", gap: 6 }}>
@@ -232,7 +268,7 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
             ))}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ padding: 24, color: "var(--muted)", textAlign: "center" }}>
+                <td colSpan={6} style={{ padding: 24, color: "var(--muted)", textAlign: "center" }}>
                   No themes yet.
                 </td>
               </tr>

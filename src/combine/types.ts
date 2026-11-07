@@ -6,7 +6,14 @@
 import type { ItemKind, Tier } from "../db/schema";
 import type { DailyConfig } from "./daily-config";
 
-export type ThemeKey = "everything";
+/** A Combine theme's `combine_themes.code`. Any admin-published theme is
+ *  valid — the legacy "everything" alias remains in the data for continuity
+ *  but new themes just plug in by code. */
+export type ThemeKey = string;
+
+/** The fallback / historical default theme. Used when no theme is supplied
+ *  (legacy URLs, missing config) and as the publish-gate seed. */
+export const DEFAULT_THEME: ThemeKey = "everything";
 
 /** Combine play mode. Three first-class modes:
  *  - `endless` — age-banded progression, long-running, score+collection.

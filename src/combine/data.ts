@@ -649,17 +649,19 @@ export function catalogueByKind(bundle: ThemeBundle): {
   return { kinds };
 }
 
+/** Build endless bundles for the given list of theme codes. Pass the list
+ *  of themes you actually need (usually: the published list, or just the
+ *  active theme on the page). */
 export function buildAllBundles(
   snapshot: Snapshot,
-  prevNumAges: Partial<Record<ThemeKey, number>> = {},
-): Record<ThemeKey, ThemeBundle> {
-  return {
-    everything: buildThemeBundle(
-      snapshot,
-      "everything",
-      prevNumAges.everything ?? 0,
-    ),
-  };
+  prevNumAges: Partial<Record<string, number>> = {},
+  themes: readonly string[] = ["everything"],
+): Record<string, ThemeBundle> {
+  const out: Record<string, ThemeBundle> = {};
+  for (const code of themes) {
+    out[code] = buildThemeBundle(snapshot, code, prevNumAges[code] ?? 0);
+  }
+  return out;
 }
 
 /** Build the per-theme daily bundles. A theme without a `dailyConfig` just
@@ -673,29 +675,36 @@ export function buildAllBundles(
  *  supply synthetic values. */
 export function buildAllDailyBundles(
   snapshot: Snapshot,
-  prevNumAges: Partial<Record<ThemeKey, number>> = {},
-  dailyConfigs: Partial<Record<ThemeKey, DailyConfig | null>> = {},
-  guestRecipes: Partial<Record<ThemeKey, GuestRecipeExtension[] | null>> = {},
-): Record<ThemeKey, ThemeBundle> {
-  return {
-    everything: buildThemeBundle(
+  prevNumAges: Partial<Record<string, number>> = {},
+  dailyConfigs: Partial<Record<string, DailyConfig | null>> = {},
+  guestRecipes: Partial<Record<string, GuestRecipeExtension[] | null>> = {},
+  themes: readonly string[] = ["everything"],
+): Record<string, ThemeBundle> {
+  const out: Record<string, ThemeBundle> = {};
+  for (const code of themes) {
+    out[code] = buildThemeBundle(
       snapshot,
-      "everything",
-      prevNumAges.everything ?? 0,
+      code,
+      prevNumAges[code] ?? 0,
       "daily",
-      dailyConfigs.everything ?? null,
-      guestRecipes.everything ?? null,
-    ),
-  };
+      dailyConfigs[code] ?? null,
+      guestRecipes[code] ?? null,
+    );
+  }
+  return out;
 }
 
-/** Build fast-mode bundles for every theme. Fast mode shares the endless
- *  collection scope, but projects a different recipe set (2-part only, single
- *  band) so the board stays combinable without the age-progression tax. */
+/** Build fast-mode bundles for the given theme codes. Fast mode shares the
+ *  endless collection scope, but projects a different recipe set (2-part
+ *  only, single band) so the board stays combinable without the
+ *  age-progression tax. */
 export function buildAllFastBundles(
   snapshot: Snapshot,
-): Record<ThemeKey, ThemeBundle> {
-  return {
-    everything: buildThemeBundle(snapshot, "everything", 0, "fast"),
-  };
+  themes: readonly string[] = ["everything"],
+): Record<string, ThemeBundle> {
+  const out: Record<string, ThemeBundle> = {};
+  for (const code of themes) {
+    out[code] = buildThemeBundle(snapshot, code, 0, "fast");
+  }
+  return out;
 }

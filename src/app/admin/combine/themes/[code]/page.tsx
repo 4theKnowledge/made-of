@@ -9,6 +9,7 @@ import { collectRecipeParts, isPlayableRecipe, type RecipePartType } from "@/com
 import type { Tier, ItemKind } from "@/db/schema";
 import type { ClosureConfig } from "@/combine/closure";
 import { ThemeBuilder, type BuilderItem } from "./ThemeBuilder";
+import { ThemeSettings } from "./ThemeSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -131,10 +132,48 @@ export default async function AdminCombineThemeDetailPage({
             { label: theme.label },
           ]}
         />
-        <h2>{theme.label}</h2>
+        <h2>
+          {theme.label}
+          {theme.isPublished ? (
+            <span
+              style={{
+                marginLeft: 10,
+                fontSize: 12,
+                padding: "2px 8px",
+                borderRadius: 10,
+                background: "var(--good)",
+                color: "var(--bg)",
+                verticalAlign: "middle",
+              }}
+            >
+              Published
+            </span>
+          ) : (
+            <span
+              style={{
+                marginLeft: 10,
+                fontSize: 12,
+                padding: "2px 8px",
+                borderRadius: 10,
+                border: "1px solid var(--line)",
+                color: "var(--muted)",
+                verticalAlign: "middle",
+              }}
+            >
+              Draft
+            </span>
+          )}
+        </h2>
         <p style={{ fontFamily: "var(--mono, monospace)", color: "var(--muted)" }}>{theme.code}</p>
         {theme.description && <p>{theme.description}</p>}
       </section>
+
+      <ThemeSettings
+        themeCode={theme.code}
+        initialIsPublished={theme.isPublished}
+        initialPictogram={theme.pictogram ?? null}
+        memberCount={memberIds.length}
+      />
 
       <ThemeBuilder
         themeCode={theme.code}

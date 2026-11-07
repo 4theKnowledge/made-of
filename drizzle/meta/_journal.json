@@ -169,6 +169,13 @@
       "when": 1794031214741,
       "tag": "0023_lame_moira_mactaggert",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794033207260,
+      "tag": "0024_oval_junta",
+      "breakpoints": true
     }
   ]
 }

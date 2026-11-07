@@ -495,6 +495,14 @@ export const combineThemes = pgTable(
      *  Non-null = closure is applied when items are added. Shape matches
      *  ClosureConfig in src/combine/closure.ts. */
     closureConfig: jsonb("closure_config"),
+    /** Public visibility. FALSE (default) = admin-only draft; TRUE = shows
+     *  up in the player's theme picker. Lets curators iterate without
+     *  leaking work-in-progress themes to the game. */
+    isPublished: boolean("is_published").notNull().default(false),
+    /** 32×32 SVG inner-markup for the theme's picker tile. Same authoring
+     *  rules as items/kinds. Null = fall back to a generic theme pictogram
+     *  (src/pictograms/data.ts). */
+    pictogram: text("pictogram"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

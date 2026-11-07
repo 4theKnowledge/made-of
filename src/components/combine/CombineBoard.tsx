@@ -92,7 +92,7 @@ import { GameOverCard } from "@/components/combine/board-parts/overlays/GameOver
 import { PlaytestMenu } from "@/components/combine/board-parts/overlays/PlaytestMenu";
 import { SoundMenu } from "@/components/combine/board-parts/overlays/SoundMenu";
 import { isPlaytestEnabled } from "@/combine/gp-overrides";
-import { ThemeMenu } from "@/components/combine/board-parts/overlays/ThemeMenu";
+import { ModeThemePicker } from "@/components/combine/board-parts/overlays/ModeThemePicker";
 import { AgeBar } from "@/components/combine/board-parts/board/AgeBar";
 import { Board } from "@/components/combine/board-parts/board/Board";
 import { BoardErrorBoundary } from "@/components/combine/board-parts/board/BoardErrorBoundary";
@@ -104,21 +104,18 @@ import { TopBar } from "@/components/combine/board-parts/board/TopBar";
 import { Tray } from "@/components/combine/board-parts/board/Tray";
 
 interface Props {
-  bundles: {
-    everything: SerialisedBundle;
-  };
+  /** Endless/classic bundles keyed by theme code. Server ships only the
+   *  bundles needed for the active render — usually the active theme plus
+   *  the daily host (which may be the same). */
+  bundles: Record<string, SerialisedBundle>;
   /** Fast-mode bundles (2-part recipes only, single band). Served alongside
    *  classic bundles so the same CombineBoard can swap modes without a
    *  round-trip. Fast runs are score-only — no collection unlocks. */
-  fastBundles: {
-    everything: SerialisedBundle;
-  };
+  fastBundles: Record<string, SerialisedBundle>;
   /** Daily-mode bundles. A theme without a dailyConfig serialises a bundle
    *  identical to its endless one; a theme with a config gets a bundle with
    *  capped ages, scaled ageNeed, and a guest-ingredient pool. */
-  dailyBundles: {
-    everything: SerialisedBundle;
-  };
+  dailyBundles: Record<string, SerialisedBundle>;
   /** Today's daily discovery target, resolved from the day's payload.
    *  Null if no daily is scheduled or the row predates the target-list
    *  feature — in either case the engine falls back to the legacy
@@ -139,6 +136,27 @@ interface Props {
   /** Is the current visitor signed in? Gates "suggest recipe" in the
    *  feedback sheet; the server still enforces, this just shapes the UI. */
   signedIn?: boolean;
+  /** Active theme code — comes from ?t= on /combine. Defaults to the
+   *  historical "everything" theme when unset. CombineBoard renders one
+   *  theme at a time; switching themes reloads the page. */
+  activeTheme?: string;
+  /** Initial mode — comes from ?m= on /combine. Only "fast" is honoured;
+   *  other values are ignored and the normal resume logic runs. Lets a
+   *  theme-switch nav land directly in the right mode. */
+  initialMode?: Mode;
+  /** Theme hosting today's daily puzzle. May differ from `activeTheme` —
+   *  daily is always the admin-configured host regardless of what the
+   *  player picked for endless/fast. Defaults to "everything" so legacy
+   *  behaviour is preserved when unset. */
+  dailyHostTheme?: string;
+  /** Themes available to the player in the mode+theme picker. Only
+   *  published themes with at least one member are included. */
+  publishedThemes?: Array<{
+    code: string;
+    label: string;
+    description: string | null;
+    pictogram: string | null;
+  }>;
 }
 
 // Shared empty set for the DetailCard's `madeSignatures` prop so the common
@@ -155,25 +173,26 @@ export function CombineBoard({
   dailyEnabled = true,
   admin = false,
   signedIn = false,
+  activeTheme = "everything",
+  initialMode,
+  dailyHostTheme = "everything",
+  publishedThemes = [],
 }: Props) {
-  const bundles = useMemo<Record<ThemeKey, ThemeBundle>>(
-    () => ({
-      everything: hydrateBundle(serialised.everything),
-    }),
-    [serialised],
-  );
-  const fastBundles = useMemo<Record<ThemeKey, ThemeBundle>>(
-    () => ({
-      everything: hydrateBundle(fastSerialised.everything),
-    }),
-    [fastSerialised],
-  );
-  const dailyBundles = useMemo<Record<ThemeKey, ThemeBundle>>(
-    () => ({
-      everything: hydrateBundle(dailySerialised.everything),
-    }),
-    [dailySerialised],
-  );
+  const bundles = useMemo<Record<ThemeKey, ThemeBundle>>(() => {
+    const out: Record<ThemeKey, ThemeBundle> = {};
+    for (const [code, s] of Object.entries(serialised)) out[code] = hydrateBundle(s);
+    return out;
+  }, [serialised]);
+  const fastBundles = useMemo<Record<ThemeKey, ThemeBundle>>(() => {
+    const out: Record<ThemeKey, ThemeBundle> = {};
+    for (const [code, s] of Object.entries(fastSerialised)) out[code] = hydrateBundle(s);
+    return out;
+  }, [fastSerialised]);
+  const dailyBundles = useMemo<Record<ThemeKey, ThemeBundle>>(() => {
+    const out: Record<ThemeKey, ThemeBundle> = {};
+    for (const [code, s] of Object.entries(dailySerialised)) out[code] = hydrateBundle(s);
+    return out;
+  }, [dailySerialised]);
   /** Bundle a game should run against given its target theme/mode/daily key.
    *  Centralises the three-way pick so all call sites stay in sync. */
   const pickBundle = useCallback(
@@ -190,8 +209,8 @@ export function CombineBoard({
   // after mount we may replace it with a saved game or kick off a daily,
   // both of which happen in an effect below.
   const initial = useMemo(
-    () => newGame("everything", bundles.everything, { seed: 42, size: 6 }).state,
-    [bundles.everything],
+    () => newGame(activeTheme, bundles[activeTheme], { seed: 42, size: 6 }).state,
+    [activeTheme, bundles],
   );
 
   const [state, setState] = useState<GameState>(initial);
@@ -213,12 +232,8 @@ export function CombineBoard({
   // Per-theme best scores + today's daily result. Loaded in an effect so
   // SSR/hydration stay deterministic. Fast mode keeps its own best record
   // so the two score curves don't contaminate each other.
-  const [best, setBest] = useState<Record<ThemeKey, number>>({
-    everything: 0,
-  });
-  const [fastBest, setFastBest] = useState<Record<ThemeKey, number>>({
-    everything: 0,
-  });
+  const [best, setBest] = useState<Record<ThemeKey, number>>({ [activeTheme]: 0 });
+  const [fastBest, setFastBest] = useState<Record<ThemeKey, number>>({ [activeTheme]: 0 });
   const [dailyDone, setDailyDone] = useState<DailyResult | null>(null);
   // When a theme's numAges has grown since the player last saw it, surface
   // a one-time banner with the new age's label. Keyed by theme → label.
@@ -232,12 +247,8 @@ export function CombineBoard({
   useEffect(() => {
     if (didResume.current) return;
     didResume.current = true;
-    setBest({
-      everything: loadBest("everything"),
-    });
-    setFastBest({
-      everything: loadBest("everything", "fast"),
-    });
+    setBest({ [activeTheme]: loadBest(activeTheme) });
+    setFastBest({ [activeTheme]: loadBest(activeTheme, "fast") });
     setDailyDone(loadDailyDone(todayKey()));
     // Age-promotion banner: compare each theme's live numAges to what we
     // last showed on this device. On first ever visit (seen=0), skip —
@@ -266,12 +277,12 @@ export function CombineBoard({
     const deepLinkDay = sp?.get("d");
     if (dailyEnabled && deepLinkDay && deepLinkDay === todayKey()) {
       const day = deepLinkDay;
-      const dailyBundle = dailyBundles.everything;
+      const dailyBundle = dailyBundles[dailyHostTheme];
       const saved = loadGame(dailyBundle, { daily: day, expectedSeed: dailyPayloadSeed });
       setState(
         saved
           ? hydrateGame(saved, { target: dailyTarget })
-          : newGame("everything", dailyBundle, {
+          : newGame(dailyHostTheme, dailyBundle, {
               daily: day,
               size: 6,
               seed: dailySeed(day),
@@ -281,31 +292,42 @@ export function CombineBoard({
       return;
     }
     // Resume priority on plain /combine:
-    //   1. In-flight fast run (what the player was last doing).
-    //   2. In-flight endless run.
-    //   3. Today's daily when unfinished — resumes the mid-run save if
+    //   1. If ?m=fast was set in the URL, prefer a fast run (resume save
+    //      if any, else start fresh). Lets theme-switch nav land in fast.
+    //   2. In-flight fast run.
+    //   3. In-flight endless run.
+    //   4. Today's daily when unfinished — resumes the mid-run save if
     //      any, else starts a fresh daily. Only kicks in when there's
     //      nothing mid-run to protect the "refresh doesn't eat my run"
     //      promise for fast/endless.
-    //   4. Fall through to the deterministic fresh endless in `initial`.
-    const fastSave = loadGame(fastBundles.everything, { daily: null, mode: "fast" });
+    //   5. Fall through to the deterministic fresh endless in `initial`.
+    if (initialMode === "fast") {
+      const fastSave = loadGame(fastBundles[activeTheme], { daily: null, mode: "fast" });
+      if (fastSave) {
+        setState(hydrateGame(fastSave));
+      } else {
+        setState(newGame(activeTheme, fastBundles[activeTheme], { mode: "fast", size: 6 }).state);
+      }
+      return;
+    }
+    const fastSave = loadGame(fastBundles[activeTheme], { daily: null, mode: "fast" });
     if (fastSave) {
       setState(hydrateGame(fastSave));
       return;
     }
-    const everythingSave = loadGame(bundles.everything, { daily: null });
-    if (everythingSave) {
-      setState(hydrateGame(everythingSave));
+    const endlessSave = loadGame(bundles[activeTheme], { daily: null });
+    if (endlessSave) {
+      setState(hydrateGame(endlessSave));
       return;
     }
     const today = todayKey();
     if (dailyEnabled && !loadDailyDone(today)) {
-      const dailyBundle = dailyBundles.everything;
+      const dailyBundle = dailyBundles[dailyHostTheme];
       const saved = loadGame(dailyBundle, { daily: today, expectedSeed: dailyPayloadSeed });
       setState(
         saved
           ? hydrateGame(saved, { target: dailyTarget })
-          : newGame("everything", dailyBundle, {
+          : newGame(dailyHostTheme, dailyBundle, {
               daily: today,
               size: 6,
               seed: dailySeed(today),
@@ -313,7 +335,7 @@ export function CombineBoard({
             }).state,
       );
     }
-  }, [bundles.everything, dailyBundles.everything, fastBundles.everything, dailyTarget, dailyPayloadSeed, dailyEnabled]);
+  }, [activeTheme, initialMode, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyTarget, dailyPayloadSeed, dailyEnabled]);
   const [selectedSlot, setSelectedSlot] = useState<{
     source: "tray" | "hold";
     slot: number;
@@ -1053,7 +1075,7 @@ export function CombineBoard({
     // If we read loadGame first we'd hydrate the stale finished state
     // instead of starting the fresh run the reset is meant to allow.
     const done = loadDailyDone(day);
-    const dailyBundle = dailyBundles.everything;
+    const dailyBundle = dailyBundles[dailyHostTheme];
     const saved = loadGame(dailyBundle, { daily: day, expectedSeed: dailyPayloadSeed });
     if (saved) {
       saveGame(state);
@@ -1066,7 +1088,7 @@ export function CombineBoard({
     } else {
       saveGame(state);
       setState(
-        newGame("everything", dailyBundle, {
+        newGame(dailyHostTheme, dailyBundle, {
           daily: day,
           size: 6,
           seed: dailySeed(day),
@@ -1075,7 +1097,7 @@ export function CombineBoard({
       );
     }
     resetTransient();
-  }, [bundles, dailyBundles, state, resetTransient, dailyTarget, dailyPayloadSeed, dailyEnabled]);
+  }, [bundles, dailyBundles, dailyHostTheme, state, resetTransient, dailyTarget, dailyPayloadSeed, dailyEnabled]);
 
   const shareDaily = useCallback(async () => {
     const dr = dailyDone;
@@ -1087,7 +1109,7 @@ export function CombineBoard({
       const isUuid =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dr.top);
       if (!isUuid) return dr.top.charAt(0).toUpperCase() + dr.top.slice(1);
-      const resolved = resolveItemName(dr.top, bundles.everything);
+      const resolved = resolveItemName(dr.top, bundles[dailyHostTheme] ?? bundles[activeTheme]);
       return resolved && resolved !== dr.top ? resolved : null;
     })();
     const foundLine =
@@ -1099,7 +1121,7 @@ export function CombineBoard({
       dr.shelf && dr.shelf > 0
         ? ` · ${dr.shelf} finished thing${dr.shelf > 1 ? "s" : ""}`
         : "";
-    const dailyAgeCount = dailyBundles.everything.theme.ages.length;
+    const dailyAgeCount = dailyBundles[dailyHostTheme].theme.ages.length;
     const text =
       `Made Of · Daily Combine ${dr.key}\n` +
       Array.from({ length: dailyAgeCount }, (_, k) =>
@@ -1125,7 +1147,7 @@ export function CombineBoard({
       text,
       url: `https://madeof.app/combine?${query}`,
     });
-  }, [dailyDone, bundles.everything, dailyBundles.everything]);
+  }, [dailyDone, bundles, dailyBundles, activeTheme, dailyHostTheme]);
 
   const onCellTap = useCallback(
     (cell: number) => {
@@ -2185,34 +2207,40 @@ export function CombineBoard({
           />
         )}
         {themeOpen && (
-          <ThemeMenu
-            bundles={bundles}
-            fastBundles={fastBundles}
-            mode={state.mode}
-            daily={state.daily}
-            current={state.theme}
-            dailyDone={dailyDone}
+          <ModeThemePicker
+            currentMode={state.mode}
+            currentDaily={state.daily}
+            currentTheme={state.theme}
             dailyEnabled={dailyEnabled}
-            onPickTheme={(which) => {
+            themes={publishedThemes}
+            dailyDone={!!dailyDone}
+            onShareDaily={shareDaily}
+            onRestart={() => {
               setThemeOpen(false);
-              switchTheme(which);
-            }}
-            onPickDaily={() => {
-              setThemeOpen(false);
-              startDaily();
-            }}
-            onPickFast={(which) => {
-              setThemeOpen(false);
-              startFast(which);
-            }}
-            onShareDaily={() => {
-              shareDaily();
-            }}
-            onRestart={(which, nextMode) => {
-              setThemeOpen(false);
-              restartTheme(which, nextMode);
+              restartTheme(state.theme, state.mode);
             }}
             onDismiss={() => setThemeOpen(false)}
+            onConfirm={(nextMode, nextTheme) => {
+              setThemeOpen(false);
+              // Daily: always goes to the configured host theme; the board
+              // already has the right bundle shipped.
+              if (nextMode === "daily") {
+                startDaily();
+                return;
+              }
+              // Same theme? Switch mode in-place without a reload.
+              if (nextTheme === activeTheme) {
+                if (nextMode === "fast") startFast(nextTheme);
+                else switchTheme(nextTheme);
+                return;
+              }
+              // Theme changed — reload so the server builds the right
+              // per-theme bundles. Preserve mode via the URL.
+              const sp = new URLSearchParams();
+              sp.set("t", nextTheme);
+              if (nextMode === "fast") sp.set("m", "fast");
+              window.location.href = `/combine?${sp.toString()}`;
+            }}
           />
         )}
         {bookOpen && (

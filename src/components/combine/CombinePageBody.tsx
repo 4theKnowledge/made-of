@@ -1,4 +1,6 @@
+import { asc, count, eq } from "drizzle-orm";
 import { getLiveSnapshot } from "@/graph/live";
+import { getDb, schema } from "@/db/client";
 import { Footer } from "@/components/common/Footer";
 import {
   buildAllBundles,
@@ -9,7 +11,7 @@ import {
 } from "@/combine/data";
 import type { DailyConfig } from "@/combine/daily-config";
 import { getActiveDaily } from "@/combine/daily-config-db";
-import type { ThemeKey } from "@/combine/types";
+import { DEFAULT_THEME, type ThemeKey } from "@/combine/types";
 import { serialiseBundle } from "@/combine/serialise";
 import { loadAllSeasons, promoteSeason } from "@/combine/season";
 import { CombineBoard } from "@/components/combine/CombineBoard";
@@ -25,44 +27,75 @@ function dailyFlagOn(): boolean {
   return process.env.COMBINE_DAILY_ENABLED !== "0";
 }
 
-export async function CombinePageBody() {
+interface Props {
+  /** Theme code from ?t=. When unset / unpublished / empty, falls back to
+   *  the default theme so the page always renders a valid board. */
+  theme?: string;
+  /** Mode from ?m=. Only "fast" is honoured; other values fall through to
+   *  the default endless/daily resume logic in CombineBoard. */
+  mode?: string;
+}
+
+export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Props = {}) {
   const live = await getLiveSnapshot();
   const prev = await loadAllSeasons();
-  const bundles = buildAllBundles(live.snapshot, prev);
-  // Promote any theme whose derived numAges exceeded its stored value. Fire
-  // and forget — we don't need to block the first render on the write.
+  const db = getDb();
+
+  // Load the published themes the player can pick from. These feed the
+  // mode+theme picker and determine which bundles we need to build.
+  const publishedRows = await db
+    .select({
+      code: schema.combineThemes.code,
+      label: schema.combineThemes.label,
+      description: schema.combineThemes.description,
+      pictogram: schema.combineThemes.pictogram,
+    })
+    .from(schema.combineThemes)
+    .where(eq(schema.combineThemes.isPublished, true))
+    .orderBy(asc(schema.combineThemes.position), asc(schema.combineThemes.code));
+
+  // Drop themes with no items — they'd produce an empty board.
+  const memberCounts = await db
+    .select({ themeCode: schema.itemCombineThemes.themeCode, n: count() })
+    .from(schema.itemCombineThemes)
+    .groupBy(schema.itemCombineThemes.themeCode);
+  const countByTheme = new Map(memberCounts.map((c) => [c.themeCode, c.n]));
+  const publishedThemes = publishedRows
+    .filter((r) => (countByTheme.get(r.code) ?? 0) > 0)
+    .map((r) => ({
+      code: r.code,
+      label: r.label,
+      description: r.description,
+      pictogram: r.pictogram,
+    }));
+
+  // Resolve active theme: URL param wins if it's published; else default.
+  const publishedCodes = new Set(publishedThemes.map((t) => t.code));
+  const activeTheme: ThemeKey = themeParam && publishedCodes.has(themeParam) ? themeParam : DEFAULT_THEME;
+
+  // Build bundles only for the active theme. Daily uses its own configured
+  // host theme regardless of what the player picked.
+  const activeDaily = await getActiveDaily();
+  const dailyHostTheme: ThemeKey = activeDaily?.themeCode ?? DEFAULT_THEME;
+  const themesToBuild = Array.from(new Set([activeTheme, dailyHostTheme]));
+
+  const bundles = buildAllBundles(live.snapshot, prev, themesToBuild);
   for (const [theme, bundle] of Object.entries(bundles)) {
     const curr = bundle.theme.ages.length;
-    if (curr > (prev[theme as keyof typeof prev] ?? 0)) {
-      void promoteSeason(theme as keyof typeof prev, curr);
+    if (curr > (prev[theme] ?? 0)) {
+      void promoteSeason(theme, curr);
     }
   }
-  const fastBundles = buildAllFastBundles(live.snapshot);
+  const fastBundles = buildAllFastBundles(live.snapshot, themesToBuild);
 
-  // Load the singleton daily config. If none is set, daily plays with the
-  // same shape as endless (no cap, no guests). The active theme drives
-  // which per-theme bundle receives the daily knobs.
-  const activeDaily = await getActiveDaily();
-  const dailyConfigs: Partial<Record<ThemeKey, DailyConfig | null>> = {};
-  if (activeDaily) {
-    dailyConfigs[activeDaily.themeCode] = activeDaily.config;
-  }
+  // Daily config + guest recipes live only on the daily host theme.
+  const dailyConfigs: Partial<Record<string, DailyConfig | null>> = {};
+  if (activeDaily) dailyConfigs[activeDaily.themeCode] = activeDaily.config;
 
-  // Resolve today's guest recipes from the precomputed schedule. A missing
-  // row (first-time setup, cron hasn't run yet) falls back to zero guests —
-  // the daily still plays, just without rare-item drip.
   const today = todayKey();
-  const guestRecipes: Partial<Record<ThemeKey, GuestRecipeExtension[] | null>> = {};
-  // Daily discovery target. Read from the day's payload for whichever
-  // theme hosts today's daily — the payload is the frozen source of
-  // truth. We look up every theme we know about so the target still
-  // surfaces even when the admin has cleared the active-daily singleton
-  // (regenerate still stamped a target onto the row via resolveDailyTarget's
-  // default fallback). Null means no row exists → engine falls back to the
-  // legacy age-progression end.
+  const guestRecipes: Partial<Record<string, GuestRecipeExtension[] | null>> = {};
   let dailyTarget: number | null = null;
   let dailyPayloadSeed: number | null = null;
-  const dailyHostTheme: ThemeKey = activeDaily?.themeCode ?? "everything";
   const todaysPayload = await getDailyPayload(dailyHostTheme, today);
   if (todaysPayload) {
     dailyTarget = todaysPayload.targetDiscoveries ?? null;
@@ -93,25 +126,27 @@ export async function CombinePageBody() {
     prev,
     dailyConfigs,
     guestRecipes,
+    themesToBuild,
   );
 
-  const serialised = {
-    everything: serialiseBundle(bundles.everything),
-  };
-  const fastSerialised = {
-    everything: serialiseBundle(fastBundles.everything),
-  };
-  const dailySerialised = {
-    everything: serialiseBundle(dailyBundles.everything),
-  };
+  // Serialise only the bundles we need. CombineBoard looks up by theme
+  // code at runtime — shipping a single theme is fine while CombineBoard
+  // runs under one theme at a time. Mode/theme switching reloads the page.
+  const serialised: Record<string, ReturnType<typeof serialiseBundle>> = {};
+  const fastSerialised: Record<string, ReturnType<typeof serialiseBundle>> = {};
+  const dailySerialised: Record<string, ReturnType<typeof serialiseBundle>> = {};
+  for (const code of themesToBuild) {
+    if (bundles[code]) serialised[code] = serialiseBundle(bundles[code]);
+    if (fastBundles[code]) fastSerialised[code] = serialiseBundle(fastBundles[code]);
+    if (dailyBundles[code]) dailySerialised[code] = serialiseBundle(dailyBundles[code]);
+  }
+
   const admin = await isAdmin();
   const session = await getSession();
   const signedIn = !!session?.user?.id;
-
-  // Daily is visible when the env flag is on OR the viewer is an admin.
-  // Admin bypass lets you keep testing + resetting even when the flag
-  // mutes daily for the public.
   const dailyEnabled = dailyFlagOn() || admin;
+
+  const initialMode = modeParam === "fast" ? "fast" : undefined;
 
   return (
     <main className="wrap wrap-combine">
@@ -124,6 +159,10 @@ export async function CombinePageBody() {
         dailyEnabled={dailyEnabled}
         admin={admin}
         signedIn={signedIn}
+        activeTheme={activeTheme}
+        initialMode={initialMode}
+        dailyHostTheme={dailyHostTheme}
+        publishedThemes={publishedThemes}
       />
       <Footer compactOnMobile />
     </main>

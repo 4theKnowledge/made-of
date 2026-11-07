@@ -71,6 +71,13 @@ export async function generateMetadata({
   };
 }
 
-export default function CombinePage() {
-  return <CombinePageBody />;
+export default async function CombinePage({
+  searchParams,
+}: {
+  searchParams: Promise<SP>;
+}) {
+  const sp = await searchParams;
+  const theme = pick(sp, "t") ?? undefined;
+  const mode = pick(sp, "m") ?? undefined;
+  return <CombinePageBody theme={theme} mode={mode} />;
 }

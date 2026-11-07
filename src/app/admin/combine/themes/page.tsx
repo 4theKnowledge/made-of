@@ -33,6 +33,7 @@ export default async function AdminCombineThemesPage() {
     description: t.description,
     position: t.position,
     itemCount: countByTheme.get(t.code) ?? 0,
+    isPublished: t.isPublished,
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
   }));

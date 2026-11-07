@@ -46,6 +46,22 @@ export async function PATCH(
       return NextResponse.json({ error: "invalid_closure_config" }, { status: 400 });
     }
   }
+  // is_published: boolean. Admin flips this when a theme is ready for
+  // players. Unpublishing is non-destructive: data stays, picker hides it.
+  if ("is_published" in body) {
+    if (typeof body.is_published !== "boolean") {
+      return NextResponse.json({ error: "invalid_is_published" }, { status: 400 });
+    }
+    patch.isPublished = body.is_published;
+  }
+  // pictogram: string (SVG inner markup) or null. 32×32 viewBox, same
+  // authoring rules as items/kinds.
+  if ("pictogram" in body) {
+    const p = body.pictogram;
+    if (p === null) patch.pictogram = null;
+    else if (typeof p === "string") patch.pictogram = p.trim() || null;
+    else return NextResponse.json({ error: "invalid_pictogram" }, { status: 400 });
+  }
   if (Object.keys(patch).length === 1) {
     return NextResponse.json({ error: "no_fields" }, { status: 400 });
   }
