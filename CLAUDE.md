@@ -89,6 +89,7 @@ One Next.js service (App Router, TypeScript), built as a standalone server from 
 - **Single instance for now.** The graph snapshot and rate-limit counters live in memory. If you add replicas, move the counters to Postgres and reload snapshots through `LISTEN/NOTIFY`.
 - **Scheduled jobs take a Postgres advisory lock** before running, so a job never runs twice.
 - **Trust only Cloudflare.** Reject requests missing the origin-lock header, and read the client IP from `CF-Connecting-IP`.
+- **`NEXT_PUBLIC_*` used in client components must be declared as `ARG` + `ENV` in the Dockerfile build stage.** Next.js inlines these at build time; Railway service vars alone only reach runtime. Server Components read `process.env` at runtime, so they're fine without the ARG.
 
 ## Design
 
