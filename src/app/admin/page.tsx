@@ -48,6 +48,7 @@ const GROUPS: ToolGroup[] = [
       { href: "/admin/banners", label: "Site banners" },
       { href: "/admin/changelog", label: "Changelog" },
       { href: "/admin/feedback", label: "Feedback" },
+      { href: "/admin/debug", label: "Debug" },
       { href: "/api/admin/export", label: "Download export", download: true },
     ],
   },

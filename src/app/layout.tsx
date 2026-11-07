@@ -4,6 +4,7 @@ import "./globals.css";
 import { Suspense } from "react";
 import { PostHogProvider } from "@/components/analytics/PostHogProvider";
 import { SiteBanner } from "@/components/common/SiteBanner";
+import { VersionWatcher } from "@/components/common/VersionWatcher";
 import { resolveEnv } from "@/lib/analytics/env";
 
 export const metadata: Metadata = {
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </Suspense>
         <SiteBanner />
         {children}
+        <VersionWatcher />
       </body>
     </html>
   );

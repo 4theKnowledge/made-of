@@ -398,6 +398,17 @@ a.btn.primary{color:var(--bg)}
 .linkbtn:hover{text-decoration:underline}
 .factions{display:flex;gap:16px;border-top:1px solid var(--line);padding-top:10px;margin-top:-4px}
 .toast{position:fixed;left:50%;bottom:max(20px, env(safe-area-inset-bottom, 0px));transform:translateX(-50%);z-index:90;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:3px;font-size:14px;box-shadow:0 10px 30px -10px rgba(0,0,0,.5);max-width:calc(100vw - 32px)}
+/* Update nudge: a tile-styled card that slides in from the bottom-right
+   when the client detects a newer deployed version. Mirrors the .btn
+   ink-border + 2px hover-shadow language the rest of the app uses. */
+.update-toast{position:fixed;right:max(16px, env(safe-area-inset-right, 0px));bottom:max(16px, env(safe-area-inset-bottom, 0px));z-index:95;display:flex;align-items:center;gap:10px;padding:10px 10px 10px 14px;background:var(--surface);color:var(--ink);border:1.5px solid var(--ink);border-radius:4px;font-size:14px;box-shadow:4px 4px 0 var(--ink);max-width:calc(100vw - 32px);animation:update-toast-in .32s cubic-bezier(.2,.8,.2,1)}
+.update-toast-body{font-weight:500}
+.update-toast-refresh{padding:6px 11px;border:1.5px solid var(--ink);background:var(--ink);color:var(--bg);border-radius:3px;cursor:pointer;font:inherit;font-weight:600;font-size:13.5px;transition:transform .12s, box-shadow .12s}
+.update-toast-refresh:hover{box-shadow:2px 2px 0 color-mix(in srgb, var(--ink) 55%, transparent);transform:translate(-1px,-1px)}
+.update-toast-x{background:none;border:0;cursor:pointer;font-size:20px;line-height:1;color:var(--muted);padding:0 4px;opacity:.75}
+.update-toast-x:hover{opacity:1;color:var(--ink)}
+@keyframes update-toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media (max-width: 480px){.update-toast{left:max(12px, env(safe-area-inset-left, 0px));right:max(12px, env(safe-area-inset-right, 0px))}}
 .sharebox{width:100%;box-sizing:border-box;border:1.5px solid var(--ink);border-radius:3px;padding:10px 12px;background:var(--bg);font-family:var(--mono);font-size:13px;line-height:1.5;resize:vertical}
 .rwhat{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-radius:3px;background:var(--bg);font-size:15px}
 .repform{display:flex;flex-direction:column;gap:12px}
