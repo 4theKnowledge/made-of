@@ -3,6 +3,8 @@ import { and, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
 import { computeClosure, isClosureEnabled, type ClosureConfig } from "@/combine/closure";
+import { invalidateRunsForTheme } from "@/combine/run-store";
+import { reloadSnapshot } from "@/graph/live";
 import { loadGraphForClosure } from "../../_lib";
 
 export const runtime = "nodejs";
@@ -157,9 +159,13 @@ export async function POST(
     .from(schema.itemCombineThemes)
     .where(eq(schema.itemCombineThemes.themeCode, themeCode));
 
+  await reloadSnapshot();
+  const invalidatedRuns = await invalidateRunsForTheme(themeCode);
+
   return NextResponse.json({
     members: finalRows.map((r) => r.itemId),
     memberSources: Object.fromEntries(finalRows.map((r) => [r.itemId, r.source])),
     applied: { manual: [...manualAdd], closure: [...closureAdd], remove },
+    invalidatedRuns,
   });
 }

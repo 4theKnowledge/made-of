@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { count, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
+import { invalidateRunsForTheme } from "@/combine/run-store";
+import { reloadSnapshot } from "@/graph/live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,7 +75,9 @@ export async function PATCH(
     .where(eq(schema.combineThemes.code, code))
     .returning();
   if (!updated) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  return NextResponse.json({ theme: updated });
+  await reloadSnapshot();
+  const invalidated = await invalidateRunsForTheme(code);
+  return NextResponse.json({ theme: updated, invalidatedRuns: invalidated });
 }
 
 export async function DELETE(
@@ -102,5 +106,7 @@ export async function DELETE(
     .where(eq(schema.combineThemes.code, code))
     .returning();
   if (!deleted) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  return NextResponse.json({ ok: true });
+  await reloadSnapshot();
+  const invalidated = await invalidateRunsForTheme(code);
+  return NextResponse.json({ ok: true, invalidatedRuns: invalidated });
 }

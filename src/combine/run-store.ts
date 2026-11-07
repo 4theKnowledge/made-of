@@ -169,3 +169,28 @@ export async function invalidateRun(runId: string): Promise<CombineRun | null> {
     .returning();
   return row ?? null;
 }
+
+/** Invalidate every active run for a given theme code. Called from admin
+ *  mutations that touch a theme's definition or membership — the old bundle
+ *  baked into each run's state is now stale, so players bounce back to the
+ *  picker via the existing 409 reconciliation path. Returns the count of
+ *  rows transitioned. */
+export async function invalidateRunsForTheme(theme: string): Promise<number> {
+  const db = getDb();
+  const rows = await db
+    .update(schema.combineRuns)
+    .set({
+      status: "invalidated",
+      endedAt: new Date(),
+      updatedAt: new Date(),
+      epoch: sql`${schema.combineRuns.epoch} + 1`,
+    })
+    .where(
+      and(
+        eq(schema.combineRuns.theme, theme),
+        eq(schema.combineRuns.status, "active"),
+      ),
+    )
+    .returning({ id: schema.combineRuns.id });
+  return rows.length;
+}

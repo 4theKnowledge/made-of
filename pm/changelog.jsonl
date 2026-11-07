@@ -98,3 +98,4 @@
 {"id": "C-0098", "ts": "2026-11-07T13:23:46Z", "kind": "fix", "summary": "combine tutorial: step copy now names the actual output the player made; FSM cascades through multi-event batches; step 4 highlights the tray", "refs": {"task": "T-0205"}}
 {"id": "C-0099", "ts": "2026-11-07T13:26:26Z", "kind": "fix", "summary": "combine: top-bar mode chip reads \"Tutorial\" (amber, open-book glyph) during a tutorial run instead of falling through to \"Endless\"", "refs": {"task": "T-0205"}}
 {"id": "C-0100", "ts": "2026-11-07T13:40:37Z", "kind": "feature", "summary": "combine tutorial: deck swapped to rock+water (familiar), 3 visible steps (welcome/firstCombine/secondCombine), empty opening board in tutorial mode", "refs": {"task": "T-0206"}}
+{"id": "C-0101", "ts": "2026-11-07T14:23:36Z", "kind": "fix", "summary": "Combine admin theme edits now invalidate all active runs on that theme (T-0209)", "refs": {"task": "T-0209"}}
