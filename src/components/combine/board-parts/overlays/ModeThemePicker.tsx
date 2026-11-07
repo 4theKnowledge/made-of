@@ -137,6 +137,14 @@ export function ModeThemePicker({
           background: var(--line);
           border-radius: 3px;
         }
+        /* Mode row: fit all tiles across the available width without
+           horizontal scroll. Each tile takes an equal share. */
+        .cbmtp .cbmtpModeRow {
+          display: grid;
+          grid-template-columns: repeat(var(--cbmtpModeCount, 3), minmax(0, 1fr));
+          gap: 8px;
+          padding: 2px 2px 8px;
+        }
         .cbmtp .cbmtpTile {
           flex: 0 0 auto;
           min-width: 120px;
@@ -157,6 +165,14 @@ export function ModeThemePicker({
           transition: transform .1s;
           text-align: center;
         }
+        /* Mode-row tiles: no fixed width — shrink to fit the grid cell. */
+        .cbmtp .cbmtpTileFit {
+          min-width: 0;
+          max-width: none;
+          padding: 8px 4px 6px;
+        }
+        .cbmtp .cbmtpTileFit b { font-size: 12px; }
+        .cbmtp .cbmtpTileFit .t { font-size: 10px; }
         .cbmtp .cbmtpTile:hover {
           transform: translate(-1px,-1px);
           box-shadow: 4px 4px 0 var(--ink);
@@ -187,7 +203,12 @@ export function ModeThemePicker({
       `}</style>
 
       <span className="k">Mode</span>
-      <div className="cbmtpRow" role="radiogroup" aria-label="Mode">
+      <div
+        className="cbmtpModeRow"
+        role="radiogroup"
+        aria-label="Mode"
+        style={{ ["--cbmtpModeCount" as string]: visibleModes.length }}
+      >
         {visibleModes.map((m) => {
           const on = mode === m.k;
           return (
@@ -196,7 +217,7 @@ export function ModeThemePicker({
               type="button"
               role="radio"
               aria-checked={on}
-              className={`cbmtpTile${on ? " on" : ""}`}
+              className={`cbmtpTile cbmtpTileFit${on ? " on" : ""}`}
               onClick={() => setMode(m.k)}
             >
               <Pictogram name={`mode:${m.k}`} tier={m.tier} kind="object" pictogram={m.picto} />
