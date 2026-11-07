@@ -200,7 +200,7 @@ export type Event =
       close: number;
     }
   | { type: "shipped"; at: number; out: string; bonus: number }
-  | { type: "age-up"; age: number; sample: string[]; grants: HelperGrants }
+  | { type: "chapter-up"; chapter: number; sample: string[]; grants: HelperGrants }
   | { type: "crumble"; cells: number[] }
   | { type: "hold-crumble"; slots: number[]; tiles: string[] }
   | { type: "discovery"; out: string; recipe: string[]; recipeId: string }
@@ -575,7 +575,7 @@ function afterMove(
     // chapters get richer grants, clamped by HELPER_MAX.
     const grants = helperGrants(helperMilestoneIndex(state.found.length));
     applyHelperGrants(state, grants);
-    events.push({ type: "age-up", age: state.chapter, sample: [], grants });
+    events.push({ type: "chapter-up", chapter: state.chapter, sample: [], grants });
     // Clear the tray so step 3 re-deals. Keeps the chapter transition
     // feeling like a real break rather than a silent label swap.
     state.tray.fill(null);
@@ -1284,7 +1284,7 @@ export function reduce(
       // renders normally; admin-only path, never reached in prod play.
       const grants = helperGrants(target);
       applyHelperGrants(state, grants);
-      events.push({ type: "age-up", age: target, sample: [], grants });
+      events.push({ type: "chapter-up", chapter: target, sample: [], grants });
       events.push({ type: "dealt" });
       return { state, events };
     }

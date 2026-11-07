@@ -872,8 +872,8 @@ export function CombineBoard({
             () => playFx(firstLifetime ? "unlock" : "discover"),
             250,
           );
-        } else if (e.type === "age-up") {
-          latestAgeUp = { age: e.age, sample: e.sample, grants: e.grants };
+        } else if (e.type === "chapter-up") {
+          latestAgeUp = { age: e.chapter, sample: e.sample, grants: e.grants };
           playFx("age");
           vibrate([15, 30, 15, 30, 30]);
         } else if (e.type === "over") {

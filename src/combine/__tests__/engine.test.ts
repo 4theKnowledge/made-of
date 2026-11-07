@@ -1033,7 +1033,7 @@ describe("debug mode", () => {
     expect(state.chapter).toBe(2);
     expect(state.board.every((c) => c == null)).toBe(true);
     expect(state.tray.filter(Boolean).length).toBeGreaterThan(0);
-    expect(events.some((e) => e.type === "age-up")).toBe(true);
+    expect(events.some((e) => e.type === "chapter-up")).toBe(true);
     expect(events.some((e) => e.type === "dealt")).toBe(true);
   });
 

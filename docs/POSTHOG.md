@@ -11,13 +11,21 @@ How Made Of uses PostHog for product analytics. Scope: what to turn on, what eve
 
 ## Setup checklist
 
-1. Project API key (`phc_...`) and host (`us.i.posthog.com` or `eu.i.posthog.com`) → `.env.local` as `NEXT_PUBLIC_POSTHOG_KEY` and `NEXT_PUBLIC_POSTHOG_HOST`.
-2. `npm install posthog-js posthog-node`.
-3. Next.js rewrite from `/ingest/*` → PostHog host (dodges ad-blockers, keeps host out of client bundle).
-4. Client init in a `PostHogProvider` mounted in `app/layout.tsx` with the guardrails above.
-5. Server singleton (`posthog-node`) in `src/lib/analytics/server.ts`.
-6. Typed `track()` helper — discriminated union over event names, routes to client or server SDK.
-7. Identify on Better Auth login using the user id only.
+Status as of T-0129 / C-0066. All foundation steps landed; see `src/lib/analytics/*` and `src/components/analytics/PostHogProvider.tsx`.
+
+1. [x] Project API key (`phc_...`) and host (US region) → `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` in `.env.local` **and** on Railway `made-of` / production. `NEXT_PUBLIC_*` vars are inlined at build time, so changes require a redeploy.
+2. [x] `posthog-js` + `posthog-node` installed.
+3. [x] Next.js rewrite `/ingest/*` → PostHog host in `next.config.ts` (plus `/ingest/static/*` → `us-assets.i.posthog.com`). Dodges ad-blockers and keeps the host out of the client bundle.
+4. [x] `PostHogProvider` mounted in `src/app/layout.tsx` under `<Suspense>` (required because `useSearchParams` for pageview bridge). Guardrails enforced in `src/lib/analytics/client.ts`.
+5. [x] Server singleton at `src/lib/analytics/server.ts` (`captureServer()` tags events with `environment`). `server-only` import to prevent client bleed.
+6. [~] Typed `track()` helper in `src/lib/analytics/track.ts` + `AnalyticsEvent` union in `src/lib/analytics/events.ts`. The union is `never` today — extend it as events come online (see "Pending entry points" + taxonomy below). Stub body uses `as` cast; once branches exist the generic narrows.
+7. [x] Identify on Better Auth session via `PostHogProvider` — uses `session.user.id` only (no email/name). Resets on sign-out.
+
+**Also wired, not in the original checklist:**
+
+- `$pageview` captured on `pathname` + `searchParams` change (Next.js App Router doesn't fire autocapture pageviews on client nav).
+- **`environment` super-property** on every event: `production | preview | development`, derived from `NODE_ENV` + `RAILWAY_ENVIRONMENT_NAME` (see `src/lib/analytics/env.ts`). One PostHog project hosts all envs — filter by `environment` on insights.
+- Web Vitals autocapture left **on** for now (low traffic). Revisit near launch: ~5 extra events/pageview, ~5× the cost on volume. Filter out of Activity feed if noisy.
 
 ## Features to use
 
@@ -60,9 +68,9 @@ Reconcile with the launch doc's event list before freezing the `track()` union.
 - **Account:** `signed_up`, `signed_in`, `paywall_shown { feature }`, `checkout_started`, `subscribed`
 - **Reliability:** `error_boundary_triggered { route, digest, variant }` — variant is `page` | `region` | `global` | `combine_board`
 
-## Pending entry points (waiting on `track()`)
+## Pending entry points (waiting on event branches in `events.ts`)
 
-These call sites currently log via `console.error` and need to swap to the typed helper once it exists. Search for `"[error-boundary]"`, `"[global-error]"`, and `"[combine-board-error]"` to find them:
+`track()` exists — these call sites still log via `console.error` and need an `error_boundary_triggered` branch added to `AnalyticsEvent`, then a one-line swap each. Search for `"[error-boundary]"`, `"[global-error]"`, and `"[combine-board-error]"` to find them:
 
 - `src/components/ErrorFallback.tsx` — fires on any route-segment `error.tsx` boundary. Has `variant` (`page` | `region`) and `error.digest` in scope.
 - `src/app/global-error.tsx` — last-resort boundary when the root layout itself throws. Send `variant: "global"`.

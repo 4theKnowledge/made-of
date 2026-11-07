@@ -265,7 +265,7 @@ function playOne(bundle: ThemeBundle, seed: number, maxMoves: number): GameDiag 
 
     // Detect age-up event
     for (const e of r.events) {
-      if (e.type === "age-up") {
+      if (e.type === "chapter-up") {
         perAge[prev.chapter].advanced = true;
       }
     }

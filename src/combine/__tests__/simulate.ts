@@ -506,7 +506,7 @@ function traceOne(
           `  m${state.moves.toString().padStart(3)} chapter=${prev.chapter} → ${inputsNames} ⇒ ${nameOf(e.out)} [band ${band}] ${first ? "NEW" : ""} chain=${e.mult}`,
         );
       }
-      if (e.type === "age-up") console.log(`  >>> CHAPTER UP → ${e.age}`);
+      if (e.type === "chapter-up") console.log(`  >>> CHAPTER UP → ${e.chapter}`);
       if (e.type === "shipped") console.log(`  m${state.moves} shipped ${nameOf(e.out)} +${e.bonus}`);
       if (e.type === "crumble") console.log(`  m${state.moves} crumbled ${e.cells.length} tile(s)`);
       if (e.type === "over") console.log(`  m${state.moves} GAME OVER (board full)`);
