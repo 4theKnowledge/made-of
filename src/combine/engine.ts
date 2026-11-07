@@ -48,14 +48,22 @@ export const TIER_VALUE: Record<string, number> = {
   S: 5,
 };
 
-/** Hold-zone capacity per age. Index is the 0-based age; capacity grows
- *  one slot per age. Flatten to all-1s to turn the growth off during
- *  playtesting. The array extends to cover more ages than any theme
- *  actually ships. */
-export const HOLD_CAPACITY_BY_AGE: readonly number[] = [2, 4, 6, 8, 10, 12, 14, 16];
+/** Baseline hold-zone capacity at chapter 0. */
+const HOLD_CAPACITY_BASE = 2;
+/** Each chapter adds this many hold slots. */
+const HOLD_CAPACITY_STEP = 2;
+/** Ceiling so the hold zone can't swallow the board in late chapters. */
+const HOLD_CAPACITY_MAX = 16;
 
-export function holdCapacity(age: number): number {
-  return HOLD_CAPACITY_BY_AGE[Math.min(age, HOLD_CAPACITY_BY_AGE.length - 1)] ?? 1;
+/** Hold-zone capacity at a given 0-based chapter. Linear with a ceiling —
+ *  chapter 0 starts at BASE, each chapter adds STEP, clamped at MAX.
+ *  Chapters are open-ended (log-scaled discovery thresholds) so a formula
+ *  is more honest than a lookup table that would run out of entries. */
+export function holdCapacity(chapter: number): number {
+  return Math.min(
+    HOLD_CAPACITY_MAX,
+    HOLD_CAPACITY_BASE + HOLD_CAPACITY_STEP * Math.max(0, chapter),
+  );
 }
 
 /** A crumble counter for cell `i`: counts ticks since the tile stopped
@@ -87,8 +95,9 @@ export interface ChoosingState {
 
 export interface GameState {
   theme: ThemeKey;
-  /** Play mode. `classic` = age-banded (endless/daily). `fast` = 2-part
-   *  recipes only, single band, score-only (no collection unlocks). */
+  /** Play mode. `endless` + `daily` share the chapter-progression reducer
+   *  paths; `fast` is a 2-part-recipes-only variant with no chapter
+   *  advancement or lifetime collection. See `isClassic`. */
   mode: Mode;
   daily: string | null;
   n: number;
@@ -128,9 +137,9 @@ export interface GameState {
   newBest: boolean;
   moves: number;
   shelf: string[];
-  /** Held tiles. Length is the current age's capacity (see
-   *  `HOLD_CAPACITY_BY_AGE`). Commit-until-used: a stored tile only leaves
-   *  by being placed on the board or crumbling. */
+  /** Held tiles. Length is the current chapter's capacity (see
+   *  `holdCapacity`). Commit-until-used: a stored tile only leaves by
+   *  being placed on the board or combined/moved. */
   hold: Array<string | null>;
   /** 0-based chapter index. Advances each time cumulative discoveries
    *  cross the next `chapterThreshold`. Drives hold capacity growth and
@@ -166,9 +175,9 @@ export interface GameState {
    *  is admin, so the reducer trusting this flag is fine. */
   debug: boolean;
   /** Daily discovery target. The run ends (win) when
-   *  `found.length >= target`. Null for endless/fast and for legacy daily
-   *  payloads that predate the target-list feature — in that case the
-   *  pre-existing final-age victory still fires. */
+   *  `found.length >= target`. Null for endless/fast. Legacy daily
+   *  payloads without a target just run open-ended until the board
+   *  clogs — there's no final-chapter victory. */
   target: number | null;
   /** The initial seed this run started with. Daily runs only — endless/fast
    *  leave this null. Stamped onto saves so a resume after admin reset-today
