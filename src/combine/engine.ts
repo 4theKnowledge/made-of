@@ -19,9 +19,9 @@ import { ageSets, buildThemeBundle } from "./data";
 import { getGpOverrides } from "./gp-overrides";
 import {
   chapterIndex,
+  chapterThreshold,
   effectiveCrumbleTtl,
   helperMilestoneIndex,
-  softNeed,
 } from "./progression";
 import {
   edgeNeighbours,
@@ -320,60 +320,18 @@ function fullness(board: Board): number {
   return board.filter(Boolean).length / board.length;
 }
 
-/** Fraction of unique on-band items the player must discover before advancing.
- *  40% feels like real exploration without forcing exhaustive clearing — tuned
- *  against Everything (~34 items/age) where 0.4 lands near 13–15 unlocks. */
-const UNLOCK_FRACTION = 0.4;
-
-/** Baseline ramp used when the KB is too small for the band-aware floor to
- *  take over: 7, 9, 11, 13, 15, 17. Preserves the test fixtures and keeps
- *  tiny themes playable. */
-function baselineNeed(age: number): number {
-  return 7 + 2 * age;
-}
-
-/** Number of distinct on-band outputs in the age's band. Shared by
- *  `ageNeed` and helper-grant scaling so both reward and demand move
- *  together as the KB (or an admin edit) reshapes a band. */
-export function bandSize(age: number, bundle: ThemeBundle): number {
-  const targetBand = age + 1;
-  let n = 0;
-  for (const b of bundle.outBand.values()) {
-    if (b === targetBand) n++;
-  }
-  return n;
-}
-
-/** Unique discoveries at the current age's band needed to leave each age.
- *  Only first-time makes of items whose minimum band is `age + 1` count —
- *  see `finishResolve`. Scales with band population so a mature KB demands
- *  more exploration; floors to the baseline so sparse bands stay playable.
- *
- *  Daily bundles may set `dailyConfig.ageNeedScale` to shorten runs — the
- *  scale multiplies both the scaled-by-band term *and* the baseline floor,
- *  so a 0.5 scale actually halves the demand (otherwise the baseline would
- *  pin small themes at an unshortened floor). */
-export function ageNeed(age: number, bundle: ThemeBundle): number {
-  const scale = bundle.dailyConfig?.ageNeedScale ?? 1;
-  const scaled = Math.round(bandSize(age, bundle) * UNLOCK_FRACTION * scale);
-  const floor = Math.max(1, Math.round(baselineNeed(age) * scale));
-  return Math.max(floor, scaled);
-}
-
-/** Helper grants per age. Each helper gets `floor(bandSize / divisor)`,
- *  clamped to `[min, max]`. Scales with band population so dense ages
- *  (e.g. Everything's band 4/5 at ~95/107 outputs) get proportionally
- *  more help without flooding the player; the caps keep late-game
- *  crumble pressure meaningful. */
-export const HELPER_PER_ITEMS = { mv: 10, swap: 15, clear: 20, hint: 20, shore: 15, pluck: 20 } as const;
+/** Helper grants per chapter / milestone. Amounts grow with the player's
+ *  progress (deeper chapters give richer grants) and are clamped to
+ *  sensible floors/ceilings so no single grant swamps the game or
+ *  leaves a new player helper-starved. */
 export const HELPER_MIN = { mv: 2, swap: 1, clear: 1, hint: 1, shore: 1, pluck: 1 } as const;
 export const HELPER_MAX = { mv: 8, swap: 5, clear: 3, hint: 4, shore: 4, pluck: 3 } as const;
 
-/** 0-based age at which the wipe-board helper unlocks. The player must be
- *  at this age (or higher) to use it, and each wipe costs one age — so
- *  using it at exactly this age drops them below the threshold and
- *  re-locks it until they climb back up. */
-export const WIPE_UNLOCK_AGE = 2;
+/** 0-based chapter at which the wipe-board helper unlocks. The player must
+ *  be at this chapter (or higher) to use it, and each wipe costs one
+ *  chapter — so using it at exactly this chapter drops them below the
+ *  threshold and re-locks it until they climb back up. */
+export const WIPE_UNLOCK_CHAPTER = 2;
 
 export type HelperGrants = {
   mv: number;
@@ -384,10 +342,13 @@ export type HelperGrants = {
   pluck: number;
 };
 
-export function helperGrants(age: number, bundle: ThemeBundle): HelperGrants {
-  const n = bandSize(age, bundle);
-  const grant = (k: keyof typeof HELPER_PER_ITEMS) =>
-    Math.min(HELPER_MAX[k], Math.max(HELPER_MIN[k], Math.floor(n / HELPER_PER_ITEMS[k])));
+/** Given a progression weight (chapter index, or milestone index for mid-
+ *  chapter grants), return the amount of each helper to grant. Monotonic
+ *  in `weight` up to HELPER_MAX; floors at HELPER_MIN so even a chapter-0
+ *  grant gives the player a working toolkit. */
+export function helperGrants(weight: number): HelperGrants {
+  const grant = (k: keyof typeof HELPER_MIN) =>
+    Math.min(HELPER_MAX[k], Math.max(HELPER_MIN[k], HELPER_MIN[k] + Math.floor(weight / 2)));
   return {
     mv: grant("mv"),
     swap: grant("swap"),
@@ -626,74 +587,38 @@ function afterMove(
     return;
   }
 
-  // 1. Age up?
-  const totalAges = bundle.theme.ages.length;
-  const mode = getGpOverrides().mode;
-  const softMode = mode === "soft";
-  const ageUp = softMode
-    ? state.age < totalAges - 1 && state.found.length >= softNeed(state.age, bundle.items.size)
-    : state.age < totalAges - 1 && state.ageMade >= ageNeed(state.age, bundle);
-  if (ageUp) {
+  // 1. Chapter up? Chapters are discovery-driven: each threshold is a
+  //    cumulative find count (log-scaled; see progression.ts). Open-ended
+  //    past the last computed threshold — the final chapter is the tail.
+  const chapterUp = state.found.length >= chapterThreshold(state.age + 1);
+  if (chapterUp) {
     state.age++;
     state.ageMade = 0;
     state.score += 100 * state.age;
-    // In soft mode, helper grants track discovery milestones (log-scaled),
-    // not banded age. In banded, keep the existing `bandSize(age)`-indexed
-    // grants. Both call `helperGrants` with an integer index; the function
-    // doesn't care whether the index came from a band or a milestone count.
-    const grantIdx = softMode ? helperMilestoneIndex(state.found.length) : state.age;
-    const grants = helperGrants(grantIdx, bundle);
+    // Grant amounts track the mid-chapter milestone count so helpers arrive
+    // at predictable intervals as the player progresses. Monotonic — deeper
+    // chapters get richer grants, clamped by HELPER_MAX.
+    const grants = helperGrants(helperMilestoneIndex(state.found.length));
     applyHelperGrants(state, grants);
-    const A = ageSets(bundle, state.age);
-    const sample = [...new Set(A.recipes.filter((r) => r.band === state.age + 1).map((r) => r.out))].slice(0, 4);
-    events.push({ type: "age-up", age: state.age, sample, grants });
-    // Clear the tray so step 3 re-deals from the new age's pool. Keeps I→II
-    // feeling like a transition instead of just a label swap.
+    events.push({ type: "age-up", age: state.age, sample: [], grants });
+    // Clear the tray so step 3 re-deals. Keeps the chapter transition
+    // feeling like a real break rather than a silent label swap.
     state.tray.fill(null);
-  } else if (
-    !softMode &&
-    state.mode !== "daily" &&
-    state.age === totalAges - 1 &&
-    state.ageMade >= ageNeed(state.age, bundle)
-  ) {
-    // Final-age victory: once the player has made enough on-band things in
-    // the last era, end the run with a flourish rather than letting the
-    // board clog. Playtests showed the final age soaking 70% of total
-    // moves with diminishing returns — this gives a satisfying stop.
-    // Disabled for daily: target-list runs end only on N-found or board-full.
-    state.over = true;
-    events.push({ type: "over" });
-    return;
   }
 
-  // 2. Crumble. Time-based (T-0167): every occupied cell ages one tick per
-  //    move, regardless of band or mode. A cell's counter resets when its
-  //    tile changes (combine, place, move, drop-on). This replaces the
-  //    older band-local `A.USE` gate, which turned crumble off entirely in
-  //    soft mode (nothing is "out of band" when the pool is reachability-
-  //    defined). Shore still exempts a tile until the cell changes.
-  const A = ageSets(bundle, state.age);
+  // 2. Crumble. Time-based + occupancy-scaled: TTL ramps from
+  //    CRUMBLE_TTL_MAX (empty board) to CRUMBLE_TTL_MIN (full board) so
+  //    pressure emerges from the player's own state. Shore exempts a tile
+  //    until its cell changes.
   const gone: number[] = [];
-  // Soft mode: TTL scales inversely with board occupancy so empty boards
-  // are generous and full boards tighten. Banded keeps the classic 3-tick
-  // short TTL so its behaviour is untouched.
-  let ttl = CRUMBLE_TTL;
-  if (softMode) {
-    let filled = 0;
-    for (const v of state.board) if (v) filled++;
-    const occupancy = state.board.length > 0 ? filled / state.board.length : 0;
-    ttl = effectiveCrumbleTtl(occupancy);
-  }
+  let filled = 0;
+  for (const v of state.board) if (v) filled++;
+  const occupancy = state.board.length > 0 ? filled / state.board.length : 0;
+  const ttl = effectiveCrumbleTtl(occupancy);
   for (let i = 0; i < state.board.length; i++) {
     const v = state.board[i];
     if (!v) { state.crumb[i] = null; continue; }
-    // Shored tiles are permanently exempt from crumble until the tile at
-    // this cell changes (which clears the flag at the mutation site).
     if (state.shored[i]) { state.crumb[i] = null; continue; }
-    // Banded mode keeps the old "useful across age window" short-circuit
-    // for compatibility — on-band tiles never crumble. Soft mode has no
-    // concept of "in band," so every tile is counted.
-    if (!softMode && A.USE.has(v)) { state.crumb[i] = null; continue; }
     const cur = state.crumb[i];
     const c = cur && cur.id === v ? cur : (state.crumb[i] = { id: v, n: 0 });
     c.n++;
@@ -708,27 +633,16 @@ function afterMove(
     }
   }
 
-  // 2b. Hold-zone crumble + resize.
-  // Capacity grows one slot per age. Any held tile that's no longer useful
-  // in the new age (i.e. not in `A.USE`) crumbles — this is what keeps the
-  // hold slot from becoming a free long-term stash.
+  // 2b. Hold-zone resize. Capacity grows with chapter; shrinking only
+  //     happens if the capacity config changes mid-run. Held tiles never
+  //     crumble — hold is a permanent stash until the player places the
+  //     tile on the board or the game ends.
   const cap = holdCapacity(state.age);
   const holdGone: number[] = [];
   const holdGoneTiles: string[] = [];
-  for (let i = 0; i < state.hold.length; i++) {
-    const v = state.hold[i];
-    if (v && !A.USE.has(v)) {
-      holdGone.push(i);
-      holdGoneTiles.push(v);
-      state.hold[i] = null;
-    }
-  }
   if (state.hold.length < cap) {
     while (state.hold.length < cap) state.hold.push(null);
   } else if (state.hold.length > cap) {
-    // Only shrinks if the config is reduced during a run — we keep the
-    // first `cap` slots and drop the rest (crumble any tiles in them so
-    // nothing is silently lost).
     for (let i = cap; i < state.hold.length; i++) {
       const v = state.hold[i];
       if (v) {
@@ -810,7 +724,7 @@ export function hasOrganicNonFinishingMove(state: GameState): boolean {
 /** True if the player has at least one helper spend available that opens a
  *  path forward: `mv` (relocate or on-board combine), `swap` (new tray),
  *  `clear` (remove any tile), `pluck` (lift to hold), or `wipe-board` once
- *  `WIPE_UNLOCK_AGE` is reached. Mirrors the helper branches in
+ *  `WIPE_UNLOCK_CHAPTER` is reached. Mirrors the helper branches in
  *  `hasAnyLegalAction` — keep in sync if that predicate grows. */
 export function hasHelperMove(state: GameState, bundle: ThemeBundle): boolean {
   const size = state.n;
@@ -830,7 +744,7 @@ export function hasHelperMove(state: GameState, bundle: ThemeBundle): boolean {
   if (state.swaps > 0) return true;
   if (state.clears > 0 && anyOccupied) return true;
   if (state.pluck > 0 && anyOccupied && freeHoldSlot) return true;
-  if (state.age >= WIPE_UNLOCK_AGE) return true;
+  if (state.age >= WIPE_UNLOCK_CHAPTER) return true;
   return false;
 }
 
@@ -912,7 +826,7 @@ export function newGame(
   };
 
   // Initial helpers scale to age-0's band population — see HELPER_PER_ITEMS.
-  applyHelperGrants(state, helperGrants(0, bundle));
+  applyHelperGrants(state, helperGrants(0));
 
   // Seed a few starting tiles that don't already combine. The prototype
   // used fixed cells per board size (lines 3364); we sample positions from
@@ -1294,9 +1208,9 @@ export function reduce(
       // Clear everything on the play surface and spend one age for the
       // privilege. Preserves score, discoveries, shelf, and run history —
       // only the board + hold go. Requires the player to have reached
-      // `WIPE_UNLOCK_AGE`; dropping below the threshold re-locks the
+      // `WIPE_UNLOCK_CHAPTER`; dropping below the threshold re-locks the
       // helper (UI-side), so repeat use costs an age each time.
-      if (state.age < WIPE_UNLOCK_AGE) return { state: prev, events: [] };
+      if (state.age < WIPE_UNLOCK_CHAPTER) return { state: prev, events: [] };
       state.board.fill(null);
       state.crumb.fill(null);
       state.shored.fill(false);
@@ -1410,7 +1324,7 @@ export function reduce(
       ].slice(0, 4);
       // Debug jump mirrors a real age-up's grants so the UI toast renders
       // normally; admin-only path, never reached in prod play.
-      const grants = helperGrants(target, bundle);
+      const grants = helperGrants(target);
       applyHelperGrants(state, grants);
       events.push({ type: "age-up", age: target, sample, grants });
       events.push({ type: "dealt" });

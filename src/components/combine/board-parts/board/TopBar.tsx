@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { WIPE_UNLOCK_AGE, type GameState } from "@/combine/engine";
+import { WIPE_UNLOCK_CHAPTER, type GameState } from "@/combine/engine";
 import type { Fx } from "@/components/combine/board-parts/types";
 import { formatDailyLabel } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
@@ -65,7 +65,7 @@ export function TopBar({
   onFeedback: () => void;
 }) {
   const canUndo = state.undos > 0 && state.lastSnapshot != null;
-  const wipeUnlocked = state.age >= WIPE_UNLOCK_AGE;
+  const wipeUnlocked = state.age >= WIPE_UNLOCK_CHAPTER;
   const holdFull = !state.hold.some((v) => v == null);
   const boardEmpty = !state.board.some((v) => v != null);
   const helpersLeft =
@@ -308,7 +308,7 @@ export function TopBar({
               aria-label={
                 wipeUnlocked
                   ? "Wipe the board, costs one age"
-                  : `Wipe unlocks at age ${WIPE_UNLOCK_AGE + 1}`
+                  : `Wipe unlocks at age ${WIPE_UNLOCK_CHAPTER + 1}`
               }
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -319,7 +319,7 @@ export function TopBar({
                 <em>
                   {wipeUnlocked
                     ? "Clear the board and hold. Costs one age."
-                    : `Unlocks at age ${WIPE_UNLOCK_AGE + 1}.`}
+                    : `Unlocks at age ${WIPE_UNLOCK_CHAPTER + 1}.`}
                 </em>
               </span>
             </button>

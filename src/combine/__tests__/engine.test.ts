@@ -720,44 +720,8 @@ describe("hold zone", () => {
     expect(state.hold[0]).toBeNull();
   });
 
-  it("age-up grows the hold capacity (2 → 4)", () => {
-    const s0 = state0();
-    s0.ageMade = 7; // meets ageNeed(0)
-    s0.tray = ["water", null, null];
-    s0.hold = ["flour", "water"]; // dough is in USE at ages 0, 1 (band 1 recipe)
-    const { state, events } = reduce(s0, bundle, { type: "hold", slot: 0 });
-    // Hold slot full → the hold itself was a no-op path, but we need an
-    // action that triggers afterMove. Use place of a non-combining tile on
-    // an empty cell instead.
-    expect(state).toBe(s0);
-    expect(events).toEqual([]);
-
-    const s1 = state0();
-    s1.ageMade = 7;
-    s1.hold = ["flour", "water"];
-    s1.tray = ["water", null, null];
-    const res = reduce(s1, bundle, { type: "place", slot: 0, cell: 4 });
-    expect(res.state.age).toBe(1);
-    expect(res.state.hold.length).toBe(4);
-    // "flour" is still useful at age 1 (band 1 is in [1,2,3]), so it stays.
-    expect(res.state.hold[0]).toBe("flour");
-    expect(res.state.hold[1]).toBe("water");
-    expect(res.state.hold[2]).toBeNull();
-    expect(res.state.hold[3]).toBeNull();
-  });
-
-  it("age-up crumbles held tiles that are no longer in USE", () => {
-    const s0 = state0();
-    s0.ageMade = 7 + 2; // meets ageNeed(1); start at age 1 to force → age 2
-    s0.age = 1;
-    s0.hold = ["flour", null, null, null]; // band 1; USE at age 2 is bands [2,3,4]
-    s0.tray = ["spice", null, null]; // "spice" is in band 3 so it's valid
-    const { state, events } = reduce(s0, bundle, { type: "place", slot: 0, cell: 4 });
-    expect(state.age).toBe(2);
-    expect(state.hold.length).toBe(6);
-    expect(state.hold[0]).toBeNull();
-    expect(events.some((e) => e.type === "hold-crumble")).toBe(true);
-  });
+  // Banded age-up + hold-crumble tests removed — replaced by
+  // chapter-based progression. New coverage lands in phase 7.
 });
 
 describe("purity (no shared references with input)", () => {

@@ -12,7 +12,7 @@ import {
   hasOrganicFinishingMove,
   newGame,
   reduce,
-  WIPE_UNLOCK_AGE,
+  WIPE_UNLOCK_CHAPTER,
 } from "@/combine/engine";
 import type { Action, Event, GameState } from "@/combine/engine";
 import { matchOn } from "@/combine/match";
@@ -1858,7 +1858,7 @@ export function CombineBoard({
         return;
       }
       if (which === "wipe") {
-        if (state.age < WIPE_UNLOCK_AGE || state.over) return;
+        if (state.age < WIPE_UNLOCK_CHAPTER || state.over) return;
         // Wipe is destructive — clears board, hold, and spends an age.
         // Confirm first so a stray tap can't drop a player back a tier.
         setClearMode(false);

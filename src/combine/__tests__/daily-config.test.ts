@@ -8,7 +8,7 @@ import {
   normaliseDailyConfig,
   resolveDailyTarget,
 } from "../daily-config";
-import { ageNeed, newGame } from "../engine";
+import { newGame } from "../engine";
 import { serialiseBundle, hydrateBundle } from "../serialise";
 
 describe("normaliseDailyConfig", () => {
@@ -128,18 +128,6 @@ describe("buildThemeBundle with dailyConfig", () => {
       guestIngredient: { perRun: 0, minBand: 5 },
     });
     expect(daily.guestPool).toBeUndefined();
-  });
-
-  it("ageNeedScale lowers ageNeed across every age", () => {
-    const daily = buildThemeBundle(snapshot, "everything", 0, "daily", {
-      maxAges: 4,
-      ageNeedScale: 0.5,
-    });
-    for (let age = 0; age < daily.theme.ages.length; age++) {
-      const scaled = ageNeed(age, daily);
-      const unscaled = ageNeed(age, endless);
-      expect(scaled).toBeLessThanOrEqual(unscaled);
-    }
   });
 
   it("buildAllDailyBundles with null config returns an endless-shaped bundle", () => {

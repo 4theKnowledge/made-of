@@ -22,7 +22,7 @@ import {
   hasAnyLegalAction,
   newGame,
   reduce,
-  WIPE_UNLOCK_AGE,
+  WIPE_UNLOCK_CHAPTER,
   type Action,
   type GameState,
 } from "../engine";
@@ -148,7 +148,7 @@ function pickHelper(state: GameState): Action | null {
     if (occ.length) return { type: "clear", cell: occ[0] };
   }
   // Wipe is a last resort (costs an age) and only unlocks from a certain age.
-  if (state.age >= WIPE_UNLOCK_AGE) return { type: "wipe-board" };
+  if (state.age >= WIPE_UNLOCK_CHAPTER) return { type: "wipe-board" };
   return null;
 }
 
