@@ -66,8 +66,8 @@ export function holdCapacity(chapter: number): number {
   );
 }
 
-/** A crumble counter for cell `i`: counts ticks since the tile stopped
- *  being "useful" in the current age. */
+/** A crumble counter for cell `i`: counts moves of inactivity since the
+ *  tile was last touched. Reset implicitly when the cell's tile changes. */
 export interface CrumbleCounter {
   /** The tile id this count is for. If the tile at `i` changes, the counter
    *  resets. */
@@ -988,7 +988,7 @@ export function reduce(
     case "hold": {
       // Move a tray tile into the first empty hold slot. Commit-until-used:
       // once stored, the tile only leaves by being placed or by crumbling
-      // on age-up. Counts as a move (afterMove runs below).
+      // on chapter-up. Counts as a move (afterMove runs below).
       const t = state.tray[action.slot];
       if (t == null) return { state: prev, events: [] };
       const target = state.hold.findIndex((v) => v == null);
@@ -1266,8 +1266,8 @@ export function reduce(
 
     case "debug-set-chapter": {
       // Jump straight to the requested age. Clears the board and tray,
-      // then re-deals from the new age's pool — same path a real age-up
-      // takes, minus the score bump. The age-up event is fired so the
+      // then re-deals from the new age's pool — same path a real chapter-up
+      // takes, minus the score bump. The chapter-up event is fired so the
       // UI's age-banner path still runs.
       if (!state.debug) return { state: prev, events: [] };
       const totalAges = bundle.theme.ages.length;

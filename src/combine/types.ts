@@ -16,8 +16,8 @@ export type ThemeKey = string;
 export const DEFAULT_THEME: ThemeKey = "everything";
 
 /** Combine play mode. Three first-class modes:
- *  - `endless` — age-banded progression, long-running, score+collection.
- *  - `daily` — age-banded progression tuned by a theme's `dailyConfig`
+ *  - `endless` — chapter-based progression, long-running, score+collection.
+ *  - `daily` — chapter-based progression tuned by a theme's `dailyConfig`
  *    (capped ages, guest-of-the-day). Separate collection scope.
  *  - `fast` — 2-part recipes only, single band, score-only. Shares the
  *    endless collection scope at the DB level but does not add to it.
@@ -26,7 +26,7 @@ export const DEFAULT_THEME: ThemeKey = "everything";
  *  the mode is kept distinct for UI, admin, leaderboards, and stats. */
 export type Mode = "endless" | "daily" | "fast";
 
-/** True when the mode uses the age-banded "classic" reducer paths
+/** True when the mode uses the chapter-based "classic" reducer paths
  *  (endless + daily). Fast is the only non-classic mode today. The engine
  *  historically used `mode === "classic"` for this; the predicate keeps
  *  that logic working after the mode rename. */
@@ -114,10 +114,9 @@ export interface ThemeBundle {
   items: Map<string, CombineItem>;
   /** Minimum band (1..n) each output can be made in. */
   outBand: Map<string, number>;
-  /** When set, this bundle was built for a daily run and has already had
-   *  `dailyConfig.maxAges` applied (`theme.ages` and `recipes` are the
-   *  capped slice). Carried so the dealer and `ageNeed` can see the other
-   *  knobs (`ageNeedScale`, `guestIngredient`). */
+  /** When set, this bundle was built for a daily run. Carries the
+   *  theme's `dailyConfig` so the dealer + target resolver can read
+   *  guest-ingredient settings and target discoveries. */
   dailyConfig?: DailyConfig | null;
   /** Output ids eligible as guest-of-the-day tiles. Only populated on
    *  daily bundles whose `dailyConfig.guestIngredient.perRun > 0`. */

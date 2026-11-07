@@ -650,7 +650,7 @@ export function CombineBoard({
       // in the engine's event order.)
       const discoveredOuts = new Set<string>();
 
-      // Immediate (non-combine) patch — placed/nope/crumble/discovery/age-up.
+      // Immediate (non-combine) patch — placed/nope/crumble/discovery/chapter-up.
       const immediate: Fx = {};
       // Timeline of combine phases, each scheduled relative to time 0.
       const schedule: Array<{ at: number; patch: Fx; clearAt: number; clearKeys: (keyof Fx)[] }> = [];

@@ -1,8 +1,8 @@
 /**
- * Soft-bands sampler (T-0163).
+ * Chapter-progression sampler.
  *
- * Instead of hard age-banded gating, the dealer samples from a
- * *reachability pool* that grows as the player discovers items.
+ * The dealer samples from a *reachability pool* that grows as the player
+ * discovers items — not a fixed content window.
  *
  * Definitions (per run, computed from the current found set):
  *
@@ -80,7 +80,7 @@ export function softPool(bundle: ThemeBundle, found: string[]): SoftPool {
 }
 
 /**
- * KB-size-invariant chapter thresholds for soft-bands progression.
+ * KB-size-invariant chapter thresholds.
  *
  * Replaces the earlier fraction-of-KB scheme (`softAgeThresholds`) which
  * broke at large KBs — at 40k items the first chapter would demand 1600
