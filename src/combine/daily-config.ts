@@ -46,7 +46,7 @@ export const DEFAULT_DAILY_CONFIG: DailyConfig = {};
 /** Default discovery target when neither `targetByDow[dow]` nor
  *  `targetDiscoveries` is set. Single source of truth for the resolver,
  *  the admin placeholder, and defensive engine fallbacks. */
-export const DEFAULT_TARGET_DISCOVERIES = 8;
+export const DEFAULT_TARGET_DISCOVERIES = 40;
 
 /** Validate a candidate dailyConfig payload (admin API or seed). Returns a
  *  normalised shape or null if the payload is empty / falsy. Throws on
