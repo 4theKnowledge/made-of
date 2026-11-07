@@ -38,6 +38,11 @@ export function Board({
 }) {
   const size = state.n;
   const softModeActive = getGpOverrides().mode === "soft";
+  // Effective TTL for crumble: in soft mode use the time-based inactivity
+  // window; banded mode keeps the historical 3-move short-TTL. The UI needs
+  // this to display "N turns left" correctly — otherwise the hardcoded
+  // CRUMBLE_TTL=3 makes the counter go negative in soft mode.
+  const effectiveCrumbleTtl = softModeActive ? CRUMBLE_INACTIVITY_MOVES : CRUMBLE_TTL;
   return (
     <div
       className={"cbboard" + (lastChance ? " cbboard-lastchance" : "")}
@@ -77,6 +82,7 @@ export function Board({
             id={v}
             bundle={bundle}
             crumbleTick={crumbleTick}
+            crumbleTtl={effectiveCrumbleTtl}
             fx={fx}
             preview={preview.get(i)}
             over={over}
@@ -102,6 +108,7 @@ function Cell({
   id,
   bundle,
   crumbleTick,
+  crumbleTtl,
   fx,
   preview,
   over,
@@ -117,6 +124,7 @@ function Cell({
   id: string | null;
   bundle: ThemeBundle;
   crumbleTick: number;
+  crumbleTtl: number;
   fx: Fx;
   preview: Preview | undefined;
   over: "ok" | "no" | null;
@@ -203,7 +211,7 @@ function Cell({
         shored
           ? ", shored: won't crumble"
           : crumbleTick > 0
-          ? `, crumbling: nothing in this age uses it, gone in ${CRUMBLE_TTL + 1 - crumbleTick} turns`
+          ? `, crumbling: nothing in this age uses it, gone in ${crumbleTtl + 1 - crumbleTick} turns`
           : ""
       }`
     : preview?.out
@@ -270,7 +278,7 @@ function Cell({
       )}
       {crumbleTick > 0 && !inCrumble && (
         <span className="crk" aria-hidden="true">
-          {CRUMBLE_TTL + 1 - crumbleTick}
+          {crumbleTtl + 1 - crumbleTick}
         </span>
       )}
     </button>
