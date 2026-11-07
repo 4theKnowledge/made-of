@@ -1,6 +1,6 @@
 # Combine pacing — investigation state (2026-11-07)
 
-Living summary of the pacing / grind investigation. Current branch of the discussion: strategic sim built, three prototype variants wired behind a unified `gp_override` system, playtest UI gated behind an env flag. Awaiting playtest data + a run of the four-way playability comparison.
+Living summary of the pacing / grind investigation. **Status: deployed to prod** behind `NEXT_PUBLIC_COMBINE_PLAYTEST=1`. User playtesting on mobile. While playtest runs, investigating orthogonal mechanic improvements (progression bar semantics, helper scaling in soft mode).
 
 ## Problem statement
 
@@ -136,25 +136,44 @@ In-game Experiments menu row — gated on `NEXT_PUBLIC_COMBINE_PLAYTEST=1`, so p
 
 | Task | Status | Blocked on |
 |---|---|---|
-| T-0135 Combine pacing | in-progress | moved to T-0162 for sim fidelity |
+| T-0135 Combine pacing | in-progress | user playtest in prod |
 | T-0161 Flat mode | done (rejected) | — |
-| T-0162 Strategic sim + playability | in-progress | 4-way comparison still needed |
-| T-0163 Soft bands | in-progress | sim needs caching; then playtest |
-| T-0164 4-tile tray | in-progress | 4-way sim comparison |
-| T-0165 gp_override plumbing | in-progress | code landed; just needs merge |
-| T-0166 Playtest reveal UI | in-progress | code landed; needs `NEXT_PUBLIC_COMBINE_PLAYTEST=1` in `.env.local` to try |
+| T-0162 Strategic sim + playability | done (4-way landed) | — |
+| T-0163 Soft bands | in-progress | user playtest in prod |
+| T-0164 4-tile tray | in-progress | user playtest in prod |
+| T-0165 gp_override plumbing | done (deployed) | — |
+| T-0166 Playtest reveal UI | done (deployed) | — |
 
-## Immediate next steps
+## Deployed to prod (2026-11-07)
 
-1. **Optimise `softPool`** — cache `(found.size, found.last)` → pool so the dealer's per-pick calls don't rebuild it. Should bring config-2 sim time from "timeout" back into the ~90s range.
-2. **Run the 4-way playability comparison** (banded/soft × 3-tile/4-tile) and record the numbers in the T-0162 comment.
-3. **User playtests soft-bands + 4-tile** via the Experiments menu (needs `NEXT_PUBLIC_COMBINE_PLAYTEST=1` set locally). PostHog captures which variant each run used.
-4. **Decide** between staying banded (status quo), shipping soft-bands, or soft+tray=4. Decision input: sim numbers + user feel from playtest + PostHog session data.
+- Soft-bands sampler, 4-tile tray, all behind `?gp_override=mode=soft,tray=4`.
+- `NEXT_PUBLIC_COMBINE_PLAYTEST=1` reveals Experiments row in TopBar hamburger.
+- `combine_playtest_set` PostHog event on every toggle; variant props threaded via `getActivePlaytestProps()`.
+- Commits: `24325c2` (feat) + `7e9fdde` (prod build lint fix).
+
+User is playtesting on mobile. PostHog captures variant per run.
+
+## Decisions / direction (2026-11-07)
+
+**On progression bar semantics in soft mode:** the age ladder becomes "stage of your discovery journey" (chapter bands), not "era of the world." Catalogue groupings stay thematic.
+- **Open sub-question:** how does the progression bar update as the KB grows? The chapter thresholds need to scale sensibly whether the KB is 400 or 40000 items.
+
+**On daily mode:** out of scope for now. If endless soft-bands ships, daily inherits.
+
+**On helper scaling:** user-proposed shape — grants at discovery milestones (after 10, +15, +20, +25 unique finds…) rather than at age-up. This is a soft-mode-friendly rework; replaces the current `bandSize(age)`-indexed `helperGrants`.
+
+## Orthogonal mechanic work (in flight while playtest runs)
+
+Things we can investigate without needing playtest feedback:
+
+1. **Progression bar for soft mode.** Current `AgesSheet` lies in soft mode (shows `ageMade / ageNeed`, which isn't what triggers age-up). Needs:
+   - KB-size-invariant threshold curve (works at 400 / 4000 / 40000 items).
+   - Copy that reads "stage of discovery journey," not "era of the world."
+   - Catalogue remains thematic; only the progression indicator changes.
+2. **Helper scaling by discoveries (not band).** Implement user's suggested shape: grants trigger every N discoveries. N could be fixed (10 at a time) or scaling (10, 15, 20, 25…). Replace `bandSize(age)` dependence in `helperGrants`.
+3. **Crumble in soft mode.** Currently nothing crumbles because `A.USE` is the whole reachable pool. Candidate rule: crumble tiles not touched in the last N moves regardless of mode. Or: in soft, crumble tiles whose first-recipe band is far below the player's current chapter.
 
 ## Longer-term questions (parked)
 
-- **Soft-bands age labelling.** Bands are currently labelled "I, II, III…" with thematic names from `theme.ages`. If soft-bands ships, the labelled age concept becomes "stage of your discovery journey" rather than "era of the world." Catalogue groupings stay banded (users still see "big bang era / cells era / tech era" in the collection), but the progression bar needs rethinking.
-- **Daily mode compatibility.** Daily is target-list ending (`state.target`). Soft-bands sampler would work in daily mode but the "guest of the day" mechanic may want to override the softPool constraint ("include this specific tile today even if it's far from what you know"). Punt until endless mode is settled.
-- **Helpers scaling.** `helperGrants` scales to `bandSize(age)` which reads from `bundle.outBand`. In soft-bands this is still well-defined but may feel arbitrary. Revisit after pacing is settled.
-- **Crumble in soft-bands.** Soft-bands `tallyBoard` uses the reachability pool for "in use" detection; this means anything in the pool never crumbles. Could get sticky over long runs. Low priority but needs attention before soft-bands ships.
-- **RL sim player.** If we end up needing finer-grained pacing numbers (e.g. "what's the right discovery threshold for age 3 → 4?"), that's when RL earns its keep. Defer until needed.
+- **RL sim player.** If post-playtest we need finer-grained pacing numbers (e.g. "what's the right threshold curve"), that's when RL earns its keep. Defer until needed.
+- **Soft mode sim optimization.** Per-pick reachability recomputation is slow (~5× banded). Cache per-tray or per-N-moves if we need more sim runs.
