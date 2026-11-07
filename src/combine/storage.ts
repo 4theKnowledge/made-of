@@ -41,6 +41,12 @@ const MUSIC_KEY = "madeof:music";
 const SFX_KEY = "madeof:sfx";
 const SFX_PACK_KEY = "madeof:sfxpack";
 const VOL_KEY = "madeof:vol";
+// Pointer to the slot the player was last actively in. Three saves live
+// in parallel (endless/fast/daily) and without this pointer `loadGame` on
+// mount can't tell which one is the "current" run — the old resume path
+// hard-coded fast > endless > daily, so a stale fast save hijacked refresh
+// after the player had moved on.
+const LAST_MODE_KEY = "madeof:cblastmode";
 
 export type MusicTrack =
   | "piano"
@@ -187,11 +193,49 @@ export function saveGame(state: GameState): void {
       // A finished endless or fast game has nothing to resume into. Daily
       // keeps its final state as a review slot (see startDaily).
       window.localStorage.removeItem(key);
+      // Clear the pointer if it still pointed at this slot — on next mount
+      // the resume path should fall through to its default instead of
+      // trying to load an empty slot.
+      if (loadLastMode() === state.mode) clearLastMode();
       return;
     }
     window.localStorage.setItem(key, JSON.stringify(toStored(state)));
+    saveLastMode(state.mode);
   } catch {
     // Quota or privacy mode: silently ignore.
+  }
+}
+
+/** Load the pointer to the player's last-active mode. Returns null if
+ *  unset (first visit, or cleared because the last run finished). The
+ *  resume path on mount uses this to pick which of the three save slots
+ *  to hydrate from. */
+export function loadLastMode(): Mode | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LAST_MODE_KEY);
+    if (raw === "endless" || raw === "fast" || raw === "daily") return raw;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLastMode(mode: Mode): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LAST_MODE_KEY, mode);
+  } catch {
+    // ignore
+  }
+}
+
+export function clearLastMode(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(LAST_MODE_KEY);
+  } catch {
+    // ignore
   }
 }
 

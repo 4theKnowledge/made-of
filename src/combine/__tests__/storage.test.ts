@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { hydrateGame, type StoredGame } from "../storage";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  clearLastMode,
+  hydrateGame,
+  loadLastMode,
+  saveLastMode,
+  type StoredGame,
+} from "../storage";
 
 /** `StoredGame` carries an explicit `mode` field since v7 (fast runs
  *  needed their own slot). `hydrateGame` just echoes it through — this
@@ -53,5 +59,40 @@ describe("hydrateGame mode", () => {
   it("fast save hydrates to mode=fast", () => {
     const s = hydrateGame(base({ mode: "fast" }));
     expect(s.mode).toBe("fast");
+  });
+});
+
+describe("lastMode pointer", () => {
+  beforeEach(() => {
+    const store = new Map<string, string>();
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => void store.set(k, v),
+        removeItem: (k: string) => void store.delete(k),
+      },
+    });
+  });
+
+  it("round-trips a mode value", () => {
+    saveLastMode("fast");
+    expect(loadLastMode()).toBe("fast");
+    saveLastMode("daily");
+    expect(loadLastMode()).toBe("daily");
+  });
+
+  it("returns null when unset", () => {
+    expect(loadLastMode()).toBeNull();
+  });
+
+  it("clear removes the pointer", () => {
+    saveLastMode("endless");
+    clearLastMode();
+    expect(loadLastMode()).toBeNull();
+  });
+
+  it("ignores junk values in storage", () => {
+    window.localStorage.setItem("madeof:cblastmode", "bogus");
+    expect(loadLastMode()).toBeNull();
   });
 });

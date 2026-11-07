@@ -29,6 +29,7 @@ import {
   saveSeenAges,
   loadDailyDone,
   loadGame,
+  loadLastMode,
   loadSound,
   saveBest,
   saveDailyDone,
@@ -294,13 +295,13 @@ export function CombineBoard({
     // Resume priority on plain /combine:
     //   1. If ?m=fast was set in the URL, prefer a fast run (resume save
     //      if any, else start fresh). Lets theme-switch nav land in fast.
-    //   2. In-flight fast run.
-    //   3. In-flight endless run.
-    //   4. Today's daily when unfinished — resumes the mid-run save if
-    //      any, else starts a fresh daily. Only kicks in when there's
-    //      nothing mid-run to protect the "refresh doesn't eat my run"
-    //      promise for fast/endless.
-    //   5. Fall through to the deterministic fresh endless in `initial`.
+    //   2. `lastMode` pointer (saveGame writes it on every tick) — hydrate
+    //      whichever slot the player was actually in before the refresh.
+    //      Prevents a stale fast save from hijacking a player who moved
+    //      on to endless or daily.
+    //   3. Fallback priority for first-ever visits / pre-pointer players:
+    //      fast → endless → today's daily.
+    //   4. Fall through to the deterministic fresh endless in `initial`.
     if (initialMode === "fast") {
       const fastSave = loadGame(fastBundles[activeTheme], { daily: null, mode: "fast" });
       if (fastSave) {
@@ -309,6 +310,30 @@ export function CombineBoard({
         setState(newGame(activeTheme, fastBundles[activeTheme], { mode: "fast", size: 6 }).state);
       }
       return;
+    }
+    const today = todayKey();
+    const lastMode = loadLastMode();
+    if (lastMode === "daily" && dailyEnabled && !loadDailyDone(today)) {
+      const dailyBundle = dailyBundles[dailyHostTheme];
+      const saved = loadGame(dailyBundle, { daily: today, expectedSeed: dailyPayloadSeed });
+      if (saved) {
+        setState(hydrateGame(saved, { target: dailyTarget }));
+        return;
+      }
+    }
+    if (lastMode === "fast") {
+      const fastSave = loadGame(fastBundles[activeTheme], { daily: null, mode: "fast" });
+      if (fastSave) {
+        setState(hydrateGame(fastSave));
+        return;
+      }
+    }
+    if (lastMode === "endless") {
+      const endlessSave = loadGame(bundles[activeTheme], { daily: null });
+      if (endlessSave) {
+        setState(hydrateGame(endlessSave));
+        return;
+      }
     }
     const fastSave = loadGame(fastBundles[activeTheme], { daily: null, mode: "fast" });
     if (fastSave) {
@@ -320,7 +345,6 @@ export function CombineBoard({
       setState(hydrateGame(endlessSave));
       return;
     }
-    const today = todayKey();
     if (dailyEnabled && !loadDailyDone(today)) {
       const dailyBundle = dailyBundles[dailyHostTheme];
       const saved = loadGame(dailyBundle, { daily: today, expectedSeed: dailyPayloadSeed });
