@@ -3,7 +3,7 @@ import type { GameState } from "@/combine/engine";
 import { chapterIndex, chapterThreshold } from "@/combine/progression";
 import type { ThemeBundle } from "@/combine/types";
 
-export function AgeBar({
+export function ChapterBar({
   state,
   bundle: _bundle,
   onAges,

@@ -10,7 +10,7 @@ import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 /** Journey dialog: chapter progression + discoveries grouped by the
  *  chapter the player was in when they found them. "This chapter" is
  *  always expanded; prior chapters collapse to a count + ▸ toggle. */
-export function AgesSheet({
+export function JourneySheet({
   state,
   bundle,
   onInfo,

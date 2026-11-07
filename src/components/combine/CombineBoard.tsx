@@ -86,16 +86,15 @@ import {
   FeedbackSheet,
   type FeedbackPrefill,
 } from "@/components/common/FeedbackSheet";
-import { AgesSheet } from "@/components/combine/board-parts/overlays/AgesSheet";
+import { JourneySheet } from "@/components/combine/board-parts/overlays/JourneySheet";
 import { ChoicePicker } from "@/components/combine/board-parts/overlays/ChoicePicker";
 import { CollectionBook } from "@/components/combine/board-parts/overlays/CollectionBook";
 import { DetailCard } from "@/components/combine/board-parts/overlays/DetailCard";
 import { GameOverCard } from "@/components/combine/board-parts/overlays/GameOverCard";
-import { PlaytestMenu } from "@/components/combine/board-parts/overlays/PlaytestMenu";
+import { DebugPanel } from "@/components/combine/board-parts/overlays/DebugPanel";
 import { SoundMenu } from "@/components/combine/board-parts/overlays/SoundMenu";
-import { isPlaytestEnabled } from "@/combine/gp-overrides";
 import { ModeThemePicker } from "@/components/combine/board-parts/overlays/ModeThemePicker";
-import { AgeBar } from "@/components/combine/board-parts/board/AgeBar";
+import { ChapterBar } from "@/components/combine/board-parts/board/ChapterBar";
 import { Board } from "@/components/combine/board-parts/board/Board";
 import { BoardErrorBoundary } from "@/components/combine/board-parts/board/BoardErrorBoundary";
 import { DragGhost } from "@/components/combine/board-parts/board/DragGhost";
@@ -582,7 +581,7 @@ export function CombineBoard({
   }, [sound, state.chapter]);
   const [bookOpen, setBookOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
-  const [playtestOpen, setPlaytestOpen] = useState(false);
+  const [experimentsOpen, setExperimentsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   // First-run onboarding: a non-interactive ghost-hand demo overlay shown
   // once per device. Replayable from the "..." menu. Separate from
@@ -2055,14 +2054,10 @@ export function CombineBoard({
             setMoreOpen(false);
             setSoundOpen(true);
           }}
-          onPlaytest={
-            isPlaytestEnabled()
-              ? () => {
-                  setMoreOpen(false);
-                  setPlaytestOpen(true);
-                }
-              : undefined
-          }
+          onDebug={() => {
+            setMoreOpen(false);
+            setExperimentsOpen(true);
+          }}
           onHelp={() => {
             setMoreOpen(false);
             setHelpOpen(true);
@@ -2085,7 +2080,7 @@ export function CombineBoard({
           shoreMode={shoreMode}
           pluckMode={pluckMode}
         />
-        <AgeBar
+        <ChapterBar
           state={state}
           bundle={bundle}
           onAges={() => setAgesOpen(true)}
@@ -2346,7 +2341,7 @@ export function CombineBoard({
           />
         )}
         {agesOpen && (
-          <AgesSheet
+          <JourneySheet
             state={state}
             bundle={bundle}
             onInfo={(id) => setInfoTile(id)}
@@ -2419,8 +2414,8 @@ export function CombineBoard({
             onDismiss={() => setSoundOpen(false)}
           />
         )}
-        {playtestOpen && (
-          <PlaytestMenu onDismiss={() => setPlaytestOpen(false)} />
+        {experimentsOpen && (
+          <DebugPanel onDismiss={() => setExperimentsOpen(false)} />
         )}
         <HowToPlay
           open={helpOpen}
