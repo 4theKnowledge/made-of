@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import { ageNeed } from "@/combine/engine";
 import type { GameState } from "@/combine/engine";
@@ -58,6 +58,33 @@ export function AgesSheet({
     }
     return m;
   }, [bundle, state.found, state.madeAtBand]);
+  // Soft-mode grouping: discoveries by the chapter the player was in when
+  // they found them. Chapter 1-indexed; chapter 0 is a graceful fallback
+  // for pre-T-0170 saves where the attribution wasn't recorded (treat as
+  // "unattributed").
+  const foundByChapter = useMemo(() => {
+    const m = new Map<number, string[]>();
+    for (const id of state.found) {
+      const ch = state.discoveredAtChapter?.[id] ?? 0;
+      let list = m.get(ch);
+      if (!list) {
+        list = [];
+        m.set(ch, list);
+      }
+      list.push(id);
+    }
+    return m;
+  }, [state.found, state.discoveredAtChapter]);
+  // Collapsible state for prior-chapter rows. Current chapter is always open.
+  const [openChapters, setOpenChapters] = useState<Set<number>>(() => new Set());
+  const toggleChapter = (ch: number) => {
+    setOpenChapters((prev) => {
+      const next = new Set(prev);
+      if (next.has(ch)) next.delete(ch);
+      else next.add(ch);
+      return next;
+    });
+  };
   // One canonical chain per theme + age index. Hand-picked by item name so
   // the diagram tells a clear "raw → refined → made" story. Items in the
   // bundle are keyed by UUID; we resolve name → id here. If a name goes
@@ -136,68 +163,154 @@ export function AgesSheet({
             </div>
           </div>
         )}
-        <ol className="cbagelist">
-          {ages.map((name, i) => {
-            const isNow = !softMode && i === current;
-            const isPast = !softMode && i < current;
-            const metaNeed = ageNeed(i, bundle);
-            const finds = foundByBand.get(i + 1) ?? [];
-            // In soft mode the thematic row is purely a collection grouping —
-            // no "needs X" counter, no on/past highlight. Show the band name
-            // + what you've found there. In banded mode keep the full ladder.
-            const meta = softMode
-              ? finds.length > 0
-                ? `${finds.length} found`
-                : ""
-              : isNow
+        {softMode ? (
+          <ol className="cbagelist">
+            {(() => {
+              // Soft: group by chapter, newest-first, with "This chapter"
+              // always expanded and prior chapters collapsible.
+              const currentChapter = softChapter + 1;
+              const chapterNums = [...foundByChapter.keys()].filter((c) => c > 0).sort((a, b) => b - a);
+              // Always render "This chapter" row even if empty — shows the
+              // header + helpful placeholder.
+              const hasCurrent = chapterNums.includes(currentChapter);
+              const prior = chapterNums.filter((c) => c !== currentChapter);
+              const rows: React.ReactNode[] = [];
+              const thisFinds = foundByChapter.get(currentChapter) ?? [];
+              rows.push(
+                <li key={`chapter-${currentChapter}`} className="cbagerow on">
+                  <div className="cbagerow-top">
+                    <b className="cbageno">This chapter</b>
+                    <span className="cbagemeta">{thisFinds.length} found</span>
+                  </div>
+                  {thisFinds.length > 0 && (
+                    <div className="cbagefinds" aria-label="Found this chapter">
+                      {thisFinds.map((id) => {
+                        const it = bundle.items.get(id);
+                        if (!it) return null;
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            className="cbslot"
+                            style={fillVar(it)}
+                            title={cap(it.name)}
+                            aria-label={`${cap(it.name)}. Show how it's made`}
+                            onClick={() => onInfo(id)}
+                          >
+                            <Pictogram
+                              name={it.name}
+                              tier={it.tier}
+                              kind={it.kind}
+                              symbol={it.symbol}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </li>,
+              );
+              for (const ch of prior) {
+                const finds = foundByChapter.get(ch) ?? [];
+                const isOpen = openChapters.has(ch);
+                rows.push(
+                  <li key={`chapter-${ch}`} className="cbagerow past">
+                    <button
+                      type="button"
+                      className="cbagerow-top"
+                      onClick={() => toggleChapter(ch)}
+                      aria-expanded={isOpen}
+                      style={{ background: "transparent", border: 0, padding: 0, width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+                    >
+                      <b className="cbageno">Chapter {ch === 0 ? "—" : ch}</b>
+                      <span className="cbagemeta">{finds.length} found {isOpen ? "▾" : "▸"}</span>
+                    </button>
+                    {isOpen && finds.length > 0 && (
+                      <div className="cbagefinds" aria-label={`Found in Chapter ${ch}`}>
+                        {finds.map((id) => {
+                          const it = bundle.items.get(id);
+                          if (!it) return null;
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              className="cbslot"
+                              style={fillVar(it)}
+                              title={cap(it.name)}
+                              aria-label={`${cap(it.name)}. Show how it's made`}
+                              onClick={() => onInfo(id)}
+                            >
+                              <Pictogram
+                                name={it.name}
+                                tier={it.tier}
+                                kind={it.kind}
+                                symbol={it.symbol}
+                              />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </li>,
+                );
+              }
+              return rows;
+            })()}
+          </ol>
+        ) : (
+          <ol className="cbagelist">
+            {ages.map((name, i) => {
+              const isNow = i === current;
+              const isPast = i < current;
+              const metaNeed = ageNeed(i, bundle);
+              const finds = foundByBand.get(i + 1) ?? [];
+              const meta = isNow
                 ? last
                   ? "Final"
                   : `${state.ageMade}/${metaNeed}`
                 : isPast
                   ? `Done (${finds.length}/${metaNeed})`
                   : `Needs ${metaNeed}`;
-            // Soft mode: skip rows that have zero finds AND zero collection
-            // relevance to avoid a 14-row empty ladder. Banded shows all.
-            if (softMode && finds.length === 0) return null;
-            return (
-              <li
-                key={name}
-                className={`cbagerow${isNow ? " on" : ""}${isPast ? " past" : ""}`}
-              >
-                <div className="cbagerow-top">
-                  <b className="cbageno">{name}</b>
-                  <span className="cbagemeta">{meta}</span>
-                </div>
-                {finds.length > 0 && (
-                  <div className="cbagefinds" aria-label={`Found in Age ${name}`}>
-                    {finds.map((id) => {
-                      const it = bundle.items.get(id);
-                      if (!it) return null;
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          className="cbslot"
-                          style={fillVar(it)}
-                          title={cap(it.name)}
-                          aria-label={`${cap(it.name)}. Show how it's made`}
-                          onClick={() => onInfo(id)}
-                        >
-                          <Pictogram
-                            name={it.name}
-                            tier={it.tier}
-                            kind={it.kind}
-                            symbol={it.symbol}
-                          />
-                        </button>
-                      );
-                    })}
+              return (
+                <li
+                  key={name}
+                  className={`cbagerow${isNow ? " on" : ""}${isPast ? " past" : ""}`}
+                >
+                  <div className="cbagerow-top">
+                    <b className="cbageno">{name}</b>
+                    <span className="cbagemeta">{meta}</span>
                   </div>
-                )}
-              </li>
-            );
-          })}
-        </ol>
+                  {finds.length > 0 && (
+                    <div className="cbagefinds" aria-label={`Found in Age ${name}`}>
+                      {finds.map((id) => {
+                        const it = bundle.items.get(id);
+                        if (!it) return null;
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            className="cbslot"
+                            style={fillVar(it)}
+                            title={cap(it.name)}
+                            aria-label={`${cap(it.name)}. Show how it's made`}
+                            onClick={() => onInfo(id)}
+                          >
+                            <Pictogram
+                              name={it.name}
+                              tier={it.tier}
+                              kind={it.kind}
+                              symbol={it.symbol}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
       <button
         type="button"
         className="cbh cbback"
