@@ -102,7 +102,7 @@ export function AgesSheet({
             </>
           )}
         </p>
-        {chain.length >= 2 && (
+        {!softMode && chain.length >= 2 && (
           <div className="cbageex">
             <b>Age {ages[current]} looks like this</b>
             <div className="cbagechain" aria-label={`Example chain from raw to Age ${ages[current]}`}>
