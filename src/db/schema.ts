@@ -531,14 +531,15 @@ export const combineThemes = pgTable(
 /* ========================================================================
  * Combine daily config (singleton).
  *
+
  * The daily mode is a top-level gameplay concept: one theme is "the daily
- * theme" at a time, and that theme's daily carries the knobs (capped
- * ages, ageNeedScale, guest ingredient). Modelled as a singleton row so
- * there's always exactly one "active" config; swapping which theme hosts
- * the daily is a single UPDATE.
+ * theme" at a time, and that theme's daily carries the knobs (target
+ * discoveries, guest ingredient). Modelled as a singleton row so there's
+ * always exactly one "active" config; swapping which theme hosts the
+ * daily is a single UPDATE.
  *
- * Shape of `config`: { maxAges?, ageNeedScale?, guestIngredient? } — see
- * DailyConfig in src/combine/daily-config.ts.
+ * Shape of `config`: { guestIngredient?, targetDiscoveries?, targetByDow? }
+ * — see DailyConfig in src/combine/daily-config.ts.
  * ====================================================================== */
 
 export const combineDailyConfig = pgTable("combine_daily_config", {

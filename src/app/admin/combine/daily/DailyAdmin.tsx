@@ -46,9 +46,6 @@ export function DailyAdmin({
   const [themeCode, setThemeCode] = useState<string>(
     initialActive?.themeCode ?? themes[0]?.code ?? "",
   );
-  const [maxAges, setMaxAges] = useState<string>(
-    initialActive?.config.maxAges?.toString() ?? "",
-  );
   const [guestPerRun, setGuestPerRun] = useState<string>(
     initialActive?.config.guestIngredient?.perRun?.toString() ?? "",
   );
@@ -70,7 +67,6 @@ export function DailyAdmin({
 
   const payloadConfig = useCallback((): DailyConfig => {
     const cfg: DailyConfig = {};
-    if (maxAges.trim()) cfg.maxAges = Number(maxAges);
     if (guestPerRun.trim() || guestMinBand.trim()) {
       cfg.guestIngredient = {
         perRun: Number(guestPerRun || "0"),
@@ -85,7 +81,7 @@ export function DailyAdmin({
     }
     if (Object.keys(dow).length) cfg.targetByDow = dow;
     return cfg;
-  }, [maxAges, guestPerRun, guestMinBand, targetDiscoveries, targetByDow]);
+  }, [guestPerRun, guestMinBand, targetDiscoveries, targetByDow]);
 
   const refreshSchedule = useCallback(async () => {
     const res = await fetch("/api/admin/combine/daily");
@@ -223,7 +219,6 @@ export function DailyAdmin({
     try {
       const res = await fetch("/api/admin/combine/daily", { method: "DELETE" });
       if (!res.ok) throw new Error(`request_failed_${res.status}`);
-      setMaxAges("");
       setGuestPerRun("");
       setGuestMinBand("");
       setTargetDiscoveries("");
@@ -358,28 +353,6 @@ export function DailyAdmin({
           encounters along the way.
         </p>
         <div style={{ display: "grid", gap: 10, maxWidth: 520 }}>
-          <Field
-            label="Max ages"
-            hint={
-              <>
-                Caps the daily&apos;s recipe pool at this many ages. Blank → full
-                theme pool (the whole canon). Lower = tighter, more focused deal;
-                higher = more variety but more complexity on-screen.
-                <br />
-                <em>Start at ~5 on Everything.</em>
-              </>
-            }
-          >
-            <input
-              type="number"
-              min={1}
-              max={30}
-              value={maxAges}
-              onChange={(e) => setMaxAges(e.target.value)}
-              style={input}
-              placeholder="no cap"
-            />
-          </Field>
           <fieldset
             style={{
               border: "1px solid var(--line)",

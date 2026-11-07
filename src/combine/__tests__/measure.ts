@@ -8,9 +8,9 @@
  * escalates through swap → hold → clear → wipe-board → placement so the
  * run doesn't stall out at move 47.
  *
- *   npx tsx src/combine/__tests__/measure.ts [maxAges] [games]
+ *   npx tsx src/combine/__tests__/measure.ts [games]
  *
- * Defaults: maxAges=5 games=30.
+ * Defaults: games=30.
  */
 
 import { loadKnowledgeBase } from "../../data/load";
@@ -290,18 +290,17 @@ export function measureDailyLength(
 
 /** CLI entry point for ad-hoc sweeps. */
 async function main() {
-  const maxAges = parseInt(process.argv[2] ?? "", 10) || 5;
-    const games = parseInt(process.argv[4] ?? "", 10) || 30;
+  const games = parseInt(process.argv[2] ?? "", 10) || 30;
 
   const kb = loadKnowledgeBase();
   const snap = buildSnapshot(toRows(kb));
-  const cfg: DailyConfig = { maxAges };
+  const cfg: DailyConfig = {};
   const bundle = buildThemeBundle(snap, "everything", 0, "daily", cfg);
 
   const seeds = Array.from({ length: games }, (_, i) => 0xC0FFEE ^ (i * 2654435761));
   const result = measureDailyLength("everything", bundle, seeds);
 
-  console.log(`\nEverything daily  maxAges=${maxAges}`);
+  console.log(`\nEverything daily `);
   console.log(`  ages in bundle:      ${bundle.theme.ages.length}`);
   console.log(`  recipes in bundle:   ${bundle.recipes.length}`);
   console.log(`  n games:             ${result.runs.length}`);

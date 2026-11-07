@@ -422,51 +422,37 @@ export function buildThemeBundle(
     // `assignAges` may merge sparse bands and return a smaller effective count.
     // The displayed age list reflects the merged layout — no "dead ages" with
     // too few recipes for the dealer to surface progression combos.
-    let effectiveNumAges = assignAges(snapshot, recipes, preOutputs, numAges);
-    // Daily may cap the run short. When capped, recipes above the cap are
-    // dropped from the playable set (so the dealer never deals them and
-    // victory fires at the capped final age); outputs from above-cap bands
-    // are captured separately as the guest-ingredient pool.
-    if (dailyConfig?.maxAges != null && dailyConfig.maxAges < effectiveNumAges) {
-      effectiveNumAges = dailyConfig.maxAges;
-    }
+    const effectiveNumAges = assignAges(snapshot, recipes, preOutputs, numAges);
     meta = { ...base_meta, ages: pool.slice(0, effectiveNumAges) };
 
-    if (dailyConfig?.maxAges != null && dailyConfig.guestIngredient && dailyConfig.guestIngredient.perRun > 0) {
-      const minBand = Math.max(dailyConfig.guestIngredient.minBand, dailyConfig.maxAges + 1);
-      // Guest = output whose *minimum* band is above the cap. If the same
-      // output has any below-cap recipe, players can make it normally and it
-      // shouldn't be a guest.
+    // Guest-of-the-day pool (daily only). Outputs whose minimum catalogue
+    // band is at or above `guestIngredient.minBand` — "rare content from
+    // thematic era N and deeper". Band is read here as the catalogue's
+    // thematic classification, not a progression gate.
+    if (dailyConfig?.guestIngredient && dailyConfig.guestIngredient.perRun > 0) {
+      const { minBand } = dailyConfig.guestIngredient;
       const minBandByOutput = new Map<string, number>();
       for (const r of recipes) {
         const cur = minBandByOutput.get(r.out);
         if (cur == null || r.band < cur) minBandByOutput.set(r.out, r.band);
       }
-      const pool: string[] = [];
+      const gpool: string[] = [];
       for (const [out, minB] of minBandByOutput) {
-        if (minB >= minBand) pool.push(out);
+        if (minB >= minBand) gpool.push(out);
       }
-      guestPool = pool;
+      guestPool = gpool;
     }
 
-    // Apply the daily age cap to the actual recipe set. Must happen AFTER
-    // guest-pool capture so above-cap outputs are still reachable as guests.
-    if (dailyConfig?.maxAges != null) {
-      recipes = recipes.filter((r) => r.band <= dailyConfig.maxAges!);
-    }
-
-    // Splice in today's guest recipes. They live at the final band so the
-    // dealer surfaces them as "current-age" combines; first-finds on them
-    // count toward the daily collection (scope=daily) via the normal
-    // discovery path. If maxAges is null (no cap), guests are a no-op —
-    // the player already sees every recipe.
-    if (guestRecipes && guestRecipes.length > 0 && dailyConfig?.maxAges != null) {
-      const finalBand = dailyConfig.maxAges;
+    // Splice in today's guest recipes. They're picked per-day from the
+    // guest pool and injected here so the dealer surfaces them in the
+    // normal reachability flow. First-finds on them count toward the
+    // daily collection (scope=daily) via the normal discovery path.
+    if (guestRecipes && guestRecipes.length > 0) {
       for (const g of guestRecipes) {
         // Clone so we don't mutate the shared recipe object held by the
-        // full-theme bundle. Overwrite band so age gating treats it as
-        // current-age playable.
-        recipes.push({ ...g.recipe, band: finalBand });
+        // full-theme bundle. Band stays at the recipe's original value —
+        // no banded cap exists to clamp it against.
+        recipes.push({ ...g.recipe });
       }
     }
   }

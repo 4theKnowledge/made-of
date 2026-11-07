@@ -107,23 +107,27 @@ describe("pickGuests", () => {
 describe("guestPoolFor + reachableGuestRecipe", () => {
   const snapshot = buildSnapshot(toRows(loadKnowledgeBase()));
   const full = buildThemeBundle(snapshot, "everything");
-  const capped = buildThemeBundle(snapshot, "everything", 0, "daily", {
-    maxAges: 4,
-    guestIngredient: { perRun: 2, minBand: 5 },
-  });
 
-  it("guestPoolFor yields outputs whose min band is ≥ max(cap+1, minBand)", () => {
-    const pool = guestPoolFor(full, { maxAges: 4, guestIngredient: { perRun: 2, minBand: 5 } });
+  it("guestPoolFor yields outputs whose min catalogue band is ≥ guestMinBand", () => {
+    const pool = guestPoolFor(full, { guestIngredient: { perRun: 2, minBand: 5 } });
     expect(pool.length).toBeGreaterThan(0);
     // Returned pool is sorted.
     expect([...pool].sort()).toEqual(pool);
-    // None of them should be reachable within the capped bundle's outputs.
-    for (const id of pool) expect(capped.outputs.has(id)).toBe(false);
+    // Every pool entry has a min-band ≥ 5 in the full bundle.
+    for (const id of pool) {
+      const b = full.outBand.get(id);
+      expect(b).toBeDefined();
+      expect(b!).toBeGreaterThanOrEqual(5);
+    }
   });
 
-  it("reachableGuestRecipe prefers smaller recipes and respects capped buildable", () => {
-    const pool = guestPoolFor(full, { maxAges: 4, guestIngredient: { perRun: 2, minBand: 5 } });
-    const buildable = cappedBuildableSet(capped);
+  it("reachableGuestRecipe prefers smaller recipes and respects the player's buildable set", () => {
+    const pool = guestPoolFor(full, { guestIngredient: { perRun: 2, minBand: 5 } });
+    // Simulated "what the player could already make" — just the bundle's
+    // base ingredients plus a few shallow outputs. Enough for the
+    // reachable-guest resolver to find a candidate for at least one pool
+    // entry.
+    const buildable = cappedBuildableSet(full);
     let anyReachable = 0;
     for (const id of pool.slice(0, 50)) {
       const r = reachableGuestRecipe(full, id, buildable);
@@ -141,7 +145,7 @@ describe("buildSchedule", () => {
   const full = buildThemeBundle(snapshot, "everything");
 
   it("rotates so the same output rarely repeats inside the window", () => {
-    const cfg = { maxAges: 4, guestIngredient: { perRun: 1, minBand: 5 } };
+    const cfg = {guestIngredient: { perRun: 1, minBand: 5 } };
     const schedule = buildSchedule(
       { theme: "everything", fullBundle: full, dailyConfig: cfg },
       "2026-01-01",
@@ -161,7 +165,7 @@ describe("buildSchedule", () => {
   });
 
   it("uses priorRows to continue the rotation without repeats", () => {
-    const cfg = { maxAges: 4, guestIngredient: { perRun: 1, minBand: 5 } };
+    const cfg = {guestIngredient: { perRun: 1, minBand: 5 } };
     const first = buildSchedule(
       { theme: "everything", fullBundle: full, dailyConfig: cfg },
       "2026-01-01",
@@ -181,7 +185,7 @@ describe("buildSchedule", () => {
   });
 
   it("payload freezes the config at build time", () => {
-    const cfg = { maxAges: 3, guestIngredient: { perRun: 2, minBand: 4 } };
+    const cfg = {guestIngredient: { perRun: 2, minBand: 4 } };
     const schedule = buildSchedule(
       { theme: "everything", fullBundle: full, dailyConfig: cfg },
       "2026-01-01",
@@ -193,7 +197,7 @@ describe("buildSchedule", () => {
   });
 
   it("is deterministic for the same input", () => {
-    const cfg = { maxAges: 4, guestIngredient: { perRun: 2, minBand: 5 } };
+    const cfg = {guestIngredient: { perRun: 2, minBand: 5 } };
     const a = buildSchedule(
       { theme: "everything", fullBundle: full, dailyConfig: cfg },
       "2026-01-01",
@@ -218,7 +222,7 @@ describe("buildDailyPayload", () => {
   const full = buildThemeBundle(snapshot, "everything");
 
   it("seeds from the day key", () => {
-    const cfg = { maxAges: 4, guestIngredient: { perRun: 2, minBand: 5 } };
+    const cfg = {guestIngredient: { perRun: 2, minBand: 5 } };
     const p1 = buildDailyPayload(
       { theme: "everything", fullBundle: full, dailyConfig: cfg },
       "2026-01-01",
@@ -235,7 +239,7 @@ describe("buildDailyPayload", () => {
 
   it("returns empty guests when guestIngredient is absent", () => {
     const p = buildDailyPayload(
-      { theme: "everything", fullBundle: full, dailyConfig: { maxAges: 4 } },
+      { theme: "everything", fullBundle: full, dailyConfig: {} },
       "2026-01-01",
       new Map(),
     );
@@ -273,6 +277,6 @@ describe("buildDailyPayload", () => {
       "2026-11-09",
       new Map(),
     );
-    expect(p.targetDiscoveries).toBe(8);
+    expect(p.targetDiscoveries).toBe(40);
   });
 });

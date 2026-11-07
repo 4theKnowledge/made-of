@@ -1,30 +1,26 @@
 /**
  * Daily-mode overrides for a Combine theme.
  *
- * Endless and daily both play the `classic` mode, but a daily run should fit
- * in ~15 min while endless can run as long as the player wants. The admin
- * sets these on the singleton `combine_daily_config` row; `buildThemeBundle`
- * reads them when the bundle is built for `mode: "daily"`.
+ * Daily runs are target-list-ended (fit in ~15 min). The admin sets these
+ * on the singleton `combine_daily_config` row; `buildThemeBundle` reads
+ * them when the bundle is built for `mode: "daily"`.
  *
  * `guestIngredient` is a deterministic "guest of the day" tile injected
- * into the dealer: per-day RNG picks N tiles from bands at or above
- * `minBand` and seeds them into the tray on chosen turns. Same for every
- * player so leaderboards stay comparable; its purpose is to drip rare
- * items into the lifetime daily collection over time.
+ * into the dealer: per-day RNG picks N tiles from the catalogue at or
+ * above band `minBand` (the thematic grouping; later bands = rarer items)
+ * and seeds them into the tray on chosen turns. Same for every player so
+ * leaderboards stay comparable; purpose is to drip rare items into the
+ * lifetime daily collection over time.
  */
 
 export interface DailyConfig {
-  /** Cap total ages for a daily run to this many (1..authored pool length).
-   *  The bundle builder clamps the authored age slice to this value when
-   *  building for daily. Null / missing → no cap. */
-  maxAges?: number;
   /** Guest-ingredient injection. */
   guestIngredient?: {
     /** How many guest tiles to inject per daily run. */
     perRun: number;
-    /** Minimum band (1-based) a guest tile's output lives in. Must be above
-     *  the daily's effective max band so guests surface items the player
-     *  wouldn't normally meet in a capped daily. */
+    /** Minimum catalogue band (1-based) a guest tile's output lives in.
+     *  Higher = rarer / later-era items. The "band" here is the thematic
+     *  catalogue grouping (I, II, III…), not a progression gate. */
     minBand: number;
   };
   /** Target discovery count that ends a daily run (win). `null`/missing falls
@@ -56,13 +52,6 @@ export function normaliseDailyConfig(raw: unknown): DailyConfig | null {
   if (typeof raw !== "object") throw new Error("dailyConfig must be an object");
   const out: DailyConfig = {};
   const r = raw as Record<string, unknown>;
-  if (r.maxAges != null) {
-    const n = Number(r.maxAges);
-    if (!Number.isInteger(n) || n < 1 || n > 30) {
-      throw new Error("dailyConfig.maxAges must be an integer in [1, 30]");
-    }
-    out.maxAges = n;
-  }
   if (r.guestIngredient != null) {
     const g = r.guestIngredient as Record<string, unknown>;
     const perRun = Number(g.perRun);

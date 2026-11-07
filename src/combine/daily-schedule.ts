@@ -50,13 +50,13 @@ export function rotationWindow(poolSize: number, perRun: number): number {
 }
 
 /** Resolve the guest output pool for a config: outputs whose *minimum*
- *  band (in the full bundle) is at or above the configured min-band.
- *  Mirrors `buildThemeBundle`'s guest-pool logic but reads from the full
- *  bundle rather than the capped one. */
+ *  catalogue band (in the full bundle) is at or above the configured
+ *  `guestIngredient.minBand`. Band here is read as the catalogue's
+ *  thematic grouping (higher = rarer / later-era), not a progression
+ *  gate. Mirrors `buildThemeBundle`'s guest-pool logic. */
 export function guestPoolFor(fullBundle: ThemeBundle, config: DailyConfig): string[] {
   if (!config.guestIngredient || config.guestIngredient.perRun <= 0) return [];
-  if (config.maxAges == null) return [];
-  const minBand = Math.max(config.guestIngredient.minBand, config.maxAges + 1);
+  const { minBand } = config.guestIngredient;
   const minBandByOutput = new Map<string, number>();
   for (const r of fullBundle.recipes) {
     const cur = minBandByOutput.get(r.out);
