@@ -237,18 +237,24 @@ export function CollectionBook({
                 const isMastered = m?.mastered ?? false;
                 const showProgress =
                   !!m && m.available > 1 && m.made < m.available;
+                const madeCount = state.madeCounts[id] ?? 0;
+                const madeThisRun = madeCount > 0;
                 return (
                   <button
                     key={id}
                     type="button"
                     className={`cbbookrow${isNew ? " unlock" : ""}${
                       isMastered ? " mastered" : ""
-                    }`}
+                    }${madeThisRun ? " made" : ""}`}
                     aria-label={`${cap(it.name)}${
                       isNew ? ", new in your collection" : ""
                     }${isMastered ? ", mastered" : ""}${
                       showProgress
                         ? `, ${m!.made} of ${m!.available} recipes`
+                        : ""
+                    }${
+                      madeThisRun
+                        ? `, made ${madeCount} time${madeCount === 1 ? "" : "s"} this run`
                         : ""
                     }`}
                     onClick={() => {
@@ -287,6 +293,14 @@ export function CollectionBook({
                               aria-label={`${m!.made} of ${m!.available} recipes`}
                             >
                               {m!.made}/{m!.available}
+                            </span>
+                          )}
+                          {madeThisRun && (
+                            <span
+                              className="cbbookrow-made"
+                              aria-hidden="true"
+                            >
+                              ×{madeCount} this run
                             </span>
                           )}
                         </b>
@@ -370,9 +384,12 @@ export function CollectionBook({
                     const isMastered = m?.mastered ?? false;
                     const showProgress =
                       !!m && m.available > 1 && m.made < m.available;
+                    const madeCount = state.madeCounts[id] ?? 0;
+                    const madeThisRun = madeCount > 0;
                     const tileClasses: string[] = [];
                     if (isNew) tileClasses.push("unlock");
                     if (isMastered) tileClasses.push("mastered");
+                    if (madeThisRun) tileClasses.push("made");
                     return (
                       <CombineTile
                         key={id}
@@ -393,6 +410,10 @@ export function CollectionBook({
                           showProgress
                             ? `, ${m!.made} of ${m!.available} recipes`
                             : ""
+                        }${
+                          madeThisRun
+                            ? `, made ${madeCount} time${madeCount === 1 ? "" : "s"} this run`
+                            : ""
                         }`}
                       >
                         <small>{relativeTime(foundAt)}</small>
@@ -409,6 +430,11 @@ export function CollectionBook({
                         {showProgress && (
                           <span className="cbprogress-badge" aria-hidden="true">
                             {m!.made}/{m!.available}
+                          </span>
+                        )}
+                        {madeThisRun && (
+                          <span className="cbmade-badge" aria-hidden="true">
+                            ×{madeCount}
                           </span>
                         )}
                       </CombineTile>

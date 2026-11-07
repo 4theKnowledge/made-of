@@ -9,7 +9,7 @@ import {
   buildThemeBundle,
   type GuestRecipeExtension,
 } from "@/combine/data";
-import type { DailyConfig } from "@/combine/daily-config";
+import { DEFAULT_TARGET_DISCOVERIES, type DailyConfig } from "@/combine/daily-config";
 import { getActiveDaily } from "@/combine/daily-config-db";
 import { DEFAULT_THEME, type ThemeKey } from "@/combine/types";
 import { serialiseBundle } from "@/combine/serialise";
@@ -95,11 +95,15 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
 
   const today = todayKey();
   const guestRecipes: Partial<Record<string, GuestRecipeExtension[] | null>> = {};
-  let dailyTarget: number | null = null;
+  // Always resolve a concrete target so the engine's daily-win check
+  // (gated on `state.target != null`) can fire. Legacy payloads and
+  // missing-payload days used to leave this null, which is what let
+  // daily runs continue past the intended end.
+  let dailyTarget: number = DEFAULT_TARGET_DISCOVERIES;
   let dailyPayloadSeed: number | null = null;
   const todaysPayload = await getDailyPayload(dailyHostTheme, today);
   if (todaysPayload) {
-    dailyTarget = todaysPayload.targetDiscoveries ?? null;
+    dailyTarget = todaysPayload.targetDiscoveries ?? DEFAULT_TARGET_DISCOVERIES;
     dailyPayloadSeed = todaysPayload.seed;
   }
   if (activeDaily && todaysPayload && todaysPayload.guestOutputIds.length > 0) {
@@ -151,13 +155,18 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
   // "try the tutorial" nudge on repeat visits. Anon players fall back to
   // a localStorage check in-component.
   let userHasSeenTutorial = false;
+  let currentUserHandle: string | null = null;
   if (signedIn && session?.user?.id) {
     const [row] = await db
-      .select({ seen: schema.authUser.hasSeenCombineTutorial })
+      .select({
+        seen: schema.authUser.hasSeenCombineTutorial,
+        handle: schema.authUser.handle,
+      })
       .from(schema.authUser)
       .where(eq(schema.authUser.id, session.user.id))
       .limit(1);
     userHasSeenTutorial = row?.seen === true;
+    currentUserHandle = row?.handle ?? null;
   }
 
   const initialMode =
@@ -184,6 +193,7 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
         dailyHostTheme={dailyHostTheme}
         publishedThemes={publishedThemes}
         userHasSeenTutorial={userHasSeenTutorial}
+        currentUserHandle={currentUserHandle}
       />
       <Footer compactOnMobile />
     </main>

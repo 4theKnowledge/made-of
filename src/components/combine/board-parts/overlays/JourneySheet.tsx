@@ -2,14 +2,16 @@ import React, { useMemo, useState } from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
 import { chapterIndex, chapterThreshold } from "@/combine/progression";
-import type { ThemeBundle } from "@/combine/types";
+import type { CombineItem, ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 
-/** Journey dialog: chapter progression + discoveries grouped by the
- *  chapter the player was in when they found them. "This chapter" is
- *  always expanded; prior chapters collapse to a count + ▸ toggle. */
+/** Journey dialog. Two modes:
+ *  - Daily: a fixed-target run, so chapter grouping is noise. Shows the
+ *    goal + a flat list of this run's discoveries.
+ *  - Endless/fast: chapter progression — "This chapter" always expanded,
+ *    prior chapters collapsed with a ▸ toggle. */
 export function JourneySheet({
   state,
   bundle,
@@ -22,8 +24,38 @@ export function JourneySheet({
   onDismiss: () => void;
 }) {
   const foundCount = state.found.length;
+  const dailyTarget = state.mode === "daily" ? state.target : null;
+
+  if (dailyTarget != null) {
+    const left = Math.max(0, dailyTarget - foundCount);
+    return (
+      <ResponsiveSheet open onDismiss={onDismiss} ariaLabel="Journey" className="cbagesheet">
+        <span className="k">Journey</span>
+        <h3>Daily — {foundCount} of {dailyTarget} discoveries</h3>
+        <p>
+          {left > 0 ? (
+            <>{left} more to win · {state.moves} turn{state.moves === 1 ? "" : "s"} so far. Fewer turns ranks higher on today&apos;s leaderboard.</>
+          ) : (
+            <>Daily goal reached in {state.moves} turn{state.moves === 1 ? "" : "s"}.</>
+          )}
+        </p>
+        {foundCount > 0 && (
+          <div className="cbagefinds" aria-label="Found this run">
+            {state.found.map((id) => {
+              const it = bundle.items.get(id);
+              if (!it) return null;
+              return <DiscoveryTile key={id} item={it} onInfo={onInfo} />;
+            })}
+          </div>
+        )}
+        <button type="button" className="cbh cbback" onClick={onDismiss}>
+          Done
+        </button>
+      </ResponsiveSheet>
+    );
+  }
+
   const currentChapter = chapterIndex(foundCount) + 1;
-  const curThreshold = chapterThreshold(currentChapter - 1);
   const nextThreshold = chapterThreshold(currentChapter);
   const finite = Number.isFinite(nextThreshold);
   const left = finite ? Math.max(0, nextThreshold - foundCount) : 0;
@@ -93,24 +125,7 @@ export function JourneySheet({
               {thisFinds.map((id) => {
                 const it = bundle.items.get(id);
                 if (!it) return null;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    className="cbslot"
-                    style={fillVar(it)}
-                    title={cap(it.name)}
-                    aria-label={`${cap(it.name)}. Show how it's made`}
-                    onClick={() => onInfo(id)}
-                  >
-                    <Pictogram
-                      name={it.name}
-                      tier={it.tier}
-                      kind={it.kind}
-                      symbol={it.symbol}
-                    />
-                  </button>
-                );
+                return <DiscoveryTile key={id} item={it} onInfo={onInfo} />;
               })}
             </div>
           )}
@@ -149,24 +164,7 @@ export function JourneySheet({
                   {finds.map((id) => {
                     const it = bundle.items.get(id);
                     if (!it) return null;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        className="cbslot"
-                        style={fillVar(it)}
-                        title={cap(it.name)}
-                        aria-label={`${cap(it.name)}. Show how it's made`}
-                        onClick={() => onInfo(id)}
-                      >
-                        <Pictogram
-                          name={it.name}
-                          tier={it.tier}
-                          kind={it.kind}
-                          symbol={it.symbol}
-                        />
-                      </button>
-                    );
+                    return <DiscoveryTile key={id} item={it} onInfo={onInfo} />;
                   })}
                 </div>
               )}
@@ -178,5 +176,31 @@ export function JourneySheet({
         Done
       </button>
     </ResponsiveSheet>
+  );
+}
+
+function DiscoveryTile({
+  item,
+  onInfo,
+}: {
+  item: CombineItem;
+  onInfo: (id: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="cbslot"
+      style={fillVar(item)}
+      title={cap(item.name)}
+      aria-label={`${cap(item.name)}. Show how it's made`}
+      onClick={() => onInfo(item.id)}
+    >
+      <Pictogram
+        name={item.name}
+        tier={item.tier}
+        kind={item.kind}
+        symbol={item.symbol}
+      />
+    </button>
   );
 }

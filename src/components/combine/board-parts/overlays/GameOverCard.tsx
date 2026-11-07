@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
 import { chapterIndex } from "@/combine/progression";
@@ -13,6 +13,7 @@ export function GameOverCard({
   bundle,
   collection,
   best,
+  currentUserHandle,
   onClose,
   onPlayAgain,
   onShare,
@@ -21,6 +22,7 @@ export function GameOverCard({
   bundle: ThemeBundle;
   collection: Map<string, number>;
   best: number;
+  currentUserHandle?: string | null;
   onClose: () => void;
   onPlayAgain: () => void;
   onShare: () => void;
@@ -34,6 +36,12 @@ export function GameOverCard({
     state.mode === "daily" && state.target != null;
   const won =
     isDailyTargetRun && state.found.length >= (state.target ?? 0);
+  const rank = useDailyRank({
+    enabled: !!(won && state.daily && currentUserHandle),
+    theme: state.theme,
+    day: state.daily,
+    handle: currentUserHandle ?? null,
+  });
   // Mini-shelf: group by output.
   const shelfCounts = new Map<string, number>();
   for (const id of state.shelf) {
@@ -88,18 +96,37 @@ export function GameOverCard({
                 : `You reached ${progressionLabel}.`}
         </span>
         <div className="cb3">
-          <div>
-            <b>{state.shelf.length}</b>
-            <span>finished things</span>
-          </div>
-          <div>
-            <b>{progressionLabel}</b>
-            <span>chapter reached</span>
-          </div>
-          <div>
-            <b>{state.found.length}</b>
-            <span>new discoveries</span>
-          </div>
+          {isDailyTargetRun ? (
+            <>
+              <div>
+                <b>{state.moves}</b>
+                <span>turns</span>
+              </div>
+              <div>
+                <b>{state.found.length}{state.target != null ? ` / ${state.target}` : ""}</b>
+                <span>discoveries</span>
+              </div>
+              <div>
+                <b>{formatRank(rank, won, !!currentUserHandle)}</b>
+                <span>{rankLabel(rank, won, !!currentUserHandle)}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <b>{state.shelf.length}</b>
+                <span>finished things</span>
+              </div>
+              <div>
+                <b>{progressionLabel}</b>
+                <span>chapter reached</span>
+              </div>
+              <div>
+                <b>{state.found.length}</b>
+                <span>new discoveries</span>
+              </div>
+            </>
+          )}
         </div>
         {state.shelf.length > 0 && (
           <div className="cbshelf sum">
@@ -168,4 +195,76 @@ export function GameOverCard({
         </ButtonGroup>
     </ResponsiveSheet>
   );
+}
+
+type RankState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "ranked"; position: number; total: number }
+  | { kind: "unranked"; total: number }
+  | { kind: "error" };
+
+/** Fetch today's daily leaderboard and resolve this player's position.
+ *  The `/finish` submission is server-side so by the time the GameOver
+ *  card renders, the row should already be committed; still, ranking is
+ *  best-effort — failure quietly falls back to turn count only. */
+function useDailyRank({
+  enabled,
+  theme,
+  day,
+  handle,
+}: {
+  enabled: boolean;
+  theme: string;
+  day: string | null;
+  handle: string | null;
+}): RankState {
+  const [state, setState] = useState<RankState>({ kind: "idle" });
+  useEffect(() => {
+    if (!enabled || !day || !handle) {
+      setState({ kind: "idle" });
+      return;
+    }
+    let cancelled = false;
+    setState({ kind: "loading" });
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/combine/daily/leaderboard?day=${day}&theme=${theme}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) throw new Error(`request_failed_${res.status}`);
+        const j = (await res.json()) as {
+          rows: Array<{ handle: string | null }>;
+        };
+        if (cancelled) return;
+        const total = j.rows.length;
+        const idx = j.rows.findIndex((r) => r.handle === handle);
+        if (idx < 0) setState({ kind: "unranked", total });
+        else setState({ kind: "ranked", position: idx + 1, total });
+      } catch {
+        if (!cancelled) setState({ kind: "error" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, theme, day, handle]);
+  return state;
+}
+
+function formatRank(rank: RankState, won: boolean, signedIn: boolean): string {
+  if (!won) return "—";
+  if (!signedIn) return "Sign in";
+  if (rank.kind === "loading" || rank.kind === "idle") return "…";
+  if (rank.kind === "ranked") return `#${rank.position}`;
+  return "—";
+}
+
+function rankLabel(rank: RankState, won: boolean, signedIn: boolean): string {
+  if (!won) return "rank";
+  if (!signedIn) return "to rank today";
+  if (rank.kind === "ranked") return `of ${rank.total} today`;
+  if (rank.kind === "loading" || rank.kind === "idle") return "ranking";
+  return "rank unavailable";
 }

@@ -228,9 +228,8 @@ export function ModeThemePicker({
       <span className="k">Mode</span>
       <div
         className="cbmtpModeRow"
-        role="radiogroup"
         aria-label="Mode"
-        style={{ ["--cbmtpModeCount" as string]: visibleModes.length }}
+        style={{ ["--cbmtpModeCount" as string]: visibleModes.length + (onStartTutorial ? 1 : 0) }}
       >
         {visibleModes.map((m) => {
           const on = mode === m.k;
@@ -240,6 +239,7 @@ export function ModeThemePicker({
               type="button"
               role="radio"
               aria-checked={on}
+              aria-label={`Mode: ${m.name}`}
               className={`cbmtpTile cbmtpTileFit${on ? " on" : ""}`}
               onClick={() => setMode(m.k)}
             >
@@ -249,36 +249,30 @@ export function ModeThemePicker({
             </button>
           );
         })}
+        {onStartTutorial && (
+          <button
+            type="button"
+            className="cbmtpTile cbmtpTileFit cbmtpTutorial"
+            onClick={() => {
+              onStartTutorial();
+              onDismiss();
+            }}
+            aria-label={tutorialSeen ? "Replay tutorial" : "Start tutorial"}
+          >
+            <Pictogram
+              name="mode:tutorial"
+              tier="M"
+              kind="object"
+              // Open book pictogram.
+              pictogram={`<path class="b" d="M4 7v18l12-3 12 3V7l-12 3z"/><path class="l" d="M16 10v18"/>`}
+            />
+            <b>Tutorial</b>
+            <span className="t">
+              {tutorialSeen ? "Replay the tutorial." : "New? Learn the basics."}
+            </span>
+          </button>
+        )}
       </div>
-
-      {onStartTutorial && (
-        <>
-          <span className="k">Learn</span>
-          <div className="cbmtpModeRow" style={{ ["--cbmtpModeCount" as string]: 1 }}>
-            <button
-              type="button"
-              className="cbmtpTile cbmtpTileFit cbmtpTutorial"
-              onClick={() => {
-                onStartTutorial();
-                onDismiss();
-              }}
-              aria-label={tutorialSeen ? "Replay tutorial" : "Start tutorial"}
-            >
-              <Pictogram
-                name="mode:tutorial"
-                tier="M"
-                kind="object"
-                // Open book pictogram.
-                pictogram={`<path class="b" d="M4 7v18l12-3 12 3V7l-12 3z"/><path class="l" d="M16 10v18"/>`}
-              />
-              <b>Tutorial</b>
-              <span className="t">
-                {tutorialSeen ? "Replay the tutorial." : "New? Learn the basics."}
-              </span>
-            </button>
-          </div>
-        </>
-      )}
 
       <span className="k">
         Theme

@@ -846,8 +846,6 @@ a.btn.primary{color:var(--bg)}
 .cbscore span{font-size:12px;color:var(--muted)}
 .cbchain{padding:3px 9px;border:1.5px solid var(--pk);border-radius:3px;background:var(--fN);color:#111417;font-weight:800;font-size:14px;animation:cbbump .4s cubic-bezier(.2,.9,.3,1.4)}
 .cbchain.cbclose{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:90;pointer-events:none;box-shadow:3px 3px 0 var(--pk);white-space:nowrap}
-.cbtargetchip{display:inline-flex;align-items:center;gap:0;padding:0 10px;height:28px;border:1.5px solid var(--ink);border-radius:14px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-weight:700;font-size:13px;line-height:1;white-space:nowrap}
-.cbtargetchip .cbtargetsep{opacity:.5;margin:0 2px;font-weight:500}
 @keyframes cbbump{from{transform:scale(.5)}to{transform:none}}
 .cbhelp{display:flex;gap:6px}
 .cbtop > .cbtheme{margin-left:auto}
@@ -1078,6 +1076,11 @@ a.btn.primary{color:var(--bg)}
 .cbopt .ic svg{width:100%;height:100%}
 .cbopt.unk{border-style:dashed;border-color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, var(--surface));color:var(--ink);box-shadow:none}
 .cbopt.unk b{font-family:var(--mono);font-size:26px;line-height:34px;color:var(--accent)}
+/* Picker option marker when the output has already been produced this run.
+ * Dims the option and shows a corner ×N badge so players can steer toward
+ * recipes they haven't made yet. */
+.cbopt.made{position:relative;opacity:.72}
+.cbopt-made{position:absolute;top:-6px;right:-6px;min-width:19px;height:15px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:color-mix(in srgb, var(--ink) 80%, transparent);color:var(--bg);font-family:var(--mono);font-size:9.5px;font-weight:700;line-height:15px;text-align:center;pointer-events:none}
 .cbopt:active{transform:translateY(1px)}
 
 .cbscrim{position:fixed;inset:0;z-index:80;background:rgba(17,20,23,.4)}
@@ -1756,6 +1759,12 @@ a.btn.primary{color:var(--bg)}
 .bk .cbunlock-star{position:absolute;top:-6px;left:-6px;min-width:15px;height:15px;padding:0 3px;box-sizing:border-box;border-radius:8px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;line-height:15px;text-align:center;pointer-events:none;z-index:2}
 .bk .cbmastery-badge{position:absolute;bottom:-6px;left:-6px;width:15px;height:15px;box-sizing:border-box;border-radius:50%;background:var(--good, var(--accent));color:#fff;font-size:10px;line-height:15px;text-align:center;pointer-events:none;z-index:2}
 .bk .cbprogress-badge{position:absolute;bottom:-6px;right:-6px;min-width:19px;height:14px;padding:0 3px;box-sizing:border-box;border-radius:7px;background:color-mix(in srgb, var(--ink) 80%, transparent);color:var(--bg);font-size:9px;font-weight:700;line-height:14px;text-align:center;pointer-events:none;z-index:2}
+/* Per-run "made this run" accent on collection tiles. Softer than the
+ * lifetime-unlock outline since lifetime state takes priority — the point is
+ * to hint "you already covered this one this run" without stealing focus
+ * from newly-unlocked items. */
+.bk.made{box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 55%, transparent)}
+.bk .cbmade-badge{position:absolute;top:-6px;right:-6px;min-width:19px;height:14px;padding:0 3px;box-sizing:border-box;border-radius:7px;background:color-mix(in srgb, var(--ink) 80%, transparent);color:var(--bg);font-family:var(--mono);font-size:9px;font-weight:700;line-height:14px;text-align:center;pointer-events:none;z-index:2}
 .bk.unk .ic{opacity:.22;filter:brightness(0)}
 :root[data-theme="dark"] .bk.unk .ic{filter:brightness(0) invert(1)}
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .bk.unk .ic{filter:brightness(0) invert(1)} }
@@ -1786,6 +1795,8 @@ a.btn.primary{color:var(--bg)}
 /* Inline mastery / progress markers on the list row's name. */
 .cbbookrow-mastery{display:inline-flex;align-items:center;margin-left:6px;color:var(--good, var(--accent));font-size:13px;line-height:1}
 .cbbookrow-progress{display:inline-flex;align-items:center;margin-left:6px;padding:0 5px;border-radius:7px;background:color-mix(in srgb, var(--ink) 15%, transparent);color:var(--muted);font-family:var(--mono);font-size:10.5px;font-weight:700;line-height:1.3}
+.cbbookrow-made{display:inline-flex;align-items:center;margin-left:6px;padding:0 5px;border-radius:7px;background:color-mix(in srgb, var(--ink) 80%, transparent);color:var(--bg);font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.02em;line-height:1.4}
+.cbbookrow.made{border-color:color-mix(in srgb, var(--ink) 55%, transparent);background:color-mix(in srgb, var(--ink) 4%, var(--surface))}
 /* Collection book sign-in CTA. Reads as a real call to action rather than
  * a passive notice — accent-tinted background, solid accent border, and
  * a filled primary button so the eye lands on "Sign in". */

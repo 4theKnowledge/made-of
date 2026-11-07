@@ -1,7 +1,6 @@
 import React from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
-import { effectiveCrumbleTtl } from "@/combine/progression";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import type { Fx, Preview } from "@/components/combine/board-parts/types";
@@ -36,13 +35,6 @@ export function Board({
   onCellPointerDown: (cell: number, e: React.PointerEvent<HTMLButtonElement>) => void;
 }) {
   const size = state.n;
-  // Effective TTL for crumble scales with board occupancy (T-0176) —
-  // compute here once so every cell's "turns left" display uses the
-  // same value the engine's crumble pass is using.
-  let filled = 0;
-  for (const v of state.board) if (v) filled++;
-  const occ = state.board.length > 0 ? filled / state.board.length : 0;
-  const boardTtl = effectiveCrumbleTtl(occ);
   return (
     <div
       className={"cbboard" + (lastChance ? " cbboard-lastchance" : "")}
@@ -52,12 +44,13 @@ export function Board({
       data-tour="board"
     >
       {state.board.map((v, i) => {
-        const rawTick =
-          v && state.crumb[i]?.id === v ? state.crumb[i]!.n : 0;
-        // Only show the "crumbling" visual when the tile is in the warning
-        // window (last ~3 ticks before TTL).
-        const crumbleWarn = Math.max(0, boardTtl - 3);
-        const crumbleTick = rawTick >= crumbleWarn ? rawTick : 0;
+        // Warning countdown is engine-authoritative via `crumb.warn`: it's
+        // set once the tile enters the last ~3 ticks of its TTL and then
+        // decrements by 1 per move, so a sudden occupancy jump can't skip
+        // the visible warning.
+        const warn =
+          v && state.crumb[i]?.id === v ? state.crumb[i]!.warn : undefined;
+        const turnsLeft = warn ?? 0;
         const over =
           dragOver && dragOver.cell === i
             ? dragOver.ok
@@ -69,7 +62,7 @@ export function Board({
           moveMode != null && moveMode.from == null && v != null;
         const isMoving = moveMode != null && moveMode.from === i;
         const isShored = state.shored[i] === true;
-        const isShoreable = shoreMode && crumbleTick > 0 && !isShored;
+        const isShoreable = shoreMode && turnsLeft > 0 && !isShored;
         // Pluck targets any tile on the board — cosmetically reuse the
         // "clearable" affordance since both modes want "any full tile is
         // tappable". The onCellTap handler enforces capacity.
@@ -80,8 +73,7 @@ export function Board({
             cell={i}
             id={v}
             bundle={bundle}
-            crumbleTick={crumbleTick}
-            crumbleTtl={boardTtl}
+            crumbleTurnsLeft={turnsLeft}
             fx={fx}
             preview={preview.get(i)}
             over={over}
@@ -105,8 +97,7 @@ function Cell({
   cell,
   id,
   bundle,
-  crumbleTick,
-  crumbleTtl,
+  crumbleTurnsLeft,
   fx,
   preview,
   over,
@@ -121,8 +112,7 @@ function Cell({
   cell: number;
   id: string | null;
   bundle: ThemeBundle;
-  crumbleTick: number;
-  crumbleTtl: number;
+  crumbleTurnsLeft: number;
   fx: Fx;
   preview: Preview | undefined;
   over: "ok" | "no" | null;
@@ -178,7 +168,7 @@ function Cell({
   if (inChain) classes.push("cbchainm");
   if (isNope) classes.push("nope");
   if (isShipped) classes.push("ship");
-  if (crumbleTick > 0 && !inCrumble) classes.push("crumbling");
+  if (crumbleTurnsLeft > 0 && !inCrumble) classes.push("crumbling");
   if (inCrumble) classes.push("crumble");
   // Preview classes: empty cells where the selected tile would combine → .can;
   // occupied cells where drop-on-top would combine → .over (via .full.over).
@@ -208,8 +198,8 @@ function Cell({
       }${
         shored
           ? ", shored: won't crumble"
-          : crumbleTick > 0
-          ? `, crumbling: nothing in this age uses it, gone in ${crumbleTtl + 1 - crumbleTick} turns`
+          : crumbleTurnsLeft > 0
+          ? `, crumbling: nothing in this age uses it, gone in ${crumbleTurnsLeft} turns`
           : ""
       }`
     : preview?.out
@@ -274,9 +264,9 @@ function Cell({
           {promoteCount > 1 && <b>{promoteCount}</b>}
         </span>
       )}
-      {crumbleTick > 0 && !inCrumble && (
+      {crumbleTurnsLeft > 0 && !inCrumble && (
         <span className="crk" aria-hidden="true">
-          {crumbleTtl + 1 - crumbleTick}
+          {crumbleTurnsLeft}
         </span>
       )}
     </button>

@@ -159,14 +159,6 @@ export function TopBar({
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
-      {state.mode === "daily" && state.target != null && (
-        <span
-          className="cbtargetchip"
-          aria-label={`Daily progress: ${state.found.length} of ${state.target} found`}
-        >
-          {state.found.length}<span className="cbtargetsep">/</span>{state.target}
-        </span>
-      )}
       <div className="cbhelpwrap">
         <button
           className={`cbh${modeActive ? " on" : ""}${helpersOpen ? " open" : ""}`}

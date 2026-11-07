@@ -63,7 +63,7 @@ export const TIER_VALUE: Record<string, number> = {
  * It is fine (and expected) to skip bumping for pure refactors that
  * leave the reducer's output-for-input identical.
  */
-export const ENGINE_VERSION = 1;
+export const ENGINE_VERSION = 2;
 
 /** Baseline hold-zone capacity at chapter 0. */
 const HOLD_CAPACITY_BASE = 2;
@@ -90,6 +90,11 @@ export interface CrumbleCounter {
    *  resets. */
   id: string;
   n: number;
+  /** Locked warning countdown. Once a tile enters the final 3 ticks of its
+   *  TTL (computed against occupancy at that moment) this counts down by 1
+   *  per move regardless of later occupancy changes, so the player's
+   *  displayed "turns left" can't jump. Tile crumbles when this hits 0. */
+  warn?: number;
 }
 
 /** A pending "which output?" prompt. The engine stops here and the UI must
@@ -616,7 +621,10 @@ function afterMove(
   // 2. Crumble. Time-based + occupancy-scaled: TTL ramps from
   //    CRUMBLE_TTL_MAX (empty board) to CRUMBLE_TTL_MIN (full board) so
   //    pressure emerges from the player's own state. Shore exempts a tile
-  //    until its cell changes.
+  //    until its cell changes. Once a tile enters the last 3 ticks of its
+  //    TTL, its remaining countdown is locked (`warn`) so a sudden
+  //    occupancy jump can't skip the visible warning — the player always
+  //    sees a smooth N → 1 → gone.
   const gone: number[] = [];
   let filled = 0;
   for (const v of state.board) if (v) filled++;
@@ -629,7 +637,18 @@ function afterMove(
     const cur = state.crumb[i];
     const c = cur && cur.id === v ? cur : (state.crumb[i] = { id: v, n: 0 });
     c.n++;
-    if (c.n > ttl) gone.push(i);
+    if (c.warn != null) {
+      c.warn--;
+      if (c.warn <= 0) gone.push(i);
+    } else {
+      const remaining = ttl + 1 - c.n;
+      if (remaining <= 3) {
+        // Entering the warning window. Clamp to at least 1 so a sudden TTL
+        // drop that would otherwise crumble instantly still gives one
+        // visible tick.
+        c.warn = Math.max(1, remaining);
+      }
+    }
   }
   if (gone.length) {
     events.push({ type: "crumble", cells: gone.slice() });

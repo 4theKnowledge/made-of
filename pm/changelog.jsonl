@@ -99,3 +99,7 @@
 {"id": "C-0099", "ts": "2026-11-07T13:26:26Z", "kind": "fix", "summary": "combine: top-bar mode chip reads \"Tutorial\" (amber, open-book glyph) during a tutorial run instead of falling through to \"Endless\"", "refs": {"task": "T-0205"}}
 {"id": "C-0100", "ts": "2026-11-07T13:40:37Z", "kind": "feature", "summary": "combine tutorial: deck swapped to rock+water (familiar), 3 visible steps (welcome/firstCombine/secondCombine), empty opening board in tutorial mode", "refs": {"task": "T-0206"}}
 {"id": "C-0101", "ts": "2026-11-07T14:23:36Z", "kind": "fix", "summary": "Combine admin theme edits now invalidate all active runs on that theme (T-0209)", "refs": {"task": "T-0209"}}
+{"id": "C-0102", "ts": "2026-11-07T22:18:12Z", "kind": "fix", "summary": "combine daily now terminates for legacy/missing payloads; Journey dialog shows daily goal + total discoveries (T-0211)", "refs": {}}
+{"id": "C-0103", "ts": "2026-11-07T22:18:17Z", "kind": "fix", "summary": "combine: crumble warning counts down smoothly even when occupancy swings the TTL mid-run", "refs": {"task": "T-0210"}}
+{"id": "C-0104", "ts": "2026-11-07T22:18:18Z", "kind": "feature", "summary": "combine: show ×N \"made this run\" markers on recipe picker options and collection tiles (T-0212)", "refs": {"task": "T-0212"}}
+{"id": "C-0105", "ts": "2026-11-07T22:59:13Z", "kind": "fix", "summary": "combine picker: Tutorial tile now sits alongside Endless/Fast/Daily on the Mode row", "refs": {"task": "T-0214"}}

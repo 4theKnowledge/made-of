@@ -177,6 +177,10 @@ interface Props {
    *  tutorial" nudge; when true, the nudge is suppressed. Anon users get
    *  a localStorage fallback (`madeof:cbtut`). */
   userHasSeenTutorial?: boolean;
+  /** Current signed-in user's handle, if any. Used by the GameOverCard
+   *  on completed daily runs to look up the player's rank on today's
+   *  leaderboard. Null for anon players. */
+  currentUserHandle?: string | null;
 }
 
 // Shared empty set for the DetailCard's `madeSignatures` prop so the common
@@ -199,6 +203,7 @@ export function CombineBoard({
   dailyHostTheme = "everything",
   publishedThemes = [],
   userHasSeenTutorial = false,
+  currentUserHandle = null,
 }: Props) {
   const bundles = useMemo<Record<ThemeKey, ThemeBundle>>(() => {
     const out: Record<ThemeKey, ThemeBundle> = {};
@@ -2333,6 +2338,7 @@ export function CombineBoard({
             best={
               (state.mode === "fast" ? fastBest : best)[state.theme] ?? 0
             }
+            currentUserHandle={currentUserHandle}
             onClose={() => setOverCardOpen(false)}
             onPlayAgain={() => {
               // From a finished daily, "Play endless" starts a fresh
