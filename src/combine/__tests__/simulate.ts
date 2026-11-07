@@ -65,7 +65,7 @@ function enumerateMoves(state: GameState, bundle: ThemeBundle): {
         const willShip = bundle.terminal.has(m.recipe.out);
         combines.push({
           action: { type: "place", slot: s, cell: i },
-          priority: 1000 + m.recipe.all.length * 10 - Math.abs(band - (state.age + 1)) * 5,
+          priority: 1000 + m.recipe.all.length * 10 - Math.abs(band - (state.chapter + 1)) * 5,
           recipeSize: m.recipe.all.length,
           outputBand: band,
           willShip,
@@ -81,7 +81,7 @@ function enumerateMoves(state: GameState, bundle: ThemeBundle): {
         const willShip = bundle.terminal.has(m.recipe.out);
         combines.push({
           action: { type: "drop-on", slot: s, cell: j },
-          priority: 1000 + m.recipe.all.length * 10 - Math.abs(band - (state.age + 1)) * 5,
+          priority: 1000 + m.recipe.all.length * 10 - Math.abs(band - (state.chapter + 1)) * 5,
           recipeSize: m.recipe.all.length,
           outputBand: band,
           willShip,
@@ -183,7 +183,7 @@ function playOne(
   // Simple scorer for picking combines.
   const scoreOption = (opt: MoveOption, state: GameState): number => {
     let score = 0;
-    const currentBand = state.age + 1;
+    const currentBand = state.chapter + 1;
     const d = opt.outputBand - currentBand;
     if (policy.preferCurrentAge) {
       // Prefer d==0 strongly, d==-1 fine, d>=1 penalise (premature).
@@ -211,7 +211,7 @@ function playOne(
       for (let k = 0; k < opts.length; k++) {
         const r = opts[k];
         const unseen = state.found.includes(r.out) ? 0 : 50;
-        const bandDelta = Math.abs(r.band - (state.age + 1));
+        const bandDelta = Math.abs(r.band - (state.chapter + 1));
         const sc = unseen - bandDelta * 10;
         if (sc > bestScore) {
           bestScore = sc;
@@ -227,12 +227,12 @@ function playOne(
       applyEvents(events);
       for (const e of events) {
         if (e.type === "combine") {
-          const d = (prev.choosing?.options[bestIdx].band ?? 0) - (prev.age + 1);
+          const d = (prev.choosing?.options[bestIdx].band ?? 0) - (prev.chapter + 1);
           const key = d >= 0 ? `+${d}` : `${d}`;
           mixByAgeDelta[key] = (mixByAgeDelta[key] ?? 0) + 1;
         }
-        if (e.type === "discovery") discoveriesPerAge[prev.age] =
-          (discoveriesPerAge[prev.age] ?? 0) + 1;
+        if (e.type === "discovery") discoveriesPerAge[prev.chapter] =
+          (discoveriesPerAge[prev.chapter] ?? 0) + 1;
       }
       continue;
     }
@@ -270,18 +270,18 @@ function playOne(
     const prev = state;
     const { state: ns, events } = reduce(prev, bundle, action);
     state = ns;
-    movesPerAge[prev.age] = (movesPerAge[prev.age] ?? 0) + 1;
+    movesPerAge[prev.chapter] = (movesPerAge[prev.chapter] ?? 0) + 1;
     applyEvents(events);
     for (const e of events) {
       if (e.type === "combine") {
         const band = chosenOpt?.outputBand ?? 0;
-        const d = band - (prev.age + 1);
+        const d = band - (prev.chapter + 1);
         const key = d >= 0 ? `+${d}` : `${d}`;
         mixByAgeDelta[key] = (mixByAgeDelta[key] ?? 0) + 1;
-        madesPerAge[prev.age] = (madesPerAge[prev.age] ?? 0) + 1;
+        madesPerAge[prev.chapter] = (madesPerAge[prev.chapter] ?? 0) + 1;
       }
-      if (e.type === "discovery") discoveriesPerAge[prev.age] =
-        (discoveriesPerAge[prev.age] ?? 0) + 1;
+      if (e.type === "discovery") discoveriesPerAge[prev.chapter] =
+        (discoveriesPerAge[prev.chapter] ?? 0) + 1;
     }
   }
 
@@ -293,7 +293,7 @@ function playOne(
     movesInAge: movesPerAge[i] ?? 0,
     madesInAge: madesPerAge[i] ?? 0,
     discoveriesInAge: discoveriesPerAge[i] ?? 0,
-    entered: i <= state.age,
+    entered: i <= state.chapter,
   }));
 
   return {
@@ -304,14 +304,14 @@ function playOne(
     made: state.made,
     discoveries: state.found.length,
     longestChain: state.longest,
-    finalAge: state.age,
-    reachedAges: state.age + 1,
+    finalAge: state.chapter,
+    reachedAges: state.chapter + 1,
     endReason,
     perAge,
     mixByAgeDelta,
     movesPerAge,
     discoveriesPerAge,
-    endedAtAge: state.age,
+    endedAtAge: state.chapter,
     choicePrompts,
     crumbles,
   };
@@ -462,7 +462,7 @@ function traceOne(
 
   const scoreOption = (opt: MoveOption, state: GameState): number => {
     let score = 0;
-    const currentBand = state.age + 1;
+    const currentBand = state.chapter + 1;
     const d = opt.outputBand - currentBand;
     if (policy.preferCurrentAge) {
       if (d === 0) score += 200;
@@ -503,17 +503,17 @@ function traceOne(
         const first = !prev.found.includes(e.out);
         const inputsNames = e.inputs.map(nameOf).join("+");
         console.log(
-          `  m${state.moves.toString().padStart(3)} age=${prev.age}(${bundle.theme.ages[prev.age]}) ageMade=${prev.ageMade} → ${inputsNames} ⇒ ${nameOf(e.out)} [band ${band}] ${first ? "NEW" : ""} chain=${e.mult}`,
+          `  m${state.moves.toString().padStart(3)} chapter=${prev.chapter} → ${inputsNames} ⇒ ${nameOf(e.out)} [band ${band}] ${first ? "NEW" : ""} chain=${e.mult}`,
         );
       }
-      if (e.type === "age-up") console.log(`  >>> AGE UP → ${e.age} (${bundle.theme.ages[e.age]})`);
+      if (e.type === "age-up") console.log(`  >>> CHAPTER UP → ${e.age}`);
       if (e.type === "shipped") console.log(`  m${state.moves} shipped ${nameOf(e.out)} +${e.bonus}`);
       if (e.type === "crumble") console.log(`  m${state.moves} crumbled ${e.cells.length} tile(s)`);
       if (e.type === "over") console.log(`  m${state.moves} GAME OVER (board full)`);
     }
   }
   console.log(
-    `  → ended: age=${state.age}/${bundle.theme.ages.length - 1} discoveries=${state.found.length} made=${state.made} moves=${state.moves}`,
+    `  → ended: age=${state.chapter}/${bundle.theme.ages.length - 1} discoveries=${state.found.length} made=${state.made} moves=${state.moves}`,
   );
 }
 

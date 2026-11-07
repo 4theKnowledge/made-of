@@ -76,7 +76,7 @@ function enumerateCombines(state: GameState, bundle: ThemeBundle): ScoredAction[
   const out: ScoredAction[] = [];
   const empty = listEmpty(state.board);
   const occ = listOcc(state.board);
-  const currentBand = state.age + 1;
+  const currentBand = state.chapter + 1;
 
   const scoreCombine = (band: number, _outputId: string, firstFind: boolean): number => {
     const d = band - currentBand;
@@ -148,7 +148,7 @@ function pickHelper(state: GameState): Action | null {
     if (occ.length) return { type: "clear", cell: occ[0] };
   }
   // Wipe is a last resort (costs an age) and only unlocks from a certain age.
-  if (state.age >= WIPE_UNLOCK_CHAPTER) return { type: "wipe-board" };
+  if (state.chapter >= WIPE_UNLOCK_CHAPTER) return { type: "wipe-board" };
   return null;
 }
 
@@ -191,7 +191,7 @@ export function playOne(
       for (let k = 0; k < opts.length; k++) {
         const r = opts[k];
         const unseen = state.found.includes(r.out) ? 0 : 50;
-        const bandDelta = Math.abs(r.band - (state.age + 1));
+        const bandDelta = Math.abs(r.band - (state.chapter + 1));
         const sc = unseen - bandDelta * 10;
         if (sc > bestScore) {
           bestScore = sc;
@@ -231,7 +231,7 @@ export function playOne(
       }
     }
 
-    const prevAge = state.age;
+    const prevAge = state.chapter;
     const { state: ns, events } = reduce(state, bundle, action);
     state = ns;
     movesPerAge[prevAge] = (movesPerAge[prevAge] ?? 0) + 1;
@@ -244,8 +244,8 @@ export function playOne(
     seed,
     moves: state.moves,
     score: state.score,
-    finalAge: state.age,
-    completed: state.over && state.age === numAges - 1,
+    finalAge: state.chapter,
+    completed: state.over && state.chapter === numAges - 1,
     firstFinds,
     made: state.made,
     movesPerAge,

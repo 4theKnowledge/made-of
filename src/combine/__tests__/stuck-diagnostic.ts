@@ -62,7 +62,7 @@ function annotate(
 ): Move {
   const alts = altsFor(bundle, recipe);
   const bestAltBand = Math.min(...alts.map((a) => a.band));
-  const altAtCurrent = alts.some((a) => a.band === state.age + 1);
+  const altAtCurrent = alts.some((a) => a.band === state.chapter + 1);
   return {
     action,
     ingredients: recipe.all.slice(),
@@ -171,7 +171,7 @@ function playOne(bundle: ThemeBundle, seed: number, maxMoves: number): GameDiag 
   };
 
   while (!state.over && state.moves < maxMoves) {
-    const age = state.age;
+    const age = state.chapter;
     const ageDiag = perAge[age];
 
     // Check what current-age combos exist in the current tray
@@ -193,7 +193,7 @@ function playOne(bundle: ThemeBundle, seed: number, maxMoves: number): GameDiag 
       const prev = state;
       const r = reduce(prev, bundle, { type: "choose", outputIndex: bestIdx });
       state = r.state;
-      ingestEvents(r.events, prev.age, perAge, diag);
+      ingestEvents(r.events, prev.chapter, perAge, diag);
       ageDiag.moves += 1;
       continue;
     }
@@ -250,7 +250,7 @@ function playOne(bundle: ThemeBundle, seed: number, maxMoves: number): GameDiag 
         const alts = bundle.sameIngredients.get(key) ?? [];
         const matched = alts.find((a) => a.out === e.out);
         const firedBand = matched?.band ?? band;
-        const current = prev.age + 1;
+        const current = prev.chapter + 1;
         if (firedBand === current) ageDiag.comboAtCurrent += 1;
         else if (firedBand < current) {
           ageDiag.comboBelow += 1;
@@ -266,13 +266,13 @@ function playOne(bundle: ThemeBundle, seed: number, maxMoves: number): GameDiag 
     // Detect age-up event
     for (const e of r.events) {
       if (e.type === "age-up") {
-        perAge[prev.age].advanced = true;
+        perAge[prev.chapter].advanced = true;
       }
     }
   }
 
   if (state.over) diag.endReason = "over";
-  diag.finalAge = state.age;
+  diag.finalAge = state.chapter;
   return diag;
 }
 

@@ -89,7 +89,6 @@ export interface StoredGame {
   found: string[];
   madeCounts?: Record<string, number>;
   howMade?: Record<string, string[]>;
-  madeAtBand?: Record<string, number>;
   discoveredAtChapter?: Record<string, number>;
   swaps: number;
   clears: number;
@@ -102,8 +101,7 @@ export interface StoredGame {
   moves: number;
   shelf: string[];
   hold: Array<string | null>;
-  age: number;
-  ageMade: number;
+  chapter: number;
   crumb: Array<CrumbleCounter | null>;
   shored?: boolean[];
   closeCalls: number;
@@ -153,7 +151,6 @@ function toStored(state: GameState): StoredGame {
     found: state.found.slice(),
     madeCounts: { ...state.madeCounts },
     howMade: { ...state.howMade },
-    madeAtBand: { ...state.madeAtBand },
     discoveredAtChapter: { ...state.discoveredAtChapter },
     swaps: state.swaps,
     clears: state.clears,
@@ -166,8 +163,7 @@ function toStored(state: GameState): StoredGame {
     moves: state.moves,
     shelf: state.shelf.slice(),
     hold: state.hold.slice(),
-    age: state.age,
-    ageMade: state.ageMade,
+    chapter: state.chapter,
     crumb: state.crumb.map((c) => (c ? { ...c } : null)),
     shored: state.shored.slice(),
     closeCalls: state.closeCalls,
@@ -326,12 +322,9 @@ export function loadGame(
   if (Array.isArray(s.hold)) {
     for (const v of s.hold) if (v && !bundle.items.has(v)) return null;
   }
-  // Age must fit inside the current bundle's age layout. If the KB evolved
-  // (merge collapsed a sparse band, admin removed content) and the stored
-  // age is past the current last age, drop the save — hydrating would land
-  // the player on "Final age" with a nonsensical "step N+1 of N" header.
-  // Fast mode is single-band (ages.length is 1), so this still holds.
-  if (s.age < 0 || s.age >= bundle.theme.ages.length) return null;
+  // Chapter must be non-negative; chapters are open-ended so there's no
+  // upper bound to check. Fast mode still uses chapter=0.
+  if (s.chapter < 0) return null;
   return s;
 }
 
@@ -362,7 +355,6 @@ export function hydrateGame(s: StoredGame, opts: { target?: number | null } = {}
       ? { ...s.madeCounts }
       : Object.fromEntries(s.found.map((id) => [id, 1])),
     howMade: s.howMade ? { ...s.howMade } : {},
-    madeAtBand: s.madeAtBand ? { ...s.madeAtBand } : {},
     discoveredAtChapter: s.discoveredAtChapter ? { ...s.discoveredAtChapter } : {},
     swaps: s.swaps,
     clears: s.clears,
@@ -375,8 +367,7 @@ export function hydrateGame(s: StoredGame, opts: { target?: number | null } = {}
     moves: s.moves,
     shelf: s.shelf.slice(),
     hold: Array.isArray(s.hold) ? s.hold.slice() : [null],
-    age: s.age,
-    ageMade: s.ageMade,
+    chapter: s.chapter,
     crumb: s.crumb.map((c) => (c ? { ...c } : null)),
     shored:
       Array.isArray(s.shored) && s.shored.length === s.n * s.n

@@ -46,7 +46,7 @@ interface MusicState {
   chord: number;
   quiet: number;
   /** Supplied by callers so tracks can modulate density by how deep the
-   *  player is into the game (same as the prototype's CB.age). */
+   *  player is into the game (same as the prototype's CB.chapter). */
   busyGetter: () => number;
   /** Rainfall's long-lived noise bed. Nulled when another track is active. */
   noiseBed: { stop: () => void } | null;

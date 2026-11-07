@@ -27,7 +27,7 @@ export function GameOverCard({
   onShare: () => void;
 }) {
   const ages = bundle.theme.ages;
-  const ageName = ages[state.age];
+  const ageName = ages[state.chapter];
   const softMode = getGpOverrides().mode === "soft";
   // In soft mode the progression unit is a chapter, not a banded era.
   // Compute the chapter the player ended at from their cumulative finds

@@ -175,7 +175,7 @@ function enumeratePromotes(state: GameState, bundle: ThemeBundle): Array<{
 
 function scoreCombine(opt: CombineOpt, state: GameState): number {
   let s = 0;
-  const d = opt.outputBand - (state.age + 1);
+  const d = opt.outputBand - (state.chapter + 1);
   if (d === 0) s += 200; else if (d === 1) s += 90; else if (d === -1) s += 50;
   else if (d >= 2) s += 15; else s += 25;
   if (opt.firstFind) s += 300;
@@ -263,7 +263,7 @@ function playDay(
       let best = 0, bestScore = -Infinity;
       for (let k = 0; k < opts.length; k++) {
         const r = opts[k];
-        const sc = (state.found.includes(r.out) ? 0 : 100) - Math.abs(r.band - (state.age + 1)) * 10;
+        const sc = (state.found.includes(r.out) ? 0 : 100) - Math.abs(r.band - (state.chapter + 1)) * 10;
         if (sc > bestScore) { bestScore = sc; best = k; }
       }
       applyReduce({ type: "choose", outputIndex: best });

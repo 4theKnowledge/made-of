@@ -116,7 +116,7 @@ function enumerateMoves(state: GameState, bundle: ThemeBundle): {
 /** Score a move. Prefer first-finds, prefer current/next-band, prefer bigger. */
 function scoreMove(opt: MoveOption, state: GameState): number {
   let s = 0;
-  const currentBand = state.age + 1;
+  const currentBand = state.chapter + 1;
   const d = opt.outputBand - currentBand;
   if (d === 0) s += 200;
   else if (d === -1) s += 50;
@@ -180,12 +180,12 @@ function playOne(
   let endReason: Run["endReason"] = "max-moves";
 
   // Record the initial tray as the "move 0" observation for the starting age.
-  bands[state.age].trays.push({
-    age: state.age,
+  bands[state.chapter].trays.push({
+    age: state.chapter,
     move: 0,
     tiles: state.tray.filter((v): v is string => Boolean(v)).slice().sort(),
   });
-  let lastTraySignature = bands[state.age].trays[0].tiles.join(",");
+  let lastTraySignature = bands[state.chapter].trays[0].tiles.join(",");
 
   while (!state.over && state.moves < maxMoves) {
     if (state.choosing) {
@@ -196,7 +196,7 @@ function playOne(
       for (let k = 0; k < opts.length; k++) {
         const r = opts[k];
         const unseen = state.found.includes(r.out) ? 0 : 50;
-        const bandDelta = Math.abs(r.band - (state.age + 1));
+        const bandDelta = Math.abs(r.band - (state.chapter + 1));
         const sc = unseen - bandDelta * 10;
         if (sc > bestScore) {
           bestScore = sc;
@@ -240,10 +240,10 @@ function playOne(
     state = r.state;
 
     // Track move counts per age.
-    bands[prev.age].movesInAge++;
-    if (action!.type === "promote") bands[prev.age].promotesInAge++;
+    bands[prev.chapter].movesInAge++;
+    if (action!.type === "promote") bands[prev.chapter].promotesInAge++;
     if (action!.type === "place" || action!.type === "drop-on") {
-      for (const e of r.events) if (e.type === "combine") bands[prev.age].combinesInAge++;
+      for (const e of r.events) if (e.type === "combine") bands[prev.chapter].combinesInAge++;
     }
 
     recordEvents(prev, state, r.events, bands);
@@ -255,8 +255,8 @@ function playOne(
       .sort()
       .join(",");
     if (sig !== lastTraySignature) {
-      bands[state.age].trays.push({
-        age: state.age,
+      bands[state.chapter].trays.push({
+        age: state.chapter,
         move: state.moves,
         tiles: state.tray.filter((v): v is string => Boolean(v)).slice().sort(),
       });
@@ -268,7 +268,7 @@ function playOne(
 
   return {
     seed,
-    finalAge: state.age,
+    finalAge: state.chapter,
     moves: state.moves,
     discoveries: state.found.length,
     made: state.made,
@@ -285,7 +285,7 @@ function recordEvents(
 ): void {
   for (const e of events) {
     if (e.type === "discovery") {
-      bands[prev.age].firstFinds++;
+      bands[prev.chapter].firstFinds++;
     }
   }
 }

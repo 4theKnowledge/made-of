@@ -513,8 +513,8 @@ export function CombineBoard({
     if (!hasContext()) return;
     ensureContext({ ...sound, vol: sound.vol / 100 });
     if (sound.music === "off") fadeOutMusic();
-    else startMusic({ busyGetter: () => state.age });
-  }, [sound, state.age]);
+    else startMusic({ busyGetter: () => state.chapter });
+  }, [sound, state.chapter]);
 
   // First pointerdown: create the audio context and start music if the
   // user has chosen a track. We attach a one-shot listener to the document.
@@ -522,7 +522,7 @@ export function CombineBoard({
     const onDown = () => {
       ensureContext({ ...sound, vol: sound.vol / 100 });
       if (sound.music !== "off") {
-        startMusic({ busyGetter: () => state.age });
+        startMusic({ busyGetter: () => state.chapter });
       }
     };
     document.addEventListener("pointerdown", onDown, {
@@ -530,7 +530,7 @@ export function CombineBoard({
       once: true,
     });
     return () => document.removeEventListener("pointerdown", onDown);
-    // We intentionally use the latest `sound` and `state.age` captured on
+    // We intentionally use the latest `sound` and `state.chapter` captured on
     // mount; the effect above handles later changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -540,7 +540,7 @@ export function CombineBoard({
   // oscillators don't get cut off mid-cycle (which clicks on close).
   //
   // The pending-suspend timer lives in a ref so an effect re-run (triggered
-  // by `sound` or `state.age` changing while the tab is hidden) can't
+  // by `sound` or `state.chapter` changing while the tab is hidden) can't
   // orphan it — otherwise the new onVis closure wouldn't cancel the
   // old setTimeout and the context would get re-suspended right after we
   // resume on return, leaving the scheduler ticking into silence.
@@ -569,7 +569,7 @@ export function CombineBoard({
         silence();
       } else if (sound.music !== "off" && hasContext()) {
         clearSuspendTimer();
-        startMusic({ busyGetter: () => state.age });
+        startMusic({ busyGetter: () => state.chapter });
       }
     };
     const onHide = () => silence();
@@ -579,7 +579,7 @@ export function CombineBoard({
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("pagehide", onHide);
     };
-  }, [sound, state.age]);
+  }, [sound, state.chapter]);
   const [bookOpen, setBookOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
   const [playtestOpen, setPlaytestOpen] = useState(false);
@@ -980,7 +980,7 @@ export function CombineBoard({
               theme: r.state.theme,
               score: r.state.score,
               made: r.state.made,
-              age: r.state.age,
+              age: r.state.chapter,
               daily: r.state.daily,
               mode: r.state.mode,
               season: pickBundle(r.state.theme, r.state.mode, r.state.daily).theme.ages.length,
@@ -1008,8 +1008,8 @@ export function CombineBoard({
           const dr: DailyResult = {
             key: r.state.daily,
             score: r.state.score,
-            age: r.state.age,
-            ageName: bundle.theme.ages[r.state.age] ?? "",
+            age: r.state.chapter,
+            ageName: bundle.theme.ages[r.state.chapter] ?? "",
             made: r.state.made,
             top: bestShelfId ? bundle.items.get(bestShelfId)?.name ?? null : null,
             found: r.state.found.length,
@@ -1775,12 +1775,12 @@ export function CombineBoard({
       size: state.n,
       tray: state.tray,
       hold: state.hold,
-      age: state.age,
+      age: state.chapter,
       found,
     });
   }, [
     bundle,
-    state.age,
+    state.chapter,
     state.n,
     state.board,
     state.tray,
@@ -1858,7 +1858,7 @@ export function CombineBoard({
         return;
       }
       if (which === "wipe") {
-        if (state.age < WIPE_UNLOCK_CHAPTER || state.over) return;
+        if (state.chapter < WIPE_UNLOCK_CHAPTER || state.over) return;
         // Wipe is destructive — clears board, hold, and spends an age.
         // Confirm first so a stray tap can't drop a player back a tier.
         setClearMode(false);
@@ -1894,7 +1894,7 @@ export function CombineBoard({
       state.hints,
       state.shore,
       state.pluck,
-      state.age,
+      state.chapter,
       state.hold,
       state.board,
       state.undos,

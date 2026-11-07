@@ -159,7 +159,7 @@ export async function POST(
     const base = {
       score: final.score,
       made: final.made,
-      age: final.age,
+      chapter: final.chapter,
       season,
       mode: run.mode,
     };

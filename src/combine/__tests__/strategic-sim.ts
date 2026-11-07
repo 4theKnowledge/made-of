@@ -152,7 +152,7 @@ function enumeratePromotes(state: GameState, bundle: ThemeBundle): PromoteOpt[] 
 
 function scoreCombine(opt: CombineOpt, state: GameState): number {
   let s = 0;
-  const currentBand = state.age + 1;
+  const currentBand = state.chapter + 1;
   const d = opt.outputBand - currentBand;
   // On-band first.
   if (d === 0) s += 200;
@@ -250,7 +250,7 @@ function playOne(
     holds: 0, swaps: 0, clears: 0, hints: 0, pluck: 0, shore: 0, wipes: 0, undos: 0,
     combines: 0, promotes: 0, rawPlacements: 0,
     trayHistory: [
-      { move: 0, age: state.age, tiles: state.tray.filter((v): v is string => Boolean(v)).slice().sort() },
+      { move: 0, age: state.chapter, tiles: state.tray.filter((v): v is string => Boolean(v)).slice().sort() },
     ],
   };
 
@@ -260,7 +260,7 @@ function playOne(
     const tiles = state.tray.filter((v): v is string => Boolean(v)).slice().sort();
     const sig = tiles.join(",");
     if (sig !== lastTraySig) {
-      run.trayHistory.push({ move: state.moves, age: state.age, tiles });
+      run.trayHistory.push({ move: state.moves, age: state.chapter, tiles });
       lastTraySig = sig;
     }
   };
@@ -284,7 +284,7 @@ function playOne(
       let best = 0, bestScore = -Infinity;
       for (let k = 0; k < opts.length; k++) {
         const r = opts[k];
-        const sc = (state.found.includes(r.out) ? 0 : 100) - Math.abs(r.band - (state.age + 1)) * 10;
+        const sc = (state.found.includes(r.out) ? 0 : 100) - Math.abs(r.band - (state.chapter + 1)) * 10;
         if (sc > bestScore) { bestScore = sc; best = k; }
       }
       applyReduce({ type: "choose", outputIndex: best });
@@ -391,7 +391,7 @@ function playOne(
   }
 
   if (state.over) run.endReason = "over";
-  run.finalAge = state.age;
+  run.finalAge = state.chapter;
   run.moves = state.moves;
   run.discoveries = state.found.length;
   run.made = state.made;

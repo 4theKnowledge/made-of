@@ -152,7 +152,6 @@ describe("place (unique output recipe)", () => {
     // the end of the move, so slot 0 may hold a fresh tile — we assert the
     // move happened via `made`/events rather than reading the tray slot.
     expect(state.made).toBe(1);
-    expect(state.ageMade).toBe(1);
     expect(events.some((e) => e.type === "placed")).toBe(true);
     expect(events.some((e) => e.type === "combine")).toBe(true);
     expect(events.some((e) => e.type === "discovery")).toBe(true);
@@ -182,66 +181,9 @@ describe("place (unique output recipe)", () => {
   });
 });
 
-describe("ageMade counts only unique on-band first-finds (T-0051)", () => {
-  // Two-recipe bundle so we can distinguish "same item twice" from
-  // "two different items". Both are band-1 so they count toward age 0.
-  const bundle = fakeBundle({
-    recipes: [R("dough", ["flour", "water"]), R("rope", ["fibre", "tar"])],
-  });
-
-  it("re-making the same on-band item does NOT bump ageMade", () => {
-    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
-    s0.board = Array(9).fill(null);
-    s0.board[0] = "water";
-    s0.tray = ["flour", null, null];
-    const after1 = reduce(s0, bundle, { type: "place", slot: 0, cell: 1 }).state;
-    expect(after1.ageMade).toBe(1);
-    expect(after1.found).toContain("dough");
-
-    // Re-craft the same item: ageMade must stay at 1.
-    after1.board = Array(9).fill(null);
-    after1.board[0] = "water";
-    after1.tray = ["flour", null, null];
-    const after2 = reduce(after1, bundle, { type: "place", slot: 0, cell: 1 }).state;
-    expect(after2.ageMade).toBe(1);
-    expect(after2.madeCounts["dough"]).toBe(2);
-  });
-
-  it("two different on-band items each bump ageMade", () => {
-    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
-    s0.board = Array(9).fill(null);
-    s0.board[0] = "water";
-    s0.tray = ["flour", null, null];
-    const after1 = reduce(s0, bundle, { type: "place", slot: 0, cell: 1 }).state;
-    expect(after1.ageMade).toBe(1);
-
-    after1.board = Array(9).fill(null);
-    after1.board[0] = "tar";
-    after1.tray = ["fibre", null, null];
-    const after2 = reduce(after1, bundle, { type: "place", slot: 0, cell: 1 }).state;
-    expect(after2.ageMade).toBe(2);
-  });
-
-  it("fast mode keeps counting repeats toward the stop condition", () => {
-    // Fast mode has no bands/ages; ageMade is just a termination signal, so
-    // every on-band craft (= every craft) still counts. See engine.ts comment.
-    const s0 = newGame("everything", bundle, { seed: 1, size: 3, mode: "fast" }).state;
-    s0.board = Array(9).fill(null);
-    s0.board[0] = "water";
-    s0.tray = ["flour", null, null];
-    const after1 = reduce(s0, bundle, { type: "place", slot: 0, cell: 1 }).state;
-    expect(after1.ageMade).toBe(1);
-    // `found` tracks run-local history (powers the shelf) in every mode.
-    // Lifetime-collection unlocks are gated separately and skipped in fast.
-    expect(after1.found.length).toBe(1);
-
-    after1.board = Array(9).fill(null);
-    after1.board[0] = "water";
-    after1.tray = ["flour", null, null];
-    const after2 = reduce(after1, bundle, { type: "place", slot: 0, cell: 1 }).state;
-    expect(after2.ageMade).toBe(2);
-  });
-});
+// ageMade describe block deleted — banded "on-band first-find" counter
+// no longer exists; chapter progression is driven by state.found.length.
+// Discovery semantics covered by `found` assertions elsewhere.
 
 describe("place with alternatives → choosing state", () => {
   // steel + wood could make a saw OR a wheel.
@@ -1082,14 +1024,13 @@ describe("debug mode", () => {
   it("debug-set-age jumps age, clears board, re-deals the tray", () => {
     const s0 = newGame("everything", everything, { seed: 2, size: 5 }).state;
     s0.debug = true;
-    s0.age = 0;
+    s0.chapter = 0;
     s0.board.fill("flour");
     const { state, events } = reduce(s0, everything, {
-      type: "debug-set-age",
-      age: 2,
+      type: "debug-set-chapter",
+      chapter: 2,
     });
-    expect(state.age).toBe(2);
-    expect(state.ageMade).toBe(0);
+    expect(state.chapter).toBe(2);
     expect(state.board.every((c) => c == null)).toBe(true);
     expect(state.tray.filter(Boolean).length).toBeGreaterThan(0);
     expect(events.some((e) => e.type === "age-up")).toBe(true);
@@ -1101,17 +1042,17 @@ describe("debug mode", () => {
     s0.debug = true;
     const last = everything.theme.ages.length - 1;
     const { state } = reduce(s0, everything, {
-      type: "debug-set-age",
-      age: 999,
+      type: "debug-set-chapter",
+      chapter: 999,
     });
-    expect(state.age).toBe(last);
+    expect(state.chapter).toBe(last);
   });
 
   it("debug-set-age is a no-op when not in debug mode", () => {
     const s0 = newGame("everything", everything, { seed: 2, size: 5 }).state;
     const { state } = reduce(s0, everything, {
-      type: "debug-set-age",
-      age: 2,
+      type: "debug-set-chapter",
+      chapter: 2,
     });
     expect(state).toBe(s0);
   });
@@ -1197,7 +1138,7 @@ describe("wipe-board", () => {
 
   it("is a no-op below the unlock age", () => {
     const s0 = state0();
-    s0.age = 1;
+    s0.chapter = 1;
     s0.board[0] = "flour";
     const { state, events } = reduce(s0, bundle, { type: "wipe-board" });
     expect(state).toBe(s0);
@@ -1206,8 +1147,7 @@ describe("wipe-board", () => {
 
   it("clears the board, hold, crumb, and shored flags when unlocked", () => {
     const s0 = state0();
-    s0.age = 2;
-    s0.ageMade = 5;
+    s0.chapter = 2;
     s0.board[0] = "flour";
     s0.board[4] = "water";
     s0.hold = [null, null, "dough"];
@@ -1223,16 +1163,14 @@ describe("wipe-board", () => {
 
   it("drops the player back one age and resets ageMade", () => {
     const s0 = state0();
-    s0.age = 2;
-    s0.ageMade = 5;
+    s0.chapter = 2;
     const { state } = reduce(s0, bundle, { type: "wipe-board" });
-    expect(state.age).toBe(1);
-    expect(state.ageMade).toBe(0);
+    expect(state.chapter).toBe(1);
   });
 
   it("preserves score, discoveries, shelf, and run history", () => {
     const s0 = state0();
-    s0.age = 2;
+    s0.chapter = 2;
     s0.score = 1234;
     s0.made = 7;
     s0.longest = 3;
@@ -1240,7 +1178,6 @@ describe("wipe-board", () => {
     s0.shelf = ["bread"];
     s0.madeCounts = { dough: 4, bread: 2 };
     s0.howMade = { bread: ["dough", "fire"] };
-    s0.madeAtBand = { bread: 2 };
     const { state } = reduce(s0, bundle, { type: "wipe-board" });
     expect(state.score).toBe(1234);
     expect(state.made).toBe(7);
@@ -1253,7 +1190,7 @@ describe("wipe-board", () => {
 
   it("deals a fresh tray after wiping", () => {
     const s0 = state0();
-    s0.age = 2;
+    s0.chapter = 2;
     s0.tray = ["flour", "water", "spice"];
     const { state, events } = reduce(s0, bundle, { type: "wipe-board" });
     expect(state.tray.some((t) => t != null)).toBe(true);
@@ -1265,9 +1202,9 @@ describe("wipe-board", () => {
     // At the unlock age exactly, one wipe drops you below it. A second
     // wipe should be a no-op without climbing back up.
     const s0 = state0();
-    s0.age = 2;
+    s0.chapter = 2;
     const { state: afterOne } = reduce(s0, bundle, { type: "wipe-board" });
-    expect(afterOne.age).toBe(1);
+    expect(afterOne.chapter).toBe(1);
     const { state: afterTwo, events } = reduce(afterOne, bundle, {
       type: "wipe-board",
     });
@@ -1277,7 +1214,7 @@ describe("wipe-board", () => {
 
   it("clears the lastSnapshot so a run can't be undone back across a wipe", () => {
     const s0 = state0();
-    s0.age = 2;
+    s0.chapter = 2;
     s0.lastSnapshot = cloneForTest(s0);
     const { state } = reduce(s0, bundle, { type: "wipe-board" });
     expect(state.lastSnapshot).toBeNull();
@@ -1306,7 +1243,6 @@ describe("promote (1-input recipes)", () => {
     s.tray.fill(null);
     s.hold.fill(null);
     s.found = [];
-    s.ageMade = 0;
     s.score = 0;
     s.moves = 0;
     s.made = 0;
@@ -1327,7 +1263,6 @@ describe("promote (1-input recipes)", () => {
     s.tray.fill(null);
     s.hold.fill(null);
     s.found = [];
-    s.ageMade = 0;
     s.score = 0;
     s.moves = 0;
     s.made = 0;
@@ -1447,12 +1382,11 @@ it("promote in fast mode makes the tile and populates run-local history", () => 
     s.board[0] = "a";
     const { state } = reduce(s, b2, { type: "promote", cell: 0 });
     // Tile transformed; run-local history is populated so the shelf
-    // renders. Lifetime collection (madeAtBand / discovery event) stays
-    // untouched in fast mode.
+    // renders. Lifetime collection (discovery event) stays untouched in
+    // fast mode.
     expect(state.board[0]).toBe("b");
     expect(state.found).toContain("b");
     expect(state.howMade["b"]).toEqual(["a"]);
-    expect(state.madeAtBand["b"]).toBeUndefined();
   });
 
   it("promote scoring: 1-input yields the formula's 0.5× pair-match points", () => {

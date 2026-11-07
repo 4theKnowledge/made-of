@@ -25,7 +25,7 @@ export function dailyShareText(
   bundle: ThemeBundle,
 ): SharePayload {
   const ages = bundle.theme.ages;
-  const ageName = ages[state.age] ?? "";
+  const ageName = ages[state.chapter] ?? "";
   const top = bestShelfItem(state, bundle);
   // Target-list daily: squares show progress toward `target`, headline reads
   // `${found}/${target} in ${turns} turns`. Legacy daily (no target) keeps
@@ -38,7 +38,7 @@ export function dailyShareText(
     ? Array.from({ length: squaresLen }, (_, k) =>
         k < Math.min(found, squaresLen) ? "🟩" : "⬜",
       ).join("")
-    : ages.map((_, k) => (k <= state.age ? "🟩" : "⬜")).join("");
+    : ages.map((_, k) => (k <= state.chapter ? "🟩" : "⬜")).join("");
   const headline = hasTarget
     ? `${squares} ${found}/${target} in ${state.moves} turn${state.moves === 1 ? "" : "s"}`
     : `${squares} reached ${ageName}`;
@@ -60,7 +60,7 @@ export function dailyShareText(
     text,
     url: `${SHARE_URL}?${dailyShareQuery(dayKey, {
       score: state.score,
-      age: state.age,
+      age: state.chapter,
       made: state.made,
       ageName,
       ageCount: ages.length,
@@ -115,7 +115,7 @@ export function endlessShareText(
   bundle: ThemeBundle,
 ): SharePayload {
   const ages = bundle.theme.ages;
-  const ageName = ages[state.age] ?? "";
+  const ageName = ages[state.chapter] ?? "";
   const top = bestShelfItem(state, bundle);
   const foundLine = state.found.length
     ? ` · ${state.found.length} new discover${state.found.length > 1 ? "ies" : "y"}`
@@ -130,7 +130,7 @@ export function endlessShareText(
     text,
     url: `${SHARE_URL}?${modeShareQuery("endless", {
       score: state.score,
-      age: state.age,
+      age: state.chapter,
       made: state.made,
       ageName,
       ageCount: ages.length,

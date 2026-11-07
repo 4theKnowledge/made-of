@@ -65,7 +65,7 @@ export function TopBar({
   onFeedback: () => void;
 }) {
   const canUndo = state.undos > 0 && state.lastSnapshot != null;
-  const wipeUnlocked = state.age >= WIPE_UNLOCK_CHAPTER;
+  const wipeUnlocked = state.chapter >= WIPE_UNLOCK_CHAPTER;
   const holdFull = !state.hold.some((v) => v == null);
   const boardEmpty = !state.board.some((v) => v != null);
   const helpersLeft =

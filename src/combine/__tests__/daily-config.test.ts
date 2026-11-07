@@ -165,7 +165,7 @@ describe("buildThemeBundle with dailyConfig", () => {
     expect(daily.theme.ages.length).toBe(3);
     // Starting age is always 0; what matters is that the engine can't climb
     // above the cap because the dealer only sees band ≤ 3 recipes.
-    expect(state.age).toBe(0);
+    expect(state.chapter).toBe(0);
     expect(daily.recipes.every((r) => r.band <= 3)).toBe(true);
   });
 });

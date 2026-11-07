@@ -150,10 +150,10 @@ export function CombineDebugPanel({
               key={label + i}
               type="button"
               className={
-                "cbdebug-btn" + (state.age === i ? " cbdebug-btn-on" : "")
+                "cbdebug-btn" + (state.chapter === i ? " cbdebug-btn-on" : "")
               }
               disabled={!state.debug}
-              onClick={() => dispatch({ type: "debug-set-age", age: i })}
+              onClick={() => dispatch({ type: "debug-set-chapter", chapter: i })}
             >
               {label}
             </button>

@@ -35,7 +35,7 @@ function scoreMove(
   const first = !state.found.includes(recipe.out);
   if (first) score += 500; // discoveries dominate.
   // Prefer current-band combines so the age bar advances.
-  const d = recipe.band - (state.age + 1);
+  const d = recipe.band - (state.chapter + 1);
   if (d === 0) score += 100;
   else if (d === 1) score += 60;
   else if (d === -1) score += 20;
@@ -87,7 +87,7 @@ function playOne(
   const localScore = (recipe: CombineRecipe): number => {
     let score = 0;
     if (!foundRecipe(recipe.out)) score += 500;
-    const d = recipe.band - (state.age + 1);
+    const d = recipe.band - (state.chapter + 1);
     if (d === 0) score += 100;
     else if (d === 1) score += 60;
     else if (d === -1) score += 20;
@@ -105,7 +105,7 @@ function playOne(
       for (let k = 0; k < opts.length; k++) {
         const r = opts[k];
         const unseen = foundRecipe(r.out) ? 0 : 1000;
-        const bandDelta = Math.abs(r.band - (state.age + 1));
+        const bandDelta = Math.abs(r.band - (state.chapter + 1));
         const sc = unseen - bandDelta * 10 + r.all.length * 5;
         if (sc > bestScore) {
           bestScore = sc;

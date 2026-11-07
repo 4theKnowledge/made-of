@@ -208,7 +208,7 @@ export function validateActionShape(a: unknown): a is Action {
     "undo",
     "debug-toggle",
     "debug-deal",
-    "debug-set-age",
+    "debug-set-chapter",
     "debug-toggle-over",
   ]);
   return known.has(t);

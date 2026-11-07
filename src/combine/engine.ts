@@ -114,19 +114,11 @@ export interface GameState {
    *  with the right recipe when an item has multiple valid recipes
    *  (e.g. window = glass+wood OR glass+aluminium). */
   howMade: Record<string, string[]>;
-  /** 1-based band of the recipe the player first used to make each output.
-   *  Different from the output's canonical min-band (`bundle.outBand`): the
-   *  dialog groups finds by the age the player *actually* made them in, so
-   *  Age-II work doesn't visually land under Age I just because an alt
-   *  recipe for the same item exists at a lower band. */
-  madeAtBand: Record<string, number>;
   /** 1-based chapter index the player was in when each item was first
-   *  discovered. Only used by soft-mode progression (T-0170); banded mode
-   *  reads `madeAtBand` instead. Written once per item on first-find
-   *  before `state.found` is appended, so a Chapter-1 discovery lands at
-   *  `1` even though it pushes `found.length` to the Chapter-2 threshold.
-   *  Missing entries are treated as Chapter 0 — graceful for pre-v2
-   *  saves. */
+   *  discovered. Written once per item on first-find before `state.found`
+   *  is appended, so a Chapter-1 discovery lands at `1` even though it
+   *  pushes `found.length` to the Chapter-2 threshold. Missing entries
+   *  are treated as Chapter 0 — graceful fallback. */
   discoveredAtChapter: Record<string, number>;
   swaps: number;
   clears: number;
@@ -145,10 +137,10 @@ export interface GameState {
    *  `HOLD_CAPACITY_BY_AGE`). Commit-until-used: a stored tile only leaves
    *  by being placed on the board or crumbling. */
   hold: Array<string | null>;
-  /** 0-based age index. */
-  age: number;
-  /** Count of makes in the current age (used for the age bar). */
-  ageMade: number;
+  /** 0-based chapter index. Advances each time cumulative discoveries
+   *  cross the next `chapterThreshold`. Drives hold capacity growth and
+   *  helper grants' progression weight. */
+  chapter: number;
   /** Per-cell crumble counters. Null means useful / no counter. */
   crumb: Array<CrumbleCounter | null>;
   /** Per-cell shore flag. A shored tile is exempt from crumble for as long
@@ -246,7 +238,7 @@ export type Action =
   // on an admin session check so these never surface to normal players.
   | { type: "debug-toggle" }
   | { type: "debug-deal"; slot: number; tile: string }
-  | { type: "debug-set-age"; age: number }
+  | { type: "debug-set-chapter"; chapter: number }
   | { type: "debug-toggle-over" };
 
 export interface ReduceResult {
@@ -285,7 +277,6 @@ function cloneState(s: GameState): GameState {
     found: [...s.found],
     madeCounts: { ...s.madeCounts },
     howMade: { ...s.howMade },
-    madeAtBand: { ...s.madeAtBand },
     discoveredAtChapter: { ...s.discoveredAtChapter },
     shelf: [...s.shelf],
     hold: s.hold.slice(),
@@ -486,24 +477,21 @@ function finishResolve(
   }
 
   // Fast mode is score-only for the *lifetime collection*: no discovery
-  // events, no madeAtBand (there are no bands), so the collection stays
-  // untouched and classic progression isn't shortcutted by fast runs.
-  // `found` itself is run-local — it powers the on-board history tray
-  // and the picker's "fresh alternative" preference, both of which
-  // should work in fast mode too.
+  // events, so the collection stays untouched and classic progression
+  // isn't shortcutted by fast runs. `found` itself is run-local — it
+  // powers the on-board history tray and the picker's "fresh alternative"
+  // preference, both of which should work in fast mode too.
   const uniqueFind = !state.found.includes(recipe.out);
   if (uniqueFind) {
-    // Attribute the discovery to the player's current chapter (soft mode
-    // only reads this; banded reads `madeAtBand` below). Written BEFORE
-    // `found.push` so a tile that happens to push the player over a
-    // chapter threshold still counts under the chapter they were in when
-    // they made it. 1-based to match the UI ("Chapter 1" in dialogs).
+    // Attribute the discovery to the player's current chapter. Written
+    // BEFORE `found.push` so a tile that happens to push the player over
+    // a chapter threshold still counts under the chapter they were in
+    // when they made it. 1-based to match the UI ("Chapter 1").
     state.discoveredAtChapter[recipe.out] = chapterIndex(state.found.length) + 1;
     state.found.push(recipe.out);
   }
   const first = isClassic(state.mode) && uniqueFind;
   if (first) {
-    state.madeAtBand[recipe.out] = recipe.band;
     events.push({
       type: "discovery",
       out: recipe.out,
@@ -522,13 +510,6 @@ function finishResolve(
   // Age progression: count unique first-time makes at the current age's band.
   // `ageNeed` is documented as "unique discoveries at the current age's band
   // needed to leave each age" — duplicates at the same band don't count, so
-  // the player can't grind one item to age up. Only the initial player move
-  // counts (mult === 1); chain steps are already their own reward.
-  // Fast mode has no real ages — `ageMade` is just a stopping condition — so
-  // it keeps counting every on-band craft.
-  if (recipe.band === state.age + 1 && mult === 1) {
-    if (!isClassic(state.mode) || uniqueFind) state.ageMade++;
-  }
   events.push({
     type: "combine",
     cells: cells.slice(),
@@ -590,17 +571,16 @@ function afterMove(
   // 1. Chapter up? Chapters are discovery-driven: each threshold is a
   //    cumulative find count (log-scaled; see progression.ts). Open-ended
   //    past the last computed threshold — the final chapter is the tail.
-  const chapterUp = state.found.length >= chapterThreshold(state.age + 1);
+  const chapterUp = state.found.length >= chapterThreshold(state.chapter + 1);
   if (chapterUp) {
-    state.age++;
-    state.ageMade = 0;
-    state.score += 100 * state.age;
+    state.chapter++;
+    state.score += 100 * state.chapter;
     // Grant amounts track the mid-chapter milestone count so helpers arrive
     // at predictable intervals as the player progresses. Monotonic — deeper
     // chapters get richer grants, clamped by HELPER_MAX.
     const grants = helperGrants(helperMilestoneIndex(state.found.length));
     applyHelperGrants(state, grants);
-    events.push({ type: "age-up", age: state.age, sample: [], grants });
+    events.push({ type: "age-up", age: state.chapter, sample: [], grants });
     // Clear the tray so step 3 re-deals. Keeps the chapter transition
     // feeling like a real break rather than a silent label swap.
     state.tray.fill(null);
@@ -637,7 +617,7 @@ function afterMove(
   //     happens if the capacity config changes mid-run. Held tiles never
   //     crumble — hold is a permanent stash until the player places the
   //     tile on the board or the game ends.
-  const cap = holdCapacity(state.age);
+  const cap = holdCapacity(state.chapter);
   const holdGone: number[] = [];
   const holdGoneTiles: string[] = [];
   if (state.hold.length < cap) {
@@ -743,7 +723,7 @@ export function hasHelperMove(state: GameState, bundle: ThemeBundle): boolean {
   if (state.swaps > 0) return true;
   if (state.clears > 0 && anyOccupied) return true;
   if (state.pluck > 0 && anyOccupied && freeHoldSlot) return true;
-  if (state.age >= WIPE_UNLOCK_CHAPTER) return true;
+  if (state.chapter >= WIPE_UNLOCK_CHAPTER) return true;
   return false;
 }
 
@@ -797,7 +777,6 @@ export function newGame(
     found: [],
     madeCounts: {},
     howMade: {},
-    madeAtBand: {},
     discoveredAtChapter: {},
     swaps: 0,
     clears: 0,
@@ -810,8 +789,7 @@ export function newGame(
     moves: 0,
     shelf: [],
     hold: Array(holdCapacity(0)).fill(null),
-    age: 0,
-    ageMade: 0,
+    chapter: 0,
     crumb: Array(size * size).fill(null),
     shored: Array(size * size).fill(false),
     closeCalls: 0,
@@ -1205,21 +1183,20 @@ export function reduce(
       // only the board + hold go. Requires the player to have reached
       // `WIPE_UNLOCK_CHAPTER`; dropping below the threshold re-locks the
       // helper (UI-side), so repeat use costs an age each time.
-      if (state.age < WIPE_UNLOCK_CHAPTER) return { state: prev, events: [] };
+      if (state.chapter < WIPE_UNLOCK_CHAPTER) return { state: prev, events: [] };
       state.board.fill(null);
       state.crumb.fill(null);
       state.shored.fill(false);
       state.hold.fill(null);
       state.tray.fill(null);
       state.lastSnapshot = null;
-      state.age--;
-      state.ageMade = 0;
+      state.chapter--;
       // Resize hold to the new (lower) age's capacity. We just zeroed
       // every slot, so a straight length reset is safe.
-      const cap = holdCapacity(state.age);
+      const cap = holdCapacity(state.chapter);
       state.hold.length = 0;
       for (let i = 0; i < cap; i++) state.hold.push(null);
-      events.push({ type: "wipe", age: state.age });
+      events.push({ type: "wipe", age: state.chapter });
       // Re-deal a fresh tray from the current age's pool so the player
       // has something to act on after confirming the wipe.
       dealTray({
@@ -1283,16 +1260,15 @@ export function reduce(
       return { state, events };
     }
 
-    case "debug-set-age": {
+    case "debug-set-chapter": {
       // Jump straight to the requested age. Clears the board and tray,
       // then re-deals from the new age's pool — same path a real age-up
       // takes, minus the score bump. The age-up event is fired so the
       // UI's age-banner path still runs.
       if (!state.debug) return { state: prev, events: [] };
       const totalAges = bundle.theme.ages.length;
-      const target = Math.max(0, Math.min(action.age, totalAges - 1));
-      state.age = target;
-      state.ageMade = 0;
+      const target = Math.max(0, Math.min(action.chapter, totalAges - 1));
+      state.chapter = target;
       state.board.fill(null);
       state.tray.fill(null);
       state.crumb.fill(null);
