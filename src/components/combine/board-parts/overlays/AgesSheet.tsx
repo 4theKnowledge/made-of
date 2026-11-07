@@ -3,7 +3,7 @@ import { Pictogram } from "@/pictograms/Pictogram";
 import { ageNeed } from "@/combine/engine";
 import type { GameState } from "@/combine/engine";
 import { getGpOverrides } from "@/combine/gp-overrides";
-import { chapterIndex, chapterThreshold } from "@/combine/soft-bands";
+import { chapterIndex, chapterThreshold } from "@/combine/progression";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { AGE_CHAINS } from "@/components/combine/board-parts/types";

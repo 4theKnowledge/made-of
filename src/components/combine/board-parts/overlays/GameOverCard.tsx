@@ -2,7 +2,7 @@ import React from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
 import { getGpOverrides } from "@/combine/gp-overrides";
-import { chapterIndex } from "@/combine/soft-bands";
+import { chapterIndex } from "@/combine/progression";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";

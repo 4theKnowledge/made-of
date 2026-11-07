@@ -22,7 +22,7 @@ import {
   effectiveCrumbleTtl,
   helperMilestoneIndex,
   softNeed,
-} from "./soft-bands";
+} from "./progression";
 import {
   edgeNeighbours,
   matchAt,

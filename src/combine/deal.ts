@@ -18,7 +18,7 @@ import { ageSets } from "./data";
 import { getGpOverrides } from "./gp-overrides";
 import { matchAt, playsInOne, playsInTwo, type Board } from "./match";
 import { pick, rand, type RngState } from "./rng";
-import { DISCOVERED_WEIGHT, softPool, type SoftPool } from "./soft-bands";
+import { DISCOVERED_WEIGHT, softPool, type SoftPool } from "./progression";
 import type { ThemeBundle } from "./types";
 
 /** How many tools may sit on the board at once. The prototype's limit at

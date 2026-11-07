@@ -2,7 +2,7 @@ import React from "react";
 import { ageNeed } from "@/combine/engine";
 import type { GameState } from "@/combine/engine";
 import { getGpOverrides } from "@/combine/gp-overrides";
-import { chapterIndex, chapterThreshold } from "@/combine/soft-bands";
+import { chapterIndex, chapterThreshold } from "@/combine/progression";
 import type { ThemeBundle } from "@/combine/types";
 
 export function AgeBar({
