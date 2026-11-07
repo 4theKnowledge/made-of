@@ -31,7 +31,7 @@ import {
   type GameState,
 } from "../engine";
 import { matchAt, matchOn, type Board } from "../match";
-import type { CombineRecipe, ThemeBundle, ThemeKey } from "../types";
+import type { CombineItem, CombineRecipe, ThemeBundle, ThemeKey } from "../types";
 
 /* ======================================================================== *
  * Config
@@ -398,7 +398,7 @@ function subsampleBundle(bundle: ThemeBundle, fraction: number, seed: number): T
     let list = byIngredient.get(x); if (!list) { list = []; byIngredient.set(x, list); }
     list.push(r);
   }
-  const items = new Map<string, any>();
+  const items = new Map<string, CombineItem>();
   for (const [id, it] of bundle.items) if (used.has(id)) items.set(id, it);
   const base: string[] = [];
   for (const id of used) if (!outputs.has(id)) base.push(id);
