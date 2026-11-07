@@ -46,6 +46,11 @@ export interface DealerView {
   /** Internal: non-null when the current pick should avoid partners of
    *  this piled tile. Set by the escape hatch. */
   _diversifyAway?: string | null;
+  /** Internal: lazily-populated Set of `found` for O(1) membership during
+   *  weighted-pick scoring. Built once per DealerView, shared across the
+   *  many `pickMaybeWeighted` calls a single tray may make (soft mode
+   *  only; banded mode never reads this). */
+  _foundSet?: Set<string>;
 }
 
 /** Count how many of each in-age, non-tool tile are on the board. */
@@ -92,14 +97,20 @@ function pickWeighted(
 
 /** Mode-aware pick. In soft mode (and with `found` threaded through the
  *  DealerView), applies the discovered-tile down-weight. In banded mode,
- *  falls back to uniform pick so existing behaviour is preserved bit-for-bit. */
+ *  falls back to uniform pick so existing behaviour is preserved bit-for-bit.
+ *
+ *  Lazily builds and caches `_foundSet` on the view so the many pick calls
+ *  per tray share one O(n) construction. The copy spread used by `pickOne`
+ *  re-roots the cache per call site, which keeps the cache tied to the
+ *  current view's `found` reference. */
 function pickMaybeWeighted(
   view: DealerView,
   arr: readonly string[],
   mode: "banded" | "flat" | "soft",
 ): string | undefined {
   if (mode !== "soft" || !view.found) return pick(view.rng, arr);
-  return pickWeighted(view.rng, arr, new Set(view.found));
+  if (!view._foundSet) view._foundSet = new Set(view.found);
+  return pickWeighted(view.rng, arr, view._foundSet);
 }
 
 /** The heaviest pile on the board, or null if nothing is piling. */
@@ -304,6 +315,10 @@ function shouldDiversify(
  * tray array see the changes), then returns the same array.
  */
 export function dealTray(view: DealerView): Array<string | null> {
+  // Build the found-set once per tray so subsequent pickOne spreads (which
+  // shallow-copy the view) share the same Set reference instead of
+  // rebuilding it per pick. Only relevant in soft mode; harmless in banded.
+  if (view.found && !view._foundSet) view._foundSet = new Set(view.found);
   const writeTray = (next: Array<string | null>): Array<string | null> => {
     for (let i = 0; i < view.tray.length; i++) view.tray[i] = next[i];
     return view.tray;
