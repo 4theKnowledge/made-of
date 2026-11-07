@@ -16,7 +16,6 @@
  */
 
 import { buildThemeBundle } from "./data";
-import { getGpOverrides } from "./gp-overrides";
 import {
   chapterIndex,
   chapterThreshold,
@@ -48,10 +47,6 @@ export const TIER_VALUE: Record<string, number> = {
   P: 4,
   S: 5,
 };
-
-/** Turns a stranded tile hangs on before it crumbles (see spec: 4th tick
- *  removes). */
-export const CRUMBLE_TTL = 3;
 
 /** Hold-zone capacity per age. Index is the 0-based age; capacity grows
  *  one slot per age. Flatten to all-1s to turn the growth off during
@@ -770,7 +765,7 @@ export function newGame(
     n: size,
     rng: makeRng(seed),
     board: Array(size * size).fill(null),
-    tray: Array(getGpOverrides().traySize).fill(null),
+    tray: Array(3).fill(null),
     score: 0,
     made: 0,
     longest: 0,

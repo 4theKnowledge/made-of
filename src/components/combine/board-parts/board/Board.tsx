@@ -1,7 +1,6 @@
 import React from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
-import { getGpOverrides } from "@/combine/gp-overrides";
 import { effectiveCrumbleTtl } from "@/combine/progression";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
@@ -37,18 +36,13 @@ export function Board({
   onCellPointerDown: (cell: number, e: React.PointerEvent<HTMLButtonElement>) => void;
 }) {
   const size = state.n;
-  const softModeActive = getGpOverrides().mode === "soft";
-  // Effective TTL for crumble: in soft mode the TTL scales with board
-  // occupancy (T-0176) — compute here once so every cell's "turns left"
-  // display uses the same value the engine's crumble pass is using.
-  // Banded mode keeps the historical 3-move short-TTL.
-  let boardTtl = CRUMBLE_TTL;
-  if (softModeActive) {
-    let filled = 0;
-    for (const v of state.board) if (v) filled++;
-    const occ = state.board.length > 0 ? filled / state.board.length : 0;
-    boardTtl = effectiveCrumbleTtl(occ);
-  }
+  // Effective TTL for crumble scales with board occupancy (T-0176) —
+  // compute here once so every cell's "turns left" display uses the
+  // same value the engine's crumble pass is using.
+  let filled = 0;
+  for (const v of state.board) if (v) filled++;
+  const occ = state.board.length > 0 ? filled / state.board.length : 0;
+  const boardTtl = effectiveCrumbleTtl(occ);
   return (
     <div
       className={"cbboard" + (lastChance ? " cbboard-lastchance" : "")}
@@ -60,9 +54,8 @@ export function Board({
         const rawTick =
           v && state.crumb[i]?.id === v ? state.crumb[i]!.n : 0;
         // Only show the "crumbling" visual when the tile is in the warning
-        // window (last ~3 ticks before TTL). In soft mode TTL is dynamic;
-        // banded keeps the pre-existing immediate-warning behaviour.
-        const crumbleWarn = softModeActive ? Math.max(0, boardTtl - 3) : 0;
+        // window (last ~3 ticks before TTL).
+        const crumbleWarn = Math.max(0, boardTtl - 3);
         const crumbleTick = rawTick >= crumbleWarn ? rawTick : 0;
         const over =
           dragOver && dragOver.cell === i
@@ -106,7 +99,6 @@ export function Board({
   );
 }
 
-export const CRUMBLE_TTL = 3;
 
 function Cell({
   cell,

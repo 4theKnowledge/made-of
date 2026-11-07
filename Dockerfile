@@ -22,10 +22,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # the module throws if DATABASE_URL is unset. No connection is made at build
 # time — the stub just satisfies the module-load guard.
 ENV DATABASE_URL=postgres://stub:stub@localhost:5432/stub
-# NEXT_PUBLIC_* vars are inlined into the client bundle at build time, so
-# they must be present here — Railway service vars alone only reach runtime.
-ARG NEXT_PUBLIC_COMBINE_PLAYTEST
-ENV NEXT_PUBLIC_COMBINE_PLAYTEST=${NEXT_PUBLIC_COMBINE_PLAYTEST}
+# NEXT_PUBLIC_* vars inlined into the client bundle at build time go here.
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build \

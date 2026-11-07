@@ -1,7 +1,6 @@
 import React from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
-import { getGpOverrides } from "@/combine/gp-overrides";
 import { chapterIndex } from "@/combine/progression";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
@@ -26,14 +25,10 @@ export function GameOverCard({
   onPlayAgain: () => void;
   onShare: () => void;
 }) {
-  const ages = bundle.theme.ages;
-  const ageName = ages[state.chapter];
-  const softMode = getGpOverrides().mode === "soft";
-  // In soft mode the progression unit is a chapter, not a banded era.
-  // Compute the chapter the player ended at from their cumulative finds
-  // so the summary says "Chapter 3" instead of a thematic Age label.
-  const endChapter = softMode ? chapterIndex(state.found.length) + 1 : 0;
-  const progressionLabel = softMode ? `Chapter ${endChapter}` : ageName;
+  // Chapter the player ended at, computed from their cumulative finds so
+  // the summary can say "Chapter 3" regardless of mid-game state drift.
+  const endChapter = chapterIndex(state.found.length) + 1;
+  const progressionLabel = `Chapter ${endChapter}`;
   const newBest = state.newBest;
   const isDailyTargetRun =
     state.mode === "daily" && state.target != null;
@@ -90,9 +85,7 @@ export function GameOverCard({
               ? "A new best!"
               : best > state.score
                 ? `Your best is ${best.toLocaleString("en")}. ${(best - state.score).toLocaleString("en")} to go.`
-                : softMode
-                  ? `You reached ${progressionLabel}.`
-                  : `You reached Age ${ageName}.`}
+                : `You reached ${progressionLabel}.`}
         </span>
         <div className="cb3">
           <div>
@@ -101,7 +94,7 @@ export function GameOverCard({
           </div>
           <div>
             <b>{progressionLabel}</b>
-            <span>{softMode ? "chapter reached" : "age reached"}</span>
+            <span>chapter reached</span>
           </div>
           <div>
             <b>{state.found.length}</b>
