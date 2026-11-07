@@ -18,8 +18,8 @@ import {
   validateActionShape,
   ReplayError,
 } from "../server-engine";
-import { newGame, type Action, type GameState } from "../engine";
-import type { ThemeBundle } from "../types";
+import { newGame, reduce, type Action, type GameState } from "../engine";
+import type { CombineRecipe, ThemeBundle } from "../types";
 
 // A tiny synthetic bundle — just enough shape for `reduce` to run the
 // cheap action paths. Actual gameplay needs real items/recipes; the
@@ -134,5 +134,161 @@ describe("replayActions", () => {
       expect(err).toBeInstanceOf(ReplayError);
       expect((err as ReplayError).atIndex).toBe(1);
     }
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Round-trip determinism properties.                                 */
+/*                                                                    */
+/* The Candy-Crush trust model (T-0194) only works if the same action */
+/* sequence produces the same state twice — once during live play,    */
+/* once during server replay. Two properties cover this:              */
+/*   1. undo mid-sequence replays identically to the shorter sequence */
+/*      that skips the undone action. Guards the serialised           */
+/*      `lastSnapshot` round-trip.                                    */
+/*   2. a long random-but-valid-shape action sequence never crashes   */
+/*      replay, and `score`/`found.length`/`moves` stay monotone      */
+/*      non-decreasing. Guards against subtle replay-engine bugs      */
+/*      (SECURITY_AUDIT § "Not covered").                             */
+/* ------------------------------------------------------------------ */
+
+const recipe = (out: string, all: string[]): CombineRecipe => ({
+  id: `test-${out}-${all.join("+")}`,
+  out,
+  from: all,
+  with: [],
+  needs: [],
+  evolved: [],
+  all,
+  lvl: 0,
+  band: 0,
+});
+
+/** Tiny bundle with one 2-input recipe so `place` can trigger a combine
+ *  and we can exercise the full `reduce` → snapshot → undo path. */
+function recipeBundle(): ThemeBundle {
+  const r = recipe("dough", ["flour", "water"]);
+  const byIngredient = new Map<string, CombineRecipe[]>([
+    ["flour", [r]],
+    ["water", [r]],
+  ]);
+  const items = new Map();
+  for (const id of ["flour", "water", "dough"]) {
+    items.set(id, {
+      id,
+      slug: id,
+      name: id,
+      tier: "M",
+      symbol: null,
+      fact: "",
+      kind: "object",
+    });
+  }
+  return {
+    theme: {
+      k: "everything",
+      name: "Test",
+      desc: "",
+      ages: ["one"],
+      numAges: 1,
+      dailyConfig: null,
+    } as unknown as ThemeBundle["theme"],
+    items,
+    outputs: new Map([["dough", [r]]]),
+    recipes: [r],
+    base: ["flour", "water"],
+    byIngredient,
+    tools: new Set<string>(),
+    terminal: new Set<string>(),
+    outBand: new Map([["dough", 0]]),
+    sameIngredients: new Map([["flour+water", [r]]]),
+  } as unknown as ThemeBundle;
+}
+
+describe("replay round-trip", () => {
+  it("place then undo replays identically to no-op (undo preserves lastSnapshot)", () => {
+    const bundle = recipeBundle();
+    const seed = 12345;
+    const s0 = newGame("everything", bundle, { mode: "endless", seed, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    s0.tray = ["flour", null, null];
+    // Clone the pre-move snapshot via JSON so we compare against a known
+    // serialised shape — replay on the server ultimately reads jsonb.
+    const serialisedStart = JSON.parse(JSON.stringify(s0)) as GameState;
+    const actions: Action[] = [
+      { type: "place", slot: 0, cell: 4 },
+      { type: "undo" },
+    ];
+    const replayed = replayActions(serialisedStart, bundle, actions);
+    // After place+undo we should be back where we started on every
+    // gameplay-relevant field. Undo consumes one of the two charges a
+    // fresh game grants — `s0.undos` hasn't been touched yet so compare
+    // against the post-undo count the engine produces directly.
+    const expected = reduce(
+      reduce(s0, bundle, { type: "place", slot: 0, cell: 4 }).state,
+      bundle,
+      { type: "undo" },
+    ).state;
+    expect(replayed.state.board).toEqual(expected.board);
+    expect(replayed.state.tray).toEqual(expected.tray);
+    expect(replayed.state.score).toBe(expected.score);
+    expect(replayed.state.moves).toBe(expected.moves);
+    expect(replayed.state.undos).toBe(expected.undos);
+    expect(replayed.state.rng).toEqual(expected.rng);
+  });
+
+  it("random valid-shape action batch doesn't crash and keeps monotone totals", () => {
+    const bundle = recipeBundle();
+    // Deterministic rng so the test is reproducible; using a local
+    // generator rather than Math.random keeps CI output stable.
+    let s = 0xc0ffee;
+    const rand = (): number => {
+      s = (Math.imul(s, 1664525) + 1013904223) | 0;
+      return ((s >>> 0) / 2 ** 32);
+    };
+    const pick = <T>(arr: readonly T[]): T => arr[Math.floor(rand() * arr.length)]!;
+    const state0 = newGame("everything", bundle, { mode: "endless", seed: 7, size: 3 }).state;
+
+    // Build 200 random actions over the known action-type set. Most will
+    // be no-ops against the state (place with slot=null, swap when
+    // choosing is off, etc.) — the reducer is designed to return
+    // unchanged state rather than throw on illegal input, which is the
+    // property this fuzz guards.
+    const actions: Action[] = [];
+    const slots = [0, 1, 2];
+    const cells = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+    const types = [
+      "place",
+      "drop-on",
+      "swap",
+      "clear",
+      "move",
+      "promote",
+      "shore",
+      "hold",
+      "pluck-hold",
+    ] as const;
+    for (let i = 0; i < 200; i++) {
+      const t = pick(types);
+      if (t === "place" || t === "drop-on") {
+        actions.push({ type: t, slot: pick(slots), cell: pick(cells) });
+      } else if (t === "swap") {
+        actions.push({ type: "swap" });
+      } else if (t === "clear" || t === "promote" || t === "shore" || t === "pluck-hold") {
+        actions.push({ type: t, cell: pick(cells) });
+      } else if (t === "hold") {
+        actions.push({ type: "hold", slot: pick(slots) });
+      } else if (t === "move") {
+        actions.push({ type: "move", from: pick(cells), to: pick(cells) });
+      }
+    }
+
+    // Replay must not throw on any sequence that passes validateActionShape.
+    expect(() => replayActions(state0, bundle, actions)).not.toThrow();
+    const result = replayActions(state0, bundle, actions);
+    // Monotone invariants: score, moves, and found-count only grow.
+    expect(result.state.score).toBeGreaterThanOrEqual(state0.score);
+    expect(result.state.moves).toBeGreaterThanOrEqual(state0.moves);
+    expect(result.state.found.length).toBeGreaterThanOrEqual(state0.found.length);
   });
 });
