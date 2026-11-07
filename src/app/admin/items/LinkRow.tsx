@@ -12,10 +12,12 @@ const CONFIDENCES: Confidence[] = ["established", "strong", "debated", "hypothes
 export function LinkRow({
   link,
   targetName,
+  targetKind,
   verb,
 }: {
   link: LinkRow;
   targetName: string;
+  targetKind?: string | null;
   verb: string;
 }) {
   const router = useRouter();
@@ -68,6 +70,20 @@ export function LinkRow({
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ color: "var(--muted)" }}>{verb.toLowerCase()}</span>
         <Link href={`/admin/items/${encodeURIComponent(link.targetItemId)}`}>{targetName}</Link>
+        {targetKind && (
+          <span
+            style={{
+              fontFamily: "var(--mono, monospace)",
+              fontSize: 11,
+              color: "var(--muted)",
+              padding: "1px 5px",
+              border: "1px solid var(--line)",
+              borderRadius: 3,
+            }}
+          >
+            {targetKind}
+          </span>
+        )}
         <span style={{ fontFamily: "var(--mono, monospace)", fontSize: 11, color: "var(--muted)" }}>
           {link.type} · {confidence}
           {isCanary ? " · canary" : ""}

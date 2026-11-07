@@ -43,9 +43,10 @@ export default async function AdminItemEdit({ params }: { params: Promise<{ id: 
     ),
   );
   const names = allTargetIds.length
-    ? await db.select({ id: schema.items.id, name: schema.items.name }).from(schema.items).where(inArray(schema.items.id, allTargetIds))
+    ? await db.select({ id: schema.items.id, name: schema.items.name, kind: schema.items.kind }).from(schema.items).where(inArray(schema.items.id, allTargetIds))
     : [];
   const nameById = Object.fromEntries(names.map((n) => [n.id, n.name]));
+  const kindById = Object.fromEntries(names.map((n) => [n.id, n.kind]));
 
   return (
     <main className="wrap">
@@ -91,6 +92,7 @@ export default async function AdminItemEdit({ params }: { params: Promise<{ id: 
                       key={l.id}
                       link={l}
                       targetName={nameById[l.targetItemId] ?? l.targetItemId}
+                      targetKind={kindById[l.targetItemId] ?? null}
                       verb={REL[l.type].up}
                     />
                   ))
@@ -104,7 +106,13 @@ export default async function AdminItemEdit({ params }: { params: Promise<{ id: 
               Item-level links
             </div>
             {outLinks.map((l) => (
-              <LinkRow key={l.id} link={l} targetName={nameById[l.targetItemId] ?? l.targetItemId} verb={REL[l.type].up} />
+              <LinkRow
+                key={l.id}
+                link={l}
+                targetName={nameById[l.targetItemId] ?? l.targetItemId}
+                targetKind={kindById[l.targetItemId] ?? null}
+                verb={REL[l.type].up}
+              />
             ))}
           </div>
         )}
@@ -120,12 +128,28 @@ export default async function AdminItemEdit({ params }: { params: Promise<{ id: 
           const recipe = l.recipeId ? recipeOwnerById[l.recipeId] : null;
           const parentId = l.itemId ?? recipe?.itemId ?? "";
           const parentName = nameById[parentId] ?? parentId;
+          const parentKind = kindById[parentId] ?? null;
           const viaRecipe = recipe
             ? ` (recipe ${recipe.position}${recipe.label ? ` · ${recipe.label}` : ""})`
             : "";
           return (
             <div key={l.id} style={{ fontSize: 14, padding: "4px 0" }}>
               <Link href={parentId ? `/admin/items/${encodeURIComponent(parentId)}` : "#"}>{parentName || "(unknown)"}</Link>
+              {parentKind && (
+                <span
+                  style={{
+                    fontFamily: "var(--mono, monospace)",
+                    fontSize: 11,
+                    color: "var(--muted)",
+                    marginLeft: 6,
+                    padding: "1px 5px",
+                    border: "1px solid var(--line)",
+                    borderRadius: 3,
+                  }}
+                >
+                  {parentKind}
+                </span>
+              )}
               {viaRecipe && (
                 <span style={{ color: "var(--muted)", fontSize: 12 }}>{viaRecipe}</span>
               )}
