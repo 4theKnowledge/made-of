@@ -99,7 +99,7 @@ Counts: **0 Critical**, **3 High**, **4 Medium**, **5 Low/Info**.
 
 1. **Never send the whole graph** — ✅ enforced. Every public endpoint returns a single neighbourhood or a bounded list. `/api/items/:code/everything` is the one exception and is entitlement-gated (stubbed to always-false today, see L2).
 2. **Daily answers stay server-side** — ✅ enforced. `/api/link/*` computes deltas and legal-move checks server-side; `/api/link` returns only start/goal/par (no path). `src/app/api/link/move/route.ts` only leaks `closer|same|further`.
-3. **Entitlements server-side** — ⚠️ partial. Admin gating is solid. Paid entitlement on `/everything` is a stub (safe default, L2). `/api/combine/result` accepts client totals (H3).
+3. **Entitlements server-side** — ⚠️ partial. Admin gating is solid. Paid entitlement on `/everything` is a stub (safe default, L2). Combine scores are now server-validated via `/api/combine/runs/[id]/finish` (H3 resolved; the legacy `/api/combine/result` endpoint was deleted in T-0195).
 4. **Only `status=live` content public; canaries hidden on pages/sitemap/llms.txt** — ❌ not fully enforced. `status='live'` is enforced via `loadRowsFromDb({ liveOnly: true })` in `src/graph/load.ts:30-35`. Canary filtering has gaps: H1 (item/explore pages), H2 (llms.txt), M1 (picker).
 5. **No child profiles; no session replay; no person properties** — ✅ `disable_session_recording: true`, `person_profiles: "identified_only"` in `src/lib/analytics/client.ts:19`.
 6. **`track()` identifies by user id only** — ✅ `src/lib/analytics/client.ts:32` calls `posthog.identify(userId)`; no email/name passed anywhere found.

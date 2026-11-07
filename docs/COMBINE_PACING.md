@@ -2,6 +2,13 @@
 
 Historical record of the pacing investigation. **Status: chapter progression (née soft bands) is now the sole Combine mechanic** (refactor landed as T-0187). This document is kept for context on why the mechanic exists; the live spec lives in `docs/PROGRESSION.html`. Legacy content below is preserved for the decision trail.
 
+> **Reader note (T-0208):** everything below references the gp-overrides
+> system (`?gp_override=mode=soft,tray=4`), the Playtest UI, and
+> "banded vs soft" selection. All of those were **removed** in T-0187:
+> gp-overrides.ts is deleted, there is no Playtest menu, and chapter
+> progression is unconditional. Trust the current source for mechanics;
+> read this file for *why* the current mechanics exist.
+
 ## Problem statement
 
 Players (user playtest, 2026-11-05 → 2026-11-07) report that bands 1 and 2 of Combine endless mode feel grindy. Tile repetition is heavy, the game slows down, discovery feels gated behind the same 5 tiles (H, O, C, water, He) showing up repeatedly. See T-0135.
