@@ -14,8 +14,6 @@
  *      recent trays have all been pile-adjacent.
  */
 
-import { ageSets } from "./data";
-import { getGpOverrides } from "./gp-overrides";
 import { matchAt, playsInOne, playsInTwo, type Board } from "./match";
 import { pick, rand, type RngState } from "./rng";
 import { DISCOVERED_WEIGHT, softPool, type SoftPool } from "./progression";
@@ -34,41 +32,30 @@ export interface DealerView {
   board: Board;
   tray: Array<string | null>;
   size: number;
-  /** 0-based age index. */
-  age: number;
   rng: RngState;
   /** Short memory of recent trays as sorted multisets, newest first. The
    *  caller owns this array; `dealTray` reads and mutates it in place. */
   recentTrays?: string[][];
-  /** Items the player has discovered this run. Threaded through for the
-   *  soft-bands sampler (T-0163); banded-mode ignores it. */
-  found?: string[];
+  /** Items the player has discovered this run. Drives the reachability
+   *  pool and the discovered-tile down-weight. */
+  found: string[];
   /** Internal: non-null when the current pick should avoid partners of
    *  this piled tile. Set by the escape hatch. */
   _diversifyAway?: string | null;
   /** Internal: lazily-populated Set of `found` for O(1) membership during
    *  weighted-pick scoring. Built once per DealerView, shared across the
-   *  many `pickMaybeWeighted` calls a single tray may make (soft mode
-   *  only; banded mode never reads this). */
+   *  many weighted-pick calls a single tray may make. */
   _foundSet?: Set<string>;
   /** Internal: lazily-computed soft-pool reachability. Built once per
-   *  dealTray in soft mode (iterates all recipes, expensive for 439-item
-   *  themes), shared across the ~180+ pickOne calls per deal retry loop. */
+   *  dealTray (iterates all recipes, expensive for 439-item themes),
+   *  shared across the ~180+ pickOne calls per deal retry loop. */
   _softPool?: SoftPool;
 }
 
-/** Count how many of each in-age, non-tool tile are on the board. */
+/** Count how many of each reachable non-tool tile are on the board. */
 function tallyBoard(view: DealerView): Map<string, number> {
-  const mode = getGpOverrides().mode;
-  // In soft mode, all known/reachable tiles are "in use" for pile-detection
-  // purposes. In banded mode, use the age window's USE set.
-  let inUse: Set<string>;
-  if (mode === "soft" && view.found) {
-    if (!view._softPool) view._softPool = softPool(view.bundle, view.found);
-    inUse = view._softPool.pool;
-  } else {
-    inUse = ageSets(view.bundle, view.age).USE;
-  }
+  if (!view._softPool) view._softPool = softPool(view.bundle, view.found);
+  const inUse = view._softPool.pool;
   const counts = new Map<string, number>();
   for (const v of view.board) {
     if (!v) continue;
@@ -79,45 +66,25 @@ function tallyBoard(view: DealerView): Map<string, number> {
   return counts;
 }
 
-/** Weighted pick for soft mode: already-discovered tiles get `DISCOVERED_WEIGHT`,
+/** Weighted pick: already-discovered tiles get `DISCOVERED_WEIGHT`,
  *  undiscovered ones get 1.0. Reduces tray dominance of exhausted items so
  *  the player sees fresh things more often, without removing ingredients
- *  that may still be needed for future combos. Pure function; uses the
- *  provided RNG state for determinism. */
-function pickWeighted(
-  rng: RngState,
-  arr: readonly string[],
-  found: Set<string>,
-): string | undefined {
+ *  that may still be needed for future combos. Lazily caches `_foundSet`
+ *  on the view so the many pick calls per tray share one O(n) construction. */
+function pickWeighted(view: DealerView, arr: readonly string[]): string | undefined {
   if (arr.length === 0) return undefined;
+  if (!view._foundSet) view._foundSet = new Set(view.found);
+  const found = view._foundSet;
   let total = 0;
   for (const x of arr) total += found.has(x) ? DISCOVERED_WEIGHT : 1;
-  if (total <= 0) return pick(rng, arr); // all weights zero — fall back to uniform
-  let r = rand(rng) * total;
+  if (total <= 0) return pick(view.rng, arr);
+  let r = rand(view.rng) * total;
   for (const x of arr) {
     const w = found.has(x) ? DISCOVERED_WEIGHT : 1;
     r -= w;
     if (r <= 0) return x;
   }
   return arr[arr.length - 1];
-}
-
-/** Mode-aware pick. In soft mode (and with `found` threaded through the
- *  DealerView), applies the discovered-tile down-weight. In banded mode,
- *  falls back to uniform pick so existing behaviour is preserved bit-for-bit.
- *
- *  Lazily builds and caches `_foundSet` on the view so the many pick calls
- *  per tray share one O(n) construction. The copy spread used by `pickOne`
- *  re-roots the cache per call site, which keeps the cache tied to the
- *  current view's `found` reference. */
-function pickMaybeWeighted(
-  view: DealerView,
-  arr: readonly string[],
-  mode: "banded" | "flat" | "soft",
-): string | undefined {
-  if (mode !== "soft" || !view.found) return pick(view.rng, arr);
-  if (!view._foundSet) view._foundSet = new Set(view.found);
-  return pickWeighted(view.rng, arr, view._foundSet);
 }
 
 /** The heaviest pile on the board, or null if nothing is piling. */
@@ -134,29 +101,13 @@ function heaviestPile(view: DealerView): { tile: string; count: number } | null 
 /** Pick ONE tile for the tray. Prefers tiles that fit the board; falls
  *  through weighted strategies on each roll. */
 export function pickOne(view: DealerView): string | null {
-  const mode = getGpOverrides().mode;
-  // Mode selects the sampling universe. Banded (default) uses age-indexed
-  // ING/BASE/MID; soft uses the reachability pool from soft-bands; both
-  // hand the dealer the same shape so the layers below don't branch.
-  let ING: Set<string>;
-  let BASE: string[];
-  let MID: string[];
-  let recipes;
-  if (mode === "soft" && view.found) {
-    if (!view._softPool) view._softPool = softPool(view.bundle, view.found);
-    const sp = view._softPool;
-    ING = sp.pool;
-    BASE = sp.basePool;
-    MID = sp.midPool;
-    recipes = sp.reachableRecipes.length ? sp.reachableRecipes : view.bundle.recipes;
-  } else {
-    const banded = ageSets(view.bundle, view.age);
-    ING = banded.ING;
-    BASE = banded.BASE;
-    MID = banded.MID;
-    recipes = banded.recipes;
-  }
-  const A = { ING, BASE, MID, recipes }; // shape-compat for layers below
+  if (!view._softPool) view._softPool = softPool(view.bundle, view.found);
+  const sp = view._softPool;
+  const ING = sp.pool;
+  const BASE = sp.basePool;
+  const MID = sp.midPool;
+  const recipes = sp.reachableRecipes.length ? sp.reachableRecipes : view.bundle.recipes;
+  const A = { ING, BASE, MID, recipes };
   const onBoard = new Set(view.board.filter((v): v is string => Boolean(v)));
   const inTray = new Set(
     view.tray.filter((v): v is string => Boolean(v)),
@@ -186,9 +137,9 @@ export function pickOne(view: DealerView): string | null {
     const safe = A.BASE.filter(
       (x) => okTool(x) && !view.bundle.tools.has(x) && !forbidden.has(x) && !inTray.has(x),
     );
-    if (safe.length) return pickMaybeWeighted(view, safe, mode) ?? null;
+    if (safe.length) return pickWeighted(view, safe) ?? null;
     const safeAny = [...A.ING].filter((x) => okTool(x) && !forbidden.has(x) && !inTray.has(x));
-    if (safeAny.length) return pickMaybeWeighted(view, safeAny, mode) ?? null;
+    if (safeAny.length) return pickWeighted(view, safeAny) ?? null;
     // Nothing diversifying available — fall through to normal picks.
   }
 
@@ -211,7 +162,7 @@ export function pickOne(view: DealerView): string | null {
           need.push(x);
         }
       }
-      if (need.length) return pickMaybeWeighted(view, need, mode) ?? null;
+      if (need.length) return pickWeighted(view, need) ?? null;
     }
   }
 
@@ -232,7 +183,7 @@ export function pickOne(view: DealerView): string | null {
       }
       if (fits) cands.push(x);
     }
-    if (cands.length) return pickMaybeWeighted(view, cands, mode) ?? null;
+    if (cands.length) return pickWeighted(view, cands) ?? null;
   }
 
   // 2. A partner for something already on the board. When there is a pile,
@@ -259,15 +210,15 @@ export function pickOne(view: DealerView): string | null {
     // heavily toward them (3:1) rather than all-or-nothing — occasional
     // "wrong" partners still help by introducing variety.
     if (pileFirst.length && otherOnBoard.length && rand(view.rng) < 0.75) {
-      return pickMaybeWeighted(view, pileFirst, mode) ?? null;
+      return pickWeighted(view, pileFirst) ?? null;
     }
-    if (pileFirst.length) return pickMaybeWeighted(view, pileFirst, mode) ?? null;
-    if (otherOnBoard.length) return pickMaybeWeighted(view, otherOnBoard, mode) ?? null;
+    if (pileFirst.length) return pickWeighted(view, pileFirst) ?? null;
+    if (otherOnBoard.length) return pickWeighted(view, otherOnBoard) ?? null;
   }
 
   // 3. A made thing from this age — starts a chain next time.
   if (roll < 0.88 && A.MID.length) {
-    return pickMaybeWeighted(view, A.MID, mode) ?? null;
+    return pickWeighted(view, A.MID) ?? null;
   }
 
   // 4. A raw thing for this age; occasionally allow tools too.
@@ -276,8 +227,8 @@ export function pickOne(view: DealerView): string | null {
   );
   const pool =
     rand(view.rng) < 0.25 ? A.BASE.filter((x) => okTool(x)) : base;
-  if (pool.length) return pickMaybeWeighted(view, pool, mode) ?? null;
-  return pickMaybeWeighted(view, [...A.ING], mode) ?? null;
+  if (pool.length) return pickWeighted(view, pool) ?? null;
+  return pickWeighted(view, [...A.ING]) ?? null;
 }
 
 /** Canonical fingerprint for a tray — sorted multiset of non-null tiles. */
@@ -305,9 +256,9 @@ function shouldDiversify(
   if (!pile || pile.count < 4) return false;
   const recent = view.recentTrays ?? [];
   if (recent.length < RECENT_TRAY_WINDOW) return false;
-  const A = ageSets(view.bundle, view.age);
+  if (!view._softPool) view._softPool = softPool(view.bundle, view.found);
   const partners = new Set<string>([pile.tile]);
-  for (const r of A.recipes) {
+  for (const r of view._softPool.reachableRecipes) {
     if (!r.all.includes(pile.tile)) continue;
     for (const x of r.all) partners.add(x);
   }
@@ -325,11 +276,9 @@ function shouldDiversify(
 export function dealTray(view: DealerView): Array<string | null> {
   // Build the found-set + soft pool once per tray so subsequent pickOne
   // spreads (which shallow-copy the view) share the same references
-  // instead of rebuilding them per pick. Only relevant in soft mode.
-  if (view.found && !view._foundSet) view._foundSet = new Set(view.found);
-  if (getGpOverrides().mode === "soft" && view.found && !view._softPool) {
-    view._softPool = softPool(view.bundle, view.found);
-  }
+  // instead of rebuilding them per pick.
+  if (!view._foundSet) view._foundSet = new Set(view.found);
+  if (!view._softPool) view._softPool = softPool(view.bundle, view.found);
   const writeTray = (next: Array<string | null>): Array<string | null> => {
     for (let i = 0; i < view.tray.length; i++) view.tray[i] = next[i];
     return view.tray;
@@ -388,9 +337,9 @@ export function dealTray(view: DealerView): Array<string | null> {
   }
 
   // Last resort: hand over both halves of a two-ingredient recipe from the
-  // current age plus one pick.
-  const A = ageSets(view.bundle, view.age);
-  const twos = A.recipes.filter((r) => r.all.length === 2).slice();
+  // current reachable pool plus one pick.
+  if (!view._softPool) view._softPool = softPool(view.bundle, view.found);
+  const twos = view._softPool.reachableRecipes.filter((r) => r.all.length === 2).slice();
   // Fisher-Yates with our RNG so order stays deterministic.
   for (let i = twos.length - 1; i > 0; i--) {
     const j = Math.floor(rand(view.rng) * (i + 1));

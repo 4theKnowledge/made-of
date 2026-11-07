@@ -30,6 +30,8 @@ function minimalBundle(): ThemeBundle {
     items: new Map(),
     outputs: new Map(),
     recipes: [],
+    base: [],
+    byIngredient: new Map(),
     outBand: new Map(),
     sameIngredients: new Map(),
     ageSets: [{ use: new Set(), make: new Set() }],

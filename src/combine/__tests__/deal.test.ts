@@ -20,8 +20,8 @@ function freshView(size: number, seed: number): DealerView {
     board: emptyBoard(size),
     tray: [null, null, null],
     size,
-    age: 0,
     rng: makeRng(seed),
+    found: [],
   };
 }
 
@@ -86,10 +86,10 @@ describe("1-input recipes don't poison dealer partner selection", () => {
       board[2] = water!;
       const v: DealerView = {
         bundle: everything,
+        found: [],
         board,
         tray: [null, null, null],
         size,
-        age: everything.theme.ages.length - 1, // late age, widest recipe pool
         rng: makeRng(9000 + i),
       };
       const tray = dealTray(v);
@@ -120,10 +120,10 @@ describe("dealing guarantee (bot simulation, Everything 6×6)", () => {
     for (let i = 0; i < 100; i++) {
       const v: DealerView = {
         bundle: everything,
+        found: [],
         board: emptyBoard(size),
         tray: [null, null, null],
         size,
-        age: 0,
         rng: makeRng(5000 + i),
       };
       const tray = dealTray(v);
