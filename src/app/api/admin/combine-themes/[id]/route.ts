@@ -35,6 +35,17 @@ export async function PATCH(
   if (typeof body.position === "number" && Number.isInteger(body.position) && body.position >= 0) {
     patch.position = body.position;
   }
+  // closure_config: object | null. See src/combine/closure.ts ClosureConfig.
+  if ("closure_config" in body) {
+    const c = body.closure_config;
+    if (c === null) {
+      patch.closureConfig = null;
+    } else if (typeof c === "object" && c !== null && !Array.isArray(c)) {
+      patch.closureConfig = c;
+    } else {
+      return NextResponse.json({ error: "invalid_closure_config" }, { status: 400 });
+    }
+  }
   if (Object.keys(patch).length === 1) {
     return NextResponse.json({ error: "no_fields" }, { status: 400 });
   }

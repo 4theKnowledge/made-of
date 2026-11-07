@@ -19,6 +19,7 @@ describe("validateTheme", () => {
       themeMembers: new Set(["a", "b", "c"]),
     });
     expect(result.broken).toHaveLength(0);
+    // a and b are dealt-base (ingredients of r1, not outputs); c is built.
     expect(result.buildableCount).toBe(3);
     expect(result.baseCount).toBe(2);
   });
@@ -28,12 +29,14 @@ describe("validateTheme", () => {
       items: [
         { id: "a", name: "a", isCombineExcluded: false },
         { id: "b", name: "b", isCombineExcluded: false },
+        { id: "sink", name: "sink", isCombineExcluded: false },
         { id: "outside", name: "outside", isCombineExcluded: false },
       ],
       recipes: [
-        { id: "r1", itemId: "b", parts: ["a", "outside"] },
+        { id: "r1", itemId: "b", parts: ["a", "outside"] }, // broken: outside not in theme
+        { id: "r2", itemId: "sink", parts: ["a"] }, // keeps 'a' usable as base
       ],
-      themeMembers: new Set(["a", "b"]),
+      themeMembers: new Set(["a", "b", "sink"]),
     });
     expect(result.broken).toHaveLength(1);
     const broken = result.broken[0];
@@ -92,7 +95,29 @@ describe("validateTheme", () => {
     expect(result.broken[0]?.reason.kind).toBe("excluded-and-member");
   });
 
-  it("warns on an orphan base ingredient nothing in the theme uses", () => {
+  it("treats n and e parts as combinable (same as runtime)", () => {
+    // The runtime's isPlayableRecipe/collectRecipeParts considers all four
+    // link types; the validator receives the already-assembled parts list,
+    // so what matters here is that the loader passes n/e-based parts
+    // through. Simulate that: a recipe whose parts come from a `needs`
+    // link in the DB must still make its owner buildable.
+    const result = run({
+      items: [
+        { id: "sun", name: "sun", isCombineExcluded: false },
+        { id: "plant", name: "plant", isCombineExcluded: false },
+      ],
+      // `plant` needs `sun` — upstream loader collapsed f/w/n/e into parts.
+      recipes: [{ id: "r1", itemId: "plant", parts: ["sun"] }],
+      themeMembers: new Set(["sun", "plant"]),
+    });
+    expect(result.broken).toHaveLength(0);
+    expect(result.buildableCount).toBe(2);
+  });
+
+  it("flags an isolated member (nothing uses it, no recipe produces it)", () => {
+    // 'orphan' isn't an output of any surviving recipe and isn't an
+    // ingredient of any surviving recipe. The runtime would silently skip
+    // it — reporting as broken is correct.
     const result = run({
       items: [
         { id: "a", name: "a", isCombineExcluded: false },
@@ -104,8 +129,29 @@ describe("validateTheme", () => {
       ],
       themeMembers: new Set(["a", "b", "orphan"]),
     });
+    const brokenIds = result.broken.map((b) => b.itemId);
+    expect(brokenIds).toContain("orphan");
+  });
+
+  it("members with non-in-theme recipes are treated as dealt-base", () => {
+    // Case: 'carbon' has a recipe in the DB (comes from stars) but neither
+    // 'star' nor any of carbon's recipe parts are in the biology theme.
+    // Carbon IS an ingredient of 'amino_acids' in-theme. Runtime deals
+    // carbon directly; validator should mirror that.
+    const result = run({
+      items: [
+        { id: "carbon", name: "carbon", isCombineExcluded: false },
+        { id: "amino_acids", name: "amino_acids", isCombineExcluded: false },
+        { id: "star", name: "star", isCombineExcluded: false },
+      ],
+      recipes: [
+        { id: "r1", itemId: "carbon", parts: ["star"] }, // star NOT in theme → recipe dropped
+        { id: "r2", itemId: "amino_acids", parts: ["carbon"] }, // all in theme → survives
+      ],
+      themeMembers: new Set(["carbon", "amino_acids"]),
+    });
     expect(result.broken).toHaveLength(0);
-    expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0].itemId).toBe("orphan");
+    expect(result.baseCount).toBe(1); // carbon
+    expect(result.buildableCount).toBe(2);
   });
 });

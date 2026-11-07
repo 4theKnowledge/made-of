@@ -11,6 +11,7 @@ import type { GraphNode } from "../graph/types";
 import type { DailyConfig } from "./daily-config";
 import { THEMES, inCombineTheme, themeAgePool } from "./filters";
 import { computeRefine } from "./levels";
+import { isPlayableRecipe } from "./parts";
 import type {
   AgeSets,
   CombineItem,
@@ -93,19 +94,11 @@ function recipesForTheme(
         node,
         recipe.id,
       );
-      // 1-ingredient recipes are kept — they're unreachable via normal
-      // combining (nothing to "pair" with), so Combine surfaces them as an
-      // explicit "promote" action on the board. matchAt/matchOn skip them
-      // so a 1-input tile doesn't auto-fire on placement.
-      if (all.length < 1 || all.length > 7) continue;
+      // Shared rule — keep 1-input recipes (surfaced as "promote"), drop
+      // >7-part recipes, drop self-ref collapses. Kept in src/combine/parts
+      // so the admin theme validator stays in sync.
+      if (!isPlayableRecipe({ all, hadSelfRef })) continue;
       if (all.some((partId) => partId === node.id)) continue;
-      // Reject recipes where the raw input list referenced the output
-      // itself and that self-ref was the only thing keeping it from being
-      // ≤1-input (e.g. "recycled paper" from `paper + water` collapses
-      // to just `water` → paper, which reads as nonsense). Those authored
-      // recipes are still valid in Explore; they just don't belong in
-      // Combine as 1-input promotes.
-      if (hadSelfRef && all.length < 2) continue;
 
       const partNodes = all
         .map((id) => snapshot.nodes.get(id))

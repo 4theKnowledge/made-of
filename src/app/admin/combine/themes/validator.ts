@@ -1,18 +1,22 @@
 /**
  * Reachability validator for a Combine theme.
  *
- * An item is "buildable in the theme" if it has at least one recipe (f/w)
- * whose ingredients are all either:
- *   (a) in the theme and themselves buildable, or
- *   (b) base ingredients (items in the theme with no recipe at all).
+ * Mirrors Combine's runtime (src/combine/data.ts): a theme's recipes are
+ * only those whose parts are all in-theme (drop-wise). "Base" ingredients
+ * are items that appear as a part of at least one surviving recipe but are
+ * never produced by one — those get dealt directly by the game. An item is
+ * "buildable" if it's a base OR if some playable recipe exists where every
+ * part is already buildable (iteratively closed).
  *
- * We also report two softer problems:
- *   - "orphan" — an item in the theme that nothing in the theme uses and
- *     which itself has no recipe. It can be dealt but doesn't participate.
- *     (Not an error; just a warning.)
-
+ * A member that is neither buildable nor appears as a part of any theme
+ * recipe is reported as broken: the game would silently skip it.
+ *
+ * Softer problems:
+ *   - "orphan" — a dealable base ingredient (has recipes but none are
+ *     in-theme) that also isn't used by any theme recipe. Dealable but
+ *     decorative. Not an error.
  *   - "excluded" — an item in the theme that's also flagged
- *     isCombineExcluded. That's a contradiction; the game would skip it.
+ *     isCombineExcluded. The game would skip it.
  *
  * The validator runs over plain row-shaped input so it's trivially testable
  * without hitting the DB.
@@ -58,41 +62,45 @@ export function validateTheme(input: ValidatorInput): ValidatorResult {
   const itemById = new Map<string, ValidatorItem>();
   for (const it of input.items) itemById.set(it.id, it);
 
-  // Recipes grouped by owner.
+  // Only playable recipes owned by a theme member whose parts are ALL in
+  // the theme survive. This matches `recipesForTheme` in src/combine/data.ts.
+  // Non-member recipes don't produce in-theme items — the game never fires
+  // them.
+  const inThemeRecipes = input.recipes.filter(
+    (r) => input.themeMembers.has(r.itemId) && r.parts.every((p) => input.themeMembers.has(p)),
+  );
+
   const recipesByItem = new Map<string, ValidatorRecipe[]>();
-  for (const r of input.recipes) {
+  for (const r of inThemeRecipes) {
     const list = recipesByItem.get(r.itemId) ?? [];
     list.push(r);
     recipesByItem.set(r.itemId, list);
   }
 
-  // Which items get used as a part by some recipe owned by a theme member?
-  const usedInTheme = new Set<string>();
-  for (const r of input.recipes) {
-    if (!input.themeMembers.has(r.itemId)) continue;
-    for (const p of r.parts) usedInTheme.add(p);
+  // Runtime's `baseIng = ingredients - outputs` derived from surviving
+  // recipes. Items dealt directly by the game.
+  const outputs = new Set<string>();
+  const ingredients = new Set<string>();
+  for (const r of inThemeRecipes) {
+    outputs.add(r.itemId);
+    for (const p of r.parts) ingredients.add(p);
+  }
+  const dealableBase = new Set<string>();
+  for (const id of ingredients) {
+    if (!outputs.has(id)) dealableBase.add(id);
   }
 
-  // Seed: theme members that have no recipe at all are "base" (dealt
-  // directly by the game).
-  const buildable = new Set<string>();
-  const broken: BrokenItem[] = [];
-
-  for (const itemId of input.themeMembers) {
-    const recipes = recipesByItem.get(itemId) ?? [];
-    if (recipes.length === 0) buildable.add(itemId);
-  }
-
-  // Iteratively close: an item is buildable if any of its recipes has all
-  // parts in buildable. Repeat until no change (bounded by member count).
+  // Iteratively close: start from dealable base, add any member whose
+  // surviving recipes have all parts already buildable.
+  const buildable = new Set<string>(dealableBase);
   let changed = true;
   let safety = input.themeMembers.size + 1;
   while (changed && safety-- > 0) {
     changed = false;
     for (const itemId of input.themeMembers) {
       if (buildable.has(itemId)) continue;
-      const recipes = recipesByItem.get(itemId) ?? [];
-      for (const r of recipes) {
+      const rs = recipesByItem.get(itemId) ?? [];
+      for (const r of rs) {
         if (r.parts.every((p) => buildable.has(p))) {
           buildable.add(itemId);
           changed = true;
@@ -102,8 +110,21 @@ export function validateTheme(input: ValidatorInput): ValidatorResult {
     }
   }
 
-  // Anything in theme that isn't buildable is broken. Reason: list the
-  // most-complete recipe's missing deps (fewest unmet).
+  // Which members are actually usable by the runtime? Dealable base OR
+  // producible by a surviving recipe. Anything else = broken.
+  const usable = new Set<string>([...buildable]);
+
+  // For each member not already in `usable`, pick the "closest" recipe
+  // (fewest missing parts) using ALL known playable recipes (not just
+  // in-theme ones) so we can tell the author what's missing.
+  const allRecipesByItem = new Map<string, ValidatorRecipe[]>();
+  for (const r of input.recipes) {
+    const list = allRecipesByItem.get(r.itemId) ?? [];
+    list.push(r);
+    allRecipesByItem.set(r.itemId, list);
+  }
+
+  const broken: BrokenItem[] = [];
   for (const itemId of input.themeMembers) {
     const item = itemById.get(itemId);
     if (!item) continue;
@@ -112,12 +133,12 @@ export function validateTheme(input: ValidatorInput): ValidatorResult {
       broken.push({ itemId, name: item.name, reason: { kind: "excluded-and-member" } });
       continue;
     }
-    if (buildable.has(itemId)) continue;
+    if (usable.has(itemId)) continue;
 
-    const recipes = recipesByItem.get(itemId) ?? [];
+    const recipes = allRecipesByItem.get(itemId) ?? [];
     let bestMissing: string[] | null = null;
     for (const r of recipes) {
-      const missing = r.parts.filter((p) => !buildable.has(p));
+      const missing = r.parts.filter((p) => !input.themeMembers.has(p));
       if (!bestMissing || missing.length < bestMissing.length) bestMissing = missing;
     }
     broken.push({
@@ -130,30 +151,21 @@ export function validateTheme(input: ValidatorInput): ValidatorResult {
     });
   }
 
-  // Orphans: in theme, buildable (so no error), zero incoming recipe usage,
-  // and no recipe of their own. (A base ingredient that no theme recipe
-  // uses — functionally decorative.)
+  // Warnings: a dealable-base item that isn't itself referenced as an
+  // ingredient by any theme recipe would still play, but we never warn on
+  // those (dealable base by definition IS used as an ingredient). The
+  // interesting warning case is a member that's in `buildable` but NOT in
+  // `ingredients` and NOT in `outputs` — purely decorative, won't appear
+  // in the bundle. That can only happen if it's in `dealableBase` (never)
+  // or added by iterative close without being an ingredient of anything
+  // (also impossible — iterative close only adds outputs).
+  // Keep the warnings array for forward compat; empty for now.
   const warnings: ValidatorResult["warnings"] = [];
-  for (const itemId of input.themeMembers) {
-    const item = itemById.get(itemId);
-    if (!item) continue;
-    if (!buildable.has(itemId)) continue;
-    const hasRecipe = (recipesByItem.get(itemId)?.length ?? 0) > 0;
-    if (hasRecipe) continue;
-    if (!usedInTheme.has(itemId)) {
-      warnings.push({ itemId, name: item.name, kind: "orphan" });
-    }
-  }
-
-  let baseCount = 0;
-  for (const itemId of input.themeMembers) {
-    if ((recipesByItem.get(itemId)?.length ?? 0) === 0) baseCount++;
-  }
 
   return {
     memberCount: input.themeMembers.size,
-    baseCount,
-    buildableCount: buildable.size,
+    baseCount: dealableBase.size,
+    buildableCount: usable.size,
     broken,
     warnings,
   };

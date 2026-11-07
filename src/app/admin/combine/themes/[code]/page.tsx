@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { getDb, schema } from "@/db/client";
 import { Breadcrumb } from "../../../Breadcrumb";
-import { validateTheme, type ValidatorInput } from "../validator";
+import { collectRecipeParts, isPlayableRecipe, type RecipePartType } from "@/combine/parts";
+import type { Tier, ItemKind } from "@/db/schema";
+import type { ClosureConfig } from "@/combine/closure";
+import { ThemeBuilder, type BuilderItem } from "./ThemeBuilder";
 
 export const dynamic = "force-dynamic";
 
@@ -25,22 +28,31 @@ export default async function AdminCombineThemeDetailPage({
     .limit(1);
   if (!theme) return notFound();
 
-  // Everything in the theme (ids + items).
   const memberRows = await db
-    .select({ itemId: schema.itemCombineThemes.itemId })
+    .select({ itemId: schema.itemCombineThemes.itemId, source: schema.itemCombineThemes.source })
     .from(schema.itemCombineThemes)
     .where(eq(schema.itemCombineThemes.themeCode, themeCode));
-  const memberIds = new Set(memberRows.map((r) => r.itemId));
+  const memberIds = memberRows.map((r) => r.itemId);
+  const initialMemberSources: Record<string, string> = Object.fromEntries(
+    memberRows.map((r) => [r.itemId, r.source]),
+  );
 
-  // Load every item (we need their recipes' parts regardless of theme) and
-  // every recipe + its outgoing f/w links. At 276/354 that's cheap.
+  // Pull everything the builder needs. ~350 items × ~8 fields is well under
+  // 100 KB on the wire — ship it all so the client can filter without
+  // round-trips.
   const items = await db
     .select({
       id: schema.items.id,
       name: schema.items.name,
+      slug: schema.items.slug,
+      tier: schema.items.tier,
+      kind: schema.items.kind,
+      status: schema.items.status,
+      tags: schema.items.tags,
       isCombineExcluded: schema.items.isCombineExcluded,
     })
-    .from(schema.items);
+    .from(schema.items)
+    .orderBy(asc(schema.items.name));
 
   const recipes = await db
     .select({ id: schema.recipes.id, itemId: schema.recipes.itemId })
@@ -58,34 +70,55 @@ export default async function AdminCombineThemeDetailPage({
         .where(inArray(schema.links.recipeId, recipeIds))
     : [];
 
-  // Build Validator inputs: parts = union of f and w per recipe.
-  const partsByRecipe = new Map<string, Set<string>>();
+  const edgesByRecipe = new Map<string, { type: string; targetId: string }[]>();
   for (const l of recipeLinks) {
     if (!l.recipeId) continue;
-    if (l.type !== "f" && l.type !== "w") continue;
-    const set = partsByRecipe.get(l.recipeId) ?? new Set<string>();
-    set.add(l.targetItemId);
-    partsByRecipe.set(l.recipeId, set);
+    const list = edgesByRecipe.get(l.recipeId) ?? [];
+    list.push({ type: l.type, targetId: l.targetItemId });
+    edgesByRecipe.set(l.recipeId, list);
   }
 
-  const input: ValidatorInput = {
-    items: items.map((i) => ({ id: i.id, name: i.name, isCombineExcluded: i.isCombineExcluded })),
-    recipes: recipes.map((r) => ({
-      id: r.id,
-      itemId: r.itemId,
-      parts: Array.from(partsByRecipe.get(r.id) ?? []),
-    })),
-    themeMembers: memberIds,
-  };
+  // Only ship playable recipes — the ones Combine's runtime would surface.
+  // Validator and closure both rely on parity; see src/combine/parts.ts.
+  // Also ship partTypes aligned with parts so the client-side closure
+  // preview can honour `followLinkTypes`.
+  const playableRecipes = recipes
+    .map((r) => {
+      const edges = edgesByRecipe.get(r.id) ?? [];
+      const { all, hadSelfRef } = collectRecipeParts(edges, r.itemId);
+      return { id: r.id, itemId: r.itemId, parts: all, hadSelfRef, edges };
+    })
+    .filter((r) => isPlayableRecipe({ all: r.parts, hadSelfRef: r.hadSelfRef }))
+    .map((r) => {
+      const typeByPart = new Map<string, RecipePartType>();
+      for (const e of r.edges) {
+        if (e.targetId === r.itemId) continue;
+        if (e.type !== "f" && e.type !== "w" && e.type !== "n" && e.type !== "e") continue;
+        if (!typeByPart.has(e.targetId)) typeByPart.set(e.targetId, e.type as RecipePartType);
+      }
+      return {
+        id: r.id,
+        itemId: r.itemId,
+        parts: r.parts,
+        partTypes: r.parts.map((id) => typeByPart.get(id) ?? "f"),
+      };
+    });
 
-  const report = validateTheme(input);
+  // Facet lists.
+  const tiers: Tier[] = ["F", "N", "M", "C", "P", "S"];
+  const kinds = Array.from(new Set(items.map((i) => i.kind))).sort() as ItemKind[];
+  const tags = Array.from(new Set(items.flatMap((i) => i.tags ?? []))).sort();
 
-  // For member listing — sort alpha.
-  const members = items
-    .filter((it) => memberIds.has(it.id))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  const health = report.broken.length === 0 ? "ok" : "broken";
+  const builderItems: BuilderItem[] = items.map((i) => ({
+    id: i.id,
+    name: i.name,
+    slug: i.slug,
+    tier: i.tier,
+    kind: i.kind,
+    status: i.status,
+    tags: i.tags ?? [],
+    isCombineExcluded: i.isCombineExcluded,
+  }));
 
   return (
     <main className="wrap">
@@ -103,121 +136,23 @@ export default async function AdminCombineThemeDetailPage({
         {theme.description && <p>{theme.description}</p>}
       </section>
 
-      <section
-        className="feat"
-        style={{
-          borderLeft: `4px solid ${health === "ok" ? "var(--good, #2a7a2a)" : "#f85149"}`,
-        }}
-      >
-        <h3 style={{ marginTop: 0, fontSize: 16 }}>
-          Validator ·{" "}
-          {health === "ok" ? (
-            <span style={{ color: "var(--good, #2a7a2a)" }}>passing</span>
-          ) : (
-            <span style={{ color: "#f85149" }}>{report.broken.length} broken item(s)</span>
-          )}
-        </h3>
-        <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 16px", margin: 0, fontSize: 13 }}>
-          <dt style={{ color: "var(--muted)" }}>Members</dt>
-          <dd style={{ margin: 0 }}>{report.memberCount}</dd>
-          <dt style={{ color: "var(--muted)" }}>Base ingredients</dt>
-          <dd style={{ margin: 0 }}>
-            {report.baseCount}
-            <span style={{ color: "var(--muted)", marginLeft: 8 }}>
-              (items in theme with no recipe — the game deals these directly)
-            </span>
-          </dd>
-          <dt style={{ color: "var(--muted)" }}>Buildable</dt>
-          <dd style={{ margin: 0 }}>
-            {report.buildableCount} / {report.memberCount}
-          </dd>
-          <dt style={{ color: "var(--muted)" }}>Warnings</dt>
-          <dd style={{ margin: 0 }}>{report.warnings.length}</dd>
-        </dl>
-      </section>
-
-      {report.broken.length > 0 && (
-        <section className="feat">
-          <h3 style={{ marginTop: 0, fontSize: 16, color: "#f85149" }}>Broken items</h3>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            {report.broken.map((b) => (
-              <li
-                key={b.itemId}
-                style={{
-                  padding: "8px 0",
-                  borderBottom: "1px solid var(--line)",
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto",
-                  gap: 12,
-                }}
-              >
-                <div>
-                  <strong>{b.name}</strong>
-                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-                    {b.reason.kind === "unreachable" ? (
-                      <>
-                        No recipe where every ingredient is in the theme. Closest recipe is missing:{" "}
-                        <span style={{ fontFamily: "var(--mono, monospace)" }}>
-                          {b.reason.missingDeps.length ? b.reason.missingDeps.join(", ") : "(no recipes)"}
-                        </span>
-                      </>
-                    ) : (
-                      <>Flagged <code>isCombineExcluded</code>. The game would skip it; either remove from this theme or clear the exclude flag on the item.</>
-                    )}
-                  </div>
-                </div>
-                <Link href={`/admin/items/${encodeURIComponent(b.itemId)}`} className="btn" style={{ fontSize: 12, alignSelf: "start" }}>
-                  Open
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {report.warnings.length > 0 && (
-        <section className="feat">
-          <h3 style={{ marginTop: 0, fontSize: 16, color: "var(--warn, #a66400)" }}>Warnings</h3>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            {report.warnings.map((w) => (
-              <li key={w.itemId} style={{ padding: "6px 0", borderBottom: "1px solid var(--line)" }}>
-                <strong>{w.name}</strong>
-                <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 8 }}>
-                  Base ingredient that no theme recipe uses — can be dealt but doesn&rsquo;t participate.
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <ThemeBuilder
+        themeCode={theme.code}
+        themeLabel={theme.label}
+        initialMemberIds={memberIds}
+        initialMemberSources={initialMemberSources}
+        initialClosureConfig={(theme.closureConfig ?? null) as ClosureConfig | null}
+        items={builderItems}
+        recipes={playableRecipes}
+        availableTiers={tiers}
+        availableKinds={kinds}
+        availableTags={tags}
+      />
 
       <section className="feat">
-        <h3 style={{ marginTop: 0, fontSize: 16 }}>Members ({members.length})</h3>
-        {members.length === 0 ? (
-          <p style={{ color: "var(--muted)" }}>No items in this theme yet.</p>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {members.map((m) => (
-              <Link
-                key={m.id}
-                href={`/admin/items/${encodeURIComponent(m.id)}`}
-                style={{
-                  fontSize: 12,
-                  padding: "2px 10px",
-                  border: "1px solid var(--line)",
-                  borderRadius: 10,
-                  color: "var(--ink)",
-                  textDecoration: "none",
-                }}
-              >
-                {m.name}
-              </Link>
-            ))}
-          </div>
-        )}
-        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 12 }}>
-          Membership is edited from each item&apos;s Edit modal in the{" "}
-          <Link href="/admin/tree">knowledge base</Link>.
+        <p style={{ margin: 0, fontSize: 12, color: "var(--muted)" }}>
+          Bulk edits across many items at once still live in the{" "}
+          <Link href="/admin/tree">knowledge base</Link> — select items, use the bar&rsquo;s &ldquo;Edit themes&rdquo; action.
         </p>
       </section>
 

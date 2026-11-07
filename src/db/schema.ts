@@ -491,6 +491,10 @@ export const combineThemes = pgTable(
     label: text("label").notNull(),
     description: text("description"),
     position: integer("position").notNull().default(0),
+    /** Admin-side auto-chain config. NULL = feature off (manual curation).
+     *  Non-null = closure is applied when items are added. Shape matches
+     *  ClosureConfig in src/combine/closure.ts. */
+    closureConfig: jsonb("closure_config"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -546,6 +550,12 @@ export const itemCombineThemes = pgTable(
         onDelete: "restrict",
         onUpdate: "cascade",
       }),
+    /** 'manual' = author explicitly added this item. 'closure' = pulled in
+     *  by auto-chain. Lets the admin builder separate the "primary" theme
+     *  from supporting ingredients, and makes it safe for the closure to
+     *  overwrite only its own picks. Default 'manual' so existing rows
+     *  stay stable on deploy. */
+    source: text("source").notNull().default("manual"),
   },
   (t) => [
     primaryKey({ columns: [t.itemId, t.themeCode] }),
