@@ -18,6 +18,7 @@
 import { ageSets, buildThemeBundle } from "./data";
 import { getGpOverrides } from "./gp-overrides";
 import {
+  chapterIndex,
   CRUMBLE_INACTIVITY_MOVES,
   helperMilestoneIndex,
   softNeed,
@@ -530,7 +531,15 @@ function finishResolve(
   // and the picker's "fresh alternative" preference, both of which
   // should work in fast mode too.
   const uniqueFind = !state.found.includes(recipe.out);
-  if (uniqueFind) state.found.push(recipe.out);
+  if (uniqueFind) {
+    // Attribute the discovery to the player's current chapter (soft mode
+    // only reads this; banded reads `madeAtBand` below). Written BEFORE
+    // `found.push` so a tile that happens to push the player over a
+    // chapter threshold still counts under the chapter they were in when
+    // they made it. 1-based to match the UI ("Chapter 1" in dialogs).
+    state.discoveredAtChapter[recipe.out] = chapterIndex(state.found.length) + 1;
+    state.found.push(recipe.out);
+  }
   const first = isClassic(state.mode) && uniqueFind;
   if (first) {
     state.madeAtBand[recipe.out] = recipe.band;
