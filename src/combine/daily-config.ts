@@ -18,9 +18,6 @@ export interface DailyConfig {
    *  The bundle builder clamps the authored age slice to this value when
    *  building for daily. Null / missing → no cap. */
   maxAges?: number;
-  /** Scale `UNLOCK_FRACTION` for daily-only ageNeed. 1.0 = same as endless.
-   *  0.5 = half as many first-finds required to advance each age. */
-  ageNeedScale?: number;
   /** Guest-ingredient injection. */
   guestIngredient?: {
     /** How many guest tiles to inject per daily run. */
@@ -65,13 +62,6 @@ export function normaliseDailyConfig(raw: unknown): DailyConfig | null {
       throw new Error("dailyConfig.maxAges must be an integer in [1, 30]");
     }
     out.maxAges = n;
-  }
-  if (r.ageNeedScale != null) {
-    const n = Number(r.ageNeedScale);
-    if (!Number.isFinite(n) || n <= 0 || n > 2) {
-      throw new Error("dailyConfig.ageNeedScale must be in (0, 2]");
-    }
-    out.ageNeedScale = n;
   }
   if (r.guestIngredient != null) {
     const g = r.guestIngredient as Record<string, unknown>;

@@ -181,7 +181,7 @@ describe("buildSchedule", () => {
   });
 
   it("payload freezes the config at build time", () => {
-    const cfg = { maxAges: 3, ageNeedScale: 0.5, guestIngredient: { perRun: 2, minBand: 4 } };
+    const cfg = { maxAges: 3, guestIngredient: { perRun: 2, minBand: 4 } };
     const schedule = buildSchedule(
       { theme: "everything", fullBundle: full, dailyConfig: cfg },
       "2026-01-01",

@@ -49,9 +49,6 @@ export function DailyAdmin({
   const [maxAges, setMaxAges] = useState<string>(
     initialActive?.config.maxAges?.toString() ?? "",
   );
-  const [ageNeedScale, setAgeNeedScale] = useState<string>(
-    initialActive?.config.ageNeedScale?.toString() ?? "",
-  );
   const [guestPerRun, setGuestPerRun] = useState<string>(
     initialActive?.config.guestIngredient?.perRun?.toString() ?? "",
   );
@@ -74,7 +71,6 @@ export function DailyAdmin({
   const payloadConfig = useCallback((): DailyConfig => {
     const cfg: DailyConfig = {};
     if (maxAges.trim()) cfg.maxAges = Number(maxAges);
-    if (ageNeedScale.trim()) cfg.ageNeedScale = Number(ageNeedScale);
     if (guestPerRun.trim() || guestMinBand.trim()) {
       cfg.guestIngredient = {
         perRun: Number(guestPerRun || "0"),
@@ -89,7 +85,7 @@ export function DailyAdmin({
     }
     if (Object.keys(dow).length) cfg.targetByDow = dow;
     return cfg;
-  }, [maxAges, ageNeedScale, guestPerRun, guestMinBand, targetDiscoveries, targetByDow]);
+  }, [maxAges, guestPerRun, guestMinBand, targetDiscoveries, targetByDow]);
 
   const refreshSchedule = useCallback(async () => {
     const res = await fetch("/api/admin/combine/daily");
@@ -228,7 +224,6 @@ export function DailyAdmin({
       const res = await fetch("/api/admin/combine/daily", { method: "DELETE" });
       if (!res.ok) throw new Error(`request_failed_${res.status}`);
       setMaxAges("");
-      setAgeNeedScale("");
       setGuestPerRun("");
       setGuestMinBand("");
       setTargetDiscoveries("");
@@ -454,39 +449,6 @@ export function DailyAdmin({
               </Field>
             </div>
           </fieldset>
-          <details style={{ fontSize: 12 }}>
-            <summary style={{ cursor: "pointer", color: "var(--muted)" }}>
-              Age-up pacing (advanced)
-            </summary>
-            <div style={{ marginTop: 10 }}>
-              <Field
-                label="Age-need scale"
-                hint={
-                  <>
-                    Cosmetic. Scales how many on-band first-finds the player
-                    must make before the age-up animation fires. 1.0 matches
-                    endless; lower values trigger age transitions sooner.
-                    <br />
-                    <strong>Daily runs end on the target, not on reaching the
-                    final age</strong> — so this doesn&apos;t change how long the
-                    run is, only how often the age-up fanfare interrupts play.
-                    <em> Leave at 1.0 unless pacing feels off.</em>
-                  </>
-                }
-              >
-                <input
-                  type="number"
-                  step="0.05"
-                  min={0.05}
-                  max={2}
-                  value={ageNeedScale}
-                  onChange={(e) => setAgeNeedScale(e.target.value)}
-                  style={input}
-                  placeholder="1.0"
-                />
-              </Field>
-            </div>
-          </details>
         </div>
       </section>
 

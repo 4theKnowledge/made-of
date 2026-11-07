@@ -21,12 +21,10 @@ describe("normaliseDailyConfig", () => {
   it("accepts a well-formed config", () => {
     const cfg = normaliseDailyConfig({
       maxAges: 6,
-      ageNeedScale: 0.5,
       guestIngredient: { perRun: 2, minBand: 7 },
     });
     expect(cfg).toEqual({
       maxAges: 6,
-      ageNeedScale: 0.5,
       guestIngredient: { perRun: 2, minBand: 7 },
     });
   });
@@ -37,10 +35,6 @@ describe("normaliseDailyConfig", () => {
     expect(() => normaliseDailyConfig({ maxAges: 2.5 })).toThrow();
   });
 
-  it("rejects out-of-range ageNeedScale", () => {
-    expect(() => normaliseDailyConfig({ ageNeedScale: 0 })).toThrow();
-    expect(() => normaliseDailyConfig({ ageNeedScale: 2.5 })).toThrow();
-  });
 
   it("rejects malformed guestIngredient", () => {
     expect(() => normaliseDailyConfig({ guestIngredient: { perRun: -1, minBand: 1 } })).toThrow();
@@ -140,7 +134,7 @@ describe("buildThemeBundle with dailyConfig", () => {
     const d = buildAllDailyBundles(
       snapshot,
       {},
-      { everything: { maxAges: 3, ageNeedScale: 0.5 } },
+      { everything: { maxAges: 3 } },
     );
     expect(d.everything.theme.ages.length).toBe(3);
     expect(d.everything.dailyConfig?.maxAges).toBe(3);
