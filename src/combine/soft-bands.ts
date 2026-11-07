@@ -171,3 +171,10 @@ export function helperMilestoneIndex(finds: number): number {
  *  off in soft mode. "Touch" = tile placed, moved, dropped-on, or
  *  combined-into. Shore still exempts a tile until its cell changes. */
 export const CRUMBLE_INACTIVITY_MOVES = 20;
+
+/** Dealer down-weight for tiles the player has already discovered (T-0170).
+ *  Discovered tiles aren't removed from the sampling pool — they're still
+ *  useful as ingredients for undiscovered recipes — but they appear ~80%
+ *  less often in trays so fresh discoveries get more airtime. 1.0 would
+ *  disable this. */
+export const DISCOVERED_WEIGHT = 0.2;

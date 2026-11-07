@@ -18,7 +18,7 @@ import { ageSets } from "./data";
 import { getGpOverrides } from "./gp-overrides";
 import { matchAt, playsInOne, playsInTwo, type Board } from "./match";
 import { pick, rand, type RngState } from "./rng";
-import { softPool, type SoftPool } from "./soft-bands";
+import { DISCOVERED_WEIGHT, softPool, type SoftPool } from "./soft-bands";
 import type { ThemeBundle } from "./types";
 
 /** How many tools may sit on the board at once. The prototype's limit at
@@ -65,6 +65,41 @@ function tallyBoard(view: DealerView): Map<string, number> {
     counts.set(v, (counts.get(v) ?? 0) + 1);
   }
   return counts;
+}
+
+/** Weighted pick for soft mode: already-discovered tiles get `DISCOVERED_WEIGHT`,
+ *  undiscovered ones get 1.0. Reduces tray dominance of exhausted items so
+ *  the player sees fresh things more often, without removing ingredients
+ *  that may still be needed for future combos. Pure function; uses the
+ *  provided RNG state for determinism. */
+function pickWeighted(
+  rng: RngState,
+  arr: readonly string[],
+  found: Set<string>,
+): string | undefined {
+  if (arr.length === 0) return undefined;
+  let total = 0;
+  for (const x of arr) total += found.has(x) ? DISCOVERED_WEIGHT : 1;
+  if (total <= 0) return pick(rng, arr); // all weights zero — fall back to uniform
+  let r = rand(rng) * total;
+  for (const x of arr) {
+    const w = found.has(x) ? DISCOVERED_WEIGHT : 1;
+    r -= w;
+    if (r <= 0) return x;
+  }
+  return arr[arr.length - 1];
+}
+
+/** Mode-aware pick. In soft mode (and with `found` threaded through the
+ *  DealerView), applies the discovered-tile down-weight. In banded mode,
+ *  falls back to uniform pick so existing behaviour is preserved bit-for-bit. */
+function pickMaybeWeighted(
+  view: DealerView,
+  arr: readonly string[],
+  mode: "banded" | "flat" | "soft",
+): string | undefined {
+  if (mode !== "soft" || !view.found) return pick(view.rng, arr);
+  return pickWeighted(view.rng, arr, new Set(view.found));
 }
 
 /** The heaviest pile on the board, or null if nothing is piling. */
@@ -132,9 +167,9 @@ export function pickOne(view: DealerView): string | null {
     const safe = A.BASE.filter(
       (x) => okTool(x) && !view.bundle.tools.has(x) && !forbidden.has(x) && !inTray.has(x),
     );
-    if (safe.length) return pick(view.rng, safe) ?? null;
+    if (safe.length) return pickMaybeWeighted(view, safe, mode) ?? null;
     const safeAny = [...A.ING].filter((x) => okTool(x) && !forbidden.has(x) && !inTray.has(x));
-    if (safeAny.length) return pick(view.rng, safeAny) ?? null;
+    if (safeAny.length) return pickMaybeWeighted(view, safeAny, mode) ?? null;
     // Nothing diversifying available — fall through to normal picks.
   }
 
@@ -157,7 +192,7 @@ export function pickOne(view: DealerView): string | null {
           need.push(x);
         }
       }
-      if (need.length) return pick(view.rng, need) ?? null;
+      if (need.length) return pickMaybeWeighted(view, need, mode) ?? null;
     }
   }
 
@@ -178,7 +213,7 @@ export function pickOne(view: DealerView): string | null {
       }
       if (fits) cands.push(x);
     }
-    if (cands.length) return pick(view.rng, cands) ?? null;
+    if (cands.length) return pickMaybeWeighted(view, cands, mode) ?? null;
   }
 
   // 2. A partner for something already on the board. When there is a pile,
@@ -205,15 +240,15 @@ export function pickOne(view: DealerView): string | null {
     // heavily toward them (3:1) rather than all-or-nothing — occasional
     // "wrong" partners still help by introducing variety.
     if (pileFirst.length && otherOnBoard.length && rand(view.rng) < 0.75) {
-      return pick(view.rng, pileFirst) ?? null;
+      return pickMaybeWeighted(view, pileFirst, mode) ?? null;
     }
-    if (pileFirst.length) return pick(view.rng, pileFirst) ?? null;
-    if (otherOnBoard.length) return pick(view.rng, otherOnBoard) ?? null;
+    if (pileFirst.length) return pickMaybeWeighted(view, pileFirst, mode) ?? null;
+    if (otherOnBoard.length) return pickMaybeWeighted(view, otherOnBoard, mode) ?? null;
   }
 
   // 3. A made thing from this age — starts a chain next time.
   if (roll < 0.88 && A.MID.length) {
-    return pick(view.rng, A.MID) ?? null;
+    return pickMaybeWeighted(view, A.MID, mode) ?? null;
   }
 
   // 4. A raw thing for this age; occasionally allow tools too.
@@ -222,8 +257,8 @@ export function pickOne(view: DealerView): string | null {
   );
   const pool =
     rand(view.rng) < 0.25 ? A.BASE.filter((x) => okTool(x)) : base;
-  if (pool.length) return pick(view.rng, pool) ?? null;
-  return pick(view.rng, [...A.ING]) ?? null;
+  if (pool.length) return pickMaybeWeighted(view, pool, mode) ?? null;
+  return pickMaybeWeighted(view, [...A.ING], mode) ?? null;
 }
 
 /** Canonical fingerprint for a tray — sorted multiset of non-null tiles. */
