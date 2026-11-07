@@ -167,12 +167,13 @@ export function helperMilestoneIndex(finds: number): number {
 }
 
 /** Number of moves of inactivity before a tile crumbles in soft mode.
- *  Playtest (2026-11-07) found 20 too aggressive — tiles died before the
- *  player got back to them, forcing shoring as defense rather than
- *  strategic choice. Raised to 35 to give the board more breathing room
- *  while still creating pressure to use tiles eventually. Shore remains
- *  the escape hatch for high-value tiles. */
-export const CRUMBLE_INACTIVITY_MOVES = 35;
+ *  Playtest tuning (2026-11-07): 20 → 40. "Crumble is too easy" meant
+ *  tiles were dying too fast — the board kept clearing itself, which
+ *  stripped the player of the raw materials they'd just been dealt
+ *  before they could combine them. 40 moves gives tiles plenty of
+ *  runway; shore remains relevant for tiles you explicitly want to
+ *  preserve beyond that. */
+export const CRUMBLE_INACTIVITY_MOVES = 40;
 
 /** Dealer down-weight for tiles the player has already discovered (T-0170).
  *  Discovered tiles aren't removed from the sampling pool — they're still

@@ -76,7 +76,7 @@ Why it should pass all three criteria:
 **Sim result:** 59.2% coverage in 50 runs vs 29.2% baseline. Doubles collection reach.
 **Playtest (2026-11-07):**
 - Sampling (soft dealer + temperature) feels good. Keeps.
-- Crumble (20-move inactivity) too aggressive. Tiles die before the player comes back to them. Forces shoring as a defensive strategy but feels bad, not strategic. Needs tuning — try 30-40 moves, or scale TTL with chapter (more generous early).
+- Crumble (20-move inactivity) too aggressive — tiles died before the player could combine them with what the dealer was dealing. Board kept clearing itself, stripping raw materials. Raised to 40. Future lever: tie TTL to board occupancy (tighten when full, loose when sparse).
 **Known caveats:**
 - Sim ramp slower than target (5.2h to 40%, target 1h). Likely targets were unrealistic.
 - Soft mode is slow in sim (per-pick reachability recomputation now cached per tray).
