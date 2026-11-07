@@ -1,5 +1,6 @@
 import React from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
+import { getGpOverrides } from "@/combine/gp-overrides";
 import type { HintResult } from "@/combine/hint";
 import type { ThemeBundle } from "@/combine/types";
 import type { ReactionState } from "@/combine/useReactions";
@@ -38,7 +39,12 @@ export function AgeToast({
   bundle: ThemeBundle;
   onDismiss: () => void;
 }) {
+  const softMode = getGpOverrides().mode === "soft";
   const ageName = bundle.theme.ages[toast.age];
+  // Soft mode: `toast.age` increments on chapter thresholds, so we label
+  // it as "Chapter N" rather than the thematic era name (which is a
+  // catalogue concept, not a progression step in soft mode).
+  const chapterLabel = softMode ? `Chapter ${toast.age + 1}` : null;
   const grantBits = [
     toast.grants.mv > 0 ? `${toast.grants.mv} move` : null,
     toast.grants.swap > 0 ? `${toast.grants.swap} swap` : null,
@@ -55,11 +61,12 @@ export function AgeToast({
     >
       <span className="cbagesweep" aria-hidden="true" />
       <div className="cbagebody">
-        <span className="k">New age · tap to close</span>
-        <b>Age {ageName}</b>
+        <span className="k">{softMode ? "New chapter · tap to close" : "New age · tap to close"}</span>
+        <b>{softMode ? chapterLabel : `Age ${ageName}`}</b>
         <p>
-          New things start arriving. Old ones nobody needs will crumble
-          away.
+          {softMode
+            ? "Fresh partners are joining the deal. Keep discovering."
+            : "New things start arriving. Old ones nobody needs will crumble away."}
         </p>
         {grantBits.length > 0 && (
           <p className="cbagegrants">Replenished: +{grantBits.join(", +")}.</p>

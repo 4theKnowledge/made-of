@@ -172,15 +172,29 @@ export function AgesSheet({
               const chapterNums = [...foundByChapter.keys()].filter((c) => c > 0).sort((a, b) => b - a);
               // Always render "This chapter" row even if empty — shows the
               // header + helpful placeholder.
-              const hasCurrent = chapterNums.includes(currentChapter);
               const prior = chapterNums.filter((c) => c !== currentChapter);
               const rows: React.ReactNode[] = [];
               const thisFinds = foundByChapter.get(currentChapter) ?? [];
+              // "X of Y found": Y is this chapter's discovery-span (threshold
+              // delta). For the current chapter the span is the finite one
+              // between current and next thresholds; open-ended tail renders
+              // as just "X found".
+              const chapterSpan = (ch: number): number | null => {
+                const lo = chapterThreshold(ch);
+                const hi = chapterThreshold(ch + 1);
+                if (!Number.isFinite(hi)) return null;
+                return hi - lo;
+              };
+              const thisSpan = chapterSpan(currentChapter);
               rows.push(
                 <li key={`chapter-${currentChapter}`} className="cbagerow on">
                   <div className="cbagerow-top">
                     <b className="cbageno">This chapter</b>
-                    <span className="cbagemeta">{thisFinds.length} found</span>
+                    <span className="cbagemeta">
+                      {thisSpan == null
+                        ? `${thisFinds.length} found`
+                        : `${thisFinds.length} of ${thisSpan} found`}
+                    </span>
                   </div>
                   {thisFinds.length > 0 && (
                     <div className="cbagefinds" aria-label="Found this chapter">
@@ -213,6 +227,11 @@ export function AgesSheet({
               for (const ch of prior) {
                 const finds = foundByChapter.get(ch) ?? [];
                 const isOpen = openChapters.has(ch);
+                const span = ch === 0 ? null : chapterSpan(ch);
+                const metaText =
+                  span == null
+                    ? `${finds.length} found`
+                    : `${finds.length} of ${span} found`;
                 rows.push(
                   <li key={`chapter-${ch}`} className="cbagerow past">
                     <button
@@ -223,7 +242,7 @@ export function AgesSheet({
                       style={{ background: "transparent", border: 0, padding: 0, width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
                     >
                       <b className="cbageno">Chapter {ch === 0 ? "—" : ch}</b>
-                      <span className="cbagemeta">{finds.length} found {isOpen ? "▾" : "▸"}</span>
+                      <span className="cbagemeta">{metaText} {isOpen ? "▾" : "▸"}</span>
                     </button>
                     {isOpen && finds.length > 0 && (
                       <div className="cbagefinds" aria-label={`Found in Chapter ${ch}`}>
