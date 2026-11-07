@@ -13,6 +13,7 @@ Made Of is a web app that shows what anything is made of, traced all the way bac
 - Combine has multiple themes (Everything and Everyday today, more later) plus a daily puzzle under the same board. All endless themes share one lifetime collection; the daily puzzle has **its own** collection so endless grinding can't walk a daily into pre-unlocked items. Scope lives on `combine_discoveries.scope` (`endless` | `daily`); existing rows were backfilled to `endless`.
 - Finished-run records go to `progress` with `kind='combine'`, `ref=<theme>`, and `result.daily=<day key>` for daily runs. Future daily leaderboards filter on `result.daily`.
 - **Theme membership is in Postgres** (`combine_themes` + `item_combine_themes`). Admins curate it from `/admin/combine/themes`. The `combine-exclude` tag still trumps membership as a safety net.
+- **Progression is chapter-based** (log-scaled thresholds against cumulative unique discoveries) with a reachability-driven dealer (tiles unlock as the player discovers their partners), dealer temperature (discovered tiles down-weighted 0.2× so fresh tiles get airtime), and occupancy-scaled crumble (idle tiles die faster as the board fills). See `docs/PROGRESSION.html` for the spec.
 
 ## Current state
 

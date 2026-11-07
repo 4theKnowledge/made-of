@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Combine · soft bands (reachability progression)</title>
+<title>Combine · chapter progression (reachability progression)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
   :root {
@@ -91,10 +91,10 @@
 <body>
 <main>
 
-<h1>Combine · soft bands</h1>
+<h1>Combine · chapter progression</h1>
 <p class="lede">
-  The progression system used in Combine's soft-bands mode
-  (<code>?gp_override=mode=soft</code>). Replaces the fixed age-banded
+  The progression system used in Combine's chapter progression
+  (<code></code>). Replaces the fixed age-banded
   ladder with a reachability pool that grows with the player's discoveries,
   log-scaled chapters measured against cumulative finds, and crumble that
   tightens as the board fills.
@@ -110,7 +110,7 @@
     you age up.
   </p>
   <p>
-    In soft mode the dealer samples from a pool that <em>expands with the
+    In chapter progression the dealer samples from a pool that <em>expands with the
     player's discoveries</em>. Early on the pool is just base ingredients
     plus recipes you could fire right now; as you discover things, each
     new find unlocks the next hop of the recipe graph.
@@ -325,13 +325,13 @@
     <li><strong>Scoring</strong> — tier values, chain multipliers, close-call bonuses unchanged.</li>
     <li><strong>Fast mode</strong> — unaffected.</li>
     <li><strong>Daily mode</strong> — still target-list ending (<code>state.target</code>); soft sampler would apply if daily switched to it but current daily is independent.</li>
-    <li><strong>Hold capacity</strong> — scales with <code>state.age</code> as before. In soft mode <code>state.age</code> advances on chapter thresholds, so capacity still grows naturally.</li>
+    <li><strong>Hold capacity</strong> — scales with <code>state.age</code> as before. In chapter progression <code>state.age</code> advances on chapter thresholds, so capacity still grows naturally.</li>
   </ul>
 </section>
 
 <section class="panel">
   <h2>Tunable constants</h2>
-  <p>All the knobs live in <code>src/combine/soft-bands.ts</code>:</p>
+  <p>All the knobs live in <code>src/combine/chapter progression.ts</code>:</p>
   <div class="kv">
     <dt>CHAPTER_A, CHAPTER_B</dt><dd>a=10, b=1.8 → threshold = floor(a·b<sup>k</sup>)</dd>
     <dt>HELPER_C, HELPER_B</dt><dd>c=5, b=1.8 → helper milestone threshold</dd>

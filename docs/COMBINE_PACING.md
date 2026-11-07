@@ -1,6 +1,6 @@
-# Combine pacing — investigation state (2026-11-07)
+# Combine pacing — investigation history (2026-11-07)
 
-Living summary of the pacing / grind investigation. **Status: deployed to prod** behind `NEXT_PUBLIC_COMBINE_PLAYTEST=1`. User playtesting on mobile. While playtest runs, investigating orthogonal mechanic improvements (progression bar semantics, helper scaling in soft mode).
+Historical record of the pacing investigation. **Status: chapter progression (née soft bands) is now the sole Combine mechanic** (refactor landed as T-0187). This document is kept for context on why the mechanic exists; the live spec lives in `docs/PROGRESSION.html`. Legacy content below is preserved for the decision trail.
 
 ## Problem statement
 
