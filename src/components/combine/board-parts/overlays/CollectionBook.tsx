@@ -109,7 +109,7 @@ export function CollectionBook({
     return n;
   }, [masteryByItem]);
   const [view, setView] = useState<"grid" | "list">("grid");
-  const [sort, setSort] = useState<"recent" | "alpha" | "kind" | "age">("recent");
+  const [sort, setSort] = useState<"recent" | "alpha" | "kind" | "chapter">("recent");
   // Recipes for every discovered output, grouped by id. The quick-lookup
   // list renders these inline so players don't have to tap through each
   // item to see how it's made.
@@ -144,7 +144,7 @@ export function CollectionBook({
           if (ka !== kb) return ka.localeCompare(kb);
           return (ia?.name ?? "").localeCompare(ib?.name ?? "");
         });
-      case "age":
+      case "chapter":
         return ids.sort((a, b) => {
           const ba = bundle.outBand.get(a) ?? 99;
           const bb = bundle.outBand.get(b) ?? 99;
@@ -215,7 +215,7 @@ export function CollectionBook({
               <option value="recent">Recent</option>
               <option value="alpha">A–Z</option>
               <option value="kind">Kind</option>
-              <option value="age">Age</option>
+              <option value="chapter">Chapter</option>
             </select>
           </div>
         )}

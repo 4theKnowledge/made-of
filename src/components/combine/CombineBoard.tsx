@@ -2607,13 +2607,13 @@ export function CombineBoard({
             },
             {
               glyph: <GlyphAges />,
-              title: "Fill the bar to reach the next age",
-              body: "Every combine fills the age bar. New ages unlock new recipes. Run out of moves and the game is over.",
+              title: "Fill the bar to reach the next chapter",
+              body: "Every combine fills the chapter bar. New chapters unlock new recipes. Run out of moves and the game is over.",
             },
             {
               glyph: <GlyphCrumble />,
               title: "Old things crumble away",
-              body: "When nothing in the current age needs a tile, a red counter ticks down from 3. On the 4th turn it falls off the board — combine it, move it on, or shore it up before it goes.",
+              body: "When nothing in the current chapter needs a tile, a red counter ticks down from 3. On the 4th turn it falls off the board — combine it, move it on, or shore it up before it goes.",
             },
           ]}
           footnote="Need a nudge mid-run? Use the Helpers button for a hint, a swap, a clear, a move or a shore."

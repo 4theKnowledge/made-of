@@ -17,8 +17,8 @@ export const ONBOARD_CHAPTERS = [
     body: "Every new combine lands in your collection. Fill the book to trace life, the planet, and everything back to the big bang.",
   },
   {
-    title: "Progress through ages",
-    body: "Combines fill the age bar. Old tiles crumble if you stall — keep moving.",
+    title: "Progress through chapters",
+    body: "Combines fill the chapter bar. Old tiles crumble if you stall — keep moving.",
   },
 ] as const;
 
@@ -240,7 +240,7 @@ function OnboardStageAges() {
       <div className="cbob-bar" aria-hidden="true">
         <span className="cbob-bar-fill" />
       </div>
-      <span className="cbob-age-label">Age I → Age II</span>
+      <span className="cbob-age-label">Ch 1 → Ch 2</span>
     </>
   );
 }
