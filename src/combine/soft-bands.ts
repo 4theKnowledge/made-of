@@ -166,11 +166,13 @@ export function helperMilestoneIndex(finds: number): number {
   return k;
 }
 
-/** Number of moves of inactivity before a tile crumbles. Applies in all
- *  modes (T-0167) — replaces the band-local USE check that turned crumble
- *  off in soft mode. "Touch" = tile placed, moved, dropped-on, or
- *  combined-into. Shore still exempts a tile until its cell changes. */
-export const CRUMBLE_INACTIVITY_MOVES = 20;
+/** Number of moves of inactivity before a tile crumbles in soft mode.
+ *  Playtest (2026-11-07) found 20 too aggressive — tiles died before the
+ *  player got back to them, forcing shoring as defense rather than
+ *  strategic choice. Raised to 35 to give the board more breathing room
+ *  while still creating pressure to use tiles eventually. Shore remains
+ *  the escape hatch for high-value tiles. */
+export const CRUMBLE_INACTIVITY_MOVES = 35;
 
 /** Dealer down-weight for tiles the player has already discovered (T-0170).
  *  Discovered tiles aren't removed from the sampling pool — they're still

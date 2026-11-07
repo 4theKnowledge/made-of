@@ -74,12 +74,41 @@ Why it should pass all three criteria:
 - Collection reachable — every item has a finite chain of (known → one-hop-out) moves.
 
 **Sim result:** 59.2% coverage in 50 runs vs 29.2% baseline. Doubles collection reach.
+**Playtest (2026-11-07):**
+- Sampling (soft dealer + temperature) feels good. Keeps.
+- Crumble (20-move inactivity) too aggressive. Tiles die before the player comes back to them. Forces shoring as a defensive strategy but feels bad, not strategic. Needs tuning — try 30-40 moves, or scale TTL with chapter (more generous early).
 **Known caveats:**
-- Sim ramp is slower than target (5.2h to 40%, target 1h). Could be too-conservative thresholds, strategic-player-not-tuned-for-soft, or my targets being unrealistic.
-- Soft mode is slow in sim (per-pick reachability recomputation). Fine for playtest; optimise later if we want more sim runs.
-- No crumble in soft mode (every in-pool tile counts as "in use"). Low-priority tweak.
+- Sim ramp slower than target (5.2h to 40%, target 1h). Likely targets were unrealistic.
+- Soft mode is slow in sim (per-pick reachability recomputation now cached per tray).
 
 **Status:** code landed in `src/combine/soft-bands.ts` + wired into `deal.ts` and `engine.ts`. Playtest UI ready. User plays with `NEXT_PUBLIC_COMBINE_PLAYTEST=1`.
+
+### Option E — Strict soft (`?gp_override=mode=strict-soft`) — proposed, not built
+
+Tighter cousin of soft bands. Dealer pool = tiles whose recipes are **fully-known** (every input discovered) + base ingredients. Compared to soft's "any one input known," strict-soft gates each tile behind full input mastery.
+
+**Where it sits on the spectrum:**
+
+```
+hard-locked          soft (current)     flat (rejected)
+"all inputs known"   "any input known"  "all tiles"
+(strict-soft)        (soft bands)
+```
+
+**Pros:**
+- Crystal-clear progression — dealer literally can't give you unearned tiles.
+- One-sentence tutorial ("discover inputs to unlock outputs").
+- Pacing is deterministic in shape per chapter.
+
+**Cons:**
+- Dead zones early: band 1 has only `H+He→star` and `H+He→sun` as fully-known combines from base, which collapses to the same single-goal grind we're trying to escape.
+- 1-input promotes (24 in band 1) only unlock once `star` is discovered, which could create a worse version of the current "H+He forever, then promote star over and over."
+- Late-game recipes with 4-5 inputs gated behind more unrelated finds — slower unlock curve than soft bands.
+- Removes the "I see an unfamiliar tile, I recognize what it goes with" moment, which is gameplay.
+
+**Build cost:** ~30 lines in `soft-bands.ts` (second pool-computation function) + wiring in `deal.ts`. Can ride on the same gp_override system, same chapter progression, same time-crumble, same dealer temperature.
+
+**Decision deferred until** user playtests current soft mode. If soft feels right, strict-soft is probably unnecessary. If soft feels too chaotic ("tiles show up before I'm ready for them"), strict-soft becomes the fallback.
 
 ### Option D — 4-tile tray (`?gp_override=tray=4`) — built, sim-verified, low-signal
 
