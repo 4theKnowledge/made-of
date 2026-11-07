@@ -2,7 +2,7 @@ import React from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
 import { getGpOverrides } from "@/combine/gp-overrides";
-import { CRUMBLE_INACTIVITY_MOVES } from "@/combine/soft-bands";
+import { effectiveCrumbleTtl } from "@/combine/soft-bands";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import type { Fx, Preview } from "@/components/combine/board-parts/types";
@@ -38,11 +38,17 @@ export function Board({
 }) {
   const size = state.n;
   const softModeActive = getGpOverrides().mode === "soft";
-  // Effective TTL for crumble: in soft mode use the time-based inactivity
-  // window; banded mode keeps the historical 3-move short-TTL. The UI needs
-  // this to display "N turns left" correctly — otherwise the hardcoded
-  // CRUMBLE_TTL=3 makes the counter go negative in soft mode.
-  const effectiveCrumbleTtl = softModeActive ? CRUMBLE_INACTIVITY_MOVES : CRUMBLE_TTL;
+  // Effective TTL for crumble: in soft mode the TTL scales with board
+  // occupancy (T-0176) — compute here once so every cell's "turns left"
+  // display uses the same value the engine's crumble pass is using.
+  // Banded mode keeps the historical 3-move short-TTL.
+  let boardTtl = CRUMBLE_TTL;
+  if (softModeActive) {
+    let filled = 0;
+    for (const v of state.board) if (v) filled++;
+    const occ = state.board.length > 0 ? filled / state.board.length : 0;
+    boardTtl = effectiveCrumbleTtl(occ);
+  }
   return (
     <div
       className={"cbboard" + (lastChance ? " cbboard-lastchance" : "")}
@@ -54,10 +60,9 @@ export function Board({
         const rawTick =
           v && state.crumb[i]?.id === v ? state.crumb[i]!.n : 0;
         // Only show the "crumbling" visual when the tile is in the warning
-        // window (last ~3 ticks before TTL), not the entire TTL. In soft
-        // mode the TTL is 20 moves so every tile would otherwise show as
-        // crumbling from move 2 onward.
-        const crumbleWarn = softModeActive ? CRUMBLE_INACTIVITY_MOVES - 3 : 0;
+        // window (last ~3 ticks before TTL). In soft mode TTL is dynamic;
+        // banded keeps the pre-existing immediate-warning behaviour.
+        const crumbleWarn = softModeActive ? Math.max(0, boardTtl - 3) : 0;
         const crumbleTick = rawTick >= crumbleWarn ? rawTick : 0;
         const over =
           dragOver && dragOver.cell === i
@@ -82,7 +87,7 @@ export function Board({
             id={v}
             bundle={bundle}
             crumbleTick={crumbleTick}
-            crumbleTtl={effectiveCrumbleTtl}
+            crumbleTtl={boardTtl}
             fx={fx}
             preview={preview.get(i)}
             over={over}

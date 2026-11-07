@@ -166,14 +166,42 @@ export function helperMilestoneIndex(finds: number): number {
   return k;
 }
 
-/** Number of moves of inactivity before a tile crumbles in soft mode.
- *  Playtest tuning (2026-11-07): 20 → 40. "Crumble is too easy" meant
- *  tiles were dying too fast — the board kept clearing itself, which
- *  stripped the player of the raw materials they'd just been dealt
- *  before they could combine them. 40 moves gives tiles plenty of
- *  runway; shore remains relevant for tiles you explicitly want to
- *  preserve beyond that. */
+/** Legacy constant TTL — retained as an upper reference for the
+ *  occupancy-scaled TTL below and as the fallback when the caller doesn't
+ *  provide an occupancy. The active formula is `effectiveCrumbleTtl`. */
 export const CRUMBLE_INACTIVITY_MOVES = 40;
+
+/**
+ * Occupancy-scaled crumble TTL (T-0176).
+ *
+ * Idle tiles die faster as the board fills up. Pressure emerges from the
+ * player's own board state instead of a fixed timer: an empty board is
+ * generous, a nearly-full board forces declutter.
+ *
+ *   occ = occupied / total
+ *   t = max(0, (occ - START) / (1 - START))
+ *   ttl = TTL_MAX - (TTL_MAX - TTL_MIN) * t
+ *
+ * With defaults (MAX=60, MIN=20, START=0.3) and a 6×6 board:
+ *   occ   0%  → 60 moves (very lenient)
+ *   occ  30%  → 60 moves (pressure begins)
+ *   occ  50%  → 43 moves
+ *   occ  70%  → 26 moves
+ *   occ 100%  → 20 moves (tight)
+ */
+export const CRUMBLE_TTL_MAX = 60;
+export const CRUMBLE_TTL_MIN = 20;
+export const CRUMBLE_OCCUPANCY_START = 0.3;
+
+/** Return the effective inactivity TTL for a board at the given occupancy
+ *  fraction (0..1). Linear ramp from TTL_MAX to TTL_MIN once occupancy
+ *  exceeds OCCUPANCY_START. */
+export function effectiveCrumbleTtl(occupancy: number): number {
+  const span = 1 - CRUMBLE_OCCUPANCY_START;
+  const t = Math.max(0, (occupancy - CRUMBLE_OCCUPANCY_START) / (span > 0 ? span : 1));
+  const ttl = CRUMBLE_TTL_MAX - (CRUMBLE_TTL_MAX - CRUMBLE_TTL_MIN) * Math.min(1, t);
+  return Math.round(ttl);
+}
 
 /** Dealer down-weight for tiles the player has already discovered (T-0170).
  *  Discovered tiles aren't removed from the sampling pool — they're still

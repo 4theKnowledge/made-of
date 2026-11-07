@@ -19,7 +19,7 @@ import { ageSets, buildThemeBundle } from "./data";
 import { getGpOverrides } from "./gp-overrides";
 import {
   chapterIndex,
-  CRUMBLE_INACTIVITY_MOVES,
+  effectiveCrumbleTtl,
   helperMilestoneIndex,
   softNeed,
 } from "./soft-bands";
@@ -674,7 +674,16 @@ function afterMove(
   //    defined). Shore still exempts a tile until the cell changes.
   const A = ageSets(bundle, state.age);
   const gone: number[] = [];
-  const ttl = softMode ? CRUMBLE_INACTIVITY_MOVES : CRUMBLE_TTL;
+  // Soft mode: TTL scales inversely with board occupancy so empty boards
+  // are generous and full boards tighten. Banded keeps the classic 3-tick
+  // short TTL so its behaviour is untouched.
+  let ttl = CRUMBLE_TTL;
+  if (softMode) {
+    let filled = 0;
+    for (const v of state.board) if (v) filled++;
+    const occupancy = state.board.length > 0 ? filled / state.board.length : 0;
+    ttl = effectiveCrumbleTtl(occupancy);
+  }
   for (let i = 0; i < state.board.length; i++) {
     const v = state.board[i];
     if (!v) { state.crumb[i] = null; continue; }
