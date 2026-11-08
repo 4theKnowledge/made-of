@@ -105,10 +105,13 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
   // board clogs. Kept as a prop until T-0241 removes `state.target`.
   const dailyTarget: number | null = null;
   let dailyPayloadSeed: number | null = null;
+  let dailyManifest: string[] | null = null;
+  let dailyManifestPartnerBias: number | null = null;
   const todaysPayload = await getDailyPayload(dailyHostTheme, today);
   if (todaysPayload) {
     dailyPayloadSeed = todaysPayload.seed;
-    // todaysPayload.manifest is threaded into the client in T-0244.
+    dailyManifest = todaysPayload.manifest.length > 0 ? todaysPayload.manifest : null;
+    dailyManifestPartnerBias = todaysPayload.config.manifest?.partnerBias ?? null;
   }
   if (activeDaily && todaysPayload && todaysPayload.guestOutputIds.length > 0) {
     const fullThemeBundle = buildThemeBundle(
@@ -200,6 +203,8 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
         dailyBundles={dailySerialised}
         dailyTarget={dailyEnabled ? dailyTarget : null}
         dailyPayloadSeed={dailyEnabled ? dailyPayloadSeed : null}
+        dailyManifest={dailyEnabled ? dailyManifest : null}
+        dailyManifestPartnerBias={dailyEnabled ? dailyManifestPartnerBias : null}
         dailyEnabled={dailyEnabled}
         admin={admin}
         signedIn={signedIn}

@@ -24,9 +24,6 @@ export function JourneySheet({
   onInfo: (id: string) => void;
   onDismiss: () => void;
 }) {
-  // T-0240 removed state.target; T-0244 will swap DailyJourney to render
-  // the manifest grid. Until then daily runs show the chapter view like
-  // endless so the sheet isn't blank.
   if (state.mode === "daily") {
     return (
       <DailyJourney

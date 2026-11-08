@@ -137,6 +137,16 @@ interface Props {
    *  saved game's `initialSeed` so an admin reset-today mid-run drops the
    *  stale save and starts fresh. Null if no daily payload exists. */
   dailyPayloadSeed?: number | null;
+  /** Today's daily manifest (find list), frozen on the payload. Threaded
+   *  into `newGame` so a fresh daily run starts with `state.manifest`
+   *  populated — otherwise the Journey sheet would render the "no manifest"
+   *  fallback until the server reconcile lands. Null if no daily payload or
+   *  the payload has no manifest. */
+  dailyManifest?: string[] | null;
+  /** Dealer partner-bias (`1 + bias` multiplier for unfound manifest
+   *  partners). Frozen on the payload's `config.manifest.partnerBias`.
+   *  Null falls through to the engine's default coercion. */
+  dailyManifestPartnerBias?: number | null;
   /** Feature flag — when false, hide every daily entry point (deep-link
    *  resolution, auto-open on first visit, theme-menu Daily option).
    *  Server-side gate runs `env flag OR isAdmin()` before passing. */
@@ -213,6 +223,8 @@ export function CombineBoard({
   dailyBundles: dailySerialised,
   dailyTarget = null,
   dailyPayloadSeed = null,
+  dailyManifest = null,
+  dailyManifestPartnerBias = null,
   dailyEnabled = true,
   admin = false,
   signedIn = false,
@@ -415,6 +427,8 @@ export function CombineBoard({
               daily: day,
               size: 6,
               seed: dailySeed(day),
+              manifest: dailyManifest,
+              manifestPartnerBias: dailyManifestPartnerBias,
             }).state,
       );
       return;
@@ -524,10 +538,12 @@ export function CombineBoard({
               daily: today,
               size: 6,
               seed: dailySeed(today),
+              manifest: dailyManifest,
+              manifestPartnerBias: dailyManifestPartnerBias,
             }).state,
       );
     }
-  }, [activeTheme, initialMode, themeFromUrl, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyPayloadSeed, dailyEnabled, run.ready, admin]);
+  }, [activeTheme, initialMode, themeFromUrl, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyPayloadSeed, dailyManifest, dailyManifestPartnerBias, dailyEnabled, run.ready, admin]);
 
   // Server run alignment. Each time the local state settles on a fresh
   // (mode, theme, dailyKey) slot, register a matching server run. The
@@ -1485,6 +1501,8 @@ export function CombineBoard({
           daily: day,
           size: 6,
           seed: dailySeed(day),
+          manifest: dailyManifest,
+          manifestPartnerBias: dailyManifestPartnerBias,
         }).state,
       );
       dailyStartRef.current = null;
@@ -1492,7 +1510,7 @@ export function CombineBoard({
       setDailyStartPending(true);
     }
     resetTransient();
-  }, [bundles, dailyBundles, dailyHostTheme, state, resetTransient, dailyPayloadSeed, dailyEnabled, admin]);
+  }, [bundles, dailyBundles, dailyHostTheme, state, resetTransient, dailyPayloadSeed, dailyManifest, dailyManifestPartnerBias, dailyEnabled, admin]);
 
   // Player tapped "Start" on the Start-daily sheet. Stamps the clock
   // locally + server-side (T-0247: `run.markStartedDaily()` so a
@@ -1535,6 +1553,8 @@ export function CombineBoard({
         daily: day,
         size: 6,
         seed: dailySeed(day),
+        manifest: dailyManifest,
+        manifestPartnerBias: dailyManifestPartnerBias,
       }).state,
     );
     dailyStartRef.current = null;
@@ -1542,7 +1562,7 @@ export function CombineBoard({
     setDailyStartPending(true);
     setOverCardOpen(false);
     resetTransient();
-  }, [admin, dailyBundles, dailyHostTheme, resetTransient]);
+  }, [admin, dailyBundles, dailyHostTheme, dailyManifest, dailyManifestPartnerBias, resetTransient]);
 
   const shareDaily = useCallback(async () => {
     const dr = dailyDone;
