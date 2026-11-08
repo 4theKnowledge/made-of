@@ -123,3 +123,4 @@
 {"id": "C-0123", "ts": "2026-11-08T03:26:18Z", "kind": "fix", "summary": "Combine daily: rank race fixed, start-daily dialog + elapsed timer, end-card style/badge polish, admin can replay daily", "refs": {"tasks": ["T-0234", "T-0235", "T-0236"], "commit": "c3d4011"}}
 {"id": "C-0124", "ts": "2026-11-08T03:28:20Z", "kind": "decision", "summary": "Combine daily manifest variant: design note landed, Variant 1c (themed + reachable + pinned)", "refs": {"task": "T-0237", "doc": "docs/COMBINE_DAILY_MANIFEST.md"}}
 {"id": "C-0125", "ts": "2026-11-08T03:50:11Z", "kind": "fix", "summary": "Combine theme item removal no longer crashes with malformed array literal (T-0246)", "refs": {"task": "T-0246"}}
+{"id": "C-0126", "ts": "2026-11-08T03:59:48Z", "kind": "feature", "summary": "Combine daily: manifest engine + solver + schedule integration (T-0241+T-0242)", "refs": {"tasks": ["T-0241", "T-0242"], "commit": "133c73a"}}
