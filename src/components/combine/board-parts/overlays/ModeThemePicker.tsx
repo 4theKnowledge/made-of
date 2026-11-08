@@ -27,7 +27,7 @@ export interface PickerTheme {
   collectionVersion: number;
 }
 
-type PickerMode = "endless" | "fast" | "daily";
+type PickerMode = "endless" | "fast" | "daily" | "tutorial";
 
 const MODE_META: Array<{
   k: PickerMode;
@@ -117,8 +117,23 @@ export function ModeThemePicker({
   onStartTutorial,
   tutorialSeen = false,
 }: Props) {
-  const initialMode: PickerMode = currentDaily ? "daily" : currentMode === "fast" ? "fast" : "endless";
-  const [mode, setMode] = useState<PickerMode>(initialMode);
+  // Actively-running mode (what the player is playing right now). Distinct
+  // from `mode` below, which is the pending selection. Painted purple on
+  // the matching tile so "what's running" stays legible even as the player
+  // taps around to preview other modes.
+  const currentPickerMode: PickerMode = currentDaily
+    ? "daily"
+    : currentMode === "fast"
+      ? "fast"
+      : currentMode === "tutorial"
+        ? "tutorial"
+        : "endless";
+  // Pending selection defaults to the current mode, falling back to
+  // "endless" when the player is in tutorial (there's no way to re-confirm
+  // into tutorial from this picker — it's a bypass-click path below).
+  const [mode, setMode] = useState<PickerMode>(
+    currentPickerMode === "tutorial" ? "endless" : currentPickerMode,
+  );
   const [theme, setTheme] = useState<string>(currentTheme);
 
   const visibleModes = useMemo(
@@ -126,7 +141,11 @@ export function ModeThemePicker({
     [dailyEnabled],
   );
 
-  const dirty = mode !== initialMode || theme !== currentTheme;
+  // Dirty against the actually-running mode. Important when
+  // `currentMode === "tutorial"`: the pending `mode` defaults to "endless"
+  // but the player isn't playing endless, so the confirm button should be
+  // live rather than "Already playing this".
+  const dirty = mode !== currentPickerMode || theme !== currentTheme;
   const confirmLabel =
     mode === "daily"
       ? "Play today's daily"
@@ -203,6 +222,17 @@ export function ModeThemePicker({
           color: var(--bg);
         }
         .cbmtp .cbmtpTile.on .t { color: inherit; opacity: .75; }
+        /* Actively-running mode/theme. Purple fill matches the "Restart
+           current run" button below — one visual language for "what's
+           playing right now". Wins over .on when both apply (user hasn't
+           changed their selection yet), so the current tile stays purple
+           by default and only flips to ink when another tile gets picked. */
+        .cbmtp .cbmtpTile.current {
+          background: var(--accent);
+          color: #fff;
+          border-color: var(--accent);
+        }
+        .cbmtp .cbmtpTile.current .t { color: inherit; opacity: .85; }
         .cbmtp .cbmtpTile:disabled {
           opacity: .4;
           cursor: not-allowed;
@@ -246,6 +276,11 @@ export function ModeThemePicker({
           color: var(--ink);
           border-color: var(--ink);
         }
+        .cbmtp .cbmtpTile.current .cbmtpTileDone {
+          background: #fff;
+          color: var(--accent);
+          border-color: #fff;
+        }
         /* Tutorial card accent: matches the amber glow used by the live
            tutorial overlay (see .cbtut-overlay-spotlight in globals.css),
            so the "Learn" surface reads as the same visual language. */
@@ -266,14 +301,15 @@ export function ModeThemePicker({
       >
         {visibleModes.map((m) => {
           const on = mode === m.k;
+          const isCurrent = currentPickerMode === m.k;
           return (
             <button
               key={m.k}
               type="button"
               role="radio"
               aria-checked={on}
-              aria-label={`Mode: ${m.name}`}
-              className={`cbmtpTile cbmtpTileFit${on ? " on" : ""}`}
+              aria-label={`Mode: ${m.name}${isCurrent ? ", currently playing" : ""}`}
+              className={`cbmtpTile cbmtpTileFit${isCurrent ? " current" : on ? " on" : ""}`}
               onClick={() => setMode(m.k)}
             >
               <Pictogram name={`mode:${m.k}`} tier={m.tier} kind="object" pictogram={m.picto} />
@@ -285,12 +321,12 @@ export function ModeThemePicker({
         {onStartTutorial && (
           <button
             type="button"
-            className="cbmtpTile cbmtpTileFit cbmtpTutorial"
+            className={`cbmtpTile cbmtpTileFit cbmtpTutorial${currentPickerMode === "tutorial" ? " current" : ""}`}
             onClick={() => {
               onStartTutorial();
               onDismiss();
             }}
-            aria-label={tutorialSeen ? "Replay tutorial" : "Start tutorial"}
+            aria-label={`${tutorialSeen ? "Replay tutorial" : "Start tutorial"}${currentPickerMode === "tutorial" ? ", currently playing" : ""}`}
           >
             <Pictogram
               name="mode:tutorial"
@@ -325,16 +361,24 @@ export function ModeThemePicker({
           const on = t.code === theme && mode !== "daily";
           const dim = mode === "daily";
           const done = completedThemes?.has(t.code) ?? false;
+          // Mark the currently-running theme as `current` only when the
+          // player is actually on it in endless/fast (daily overrides the
+          // theme row). Mirrors the mode-row rule so the two rows read with
+          // the same language.
+          const isCurrent =
+            t.code === currentTheme &&
+            !currentDaily &&
+            (currentPickerMode === "endless" || currentPickerMode === "fast");
           return (
             <button
               key={t.code}
               type="button"
               role="radio"
               aria-checked={on}
-              className={`cbmtpTile${on ? " on" : ""}${done ? " done" : ""}`}
+              className={`cbmtpTile${isCurrent ? " current" : on ? " on" : ""}${done ? " done" : ""}`}
               onClick={() => setTheme(t.code)}
               disabled={dim}
-              aria-label={done ? `${t.label}, completed` : t.label}
+              aria-label={`${done ? `${t.label}, completed` : t.label}${isCurrent ? ", currently playing" : ""}`}
             >
               {done && (
                 <span className="cbmtpTileDone" aria-hidden="true">✓</span>
