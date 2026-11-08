@@ -1280,14 +1280,22 @@ export function reduce(
     }
 
     case "finish": {
-      // Player-chosen end-of-run. Only legal when the player can't finish
-      // a combine organically but still has helper spends available — i.e.
-      // the "last chance" state. Lets them bank the score instead of being
-      // forced to burn helpers on a run they'd rather end cleanly.
+      // Player-chosen end-of-run. Two legal paths:
+      //  1. Endless / fast: any time after the player has actually scored,
+      //     so they can bank a high-watermark run instead of grinding until
+      //     the board fills.
+      //  2. Daily or either mode's "last chance" state: no organic finishing
+      //     move left but helpers still available. Lets the player bail
+      //     without burning helpers. Daily is restricted to this path so a
+      //     player can't unlock a tile and immediately bank it.
       //
       // Guarded here so the UI can dispatch freely without re-checking.
-      if (hasOrganicFinishingMove(state, bundle)) return { state: prev, events: [] };
-      if (!hasHelperMove(state, bundle)) return { state: prev, events: [] };
+      if (state.over) return { state: prev, events: [] };
+      const lastChance =
+        !hasOrganicFinishingMove(state, bundle) && hasHelperMove(state, bundle);
+      const endlessBank =
+        (state.mode === "endless" || state.mode === "fast") && state.score > 0;
+      if (!lastChance && !endlessBank) return { state: prev, events: [] };
       state.over = true;
       events.push({ type: "over" });
       return { state, events };

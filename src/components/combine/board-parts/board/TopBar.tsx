@@ -38,6 +38,8 @@ export function TopBar({
   onHelp,
   onIntro,
   onFeedback,
+  onEndRun,
+  canEndRun,
 }: {
   state: GameState;
   fx: Fx;
@@ -63,6 +65,12 @@ export function TopBar({
   onHelp: () => void;
   onIntro: () => void;
   onFeedback: () => void;
+  /** Open the end-run confirm. Caller is expected to pass this only for
+   *  modes where ending early is allowed (endless, fast). */
+  onEndRun?: () => void;
+  /** True when the player has banked something worth ending on. Disables
+   *  the menu row when false so a zero-score misclick can't cut a run. */
+  canEndRun?: boolean;
 }) {
   const canUndo = state.undos > 0 && state.lastSnapshot != null;
   const wipeUnlocked = state.chapter >= WIPE_UNLOCK_CHAPTER;
@@ -471,6 +479,27 @@ export function TopBar({
                   <em>Walk through the basics again</em>
                 </span>
               </button>
+              {onEndRun && (
+                <button
+                  type="button"
+                  className="cbhm"
+                  onClick={onEndRun}
+                  disabled={!canEndRun}
+                  aria-label="End run and bank score"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 4h4v16H5zM13 4l7 8-7 8z" />
+                  </svg>
+                  <span className="nm">
+                    <b className="t">End run</b>
+                    <em>
+                      {canEndRun
+                        ? "Bank your score and start fresh"
+                        : "Score something first"}
+                    </em>
+                  </span>
+                </button>
+              )}
               <button
                 type="button"
                 className="cbhm"

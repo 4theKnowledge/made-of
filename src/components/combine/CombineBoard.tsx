@@ -556,6 +556,8 @@ export function CombineBoard({
   const [pluckMode, setPluckMode] = useState(false);
   // Wipe-board confirmation dialog.
   const [wipeConfirm, setWipeConfirm] = useState(false);
+  // End-run confirmation dialog — endless/fast only, see engine `finish`.
+  const [endRunConfirm, setEndRunConfirm] = useState(false);
   // Hint toast — a card with a recipe to try when nothing fits.
   const [hintToast, setHintToast] = useState<HintResult | null>(null);
   const [fx, setFx] = useState<Fx>({});
@@ -1681,6 +1683,10 @@ export function CombineBoard({
         setWipeConfirm(false);
         return;
       }
+      if (endRunConfirm) {
+        setEndRunConfirm(false);
+        return;
+      }
       if (selectedSlot != null) {
         setSelectedSlot(null);
       }
@@ -1704,6 +1710,7 @@ export function CombineBoard({
     shoreMode,
     pluckMode,
     wipeConfirm,
+    endRunConfirm,
     selectedSlot,
   ]);
 
@@ -2304,6 +2311,15 @@ export function CombineBoard({
             setMoreOpen(false);
             setFeedback({ type: "suggest_item", payload: {} });
           }}
+          onEndRun={
+            (state.mode === "endless" || state.mode === "fast") && !state.over
+              ? () => {
+                  setMoreOpen(false);
+                  setEndRunConfirm(true);
+                }
+              : undefined
+          }
+          canEndRun={state.score > 0}
         />
         <TipLine
           state={state}
@@ -2825,6 +2841,19 @@ export function CombineBoard({
             act({ type: "wipe-board" });
           }}
           onDismiss={() => setWipeConfirm(false)}
+        />
+        <ConfirmDialog
+          open={endRunConfirm}
+          title="End this run?"
+          body="Banks your current score and saves any new discoveries. You'll start a fresh run on the next tap."
+          confirmLabel="End run"
+          cancelLabel="Keep playing"
+          destructive
+          onConfirm={() => {
+            setEndRunConfirm(false);
+            act({ type: "finish" });
+          }}
+          onDismiss={() => setEndRunConfirm(false)}
         />
       </div>
       {drag &&

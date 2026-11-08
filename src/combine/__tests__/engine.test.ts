@@ -1222,6 +1222,45 @@ describe("wipe-board", () => {
   });
 });
 
+describe("finish (player-chosen end-of-run)", () => {
+  const bundle = fakeBundle({
+    recipes: [R("dough", ["flour", "water"])],
+  });
+
+  it("endless + score > 0 → ends the run", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.score = 12;
+    const { state, events } = reduce(s0, bundle, { type: "finish" });
+    expect(state.over).toBe(true);
+    expect(events).toContainEqual({ type: "over" });
+  });
+
+  it("endless + score 0 → no-op (prevents misclick zero-score runs)", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.score = 0;
+    const { state, events } = reduce(s0, bundle, { type: "finish" });
+    expect(state).toBe(s0);
+    expect(events).toEqual([]);
+  });
+
+  it("daily + score > 0 but no last-chance state → no-op", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3, mode: "daily", daily: "2026-01-01" }).state;
+    s0.score = 50;
+    const { state, events } = reduce(s0, bundle, { type: "finish" });
+    expect(state).toBe(s0);
+    expect(events).toEqual([]);
+  });
+
+  it("already over → no-op", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.score = 12;
+    s0.over = true;
+    const { state, events } = reduce(s0, bundle, { type: "finish" });
+    expect(state).toBe(s0);
+    expect(events).toEqual([]);
+  });
+});
+
 describe("promote (1-input recipes)", () => {
   // Minimal bundle with a 1-input chain (a → b → c) plus a sibling
   // 1-input (a → d) so we can exercise the choosing path too. The

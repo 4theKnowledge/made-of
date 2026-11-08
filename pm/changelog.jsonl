@@ -113,3 +113,4 @@
 {"id": "C-0113", "ts": "2026-11-08T01:05:03Z", "kind": "feature", "summary": "combine: /account/stats completion history + ✓ chip on completed themes in picker (T-0221)", "refs": {"task": "T-0221"}}
 {"id": "C-0114", "ts": "2026-11-08T01:10:59Z", "kind": "fix", "summary": "combine: ModeThemePicker Play/Restart/Share use accent purple as primary CTAs; Close stays default outlined (T-0226)", "refs": {"task": "T-0226"}}
 {"id": "C-0115", "ts": "2026-11-08T01:12:22Z", "kind": "feature", "summary": "combine: admin friction warnings on theme mutations that drop players below 100%, strict block on delete with completions (T-0222)", "refs": {"task": "T-0222"}}
+{"id": "C-0116", "ts": "2026-11-08T01:18:20Z", "kind": "feature", "summary": "Combine: endless/fast runs can be ended early from the More menu to bank the current score.", "refs": {"task": "T-0227"}}
