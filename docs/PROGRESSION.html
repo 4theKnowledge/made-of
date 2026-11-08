@@ -12,6 +12,11 @@
     --known: #c9e6cf; --hop: #fff2c2; --unreach: #e7e9e1;
     --tF: #5A3EAD; --tN: #357030; --tM: #94630A;
     --tC: #0D6E77; --tP: #B03B2F; --tS: #33528F;
+    /* tier-pastel tile fills, mirrors src/app/globals.css */
+    --fF: #C9B8F5; --fN: #B5DDA4; --fM: #F5C96B;
+    --fC: #9ED9D5; --fP: #F4A38C; --fS: #A9B8E8;
+    --pk: #111417;
+    --mono: "Chivo Mono", ui-monospace, "SF Mono", Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -56,23 +61,73 @@
   th { color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-size: 12px; }
   td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: "Chivo Mono", monospace; }
   .graph {
-    display: flex; align-items: center; justify-content: center;
-    gap: 8px; padding: 18px; background: var(--surface);
+    display: flex; align-items: flex-start; justify-content: center;
+    gap: 14px; padding: 20px 18px; background: var(--surface);
     border: 1px solid var(--line); border-radius: 8px; margin: 12px 0;
     flex-wrap: wrap;
   }
-  .tile {
-    width: 54px; height: 54px; border-radius: 6px;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 12px; text-align: center;
-    border: 1px solid var(--line); line-height: 1.1;
+
+  /* --- Real app tile vocabulary (.ic from src/app/globals.css) --- */
+  .ic {
+    display: inline-grid; place-items: center;
+    width: 56px; height: 56px; border-radius: 6px;
+    flex: none; box-sizing: border-box;
+    background: var(--fill, #fff);
+    border: 1.5px solid var(--pk);
+    color: var(--pk);
+    font-size: 14px; line-height: 1; overflow: hidden;
   }
-  .tile.known { background: var(--known); }
-  .tile.hop { background: var(--hop); }
-  .tile.unreach { background: var(--unreach); color: var(--muted); }
-  .arrow { color: var(--muted); font-size: 18px; }
-  .legend { display: flex; gap: 14px; margin: 12px 0; font-size: 13px; flex-wrap: wrap; }
-  .legend .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--line); vertical-align: middle; margin-right: 4px; }
+  .ic svg { width: 84%; height: 84%; display: block; overflow: visible; }
+  .ic svg .b { fill: #fff; stroke: var(--pk); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+  .ic svg .l { fill: none; stroke: var(--pk); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+  .ic.el b {
+    font-family: var(--mono); font-weight: 700;
+    font-size: 22px; letter-spacing: -.03em; line-height: 1;
+  }
+
+  /* Cell = tile + caption + state */
+  .cell {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 6px; min-width: 64px;
+    font-size: 11px; color: var(--muted);
+    font-family: var(--mono);
+    text-align: center;
+  }
+  .cell .nm { max-width: 72px; overflow-wrap: anywhere; line-height: 1.2; }
+
+  /* State wrappers — layer around the real tile */
+  .cell.known .ic {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 55%, transparent);
+  }
+  .cell.hop .ic {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 55%, transparent);
+    animation: hopPulse 2.2s ease-in-out infinite;
+  }
+  .cell.unreach .ic {
+    filter: grayscale(100%) opacity(0.45);
+    border-style: dashed;
+  }
+  .cell.unreach .nm { opacity: 0.6; font-style: italic; }
+  @keyframes hopPulse {
+    0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 45%, transparent); }
+    50%      { box-shadow: 0 0 0 5px color-mix(in srgb, var(--warn) 70%, transparent); }
+  }
+
+  .arrow { color: var(--muted); font-size: 18px; align-self: center; }
+  .legend {
+    display: flex; gap: 20px; margin: 12px 0 0; font-size: 13px; flex-wrap: wrap;
+    align-items: center;
+  }
+  .legend .chip {
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .legend .sw {
+    display: inline-block; width: 18px; height: 18px; border-radius: 4px;
+    border: 1.5px solid var(--pk); vertical-align: middle;
+  }
+  .legend .sw.known { box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 55%, transparent); background: var(--fF); }
+  .legend .sw.hop   { box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 55%, transparent); background: var(--fN); }
+  .legend .sw.unreach { filter: grayscale(100%) opacity(0.45); border-style: dashed; background: var(--fF); }
   .sparkline {
     height: 100px; width: 100%;
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
@@ -131,47 +186,119 @@
 
   <h3>Move 0 — just base ingredients</h3>
   <div class="graph">
-    <div class="tile known">H</div>
-    <div class="tile known">He</div>
-    <div class="tile unreach">star</div>
-    <div class="tile unreach">sun</div>
-    <div class="tile unreach">supernova</div>
-    <div class="tile unreach">carbon</div>
-    <div class="tile unreach">…</div>
+    <div class="cell known">
+      <span class="ic el" style="--fill:var(--fF);"><b>H</b></span>
+      <span class="nm">hydrogen</span>
+    </div>
+    <div class="cell known">
+      <span class="ic el" style="--fill:var(--fF);"><b>He</b></span>
+      <span class="nm">helium</span>
+    </div>
+    <div class="cell hop">
+      <span class="ic" style="--fill:var(--fF);"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="b" d="M16 3l3.8 8.2 9 1-6.7 6.1 1.9 8.8L16 22.6 8 27.1l1.9-8.8L3.2 12.2l9-1z"/></svg></span>
+      <span class="nm">star</span>
+    </div>
+    <div class="cell unreach">
+      <span class="ic" style="--fill:var(--fF);"><svg viewBox="0 0 32 32" aria-hidden="true"><circle class="b" cx="16" cy="16" r="6"/><path class="l" d="M16 3v4M16 25v4M3 16h4M25 16h4M6.8 6.8l2.8 2.8M22.4 22.4l2.8 2.8M6.8 25.2l2.8-2.8M22.4 9.6l2.8-2.8"/></svg></span>
+      <span class="nm">sun</span>
+    </div>
+    <div class="cell unreach">
+      <span class="ic" style="--fill:var(--fF);"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="b" d="M16 7l2.5 5.5 6-1-4 4.5 4 4.5-6-1L16 25l-2.5-5.5-6 1 4-4.5-4-4.5 6 1z"/><path class="l" d="M16 2v3M16 27v3M2 16h3M27 16h3M6 6l2 2M24 24l2 2M6 26l2-2M24 8l2-2"/></svg></span>
+      <span class="nm">supernova</span>
+    </div>
+    <div class="cell unreach">
+      <span class="ic el" style="--fill:var(--fF);"><b>C</b></span>
+      <span class="nm">carbon</span>
+    </div>
+    <div class="cell unreach">
+      <span class="ic" style="--fill:var(--soft); border-style:dashed;">…</span>
+      <span class="nm">&nbsp;</span>
+    </div>
   </div>
-  <p>Only H and He are in <code>known</code>. H+He→star is a reachable recipe, so <strong>star</strong> is in the pool too. Nothing else is visible yet.</p>
+  <p>Only H and He are in <code>known</code>. H+He→star is a reachable recipe, so <strong>star</strong> is in the pool too (one-hop-out, dealer can serve it). Nothing else is visible yet.</p>
 
   <h3>Move 3 — player makes star</h3>
   <div class="graph">
-    <div class="tile known">H</div>
-    <div class="tile known">He</div>
-    <div class="tile known">star</div>
-    <div class="tile hop">supernova</div>
-    <div class="tile hop">carbon</div>
-    <div class="tile hop">oxygen</div>
-    <div class="tile unreach">water</div>
-    <div class="tile unreach">…</div>
+    <div class="cell known">
+      <span class="ic el" style="--fill:var(--fF);"><b>H</b></span>
+      <span class="nm">hydrogen</span>
+    </div>
+    <div class="cell known">
+      <span class="ic el" style="--fill:var(--fF);"><b>He</b></span>
+      <span class="nm">helium</span>
+    </div>
+    <div class="cell known">
+      <span class="ic" style="--fill:var(--fF);"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="b" d="M16 3l3.8 8.2 9 1-6.7 6.1 1.9 8.8L16 22.6 8 27.1l1.9-8.8L3.2 12.2l9-1z"/></svg></span>
+      <span class="nm">star</span>
+    </div>
+    <div class="cell hop">
+      <span class="ic" style="--fill:var(--fF);"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="b" d="M16 7l2.5 5.5 6-1-4 4.5 4 4.5-6-1L16 25l-2.5-5.5-6 1 4-4.5-4-4.5 6 1z"/><path class="l" d="M16 2v3M16 27v3M2 16h3M27 16h3M6 6l2 2M24 24l2 2M6 26l2-2M24 8l2-2"/></svg></span>
+      <span class="nm">supernova</span>
+    </div>
+    <div class="cell hop">
+      <span class="ic el" style="--fill:var(--fF);"><b>C</b></span>
+      <span class="nm">carbon</span>
+    </div>
+    <div class="cell hop">
+      <span class="ic el" style="--fill:var(--fF);"><b>O</b></span>
+      <span class="nm">oxygen</span>
+    </div>
+    <div class="cell unreach">
+      <span class="ic" style="--fill:var(--fN);"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="b" d="M16 3c5 7 9 11.5 9 16.5a9 9 0 0 1-18 0C7 14.5 11 10 16 3z"/><path class="l" d="M11.5 20a4.5 4.5 0 0 0 3 4"/></svg></span>
+      <span class="nm">water</span>
+    </div>
+    <div class="cell unreach">
+      <span class="ic" style="--fill:var(--soft); border-style:dashed;">…</span>
+      <span class="nm">&nbsp;</span>
+    </div>
   </div>
   <p>star joins <code>known</code>. Every 1-input promote recipe whose source is star (<code>star→supernova</code>, <code>star→carbon</code>, …) becomes one-hop-out — the outputs are now <em>candidates to introduce</em>. Water (needs oxygen + hydrogen) is still invisible because oxygen hasn't been discovered.</p>
 
   <h3>Move 8 — player promotes star into oxygen + carbon</h3>
   <div class="graph">
-    <div class="tile known">H</div>
-    <div class="tile known">He</div>
-    <div class="tile known">star</div>
-    <div class="tile known">O</div>
-    <div class="tile known">C</div>
-    <div class="tile hop">water</div>
-    <div class="tile hop">CO₂</div>
-    <div class="tile hop">methane</div>
-    <div class="tile unreach">…</div>
+    <div class="cell known">
+      <span class="ic el" style="--fill:var(--fF);"><b>H</b></span>
+      <span class="nm">hydrogen</span>
+    </div>
+    <div class="cell known">
+      <span class="ic el" style="--fill:var(--fF);"><b>He</b></span>
+      <span class="nm">helium</span>
+    </div>
+    <div class="cell known">
+      <span class="ic" style="--fill:var(--fF);"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="b" d="M16 3l3.8 8.2 9 1-6.7 6.1 1.9 8.8L16 22.6 8 27.1l1.9-8.8L3.2 12.2l9-1z"/></svg></span>
+      <span class="nm">star</span>
+    </div>
+    <div class="cell known">
+      <span class="ic el" style="--fill:var(--fF);"><b>O</b></span>
+      <span class="nm">oxygen</span>
+    </div>
+    <div class="cell known">
+      <span class="ic el" style="--fill:var(--fF);"><b>C</b></span>
+      <span class="nm">carbon</span>
+    </div>
+    <div class="cell hop">
+      <span class="ic" style="--fill:var(--fN);"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="b" d="M16 3c5 7 9 11.5 9 16.5a9 9 0 0 1-18 0C7 14.5 11 10 16 3z"/><path class="l" d="M11.5 20a4.5 4.5 0 0 0 3 4"/></svg></span>
+      <span class="nm">water</span>
+    </div>
+    <div class="cell hop">
+      <span class="ic" style="--fill:var(--fN);"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="b" d="M8 24a5 5 0 0 1-1-10 6 6 0 0 1 11-4 6 6 0 0 1 9 5 5 5 0 0 1-2 9z"/><text x="16" y="21" text-anchor="middle" font-family="Chivo, sans-serif" font-weight="800" font-size="7.5" fill="#111417">CO₂</text></svg></span>
+      <span class="nm">carbon dioxide</span>
+    </div>
+    <div class="cell hop">
+      <span class="ic" style="--fill:var(--fN);"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="b" d="M16 5l6 4v14l-6 4-6-4V9z"/><text x="16" y="19" text-anchor="middle" font-family="Chivo, sans-serif" font-weight="800" font-size="7" fill="#111417">CH₄</text></svg></span>
+      <span class="nm">methane</span>
+    </div>
+    <div class="cell unreach">
+      <span class="ic" style="--fill:var(--soft); border-style:dashed;">…</span>
+      <span class="nm">&nbsp;</span>
+    </div>
   </div>
   <p>Oxygen and carbon are now <code>known</code>. The pool jumps: water becomes reachable (H+O), CO₂ (C+O), methane (CH₄). The dealer can start dealing those partners.</p>
 
   <div class="legend">
-    <span><span class="sw" style="background:var(--known);"></span>Known — discovered or base</span>
-    <span><span class="sw" style="background:var(--hop);"></span>One-hop-out — can be dealt</span>
-    <span><span class="sw" style="background:var(--unreach);"></span>Not yet visible</span>
+    <span class="chip"><span class="sw known"></span>Known — discovered or base</span>
+    <span class="chip"><span class="sw hop"></span>One-hop-out — dealer can serve</span>
+    <span class="chip"><span class="sw unreach"></span>Not yet visible</span>
   </div>
 </section>
 
