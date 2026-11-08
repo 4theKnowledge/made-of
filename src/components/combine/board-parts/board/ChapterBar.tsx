@@ -40,6 +40,7 @@ export function ChapterBar({
             <span className="an">Daily</span>
             <span className="nx">
               {done ? "Complete" : `${foundN}/${total} items found`}
+              <span className="cbage-chev" aria-hidden="true">›</span>
             </span>
           </span>
         </button>
@@ -76,6 +77,7 @@ export function ChapterBar({
           <span className="an">Ch {chapter + 1}</span>
           <span className="nx">
             {finite ? `${inChapter}/${chapterSpan} → Ch ${chapter + 2}` : "Open-ended"}
+            <span className="cbage-chev" aria-hidden="true">›</span>
           </span>
         </span>
       </button>

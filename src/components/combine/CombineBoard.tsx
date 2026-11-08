@@ -2463,26 +2463,6 @@ export function CombineBoard({
           bundle={bundle}
           onAges={() => setAgesOpen(true)}
         />
-        {state.manifest && state.manifest.length > 0 && !dailyStartPending && (
-          <div style={{ display: "flex", justifyContent: "center", margin: "4px 0 0" }}>
-            <button
-              type="button"
-              className={
-                state.manifestFound.length >= state.manifest.length
-                  ? "cbmanifest-pill done"
-                  : "cbmanifest-pill"
-              }
-              aria-label="Daily progress — tap to see today's find list"
-              onClick={() => setAgesOpen(true)}
-            >
-              <span>Find list</span>
-              <span className="cbmanifest-pill-count">
-                {state.manifestFound.length}/{state.manifest.length}
-              </span>
-              <span className="cbmanifest-pill-chev" aria-hidden="true">›</span>
-            </button>
-          </div>
-        )}
         <Shelf
           state={state}
           bundle={bundle}

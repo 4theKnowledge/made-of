@@ -874,8 +874,23 @@ a.btn.primary{color:var(--bg)}
 .cbage .bar{position:relative;flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;height:22px;padding:0 10px;border:1.5px solid var(--ink);border-radius:5px;overflow:hidden;background:var(--surface);min-width:40px}
 .cbage .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--fN);transition:width .4s;z-index:0}
 .cbage .an{position:relative;z-index:1;font-size:13px;font-weight:700;white-space:nowrap;color:var(--ink)}
-.cbage .nx{position:relative;z-index:1;font-family:var(--mono);font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cbage .nx{position:relative;z-index:1;display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cbage-chev{font-family:inherit;font-weight:700;opacity:.5;transition:transform .15s ease, opacity .15s ease}
 .cbageinfo:hover .bar{background:color-mix(in srgb, var(--ink) 6%, var(--surface))}
+.cbageinfo:hover .cbage-chev{opacity:.9;transform:translateX(2px)}
+/* Touch devices get no hover, so the chevron needs to read as
+   interactive at rest. Brighten it and give it a slow nudge so the
+   affordance is unambiguous without being distracting. */
+@media (hover: none){
+  .cbage-chev{opacity:.85;animation:cbage-chev-nudge 2.4s ease-in-out infinite}
+}
+@keyframes cbage-chev-nudge{
+  0%,100%{transform:translateX(0)}
+  50%{transform:translateX(3px)}
+}
+@media (prefers-reduced-motion: reduce){
+  .cbage-chev{animation:none !important}
+}
 .cbover.cbagesheet{align-items:stretch;text-align:left;gap:12px;z-index:78;max-height:min(640px, calc(100dvh - 28px));overflow:hidden}
 .cbover.cbagesheet > .cbagelist{overflow:auto;flex:1 1 auto}
 .rsheet.cbagesheet{align-items:stretch;text-align:left;gap:10px;max-height:min(680px, calc(100dvh - 48px));overflow:hidden}
@@ -1696,9 +1711,9 @@ a.btn.primary{color:var(--bg)}
    mutes the whole tile for the end-of-run review surface. */
 .cbmanifest{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:100%;margin:6px 0}
 .cbmanifest-tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;padding:8px 6px 6px;border:1.5px solid var(--pk);border-radius:4px;background:var(--fill);box-shadow:2px 2px 0 var(--pk);color:#111417;cursor:pointer;font:inherit;text-align:center;-webkit-tap-highlight-color:transparent}
-.cbmanifest-tile .ic{width:36px;height:36px;border:0;background:transparent}
+.cbmanifest-tile .ic{width:28px;height:28px;border:0;background:transparent}
 .cbmanifest-tile .ic svg{width:100%;height:100%}
-.cbmanifest-name{display:block;font-style:normal;font-size:10.5px;font-weight:600;line-height:1.1;letter-spacing:.01em;color:#111417;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.cbmanifest-name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;font-style:normal;font-size:10.5px;font-weight:600;line-height:1.15;letter-spacing:.01em;color:#111417;overflow:hidden;max-width:100%;word-break:break-word}
 .cbmanifest-tile-found{opacity:.55}
 .cbmanifest-tile-found .ic{opacity:.7}
 .cbmanifest-tile-found .cbmanifest-name{color:color-mix(in srgb, #111417 70%, transparent)}
