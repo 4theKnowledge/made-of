@@ -106,6 +106,7 @@ import { ModeThemePicker } from "@/components/combine/board-parts/overlays/ModeT
 import { ChapterBar } from "@/components/combine/board-parts/board/ChapterBar";
 import { Board } from "@/components/combine/board-parts/board/Board";
 import { BoardErrorBoundary } from "@/components/combine/board-parts/board/BoardErrorBoundary";
+import { BoardPlaceholder } from "@/components/combine/board-parts/board/BoardPlaceholder";
 import { DragGhost } from "@/components/combine/board-parts/board/DragGhost";
 import { Hold } from "@/components/combine/board-parts/board/Hold";
 import { Shelf } from "@/components/combine/board-parts/board/Shelf";
@@ -182,6 +183,14 @@ interface Props {
    *  on completed daily runs to look up the player's rank on today's
    *  leaderboard. Null for anon players. */
   currentUserHandle?: string | null;
+  /** T-0228 — server-side hint about whether this viewer has any active
+   *  saved Combine run. Signed-in viewers under COMBINE_SERVER_RUNS get
+   *  `true`/`false`; guests and viewers under the local-only path get
+   *  `null` (unknown). When unknown or true, CombineBoard shows a
+   *  shimmer skeleton on first paint so there's no empty-board flash
+   *  before the resume effect loads a save. When `false`, we skip
+   *  straight to the fresh starter state. */
+  hasActiveRunHint?: boolean | null;
 }
 
 // Shared empty set for the DetailCard's `madeSignatures` prop so the common
@@ -214,6 +223,7 @@ export function CombineBoard({
   publishedThemes = [],
   userHasSeenTutorial = false,
   currentUserHandle = null,
+  hasActiveRunHint = null,
 }: Props) {
   const bundles = useMemo<Record<ThemeKey, ThemeBundle>>(() => {
     const out: Record<ThemeKey, ThemeBundle> = {};
@@ -251,6 +261,14 @@ export function CombineBoard({
   );
 
   const [state, setState] = useState<GameState>(initial);
+  // T-0228: while `loaded=false` we overlay a shimmer skeleton over the
+  // board + trays so the mount-time resume doesn't visibly swap a
+  // populated save into an empty placeholder board. Starts `true` only
+  // when the server has told us (confidently) that there's no save to
+  // restore — otherwise we show shimmer until the resume effect flips
+  // it. The initial value is derived from a prop so SSR + first client
+  // render agree (no hydration mismatch).
+  const [loaded, setLoaded] = useState<boolean>(hasActiveRunHint === false);
   // Active bundle follows mode + daily flag: fast uses the 2-part projection,
   // daily uses the (potentially capped) dailyBundles, endless uses the full
   // bundle. Daily and endless may be identical if the theme has no dailyConfig.
@@ -353,6 +371,11 @@ export function CombineBoard({
     if (didResume.current) return;
     if (!run.ready) return;
     didResume.current = true;
+    // T-0228: flip the skeleton off once the resume path has decided on a
+    // state. Batched with any setState() call below so the real tiles
+    // appear in the same React commit as the skeleton leaves — no extra
+    // frame of the empty placeholder.
+    setLoaded(true);
     setBest({ [activeTheme]: loadBest(activeTheme) });
     setFastBest({ [activeTheme]: loadBest(activeTheme, "fast") });
     setDailyDone(loadDailyDone(todayKey()));
@@ -2316,6 +2339,9 @@ export function CombineBoard({
           newUnlocks={newUnlocks}
           onInfo={(id) => setInfoTile(id)}
         />
+        {!loaded && <BoardPlaceholder size={6} traySlots={3} holdSlots={3} />}
+        {loaded && (
+        <>
         <BoardErrorBoundary>
           <Board
             state={state}
@@ -2406,6 +2432,8 @@ export function CombineBoard({
           onSlotTap={onSlotTap}
           onSlotPointerDown={onSlotPointerDown}
         />
+        </>
+        )}
         {state.choosing && (
           <ChoicePicker
             state={state}

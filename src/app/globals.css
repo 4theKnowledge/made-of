@@ -1066,6 +1066,47 @@ a.btn.primary{color:var(--bg)}
 .cbp.empty{border:1.5px dashed color-mix(in srgb, var(--ink) 25%, transparent);background:transparent;box-shadow:none;cursor:default}
 .cbp .tool{position:absolute;top:-8px;right:-8px;font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;background:var(--ink);color:var(--bg);padding:1px 5px;border-radius:2px}
 
+/* Board/tray load-skeleton (T-0228). Rendered in place of the live
+ * Board/Hold/Tray while a saved run is being restored. Reuses the exact
+ * `.cbboard/.cbtray/.cbshelf` classes so geometry (grid size, aspect
+ * ratios, gaps, borders) is byte-identical to the live layout — the
+ * cross-fade between skeleton and real tiles has no layout shift. */
+.cb-skel{display:contents}
+.cb-skel-cell,.cb-skel-tile,.cb-skel-slot{position:relative;overflow:hidden;cursor:default;pointer-events:none}
+.cb-skel-cell{aspect-ratio:1;border-radius:3px;border:1.5px dashed color-mix(in srgb, var(--ink) 18%, transparent);background:color-mix(in srgb, var(--surface) 55%, transparent)}
+.cb-skel-tile{aspect-ratio:1;max-width:96px;justify-self:center;width:100%;border:2px solid color-mix(in srgb, var(--ink) 35%, transparent);border-radius:4px;background:color-mix(in srgb, var(--surface) 70%, transparent);box-shadow:3px 3px 0 color-mix(in srgb, var(--ink) 18%, transparent)}
+.cb-skel-slot{aspect-ratio:1;border-radius:3px;border:1.5px dashed color-mix(in srgb, var(--ink) 18%, transparent);background:color-mix(in srgb, var(--surface) 55%, transparent)}
+.cb-skel-cell::after,.cb-skel-tile::after,.cb-skel-slot::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,color-mix(in srgb, var(--accent) 22%, transparent) 50%,transparent 70%);background-size:220% 100%;animation:cb-skel-shimmer 1400ms linear infinite}
+@keyframes cb-skel-shimmer{
+  0%{background-position:160% 0}
+  100%{background-position:-60% 0}
+}
+/* Stagger shimmer across the board grid so it reads as alive rather than
+ * a uniform sweep. Keeps the animation count low (one keyframe, N delays). */
+.cb-skel-board .cb-skel-cell:nth-child(6n+2)::after{animation-delay:120ms}
+.cb-skel-board .cb-skel-cell:nth-child(6n+3)::after{animation-delay:240ms}
+.cb-skel-board .cb-skel-cell:nth-child(6n+4)::after{animation-delay:360ms}
+.cb-skel-board .cb-skel-cell:nth-child(6n+5)::after{animation-delay:480ms}
+.cb-skel-board .cb-skel-cell:nth-child(6n)::after{animation-delay:600ms}
+@media (prefers-reduced-motion: reduce){
+  .cb-skel-cell::after,.cb-skel-tile::after,.cb-skel-slot::after{animation:none;opacity:.5}
+}
+/* The real board + tray cross-fade in once the saved run is loaded. */
+.cb-live{animation:cb-live-fade 180ms ease-out both}
+.cb-live-stagger > *{animation:cb-live-fade 160ms ease-out both}
+.cb-live-stagger > *:nth-child(2){animation-delay:20ms}
+.cb-live-stagger > *:nth-child(3){animation-delay:40ms}
+.cb-live-stagger > *:nth-child(4){animation-delay:60ms}
+.cb-live-stagger > *:nth-child(5){animation-delay:80ms}
+.cb-live-stagger > *:nth-child(6){animation-delay:100ms}
+@keyframes cb-live-fade{
+  0%{opacity:0;transform:scale(.985)}
+  100%{opacity:1;transform:scale(1)}
+}
+@media (prefers-reduced-motion: reduce){
+  .cb-live,.cb-live-stagger > *{animation:none}
+}
+
 .cbghost{position:fixed;z-index:95;width:64px;height:64px;pointer-events:none;border:2px solid #111417;border-radius:4px;background:var(--fill);box-shadow:5px 7px 0 rgba(17,20,23,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#111417;transform:rotate(-5deg)}
 .cbghost-v{position:absolute;top:-10px;right:-10px;width:22px;height:22px;border-radius:50%;border:2px solid #111417;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;line-height:1;color:#fff;box-shadow:2px 2px 0 rgba(17,20,23,.3);transform:rotate(5deg);animation:cbghostvpop .18s ease-out}
 .cbghost-v-ok{background:#1b8a3a}

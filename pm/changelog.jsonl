@@ -116,3 +116,4 @@
 {"id": "C-0116", "ts": "2026-11-08T01:18:20Z", "kind": "feature", "summary": "Combine: endless/fast runs can be ended early from the More menu to bank the current score.", "refs": {"task": "T-0227"}}
 {"id": "C-0117", "ts": "2026-11-08T01:31:21Z", "kind": "feature", "summary": "Account pages for Combine: /account/collections (per-scope mastery grid) and /account/combine (personal bests + run history with mode/theme chips + inline daily leaderboard)", "refs": {"task": "T-0224"}}
 {"id": "C-0118", "ts": "2026-11-08T01:33:30Z", "kind": "feature", "summary": "Combine Helpers trigger moved from TopBar to right edge of the hold bar (thumb-zone reachable)", "refs": {"task": "T-0229"}}
+{"id": "C-0119", "ts": "2026-11-08T01:49:13Z", "kind": "feature", "summary": "combine: shimmer skeleton while a saved run loads, replacing the empty-board flash", "refs": {"task": "T-0228"}}
