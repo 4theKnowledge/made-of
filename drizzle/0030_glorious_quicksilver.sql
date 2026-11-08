@@ -1,0 +1,1 @@
+ALTER TABLE "combine_runs" ADD COLUMN "started_at" timestamp with time zone;

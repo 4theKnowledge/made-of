@@ -211,6 +211,13 @@
       "when": 1794098693032,
       "tag": "0029_theme_collection_version",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794121703330,
+      "tag": "0030_glorious_quicksilver",
+      "breakpoints": true
     }
   ]
 }

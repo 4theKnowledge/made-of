@@ -137,6 +137,37 @@ export async function saveRunCheckpoint(
   return row ?? null;
 }
 
+/** Stamp `startedAt = now()` on an active daily run if it isn't already
+ *  set. Idempotent — a second call on the same run returns the existing
+ *  row unchanged. Used by `POST /runs/[id]/start-daily` (T-0247) to
+ *  record the moment the player commits past the manifest-preview
+ *  sheet. `/finish` reads this to compute a server-trusted `durationMs`
+ *  instead of trusting the client's clock. */
+export async function markRunStarted(
+  runId: string,
+  owner: RunOwnerKey,
+): Promise<CombineRun | null> {
+  const db = getDb();
+  const existing = await getRunForOwner(runId, owner);
+  if (!existing) return null;
+  if (existing.status !== "active") return existing;
+  if (existing.startedAt != null) return existing;
+  const [row] = await db
+    .update(schema.combineRuns)
+    .set({
+      startedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(schema.combineRuns.id, runId),
+        eq(schema.combineRuns.status, "active"),
+      ),
+    )
+    .returning();
+  return row ?? null;
+}
+
 /** Transition a run to `ended`. Idempotent — a second call on an
  *  already-ended row is a no-op that still returns the row. */
 export async function endRun(runId: string): Promise<CombineRun | null> {

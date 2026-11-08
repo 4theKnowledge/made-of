@@ -91,14 +91,14 @@ export async function POST(
   if (body.actions.length > 100) {
     return NextResponse.json({ error: "batch too large" }, { status: 413 });
   }
-  // Cap duration at 24h — anything longer is almost certainly a stale
-  // tab / clock skew, and we don't want absurd values polluting the
-  // leaderboard tie-break.
-  let durationMs: number | null = null;
+  // `durationMs` from the client is treated as a fallback hint only —
+  // the authoritative value (T-0247) comes from `run.startedAt` below.
+  // Keep the parser so a legacy client that sends it doesn't error out.
+  let clientDurationMs: number | null = null;
   if (body.durationMs != null) {
     const n = Number(body.durationMs);
     if (Number.isFinite(n) && n >= 0 && n <= 24 * 60 * 60 * 1000) {
-      durationMs = Math.floor(n);
+      clientDurationMs = Math.floor(n);
     }
   }
   const parsed: Action[] = [];
@@ -213,6 +213,18 @@ export async function POST(
     };
     const manifestSize = final.manifest?.length ?? 0;
     const manifestFound = final.manifestFound.length;
+    // Server-authoritative durationMs (T-0247). Computed from the row's
+    // `startedAt` (stamped when the player tapped Start on the daily
+    // sheet) and now. Clamped at 24h for absurd tabs. Falls back to the
+    // client hint only when the row has no `startedAt` (shouldn't happen
+    // for a valid daily run; belt-and-suspenders).
+    let durationMs: number | null = clientDurationMs;
+    if (run.mode === "daily" && run.startedAt) {
+      const elapsed = Date.now() - run.startedAt.getTime();
+      if (Number.isFinite(elapsed) && elapsed >= 0) {
+        durationMs = Math.min(elapsed, 24 * 60 * 60 * 1000);
+      }
+    }
     const resultValue =
       run.mode === "daily"
         ? {

@@ -751,6 +751,12 @@ export const combineRuns = pgTable(
       .notNull()
       .defaultNow(),
     endedAt: timestamp("ended_at", { withTimezone: true }),
+    // Server-side "player committed to this daily" marker (T-0247).
+    // Daily only: set when the player taps Start on the manifest-preview
+    // sheet via POST /runs/[id]/start-daily. Null means the run was
+    // minted but the player hasn't committed yet; /finish uses this to
+    // compute a server-trusted durationMs. Idempotent on the server side.
+    startedAt: timestamp("started_at", { withTimezone: true }),
   },
   (t) => [
     index("combine_runs_owner_idx").on(t.ownerKind, t.ownerId),

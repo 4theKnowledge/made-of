@@ -30,6 +30,12 @@ export interface RunContext {
   seed: number;
   eventCount: number;
   epoch: number;
+  /** Server-stamped "player committed to this daily" ISO timestamp
+   *  (T-0247). Null for runs the player hasn't tapped Start on yet
+   *  (and always null for endless/fast). The start-daily sheet uses
+   *  this as the authoritative "has the player committed?" flag — a
+   *  reload re-reads it, so the peek-and-reload exploit is closed. */
+  startedAt: string | null;
 }
 
 export interface StartArgs {
@@ -160,6 +166,12 @@ export interface UseCombineRunApi {
   /** Start (or resume) a run. Returns the server's initial state so
    *  the caller can hydrate its local reducer. */
   start: (args: StartArgs) => Promise<StartResult | null>;
+  /** Mark a daily run as "player tapped Start" server-side (T-0247).
+   *  Idempotent. Flips `context.startedAt` so the UI gate can close
+   *  immediately without another round-trip. Returns the new
+   *  `startedAt` or null when server-runs are off / the request
+   *  failed. */
+  markStartedDaily: () => Promise<string | null>;
   /** Push an action into the checkpoint buffer. The caller has
    *  already applied it to its local state; the buffer is purely for
    *  server validation. */
@@ -209,6 +221,7 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
             state: GameState;
             eventCount: number;
             epoch: number;
+            startedAt: string | null;
             resumed: boolean;
           }
         | { __error: true }
@@ -223,6 +236,7 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
         seed: res.seed,
         eventCount: res.eventCount,
         epoch: res.epoch,
+        startedAt: res.startedAt ?? null,
       };
       setContext(ctx);
       setReady(true);
@@ -231,6 +245,25 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
     },
     [],
   );
+
+  /** Stamp the current run as "player tapped Start on the daily sheet"
+   *  (T-0247). Server-side idempotent; a second call on the same run
+   *  is a no-op. Updates `context.startedAt` so downstream UI (gate
+   *  effect in `CombineBoard`) sees the flip immediately without
+   *  another round-trip. Returns the new `startedAt` or null when
+   *  server-runs are off / the request failed. */
+  const markStartedDaily = useCallback(async (): Promise<string | null> => {
+    const ctx = contextRef.current;
+    if (!ctx) return null;
+    if (ctx.startedAt) return ctx.startedAt;
+    const res = await postJSON<
+      { runId: string; startedAt: string | null } | { __error: true }
+    >(`/api/combine/runs/${ctx.runId}/start-daily`, {});
+    if (!res || "__error" in res) return null;
+    const startedAt = res.startedAt ?? null;
+    setContext((cur) => (cur ? { ...cur, startedAt } : cur));
+    return startedAt;
+  }, []);
 
   // Mark ready when the feature flag is off. We detect that with a
   // GET /active probe on mount — a 200 with `{ runs: [] }` while the
@@ -458,6 +491,7 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
     serverBacked: context != null,
     finishing,
     start,
+    markStartedDaily,
     push,
     flush,
     finish,

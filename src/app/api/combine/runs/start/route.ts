@@ -73,6 +73,7 @@ export async function POST(req: Request) {
       state: existing.stateJson,
       eventCount: existing.eventCount,
       epoch: existing.epoch,
+      startedAt: existing.startedAt?.toISOString() ?? null,
       resumed: true,
     });
   }
@@ -126,6 +127,7 @@ export async function POST(req: Request) {
     state: row.stateJson,
     eventCount: row.eventCount,
     epoch: row.epoch,
+    startedAt: row.startedAt?.toISOString() ?? null,
     resumed: false,
   });
 }

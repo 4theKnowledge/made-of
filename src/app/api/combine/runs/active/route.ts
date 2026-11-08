@@ -35,6 +35,7 @@ export async function GET() {
       state: r.stateJson,
       eventCount: r.eventCount,
       epoch: r.epoch,
+      startedAt: r.startedAt?.toISOString() ?? null,
       updatedAt: r.updatedAt.toISOString(),
     })),
   });

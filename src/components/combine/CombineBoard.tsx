@@ -798,22 +798,31 @@ export function CombineBoard({
   // Detect "entered a fresh daily" via the auto-resume path (deep link,
   // last-mode pointer, fallback). A game that's daily + has no moves +
   // hasn't ticked the clock yet means the player hasn't committed yet.
-  // Fires the start sheet so endless-first players still see the gate
-  // instead of landing straight on the board.
+  //
+  // T-0247: the primary "has committed?" signal is the server's
+  // `run.context.startedAt` — it survives reloads and clearing
+  // localStorage, closing the peek-and-reload exploit. The in-memory
+  // `dailyStartRef` is still consulted as a fallback for the
+  // server-runs-off path (no `run.context`). `state.moves > 0` is a
+  // soft fallback too — once the player has placed a tile, don't
+  // re-show the sheet even if the server was unreachable.
+  const serverStartedAt = run.context?.startedAt ?? null;
   useEffect(() => {
     if (!state.daily) {
       setDailyStartPending(false);
       return;
     }
     if (state.over) return;
+    if (!didResume.current) return;
+    // Hard signals the player has already committed to this run.
+    if (serverStartedAt) return;
     if (state.moves > 0) return;
     if (dailyStartRef.current != null) return;
-    if (!didResume.current) return;
     setDailyStartPending(true);
-    // We intentionally only re-run when the daily identity or run status
-    // changes — mid-run state ticks shouldn't re-open the sheet.
+    // We intentionally only re-run when the daily identity, run status,
+    // or the server's startedAt signal changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.daily, state.over]);
+  }, [state.daily, state.over, serverStartedAt]);
   const prevOverRef = useRef(false);
   useEffect(() => {
     if (state.over && !prevOverRef.current && !state.debug) {
@@ -1485,14 +1494,22 @@ export function CombineBoard({
     resetTransient();
   }, [bundles, dailyBundles, dailyHostTheme, state, resetTransient, dailyPayloadSeed, dailyEnabled, admin]);
 
-  // Player tapped "Start" on the Start-daily sheet. Seals the clock and
-  // reveals the board. Idempotent — a second tap is a no-op.
+  // Player tapped "Start" on the Start-daily sheet. Stamps the clock
+  // locally + server-side (T-0247: `run.markStartedDaily()` so a
+  // reload can't replay the peek exploit) and reveals the board.
+  // Idempotent — the server endpoint is a no-op on a second call.
+  const markStartedDaily = run.markStartedDaily;
   const confirmStartDaily = useCallback(() => {
     if (!dailyStartPending) return;
     dailyStartRef.current = Date.now();
     setDailyDurationMs(null);
     setDailyStartPending(false);
-  }, [dailyStartPending]);
+    // Server-side commit (T-0247). Fire-and-forget: the local gate
+    // flip is enough for immediate UI; the server stamp survives
+    // reload. Failures leave the player with a fresh clock on reload,
+    // which is the pre-T-0247 behaviour — acceptable fallback.
+    void markStartedDaily();
+  }, [dailyStartPending, markStartedDaily]);
 
   // Admin "Replay daily" — restart today's daily server-side with
   // restart:true and reset the local engine to a fresh daily state. Not
