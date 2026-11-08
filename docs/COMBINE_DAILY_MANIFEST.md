@@ -8,6 +8,10 @@
 
 **Scope — daily only.** Endless and fast modes are untouched. Every change is gated on `state.manifest != null`; absent that, the engine, dealer, and UI behave exactly as they do today. Manifest is a daily-only play mode.
 
+**Revision 2026-11-08:** With only 2 playtesters in prod and a strong "no dead code" preference, target-count daily is being **ripped out entirely** rather than kept as a mutually-exclusive co-tenant. `combine_dailies` and `progress WHERE kind='combine'` get truncated; `DailyConfig.manifest` is **required** (not optional), `DailyPayload.manifest` is required (payload version stays 1 since no v1-shaped data survives the wipe), `GameState.target` + `DEFAULT_TARGET_DISCOVERIES` + `resolveDailyTarget` + `dailyTargetForRun` all get deleted. The migration path from the design note's "coexistence" plan is: delete the old shape, not shim it.
+
+**JourneySheet as the manifest hub.** Rather than introduce a dedicated `ManifestTracker.tsx`, the existing `JourneySheet` (opened from the hold bar) is where the in-run manifest list lives. A compact pill above the shelf shows `Manifest  3/8  ›` and taps through to the JourneySheet's daily branch, which renders the shared grid with tap-to-info on each tile. Three surfaces share one `ManifestGrid` primitive: start-sheet, JourneySheet, end-card.
+
 ---
 
 ## Recommendation — **Variant 1c (Themed + Reachable + Curated-overlay)**
