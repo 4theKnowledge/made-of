@@ -353,6 +353,7 @@ function emptyPayload(): DailyPayload {
     config: {},
     guestOutputIds: [],
     seed: 0,
+    manifest: [],
     generatedAt: new Date(0).toISOString(),
   };
 }

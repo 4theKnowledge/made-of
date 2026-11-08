@@ -218,7 +218,8 @@ export async function POST(
             daily: run.dailyKey || null,
             turns: final.moves,
             found: final.found.length,
-            target: final.target ?? 0,
+            // T-0241 will add `manifestFound` + `manifestSize` here for
+            // the leaderboard's manifest-progress sort.
             durationMs,
           }
         : base;

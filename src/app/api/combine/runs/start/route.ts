@@ -3,7 +3,7 @@ import { getRunOwner, serverRunsEnabled } from "@/lib/anon-session";
 import { isAdmin } from "@/lib/session";
 import {
   bundleForRun,
-  dailyTargetForRun,
+  dailyManifestForRun,
   mintSeed,
   newServerGame,
   type ServerMode,
@@ -89,14 +89,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "bundle unavailable" }, { status: 500 });
   }
   const seed = mintSeed(mode, dailyKey);
-  const target = await dailyTargetForRun(theme, dailyKey);
+  // T-0240: target-count dailies removed; manifest is the daily win
+  // condition. The engine field itself (`state.manifest`) lands in
+  // T-0241 — this step only plumbs the payload through so T-0241 has
+  // something to receive.
+  const manifest = await dailyManifestForRun(theme, dailyKey);
   const state = newServerGame({
     mode,
     theme,
     dailyKey,
     seed,
     bundle,
-    target,
+    manifest,
   });
 
   // Admin flag shadows onto the row via the state field; non-admin

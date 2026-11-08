@@ -410,12 +410,11 @@ export function CombineBoard({
       const saved = loadGame(dailyBundle, { daily: day, expectedSeed: dailyPayloadSeed });
       setState(
         saved
-          ? hydrateGame(saved, { target: dailyTarget })
+          ? hydrateGame(saved)
           : newGame(dailyHostTheme, dailyBundle, {
               daily: day,
               size: 6,
               seed: dailySeed(day),
-              target: dailyTarget,
             }).state,
       );
       return;
@@ -487,7 +486,7 @@ export function CombineBoard({
       const dailyBundle = dailyBundles[dailyHostTheme];
       const saved = loadGame(dailyBundle, { daily: today, expectedSeed: dailyPayloadSeed });
       if (saved) {
-        setState(hydrateGame(saved, { target: dailyTarget }));
+        setState(hydrateGame(saved));
         return;
       }
     }
@@ -520,16 +519,15 @@ export function CombineBoard({
       const saved = loadGame(dailyBundle, { daily: today, expectedSeed: dailyPayloadSeed });
       setState(
         saved
-          ? hydrateGame(saved, { target: dailyTarget })
+          ? hydrateGame(saved)
           : newGame(dailyHostTheme, dailyBundle, {
               daily: today,
               size: 6,
               seed: dailySeed(today),
-              target: dailyTarget,
             }).state,
       );
     }
-  }, [activeTheme, initialMode, themeFromUrl, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyTarget, dailyPayloadSeed, dailyEnabled, run.ready, admin]);
+  }, [activeTheme, initialMode, themeFromUrl, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyPayloadSeed, dailyEnabled, run.ready, admin]);
 
   // Server run alignment. Each time the local state settles on a fresh
   // (mode, theme, dailyKey) slot, register a matching server run. The
@@ -1457,7 +1455,7 @@ export function CombineBoard({
       // (If `dailyStartRef.current` was cleared by a reload, we accept
       //  the clock drift — resumed-runs show time from this mount.)
       saveGame(state);
-      setState(hydrateGame(saved, { target: dailyTarget }));
+      setState(hydrateGame(saved));
       if (dailyStartRef.current == null) {
         dailyStartRef.current = Date.now();
       }
@@ -1477,7 +1475,6 @@ export function CombineBoard({
           daily: day,
           size: 6,
           seed: dailySeed(day),
-          target: dailyTarget,
         }).state,
       );
       dailyStartRef.current = null;
@@ -1485,7 +1482,7 @@ export function CombineBoard({
       setDailyStartPending(true);
     }
     resetTransient();
-  }, [bundles, dailyBundles, dailyHostTheme, state, resetTransient, dailyTarget, dailyPayloadSeed, dailyEnabled, admin]);
+  }, [bundles, dailyBundles, dailyHostTheme, state, resetTransient, dailyPayloadSeed, dailyEnabled, admin]);
 
   // Player tapped "Start" on the Start-daily sheet. Seals the clock and
   // reveals the board. Idempotent — a second tap is a no-op.
@@ -1520,7 +1517,6 @@ export function CombineBoard({
         daily: day,
         size: 6,
         seed: dailySeed(day),
-        target: dailyTarget,
       }).state,
     );
     dailyStartRef.current = null;
@@ -1528,7 +1524,7 @@ export function CombineBoard({
     setDailyStartPending(true);
     setOverCardOpen(false);
     resetTransient();
-  }, [admin, dailyBundles, dailyHostTheme, dailyTarget, resetTransient]);
+  }, [admin, dailyBundles, dailyHostTheme, resetTransient]);
 
   const shareDaily = useCallback(async () => {
     const dr = dailyDone;
@@ -2554,9 +2550,10 @@ export function CombineBoard({
             className="cbresult cbstartdaily"
           >
             <span className="k">Daily · {state.daily}</span>
-            <b className="big">{state.target ?? dailyTarget ?? "—"}</b>
+            <b className="big">Ready?</b>
             <span className="sub">
-              Discoveries to make. Your time starts when you tap Start.
+              {/* T-0244 will render the manifest grid here. */}
+              Your time starts when you tap Start.
             </span>
             <ButtonGroup>
               <button

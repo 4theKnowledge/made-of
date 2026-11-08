@@ -6,10 +6,14 @@
  */
 
 import { dailySeed } from "./rng";
-import { resolveDailyTarget, type DailyConfig } from "./daily-config";
+import type { DailyConfig } from "./daily-config";
 import type { CombineRecipe, ThemeBundle, ThemeKey } from "./types";
 
-/** Frozen snapshot of what today's daily looks like for one theme. */
+/** Frozen snapshot of what today's daily looks like for one theme.
+ *
+ *  Every payload carries a non-empty `manifest: string[]` — the per-day
+ *  find list every player must complete to win. Target-count dailies
+ *  were removed in T-0240 along with the pre-manifest playerbase. */
 export interface DailyPayload {
   version: 1;
   /** Copy of the theme's `dailyConfig` at generation time. Past dailies
@@ -22,12 +26,11 @@ export interface DailyPayload {
    *  is just `dailySeed(day)`; keeping it in the payload lets us change
    *  the seed policy later without rewriting history. */
   seed: number;
-  /** Discovery target that ends the run (win). Resolved from
-   *  `config.targetByDow[dow] ?? config.targetDiscoveries ?? DEFAULT`
-   *  at build time and frozen here so mid-week admin edits never shift
-   *  a scheduled day. Optional for backwards-compat with rows written
-   *  before the target-list feature shipped. */
-  targetDiscoveries?: number;
+  /** Frozen ordered manifest for the day. Built by the solver (T-0242)
+   *  from `config.manifest.pool`, respecting pins. Order is payload-
+   *  stable so every player sees the same list in the same grid cells.
+   *  Required: a valid payload always has a non-empty manifest. */
+  manifest: string[];
   /** When this payload was produced. Informational only. */
   generatedAt: string;
 }
@@ -175,11 +178,19 @@ export function pickGuests(
 
 /** Build a single day's payload. `recentByOutput` reflects the rotation
  *  history visible at generation time; callers compose it from prior
- *  rows. */
+ *  rows.
+ *
+ *  The manifest itself is produced by the solver (T-0242) and passed in
+ *  via `manifest`. This base builder stays pure + doesn't know about the
+ *  solver's bundle machinery; schedule-builder wiring in T-0242 will
+ *  populate it. Callers in step T-0240 pass an empty array when no
+ *  solver is wired yet — the engine (T-0241) will still refuse to start
+ *  a daily run against an empty manifest. */
 export function buildDailyPayload(
   input: ScheduleInput,
   day: string,
   recentByOutput: Map<string, number>,
+  manifest: string[] = [],
 ): DailyPayload {
   const pool = guestPoolFor(input.fullBundle, input.dailyConfig);
   const perRun = input.dailyConfig.guestIngredient?.perRun ?? 0;
@@ -189,7 +200,7 @@ export function buildDailyPayload(
     config: input.dailyConfig,
     guestOutputIds: guests,
     seed: dailySeed(day),
-    targetDiscoveries: resolveDailyTarget(input.dailyConfig, day),
+    manifest,
     generatedAt: new Date().toISOString(),
   };
 }

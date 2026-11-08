@@ -226,10 +226,12 @@ function playDay(
   target: number,
   uncappedMoves: number,
 ): DayResult {
+  // Sim keeps its own `target` for reporting; the engine no longer carries
+  // it (T-0240). Discovery count is read off `state.found.length`.
+  void target;
   const { state: s0 } = newGame(theme, bundle, {
     mode: "daily",
     daily: dayKey,
-    target,
   });
   let state = s0;
   const firstFindMoves: number[] = [];

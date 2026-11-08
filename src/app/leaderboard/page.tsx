@@ -32,30 +32,27 @@ export default async function LeaderboardPage() {
   const today = todayKey();
   const theme = "everything" as const;
 
-  // Pre-resolve `targetDiscoveries` for the 7 visible days so the UI can
-  // render `X / N` without a second round-trip per day. Past-day rows
-  // without a payload (pre-feature) resolve to null and render without
-  // a divisor.
+  // Pre-resolve the manifest size for the 7 visible days so the UI can
+  // render `X / N` without a second round-trip per day. Days without a
+  // payload resolve to null (hide the divisor).
   const days: string[] = [];
   let cursor = today;
   for (let i = 0; i < 7; i++) {
     days.push(cursor);
     cursor = prevDay(cursor);
   }
-  // If the daily tables haven't been created yet (fresh env) or the query
-  // fails for any reason, degrade gracefully — the leaderboard still works,
-  // just without `/target` divisors.
   const payloadEntries = await Promise.all(
     days.map(async (d) => {
       try {
         const payload = await getDailyPayload(theme, d);
-        return [d, payload?.targetDiscoveries ?? null] as const;
+        const size = payload?.manifest?.length ?? 0;
+        return [d, size > 0 ? size : null] as const;
       } catch {
         return [d, null] as const;
       }
     }),
   );
-  const targetByDay: Record<string, number | null> = Object.fromEntries(payloadEntries);
+  const manifestSizeByDay: Record<string, number | null> = Object.fromEntries(payloadEntries);
 
   const session = await getSession();
   const currentUserHandle =
@@ -76,7 +73,7 @@ export default async function LeaderboardPage() {
           theme={theme}
           today={today}
           days={days}
-          targetByDay={targetByDay}
+          targetByDay={manifestSizeByDay}
           currentUserHandle={currentUserHandle}
         />
       </div>

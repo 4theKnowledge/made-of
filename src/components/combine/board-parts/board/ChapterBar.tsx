@@ -22,21 +22,16 @@ export function ChapterBar({
   const inChapter = foundCount - curThreshold;
   const chapterSpan = nextThreshold - curThreshold;
   const finite = Number.isFinite(nextThreshold);
-  const dailyTarget = state.mode === "daily" ? state.target : null;
-  const dailyPct =
-    dailyTarget != null
-      ? Math.min(100, Math.round((foundCount / Math.max(1, dailyTarget)) * 100))
-      : 0;
+  // T-0240: target-count daily removed; chapter bar reads the same
+  // chapter progression for daily + endless. T-0244 may swap this for a
+  // manifest-progress variant.
   const chapterPct = !finite
     ? 100
     : Math.min(100, Math.round((inChapter / Math.max(1, chapterSpan)) * 100));
-  const pct = dailyTarget != null ? dailyPct : chapterPct;
-  const ariaLabel =
-    dailyTarget != null
-      ? `Daily: ${foundCount} of ${dailyTarget} discoveries. Tap for details.`
-      : finite
-        ? `Chapter ${chapter + 1}. ${nextThreshold - foundCount} more unique finds to reach Chapter ${chapter + 2}. Tap for details.`
-        : `Chapter ${chapter + 1} — open-ended. Tap for details.`;
+  const pct = chapterPct;
+  const ariaLabel = finite
+    ? `Chapter ${chapter + 1}. ${nextThreshold - foundCount} more unique finds to reach Chapter ${chapter + 2}. Tap for details.`
+    : `Chapter ${chapter + 1} — open-ended. Tap for details.`;
   return (
     <div className="cbage" data-tour="chapter">
       <button
@@ -47,15 +42,9 @@ export function ChapterBar({
       >
         <span className="bar">
           <i style={{ width: `${pct}%` }} />
-          <span className="an">
-            {dailyTarget != null ? "Daily" : `Ch ${chapter + 1}`}
-          </span>
+          <span className="an">Ch {chapter + 1}</span>
           <span className="nx">
-            {dailyTarget != null
-              ? `${foundCount}/${dailyTarget}`
-              : finite
-                ? `${inChapter}/${chapterSpan} → Ch ${chapter + 2}`
-                : "Open-ended"}
+            {finite ? `${inChapter}/${chapterSpan} → Ch ${chapter + 2}` : "Open-ended"}
           </span>
         </span>
       </button>

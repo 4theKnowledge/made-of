@@ -26,7 +26,6 @@
 import { randomInt } from "node:crypto";
 import { buildThemeBundle, buildAllDailyBundles } from "./data";
 import { getActiveDaily } from "./daily-config-db";
-import { DEFAULT_TARGET_DISCOVERIES } from "./daily-config";
 import { getDailyPayload, resolveGuestRecipes } from "./daily-schedule-db";
 import { loadAllSeasons } from "./season";
 import { getLiveSnapshot } from "@/graph/live";
@@ -105,20 +104,18 @@ export async function bundleForRun(
   return built;
 }
 
-/** Target discovery count for today's daily, or null for non-daily
- *  runs. For daily runs always resolves to a number: payload value
- *  when present, else `DEFAULT_TARGET_DISCOVERIES`. Without this
- *  fallback, legacy payloads (pre-target-list) and missing payloads
- *  hydrate with `target=null`, and the engine's daily-win check at
- *  `engine.ts` (gated on `target != null`) never fires — the run
- *  continues until the board clogs. */
-export async function dailyTargetForRun(
+/** Resolve the per-day manifest for today's daily (T-0240/T-0241). Null
+ *  for non-daily runs; for daily runs, returns the payload's frozen
+ *  manifest or `[]` if the payload is missing / pre-manifest. The
+ *  engine (T-0241) will refuse to start a daily with an empty manifest
+ *  — scheduling should always pre-fill it. */
+export async function dailyManifestForRun(
   theme: ThemeKey,
   dailyKey: string | null,
-): Promise<number | null> {
+): Promise<string[] | null> {
   if (!dailyKey) return null;
   const payload = await getDailyPayload(theme, dailyKey);
-  return payload?.targetDiscoveries ?? DEFAULT_TARGET_DISCOVERIES;
+  return payload?.manifest ?? [];
 }
 
 /** Mint a seed for a new server run. Daily runs are keyed by day so
@@ -140,14 +137,17 @@ export function newServerGame(opts: {
   dailyKey: string | null;
   seed: number;
   bundle: ThemeBundle;
-  target: number | null;
+  /** Daily manifest ids (T-0240). Passed through once the engine learns
+   *  the field in T-0241; swallowed here so the start route can already
+   *  plumb it. */
+  manifest?: string[] | null;
 }): GameState {
+  void opts.manifest;
   const { state } = newGame(opts.theme, opts.bundle, {
     mode: opts.mode as Mode,
     daily: opts.dailyKey,
     size: 6,
     seed: opts.seed,
-    target: opts.target,
   });
   return state;
 }

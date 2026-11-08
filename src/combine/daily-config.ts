@@ -1,16 +1,16 @@
 /**
  * Daily-mode overrides for a Combine theme.
  *
- * Daily runs are target-list-ended (fit in ~15 min). The admin sets these
- * on the singleton `combine_daily_config` row; `buildThemeBundle` reads
- * them when the bundle is built for `mode: "daily"`.
+ * Daily is a manifest run (T-0237 / T-0240). Every daily is won by making
+ * every item on a per-day, server-generated **manifest** (`string[]` of
+ * item ids). `guestIngredient` is kept as the generic "drip rare tiles
+ * into the tray" scaffolding; the manifest config layers on top with its
+ * own pool.
  *
  * `guestIngredient` is a deterministic "guest of the day" tile injected
  * into the dealer: per-day RNG picks N tiles from the catalogue at or
- * above band `minBand` (the thematic grouping; later bands = rarer items)
- * and seeds them into the tray on chosen turns. Same for every player so
- * leaderboards stay comparable; purpose is to drip rare items into the
- * lifetime daily collection over time.
+ * above band `minBand` and seeds them into the tray on chosen turns.
+ * Same for every player so leaderboards stay comparable.
  */
 
 export interface DailyConfig {
@@ -23,26 +23,45 @@ export interface DailyConfig {
      *  catalogue grouping (I, II, III…), not a progression gate. */
     minBand: number;
   };
-  /** Target discovery count that ends a daily run (win). `null`/missing falls
-   *  back to the per-DOW map, then to `DEFAULT_TARGET_DISCOVERIES`. The run
-   *  ends either when `found.length >= target` (win) or the board runs out
-   *  of legal moves (loss). */
-  targetDiscoveries?: number;
-  /** Per-weekday overrides for `targetDiscoveries`. Keys are `"0"`–`"6"`
-   *  where `"0"` = Sunday (matches `Date#getUTCDay()`). Resolved at schedule-
-   *  build time and frozen onto the `DailyPayload`, so admin edits never
-   *  retroactively change a day that's already been scheduled. */
-  targetByDow?: Record<string, number>;
+  /** Manifest / find-list config (T-0237). When an admin has an active
+   *  daily, this field is REQUIRED — target-count dailies were removed
+   *  along with the pre-manifest playerbase (user decision 2026-11-08).
+   *
+   *  The concrete per-day list is built at schedule-build time by the
+   *  solver (T-0242) from `pool`'s members, respecting pins, and frozen
+   *  onto `DailyPayload.manifest`. Mid-week admin edits don't shift
+   *  already-scheduled days.
+   *
+   *  Daily-only. Endless and fast never read this field. */
+  manifest?: {
+    /** `combine_themes.code` whose membership sets the pool the generator
+     *  samples from. The API handler (not this normaliser) checks the
+     *  code exists — keeping this file sync + pure. */
+    pool: string;
+    /** Manifest size (number of items the player must find). 6–12 so the
+     *  grid fits a 4×2 pictogram display on narrow widths without scroll. */
+    size: number;
+    /** Admin-pinned item ids. Length ≤ `size`, unique. Pins are placed
+     *  first; the generator fills the rest from the pool. Each pin is
+     *  validated for reachability at save-time (admin API) and at
+     *  schedule-build time (payload builder). */
+    pins?: string[];
+    /** Dealer weight multiplier for tiles that are direct partners of
+     *  unfound manifest items (`1 + partnerBias` on the dealer pass).
+     *  0 disables the bias. Range [0, 2]; default 0.3. Ignored by the
+     *  dealer until T-0245 lands. */
+    partnerBias?: number;
+  };
 }
 
 /** Admin-surface default when creating a theme without daily tuning.
  *  Deliberately empty — a theme opts in by setting fields. */
 export const DEFAULT_DAILY_CONFIG: DailyConfig = {};
 
-/** Default discovery target when neither `targetByDow[dow]` nor
- *  `targetDiscoveries` is set. Single source of truth for the resolver,
- *  the admin placeholder, and defensive engine fallbacks. */
-export const DEFAULT_TARGET_DISCOVERIES = 40;
+/** Default manifest size when the admin opts in without specifying one. */
+export const DEFAULT_MANIFEST_SIZE = 8;
+/** Default dealer partner-bias multiplier for unfound manifest items. */
+export const DEFAULT_MANIFEST_PARTNER_BIAS = 0.3;
 
 /** Validate a candidate dailyConfig payload (admin API or seed). Returns a
  *  normalised shape or null if the payload is empty / falsy. Throws on
@@ -64,47 +83,50 @@ export function normaliseDailyConfig(raw: unknown): DailyConfig | null {
     }
     out.guestIngredient = { perRun, minBand };
   }
-  if (r.targetDiscoveries != null) {
-    const n = Number(r.targetDiscoveries);
-    if (!Number.isInteger(n) || n < 3 || n > 50) {
-      throw new Error("dailyConfig.targetDiscoveries must be an integer in [3, 50]");
+  if (r.manifest != null) {
+    if (typeof r.manifest !== "object") {
+      throw new Error("dailyConfig.manifest must be an object");
     }
-    out.targetDiscoveries = n;
-  }
-  if (r.targetByDow != null) {
-    if (typeof r.targetByDow !== "object") {
-      throw new Error("dailyConfig.targetByDow must be an object");
+    const m = r.manifest as Record<string, unknown>;
+    if (typeof m.pool !== "string" || m.pool.length === 0) {
+      throw new Error("dailyConfig.manifest.pool must be a non-empty string");
     }
-    const src = r.targetByDow as Record<string, unknown>;
-    const out2: Record<string, number> = {};
-    for (const [k, v] of Object.entries(src)) {
-      if (!/^[0-6]$/.test(k)) {
-        throw new Error("dailyConfig.targetByDow keys must be \"0\"–\"6\" (Sun=0)");
+    const size =
+      m.size == null ? DEFAULT_MANIFEST_SIZE : Number(m.size);
+    if (!Number.isInteger(size) || size < 6 || size > 12) {
+      throw new Error("dailyConfig.manifest.size must be an integer in [6, 12]");
+    }
+    let pins: string[] | undefined;
+    if (m.pins != null) {
+      if (!Array.isArray(m.pins)) {
+        throw new Error("dailyConfig.manifest.pins must be an array of item ids");
       }
-      const n = Number(v);
-      if (!Number.isInteger(n) || n < 3 || n > 50) {
-        throw new Error(`dailyConfig.targetByDow[${k}] must be an integer in [3, 50]`);
+      pins = [];
+      for (const p of m.pins) {
+        if (typeof p !== "string" || p.length === 0) {
+          throw new Error("dailyConfig.manifest.pins entries must be non-empty strings");
+        }
+        pins.push(p);
       }
-      out2[k] = n;
+      if (pins.length > size) {
+        throw new Error(
+          `dailyConfig.manifest.pins length (${pins.length}) exceeds size (${size})`,
+        );
+      }
+      if (new Set(pins).size !== pins.length) {
+        throw new Error("dailyConfig.manifest.pins must be unique");
+      }
     }
-    if (Object.keys(out2).length) out.targetByDow = out2;
+    let partnerBias = DEFAULT_MANIFEST_PARTNER_BIAS;
+    if (m.partnerBias != null) {
+      const pb = Number(m.partnerBias);
+      if (!Number.isFinite(pb) || pb < 0 || pb > 2) {
+        throw new Error("dailyConfig.manifest.partnerBias must be a number in [0, 2]");
+      }
+      partnerBias = pb;
+    }
+    out.manifest = { pool: m.pool, size, partnerBias };
+    if (pins && pins.length > 0) out.manifest.pins = pins;
   }
   return Object.keys(out).length ? out : null;
-}
-
-/** Resolve the discovery target for a specific daily day. Precedence:
- *  per-weekday override > base `targetDiscoveries` > `DEFAULT_TARGET_DISCOVERIES`.
- *  `dayKey` is `YYYY-MM-DD` in UTC; the weekday is taken via `getUTCDay()`
- *  so the number is stable regardless of the admin's local timezone. */
-export function resolveDailyTarget(
-  config: DailyConfig | null | undefined,
-  dayKey: string,
-): number {
-  if (!config) return DEFAULT_TARGET_DISCOVERIES;
-  const dow = new Date(`${dayKey}T00:00:00Z`).getUTCDay().toString();
-  return (
-    config.targetByDow?.[dow] ??
-    config.targetDiscoveries ??
-    DEFAULT_TARGET_DISCOVERIES
-  );
 }

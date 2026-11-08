@@ -9,7 +9,7 @@ import {
   buildThemeBundle,
   type GuestRecipeExtension,
 } from "@/combine/data";
-import { DEFAULT_TARGET_DISCOVERIES, type DailyConfig } from "@/combine/daily-config";
+import { type DailyConfig } from "@/combine/daily-config";
 import { getActiveDaily } from "@/combine/daily-config-db";
 import { DEFAULT_THEME, type ThemeKey } from "@/combine/types";
 import { serialiseBundle } from "@/combine/serialise";
@@ -99,16 +99,17 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
 
   const today = todayKey();
   const guestRecipes: Partial<Record<string, GuestRecipeExtension[] | null>> = {};
-  // Always resolve a concrete target so the engine's daily-win check
-  // (gated on `state.target != null`) can fire. Legacy payloads and
-  // missing-payload days used to leave this null, which is what let
-  // daily runs continue past the intended end.
-  let dailyTarget: number = DEFAULT_TARGET_DISCOVERIES;
+  // T-0240: target-count daily removed. The daily today has no discovery
+  // target; the manifest (T-0241+) will drive the win condition. For now
+  // `dailyTarget` is always null so the engine's daily-win branch gated
+  // on `state.target != null` never fires — the run only ends when the
+  // board clogs. Kept as a prop until T-0241 removes `state.target`.
+  const dailyTarget: number | null = null;
   let dailyPayloadSeed: number | null = null;
   const todaysPayload = await getDailyPayload(dailyHostTheme, today);
   if (todaysPayload) {
-    dailyTarget = todaysPayload.targetDiscoveries ?? DEFAULT_TARGET_DISCOVERIES;
     dailyPayloadSeed = todaysPayload.seed;
+    // todaysPayload.manifest is threaded into the client in T-0244.
   }
   if (activeDaily && todaysPayload && todaysPayload.guestOutputIds.length > 0) {
     const fullThemeBundle = buildThemeBundle(

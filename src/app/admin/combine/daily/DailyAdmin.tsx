@@ -1,12 +1,10 @@
 "use client";
 
 import { Fragment, useCallback, useState } from "react";
-import { DEFAULT_TARGET_DISCOVERIES, type DailyConfig } from "@/combine/daily-config";
+import type { DailyConfig } from "@/combine/daily-config";
 import type { DailyPayload } from "@/combine/daily-schedule";
 import { useConfirm } from "@/components/common/useConfirm";
 
-const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-const DOW_KEYS = ["0", "1", "2", "3", "4", "5", "6"] as const;
 
 export interface ThemeOption {
   code: string;
@@ -52,13 +50,7 @@ export function DailyAdmin({
   const [guestMinBand, setGuestMinBand] = useState<string>(
     initialActive?.config.guestIngredient?.minBand?.toString() ?? "",
   );
-  const [targetDiscoveries, setTargetDiscoveries] = useState<string>(
-    initialActive?.config.targetDiscoveries?.toString() ?? "",
-  );
-  const [targetByDow, setTargetByDow] = useState<Record<string, string>>(() => {
-    const src = initialActive?.config.targetByDow ?? {};
-    return Object.fromEntries(DOW_KEYS.map((k) => [k, src[k]?.toString() ?? ""]));
-  });
+  // T-0240: target-count daily removed. Manifest inputs land in T-0243.
   const [schedule, setSchedule] = useState<ScheduleRow[]>(initialSchedule);
   const [busy, setBusy] = useState<"save" | "regen" | "clear" | "reset" | null>(null);
   const [wipeResults, setWipeResults] = useState(false);
@@ -73,15 +65,14 @@ export function DailyAdmin({
         minBand: Number(guestMinBand || "1"),
       };
     }
-    if (targetDiscoveries.trim()) cfg.targetDiscoveries = Number(targetDiscoveries);
-    const dow: Record<string, number> = {};
-    for (const k of DOW_KEYS) {
-      const v = targetByDow[k]?.trim();
-      if (v) dow[k] = Number(v);
+    // T-0240: target-count removed. Manifest config lands in T-0243 and
+    // will preserve the initialActive.config.manifest value until the
+    // admin edits it explicitly.
+    if (initialActive?.config.manifest) {
+      cfg.manifest = initialActive.config.manifest;
     }
-    if (Object.keys(dow).length) cfg.targetByDow = dow;
     return cfg;
-  }, [guestPerRun, guestMinBand, targetDiscoveries, targetByDow]);
+  }, [guestPerRun, guestMinBand, initialActive]);
 
   const refreshSchedule = useCallback(async () => {
     const res = await fetch("/api/admin/combine/daily");
@@ -221,8 +212,6 @@ export function DailyAdmin({
       if (!res.ok) throw new Error(`request_failed_${res.status}`);
       setGuestPerRun("");
       setGuestMinBand("");
-      setTargetDiscoveries("");
-      setTargetByDow(Object.fromEntries(DOW_KEYS.map((k) => [k, ""])));
       setMsg({ text: "Cleared.", kind: "ok" });
       await refreshSchedule();
     } catch (e) {
@@ -257,72 +246,12 @@ export function DailyAdmin({
       </section>
 
       <section className="feat">
-        <h3 style={{ marginTop: 0, fontSize: 16 }}>Daily length</h3>
+        <h3 style={{ marginTop: 0, fontSize: 16 }}>Daily shape</h3>
         <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
-          This is what ends the daily run. Set it first.{" "}
-          Players win when they hit the target number of unique discoveries;
-          they lose if the board fills first. The leaderboard sorts completions
-          first, then by fewest turns. Changes apply to future days after you
-          click <em>Regenerate schedule</em>; today&apos;s row is protected until
-          you explicitly reset it in the Danger zone.
+          Manifest config (pool, size, pins, partner-bias) lands in T-0243.
+          Until then the daily runs open-ended and no manifest is scheduled.
         </p>
         <div style={{ display: "grid", gap: 10, maxWidth: 520 }}>
-          <Field
-            label="Target discoveries"
-            hint={
-              <>
-                How many unique first-finds end the run with a win. Range 3–50.
-                <br />
-                <strong>6–8</strong> = ~5–10 min for a median player. <strong>10–12</strong> =
-                closer to a full session. <em>Default {DEFAULT_TARGET_DISCOVERIES} when blank.</em>
-              </>
-            }
-          >
-            <input
-              type="number"
-              min={3}
-              max={50}
-              value={targetDiscoveries}
-              onChange={(e) => setTargetDiscoveries(e.target.value)}
-              style={input}
-              placeholder={DEFAULT_TARGET_DISCOVERIES.toString()}
-            />
-          </Field>
-          <details style={{ fontSize: 12 }}>
-            <summary style={{ cursor: "pointer", color: "var(--muted)" }}>
-              Per-weekday overrides (optional)
-            </summary>
-            <div style={{ marginTop: 10, color: "var(--muted)", marginBottom: 8 }}>
-              Leave a cell blank to fall back to the base target. Useful for
-              shorter weekday dailies or longer weekend ones.
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-                gap: 6,
-              }}
-            >
-              {DOW_KEYS.map((k, i) => (
-                <label key={k} style={{ display: "grid", gap: 4, fontSize: 11 }}>
-                  <span style={{ color: "var(--muted)", textAlign: "center" }}>
-                    {DOW_LABELS[i]}
-                  </span>
-                  <input
-                    type="number"
-                    min={3}
-                    max={50}
-                    value={targetByDow[k] ?? ""}
-                    onChange={(e) =>
-                      setTargetByDow((cur) => ({ ...cur, [k]: e.target.value }))
-                    }
-                    style={{ ...input, padding: "6px 8px", textAlign: "center" }}
-                    placeholder="—"
-                  />
-                </label>
-              ))}
-            </div>
-          </details>
           <div className="cb-daily-actions">
             <button
               type="button"

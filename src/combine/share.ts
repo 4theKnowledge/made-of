@@ -27,23 +27,14 @@ export function dailyShareText(
   const ages = bundle.theme.ages;
   const ageName = ages[state.chapter] ?? "";
   const top = bestShelfItem(state, bundle);
-  // Target-list daily: squares show progress toward `target`, headline reads
-  // `${found}/${target} in ${turns} turns`. Legacy daily (no target) keeps
-  // the old age-progression line so old rows still render sensibly.
-  const hasTarget = state.target != null && state.target > 0;
-  const target = state.target ?? 0;
+  // T-0240 ripped out target-count; T-0244 will swap this to manifest
+  // progress once GameState.manifest lands. Until then, the daily share
+  // uses the discovery-count headline unchanged from endless.
   const found = state.found.length;
-  const squaresLen = hasTarget ? Math.min(10, target) : ages.length;
-  const squares = hasTarget
-    ? Array.from({ length: squaresLen }, (_, k) =>
-        k < Math.min(found, squaresLen) ? "🟩" : "⬜",
-      ).join("")
-    : ages.map((_, k) => (k <= state.chapter ? "🟩" : "⬜")).join("");
-  const headline = hasTarget
-    ? `${squares} ${found}/${target} in ${state.moves} turn${state.moves === 1 ? "" : "s"}`
-    : `${squares} reached ${ageName}`;
-  const foundLine = !hasTarget && state.found.length
-    ? ` · ${state.found.length} new discover${state.found.length > 1 ? "ies" : "y"}`
+  const squares = ages.map((_, k) => (k <= state.chapter ? "🟩" : "⬜")).join("");
+  const headline = `${squares} reached ${ageName}`;
+  const foundLine = found
+    ? ` · ${found} new discover${found > 1 ? "ies" : "y"}`
     : "";
   const chainLine = state.longest > 1 ? ` · longest chain ×${state.longest}` : "";
   const shelfLine = state.shelf.length
@@ -65,11 +56,11 @@ export function dailyShareText(
       ageName,
       ageCount: ages.length,
       best: top,
-      found: state.found.length,
+      found,
       longest: state.longest,
       shelf: state.shelf.length,
       turns: state.moves,
-      target: state.target ?? 0,
+      target: 0,
     })}`,
   };
 }

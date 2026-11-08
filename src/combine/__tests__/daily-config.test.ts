@@ -3,11 +3,7 @@ import { loadKnowledgeBase } from "../../data/load";
 import { toRows } from "../../data/rows";
 import { buildSnapshot } from "../../graph/snapshot";
 import { buildAllDailyBundles, buildThemeBundle } from "../data";
-import {
-  DEFAULT_TARGET_DISCOVERIES,
-  normaliseDailyConfig,
-  resolveDailyTarget,
-} from "../daily-config";
+import { normaliseDailyConfig } from "../daily-config";
 import { newGame } from "../engine";
 import { serialiseBundle, hydrateBundle } from "../serialise";
 
@@ -18,7 +14,7 @@ describe("normaliseDailyConfig", () => {
     expect(normaliseDailyConfig({})).toBeNull();
   });
 
-  it("accepts a well-formed config", () => {
+  it("accepts a well-formed guestIngredient config", () => {
     const cfg = normaliseDailyConfig({
       guestIngredient: { perRun: 2, minBand: 7 },
     });
@@ -27,12 +23,19 @@ describe("normaliseDailyConfig", () => {
     });
   });
 
-  it("silently ignores unknown keys (e.g. legacy maxAges on old rows)", () => {
-    // Pre-T-0196 configs may still carry maxAges. Normaliser should accept
-    // the row without choking — the field is just dropped on read.
+  it("silently ignores unknown keys (e.g. legacy targetDiscoveries / maxAges)", () => {
+    // Pre-T-0240 configs may still carry targetDiscoveries or targetByDow
+    // in the DB. Normaliser drops them silently so a stale row doesn't
+    // choke. Only the known branches are preserved.
+    expect(normaliseDailyConfig({ targetDiscoveries: 40 })).toBeNull();
+    expect(normaliseDailyConfig({ targetByDow: { "0": 10 } })).toBeNull();
     expect(normaliseDailyConfig({ maxAges: 5 })).toBeNull();
     expect(
-      normaliseDailyConfig({ maxAges: 5, guestIngredient: { perRun: 1, minBand: 8 } }),
+      normaliseDailyConfig({
+        maxAges: 5,
+        targetDiscoveries: 40,
+        guestIngredient: { perRun: 1, minBand: 8 },
+      }),
     ).toEqual({ guestIngredient: { perRun: 1, minBand: 8 } });
   });
 
@@ -41,44 +44,64 @@ describe("normaliseDailyConfig", () => {
     expect(() => normaliseDailyConfig({ guestIngredient: { perRun: 1, minBand: 0 } })).toThrow();
   });
 
-  it("accepts a valid targetDiscoveries", () => {
-    expect(normaliseDailyConfig({ targetDiscoveries: 10 })).toEqual({
-      targetDiscoveries: 10,
+  // T-0240: manifest branch
+  it("accepts a minimal manifest config and fills defaults", () => {
+    expect(normaliseDailyConfig({ manifest: { pool: "everything" } })).toEqual({
+      manifest: { pool: "everything", size: 8, partnerBias: 0.3 },
     });
   });
 
-  it("rejects out-of-range targetDiscoveries", () => {
-    expect(() => normaliseDailyConfig({ targetDiscoveries: 2 })).toThrow();
-    expect(() => normaliseDailyConfig({ targetDiscoveries: 51 })).toThrow();
-    expect(() => normaliseDailyConfig({ targetDiscoveries: 5.5 })).toThrow();
+  it("accepts a full manifest config with pins", () => {
+    expect(
+      normaliseDailyConfig({
+        manifest: {
+          pool: "everyday",
+          size: 10,
+          pins: ["item-a", "item-b"],
+          partnerBias: 0.5,
+        },
+      }),
+    ).toEqual({
+      manifest: {
+        pool: "everyday",
+        size: 10,
+        pins: ["item-a", "item-b"],
+        partnerBias: 0.5,
+      },
+    });
   });
 
-  it("accepts valid targetByDow and rejects bad keys / values", () => {
-    expect(
-      normaliseDailyConfig({ targetByDow: { "0": 10, "6": 12 } }),
-    ).toEqual({ targetByDow: { "0": 10, "6": 12 } });
-    expect(() => normaliseDailyConfig({ targetByDow: { "7": 10 } })).toThrow();
-    expect(() => normaliseDailyConfig({ targetByDow: { mon: 10 } })).toThrow();
-    expect(() => normaliseDailyConfig({ targetByDow: { "0": 2 } })).toThrow();
+  it("rejects malformed manifest", () => {
+    expect(() => normaliseDailyConfig({ manifest: {} })).toThrow(/pool/);
+    expect(() => normaliseDailyConfig({ manifest: { pool: "" } })).toThrow(/pool/);
+    expect(() =>
+      normaliseDailyConfig({ manifest: { pool: "x", size: 5 } }),
+    ).toThrow(/size/);
+    expect(() =>
+      normaliseDailyConfig({ manifest: { pool: "x", size: 13 } }),
+    ).toThrow(/size/);
+    expect(() =>
+      normaliseDailyConfig({ manifest: { pool: "x", size: 8, partnerBias: -0.1 } }),
+    ).toThrow(/partnerBias/);
+    expect(() =>
+      normaliseDailyConfig({ manifest: { pool: "x", size: 8, partnerBias: 2.5 } }),
+    ).toThrow(/partnerBias/);
   });
-});
 
-describe("resolveDailyTarget", () => {
-  // 2026-11-08 is a Sunday → getUTCDay() === 0 → key "0".
-  // 2026-11-09 is a Monday → key "1".
-  it("per-weekday override takes precedence over base", () => {
-    expect(
-      resolveDailyTarget({ targetDiscoveries: 8, targetByDow: { "0": 12 } }, "2026-11-08"),
-    ).toBe(12);
+  it("rejects pins longer than size", () => {
+    expect(() =>
+      normaliseDailyConfig({
+        manifest: { pool: "x", size: 6, pins: ["a", "b", "c", "d", "e", "f", "g"] },
+      }),
+    ).toThrow(/pins length/);
   });
-  it("falls back to base when no DOW override matches", () => {
-    expect(
-      resolveDailyTarget({ targetDiscoveries: 8, targetByDow: { "0": 12 } }, "2026-11-09"),
-    ).toBe(8);
-  });
-  it("falls back to DEFAULT_TARGET_DISCOVERIES when neither set", () => {
-    expect(resolveDailyTarget({}, "2026-11-09")).toBe(DEFAULT_TARGET_DISCOVERIES);
-    expect(resolveDailyTarget(null, "2026-11-09")).toBe(DEFAULT_TARGET_DISCOVERIES);
+
+  it("rejects duplicate pins", () => {
+    expect(() =>
+      normaliseDailyConfig({
+        manifest: { pool: "x", size: 8, pins: ["a", "b", "a"] },
+      }),
+    ).toThrow(/unique/);
   });
 });
 

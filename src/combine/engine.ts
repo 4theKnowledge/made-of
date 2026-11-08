@@ -63,7 +63,7 @@ export const TIER_VALUE: Record<string, number> = {
  * It is fine (and expected) to skip bumping for pure refactors that
  * leave the reducer's output-for-input identical.
  */
-export const ENGINE_VERSION = 2;
+export const ENGINE_VERSION = 3;
 
 /** Baseline hold-zone capacity at chapter 0. */
 const HOLD_CAPACITY_BASE = 2;
@@ -196,11 +196,6 @@ export interface GameState {
    *  Gated UI-side: the panel only mounts when the server says the user
    *  is admin, so the reducer trusting this flag is fine. */
   debug: boolean;
-  /** Daily discovery target. The run ends (win) when
-   *  `found.length >= target`. Null for endless/fast. Legacy daily
-   *  payloads without a target just run open-ended until the board
-   *  clogs — there's no final-chapter victory. */
-  target: number | null;
   /** The initial seed this run started with. Daily runs only — endless/fast
    *  leave this null. Stamped onto saves so a resume after admin reset-today
    *  can detect the seed mismatch and drop the stale save. */
@@ -248,7 +243,7 @@ export type Event =
 export type TileSource = "tray" | "hold";
 
 export type Action =
-  | { type: "new-game"; theme: ThemeKey; mode: Mode; daily: string | null; size: number; seed?: number; target?: number | null }
+  | { type: "new-game"; theme: ThemeKey; mode: Mode; daily: string | null; size: number; seed?: number }
   | { type: "place"; slot: number; cell: number; source?: TileSource }
   | { type: "drop-on"; slot: number; cell: number; source?: TileSource }
   | { type: "choose"; outputIndex: number }
@@ -587,18 +582,10 @@ function afterMove(
   bundle: ThemeBundle,
   events: Event[],
 ): void {
-  // 0. Daily target-list win: end as soon as the player hits N discoveries.
-  //    Gated on daily + a resolved target so endless/fast and legacy daily
-  //    rows (no target) are untouched.
-  if (
-    state.mode === "daily" &&
-    state.target != null &&
-    state.found.length >= state.target
-  ) {
-    state.over = true;
-    events.push({ type: "over" });
-    return;
-  }
+  // 0. Daily win condition lives in `state.manifest` (T-0241) — the
+  //    target-count win was removed in T-0240 along with the pre-manifest
+  //    playerbase. Until T-0241 lands the manifest field, daily runs end
+  //    only when the board clogs.
 
   // 1. Chapter up? Chapters are discovery-driven: each threshold is a
   //    cumulative find count (log-scaled; see progression.ts). Open-ended
@@ -801,7 +788,6 @@ export function newGame(
     daily?: string | null;
     size?: number;
     seed?: number;
-    target?: number | null;
     /** Scripted dealer queue — tutorial mode only. Copied into
      *  `state.scripted`; consumed from the front on every `dealTray`.
      *  Tiles must exist in the bundle or the dealer will insert `null`
@@ -817,10 +803,6 @@ export function newGame(
   const size = opts.size ?? 6;
   const seed =
     opts.seed ?? (daily ? dailySeed(daily) : freshEndlessSeed());
-  // Only daily can have a target. Caller is expected to pass the resolved
-  // `DailyPayload.targetDiscoveries` here; legacy payloads omit the field
-  // and the engine falls through to the pre-existing age-progression end.
-  const target = mode === "daily" ? opts.target ?? null : null;
   const state: GameState = {
     theme,
     mode,
@@ -856,7 +838,6 @@ export function newGame(
     undos: 1,
     lastSnapshot: null,
     debug: false,
-    target,
     initialSeed: mode === "daily" ? seed : null,
     scripted: opts.scripted ? opts.scripted.slice() : undefined,
   };
@@ -936,7 +917,6 @@ export function reduce(
         daily: action.daily,
         size: action.size,
         seed: action.seed,
-        target: action.target ?? null,
       });
 
     case "choose": {

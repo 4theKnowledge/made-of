@@ -246,37 +246,27 @@ describe("buildDailyPayload", () => {
     expect(p.guestOutputIds).toEqual([]);
   });
 
-  it("stamps targetDiscoveries resolved from the per-DOW override", () => {
-    // 2026-11-08 is Sunday (UTC) → key "0" → should take 15.
-    // 2026-11-09 is Monday → no override → base 10.
-    const sun = buildDailyPayload(
-      {
-        theme: "everything",
-        fullBundle: full,
-        dailyConfig: { targetDiscoveries: 10, targetByDow: { "0": 15 } },
-      },
-      "2026-11-08",
-      new Map(),
-    );
-    const mon = buildDailyPayload(
-      {
-        theme: "everything",
-        fullBundle: full,
-        dailyConfig: { targetDiscoveries: 10, targetByDow: { "0": 15 } },
-      },
-      "2026-11-09",
-      new Map(),
-    );
-    expect(sun.targetDiscoveries).toBe(15);
-    expect(mon.targetDiscoveries).toBe(10);
-  });
-
-  it("falls back to DEFAULT_TARGET_DISCOVERIES when neither field is set", () => {
+  it("stamps the required manifest array (empty when no solver is wired)", () => {
     const p = buildDailyPayload(
       { theme: "everything", fullBundle: full, dailyConfig: {} },
       "2026-11-09",
       new Map(),
     );
-    expect(p.targetDiscoveries).toBe(40);
+    expect(p.manifest).toEqual([]);
+  });
+
+  it("accepts a solver-provided manifest and freezes it on the payload", () => {
+    const manifest = ["item-a", "item-b", "item-c"];
+    const p = buildDailyPayload(
+      {
+        theme: "everything",
+        fullBundle: full,
+        dailyConfig: { manifest: { pool: "x", size: 3 } },
+      },
+      "2026-11-09",
+      new Map(),
+      manifest,
+    );
+    expect(p.manifest).toEqual(manifest);
   });
 });

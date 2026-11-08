@@ -70,10 +70,12 @@ export function GameOverCard({
   const endChapter = chapterIndex(state.found.length) + 1;
   const progressionLabel = `Chapter ${endChapter}`;
   const newBest = state.newBest;
-  const isDailyTargetRun =
-    state.mode === "daily" && state.target != null;
-  const won =
-    isDailyTargetRun && state.found.length >= (state.target ?? 0);
+  // T-0240: target-count daily removed; "daily run" now means any daily.
+  // T-0244 will replace `won` with manifest completeness once
+  // GameState.manifest lands; until then a daily run that ended (board
+  // clogged) is a loss.
+  const isDailyTargetRun = state.mode === "daily";
+  const won = false;
   const rank = useDailyRank({
     // Gate on `!finishing` so we don't fetch before `/finish` commits
     // the `progress` row. Pre-fix, the fetch fired on mount and almost
@@ -213,9 +215,7 @@ export function GameOverCard({
         <b className="big">{state.score.toLocaleString("en")}</b>
         <span className="sub">
           {isDailyTargetRun
-            ? won
-              ? `All ${state.target} discovered in ${state.moves} turns.`
-              : `${state.found.length} / ${state.target} discovered in ${state.moves} turns. The board ran out.`
+            ? `${state.found.length} discover${state.found.length === 1 ? "y" : "ies"} in ${state.moves} turns. The board ran out.`
             : newBest
               ? "A new best!"
               : best > state.score
@@ -230,7 +230,7 @@ export function GameOverCard({
                 <span>turns</span>
               </div>
               <div>
-                <b>{state.found.length}{state.target != null ? ` / ${state.target}` : ""}</b>
+                <b>{state.found.length}</b>
                 <span>discoveries</span>
               </div>
               <div>

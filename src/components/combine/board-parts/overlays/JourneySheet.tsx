@@ -23,13 +23,14 @@ export function JourneySheet({
   onInfo: (id: string) => void;
   onDismiss: () => void;
 }) {
-  const dailyTarget = state.mode === "daily" ? state.target : null;
-  if (dailyTarget != null) {
+  // T-0240 removed state.target; T-0244 will swap DailyJourney to render
+  // the manifest grid. Until then daily runs show the chapter view like
+  // endless so the sheet isn't blank.
+  if (state.mode === "daily") {
     return (
       <DailyJourney
         state={state}
         bundle={bundle}
-        dailyTarget={dailyTarget}
         onInfo={onInfo}
         onDismiss={onDismiss}
       />
@@ -48,28 +49,23 @@ export function JourneySheet({
 function DailyJourney({
   state,
   bundle,
-  dailyTarget,
   onInfo,
   onDismiss,
 }: {
   state: GameState;
   bundle: ThemeBundle;
-  dailyTarget: number;
   onInfo: (id: string) => void;
   onDismiss: () => void;
 }) {
+  // T-0244 replaces this with the manifest grid. T-0240 leaves a flat
+  // discovery list + turn count so the sheet still renders usefully.
   const foundCount = state.found.length;
-  const left = Math.max(0, dailyTarget - foundCount);
   return (
     <ResponsiveSheet open onDismiss={onDismiss} ariaLabel="Journey" className="cbagesheet">
       <span className="k">Journey</span>
-      <h3>Daily — {foundCount} of {dailyTarget} discoveries</h3>
+      <h3>Daily — {foundCount} discover{foundCount === 1 ? "y" : "ies"} this run</h3>
       <p>
-        {left > 0 ? (
-          <>{left} more to win · {state.moves} turn{state.moves === 1 ? "" : "s"} so far. Fewer turns ranks higher on today&apos;s leaderboard.</>
-        ) : (
-          <>Daily goal reached in {state.moves} turn{state.moves === 1 ? "" : "s"}.</>
-        )}
+        {state.moves} turn{state.moves === 1 ? "" : "s"} so far. Fewer turns ranks higher on today&apos;s leaderboard.
       </p>
       {foundCount > 0 && (
         <div className="cbagefinds" aria-label="Found this run">
