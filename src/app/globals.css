@@ -1103,8 +1103,10 @@ a.btn.primary{color:var(--bg)}
 .cb-skel-board .cb-skel-cell:nth-child(6n+4)::after{animation-delay:360ms}
 .cb-skel-board .cb-skel-cell:nth-child(6n+5)::after{animation-delay:480ms}
 .cb-skel-board .cb-skel-cell:nth-child(6n)::after{animation-delay:600ms}
+.cb-skel-helpbtn{position:relative;overflow:hidden;cursor:default;pointer-events:none;color:color-mix(in srgb, var(--ink) 45%, transparent);border-color:color-mix(in srgb, var(--ink) 18%, transparent);background:color-mix(in srgb, var(--surface) 55%, transparent)}
+.cb-skel-helpbtn::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,color-mix(in srgb, var(--accent) 22%, transparent) 50%,transparent 70%);background-size:220% 100%;animation:cb-skel-shimmer 1400ms linear infinite}
 @media (prefers-reduced-motion: reduce){
-  .cb-skel-cell::after,.cb-skel-tile::after,.cb-skel-slot::after{animation:none;opacity:.5}
+  .cb-skel-cell::after,.cb-skel-tile::after,.cb-skel-slot::after,.cb-skel-helpbtn::after{animation:none;opacity:.5}
 }
 /* The real board + tray cross-fade in once the saved run is loaded. */
 .cb-live{animation:cb-live-fade 180ms ease-out both}

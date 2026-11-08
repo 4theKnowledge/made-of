@@ -33,6 +33,15 @@ export function BoardPlaceholder({
             ))}
           </span>
         </div>
+        <div className="cbhelpwrap">
+          <span className="cbh cbhelpbtn cb-skel-helpbtn">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 9h18v11H3zM8 9V5h8v4M3 13h18M11 12v3h2v-3" />
+            </svg>
+            <span className="lbl">Helpers</span>
+            <b>0</b>
+          </span>
+        </div>
       </div>
       <div className="cbtray cb-skel-tray">
         {Array.from({ length: traySlots }).map((_, i) => (
