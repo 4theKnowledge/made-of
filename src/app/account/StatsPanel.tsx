@@ -19,6 +19,13 @@ function fmtTime(ms: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+function fmtDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div>
@@ -41,7 +48,8 @@ export function StatsPanel({ stats }: { stats: AccountStats }) {
   const nothingYet =
     (CRAFT_PAUSED ? true : craft.totalSolves === 0) &&
     combine.totalDiscovered === 0 &&
-    combine.totalRuns === 0;
+    combine.totalRuns === 0 &&
+    combine.completions.length === 0;
   if (nothingYet) {
     return (
       <p style={{ color: "var(--muted)", margin: 0 }}>
@@ -142,6 +150,39 @@ export function StatsPanel({ stats }: { stats: AccountStats }) {
           <Stat label="Product" value={String(combine.byTier.P)} />
           <Stat label="System" value={String(combine.byTier.S)} />
         </div>
+
+        {combine.completions.length > 0 && (
+          <div style={{ marginTop: 20 }}>
+            <div style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 8 }}>
+              Completions
+            </div>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
+              {combine.completions.map((c, i) => (
+                <li
+                  key={`${c.themeCode}-${c.completedVersion}-${i}`}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    fontSize: 14,
+                    padding: "6px 10px",
+                    border: "1.5px solid var(--line)",
+                    borderRadius: 3,
+                    background: "var(--surface)",
+                  }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    <span aria-hidden="true" style={{ color: "var(--ink)" }}>✓</span>
+                    <b style={{ fontWeight: 700 }}>{c.themeLabel}</b>
+                  </span>
+                  <span style={{ color: "var(--muted)", fontFamily: "var(--mono, 'Chivo Mono'), monospace", fontSize: 12, whiteSpace: "nowrap" }}>
+                    {c.itemCount} items · {fmtDate(c.completedAt)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

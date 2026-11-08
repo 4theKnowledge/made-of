@@ -171,6 +171,7 @@ interface Props {
     label: string;
     description: string | null;
     pictogram: string | null;
+    collectionVersion: number;
   }>;
   /** Server-read `authUser.hasSeenCombineTutorial` for signed-in users.
    *  When false, the Combine landing shows a dismissible "Try the
@@ -315,6 +316,25 @@ export function CombineBoard({
     }
     return best;
   }, [themeCompletions, state.theme]);
+  // T-0217 slice 3: codes the user has completed AT the current theme
+  // collection_version. Drives the ✓ chip in ModeThemePicker. Picks the
+  // newest completion row per theme and compares to the picker's version.
+  const completedThemeCodes = useMemo<ReadonlySet<string>>(() => {
+    if (!collectionAuthed) return new Set<string>();
+    const newestByTheme = new Map<string, number>();
+    for (const row of themeCompletions) {
+      const prev = newestByTheme.get(row.themeCode);
+      if (prev == null || row.completedVersion > prev) {
+        newestByTheme.set(row.themeCode, row.completedVersion);
+      }
+    }
+    const out = new Set<string>();
+    for (const t of publishedThemes) {
+      const seen = newestByTheme.get(t.code);
+      if (seen != null && seen === t.collectionVersion) out.add(t.code);
+    }
+    return out;
+  }, [collectionAuthed, themeCompletions, publishedThemes]);
   // When a theme's numAges has grown since the player last saw it, surface
   // a one-time banner with the new age's label. Keyed by theme → label.
   const [newAgeBanner, setNewAgeBanner] = useState<Partial<Record<ThemeKey, string>>>({});
@@ -2503,6 +2523,7 @@ export function CombineBoard({
             currentTheme={state.theme}
             dailyEnabled={dailyEnabled}
             themes={publishedThemes}
+            completedThemes={completedThemeCodes}
             dailyDone={!!dailyDone}
             onShareDaily={shareDaily}
             onStartTutorial={startTutorial}

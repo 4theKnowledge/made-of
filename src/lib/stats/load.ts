@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import {
   computeCombineStats,
+  type CombineCompletion,
   type CombineRow,
   type CombineRun,
   type CombineRunResult,
@@ -25,7 +26,7 @@ export type AccountStats = {
 export async function loadAccountStats(userId: string): Promise<AccountStats> {
   const db = getDb();
 
-  const [craftRows, combineRows, combineRunRows] = await Promise.all([
+  const [craftRows, combineRows, combineRunRows, completionRows] = await Promise.all([
     db
       .select({
         ref: schema.progress.ref,
@@ -65,6 +66,27 @@ export async function loadAccountStats(userId: string): Promise<AccountStats> {
           eq(schema.progress.kind, "combine"),
         ),
       ),
+    // T-0217 slice 3: completion rows, left-joined to combine_themes for
+    // the display label. A theme that was deleted after the player
+    // completed it still has a progress row; fall back to the code.
+    db
+      .select({
+        themeCode: schema.progress.ref,
+        createdAt: schema.progress.createdAt,
+        result: schema.progress.result,
+        themeLabel: schema.combineThemes.label,
+      })
+      .from(schema.progress)
+      .leftJoin(
+        schema.combineThemes,
+        eq(schema.progress.ref, schema.combineThemes.code),
+      )
+      .where(
+        and(
+          eq(schema.progress.userId, userId),
+          eq(schema.progress.kind, "combine-theme-complete"),
+        ),
+      ),
   ]);
 
   const craft = computeCraftStats(
@@ -88,9 +110,32 @@ export async function loadAccountStats(userId: string): Promise<AccountStats> {
     )
     .map((r) => ({ ref: r.ref, createdAt: r.createdAt, result: r.result }));
 
+  const completions: CombineCompletion[] = completionRows
+    .map((r): CombineCompletion | null => {
+      const result = (r.result ?? {}) as Partial<{
+        version: number;
+        itemCount: number;
+      }>;
+      if (
+        typeof result.version !== "number" ||
+        typeof result.itemCount !== "number"
+      ) {
+        return null;
+      }
+      return {
+        themeCode: r.themeCode,
+        themeLabel: r.themeLabel ?? r.themeCode,
+        completedVersion: result.version,
+        itemCount: result.itemCount,
+        completedAt: r.createdAt,
+      };
+    })
+    .filter((x): x is CombineCompletion => x !== null);
+
   const combine = computeCombineStats(
     combineRows as readonly CombineRow[],
     combineRuns,
+    completions,
   );
 
   return { craft, combine };

@@ -49,6 +49,7 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
       label: schema.combineThemes.label,
       description: schema.combineThemes.description,
       pictogram: schema.combineThemes.pictogram,
+      collectionVersion: schema.combineThemes.collectionVersion,
     })
     .from(schema.combineThemes)
     .where(eq(schema.combineThemes.isPublished, true))
@@ -67,6 +68,7 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
       label: r.label,
       description: r.description,
       pictogram: r.pictogram,
+      collectionVersion: r.collectionVersion,
     }));
 
   // Resolve active theme: URL param wins if it's published; else default.

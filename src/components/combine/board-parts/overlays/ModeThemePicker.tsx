@@ -22,6 +22,9 @@ export interface PickerTheme {
   label: string;
   description: string | null;
   pictogram: string | null;
+  /** T-0217: current collection_version. Compared against the user's
+   *  stored completion to decide whether to render the ✓ chip. */
+  collectionVersion: number;
 }
 
 type PickerMode = "endless" | "fast" | "daily";
@@ -73,6 +76,10 @@ interface Props {
   currentTheme: string;
   dailyEnabled: boolean;
   themes: PickerTheme[];
+  /** T-0217 slice 3: theme codes the signed-in user has completed at the
+   *  current `collectionVersion`. Renders a ✓ chip on matching tiles.
+   *  Empty / undefined = no chips (signed-out or nothing completed yet). */
+  completedThemes?: ReadonlySet<string>;
   onDismiss: () => void;
   /** Called with the chosen (mode, themeCode). Daily picks pass the daily
    *  host theme and the caller ignores themeCode for daily. */
@@ -101,6 +108,7 @@ export function ModeThemePicker({
   currentTheme,
   dailyEnabled,
   themes,
+  completedThemes,
   onDismiss,
   onConfirm,
   onRestart,
@@ -213,6 +221,31 @@ export function ModeThemePicker({
           margin-top: 14px;
           width: 100%;
         }
+        /* T-0217 slice 3: completion mark on themes the signed-in user has
+           finished at the current collection_version. Corner chip, ink pill,
+           quiet so it doesn't steal from the selected state. */
+        .cbmtp .cbmtpTile.done { position: relative; }
+        .cbmtp .cbmtpTileDone {
+          position: absolute;
+          top: -6px;
+          right: -6px;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: var(--ink);
+          color: var(--bg);
+          font-size: 11px;
+          line-height: 18px;
+          text-align: center;
+          font-weight: 700;
+          pointer-events: none;
+          border: 1.5px solid var(--bg);
+        }
+        .cbmtp .cbmtpTile.on .cbmtpTileDone {
+          background: var(--bg);
+          color: var(--ink);
+          border-color: var(--ink);
+        }
         /* Tutorial card accent: matches the amber glow used by the live
            tutorial overlay (see .cbtut-overlay-spotlight in globals.css),
            so the "Learn" surface reads as the same visual language. */
@@ -291,16 +324,21 @@ export function ModeThemePicker({
         {themes.map((t) => {
           const on = t.code === theme && mode !== "daily";
           const dim = mode === "daily";
+          const done = completedThemes?.has(t.code) ?? false;
           return (
             <button
               key={t.code}
               type="button"
               role="radio"
               aria-checked={on}
-              className={`cbmtpTile${on ? " on" : ""}`}
+              className={`cbmtpTile${on ? " on" : ""}${done ? " done" : ""}`}
               onClick={() => setTheme(t.code)}
               disabled={dim}
+              aria-label={done ? `${t.label}, completed` : t.label}
             >
+              {done && (
+                <span className="cbmtpTileDone" aria-hidden="true">✓</span>
+              )}
               <Pictogram
                 name={`theme:${t.code}`}
                 tier="M"

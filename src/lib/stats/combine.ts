@@ -41,6 +41,18 @@ export type CombineThemeBest = {
   totalScore: number;
 };
 
+/** T-0217 slice 3: one row per theme-completion event. Re-completions
+ *  (after admin-added items) stack as separate rows. */
+export type CombineCompletion = {
+  themeCode: string;
+  /** Resolved display label from `combine_themes.label`, or `themeCode`
+   *  as a fallback if the theme has since been deleted. */
+  themeLabel: string;
+  completedVersion: number;
+  completedAt: Date;
+  itemCount: number;
+};
+
 export type CombineScopeDiscovery = {
   total: number;
   byTier: Record<Tier, number>;
@@ -69,6 +81,10 @@ export type CombineStats = {
   // along the way, not the goal. `totalScoreEver` is the running tally
   // across every finished run.
   totalScoreEver: number;
+  // T-0217 slice 3: theme completion log, newest first. Each row is a
+  // discrete "I finished this theme at version N" event; re-completions
+  // after an admin expansion stack as additional rows.
+  completions: CombineCompletion[];
 };
 
 const EMPTY_BY_TIER: Record<Tier, number> = {
@@ -82,6 +98,7 @@ function emptyScope(): CombineScopeDiscovery {
 export function computeCombineStats(
   discoveries: readonly CombineRow[],
   runs: readonly CombineRun[] = [],
+  completions: readonly CombineCompletion[] = [],
 ): CombineStats {
   const byTier: Record<Tier, number> = { ...EMPTY_BY_TIER };
   const byScope: Record<CombineScope, CombineScopeDiscovery> = {
@@ -120,6 +137,11 @@ export function computeCombineStats(
     }
   }
 
+  // Newest first — stats page renders chronologically newest-to-oldest.
+  const sortedCompletions = completions
+    .slice()
+    .sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime());
+
   return {
     totalDiscovered: discoveries.length,
     byTier,
@@ -131,5 +153,6 @@ export function computeCombineStats(
     totalRuns: runs.length,
     bestScoreEver,
     totalScoreEver,
+    completions: sortedCompletions,
   };
 }
