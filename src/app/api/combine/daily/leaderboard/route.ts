@@ -9,10 +9,10 @@ const THEMES = new Set(["everything"] as const);
 
 /**
  * Daily leaderboard for Combine. Returns up to the top 100 players for a
- * given (theme, day). Target-list daily rows sort by
- * `(found DESC, turns ASC, durationMs ASC, score DESC)` — completions
- * float to the top, partial runs rank below by how much was found, ties
- * break first by turns, then by time-taken, then by score.
+ * given (theme, day). Manifest daily rows (T-0241) sort by
+ * `(manifestFound DESC, turns ASC, durationMs ASC, score DESC)` —
+ * completions float to the top, partial completions rank by how many
+ * manifest items were found, then ties break by turns, time, score.
  *
  * Each user appears once (their best attempt at the day). No userIds leak
  * — only the public handle is returned.
@@ -43,15 +43,17 @@ export async function GET(req: Request) {
   // tie-breaks against pre-timer rows.
   const rows = await getDb().execute<{
     handle: string | null;
-    found: number | null;
+    manifest_found: number | null;
+    manifest_size: number | null;
     turns: number | null;
     duration_ms: number | null;
     score: number | null;
   }>(sql`
-    SELECT handle, found, turns, duration_ms, score FROM (
+    SELECT handle, manifest_found, manifest_size, turns, duration_ms, score FROM (
       SELECT DISTINCT ON (p.user_id)
         u.handle AS handle,
-        COALESCE((p.result->>'found')::int, 0) AS found,
+        COALESCE((p.result->>'manifestFound')::int, 0) AS manifest_found,
+        COALESCE((p.result->>'manifestSize')::int, 0) AS manifest_size,
         COALESCE((p.result->>'turns')::int, 0) AS turns,
         COALESCE((p.result->>'durationMs')::bigint, 9223372036854775807) AS duration_ms,
         COALESCE((p.result->>'score')::int, 0) AS score
@@ -61,12 +63,12 @@ export async function GET(req: Request) {
         AND p.ref = ${theme}
         AND p.result->>'daily' = ${day}
       ORDER BY p.user_id,
-               COALESCE((p.result->>'found')::int, 0) DESC,
+               COALESCE((p.result->>'manifestFound')::int, 0) DESC,
                COALESCE((p.result->>'turns')::int, 0) ASC,
                COALESCE((p.result->>'durationMs')::bigint, 9223372036854775807) ASC,
                COALESCE((p.result->>'score')::int, 0) DESC
     ) best
-    ORDER BY best.found DESC,
+    ORDER BY best.manifest_found DESC,
              best.turns ASC,
              best.duration_ms ASC,
              best.score DESC
@@ -76,7 +78,8 @@ export async function GET(req: Request) {
   const list = (rows as unknown as {
     rows?: Array<{
       handle: string | null;
-      found: number;
+      manifest_found: number;
+      manifest_size: number;
       turns: number;
       duration_ms: number | string | null;
       score: number;
@@ -84,7 +87,8 @@ export async function GET(req: Request) {
   }).rows
     ?? (rows as unknown as Array<{
       handle: string | null;
-      found: number;
+      manifest_found: number;
+      manifest_size: number;
       turns: number;
       duration_ms: number | string | null;
       score: number;
@@ -104,7 +108,8 @@ export async function GET(req: Request) {
           : null;
       return {
         handle: r.handle ?? null,
-        found: Number(r.found) || 0,
+        manifestFound: Number(r.manifest_found) || 0,
+        manifestSize: Number(r.manifest_size) || 0,
         turns: Number(r.turns) || 0,
         durationMs,
         score: Number(r.score) || 0,

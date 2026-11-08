@@ -137,17 +137,17 @@ export function newServerGame(opts: {
   dailyKey: string | null;
   seed: number;
   bundle: ThemeBundle;
-  /** Daily manifest ids (T-0240). Passed through once the engine learns
-   *  the field in T-0241; swallowed here so the start route can already
-   *  plumb it. */
+  /** Daily manifest ids. Frozen onto `GameState.manifest` so the engine
+   *  can run the win check locally; the client gets the same manifest
+   *  from the server-authoritative start response. */
   manifest?: string[] | null;
 }): GameState {
-  void opts.manifest;
   const { state } = newGame(opts.theme, opts.bundle, {
     mode: opts.mode as Mode,
     daily: opts.dailyKey,
     size: 6,
     seed: opts.seed,
+    manifest: opts.manifest ?? null,
   });
   return state;
 }

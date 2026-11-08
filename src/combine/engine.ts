@@ -196,6 +196,18 @@ export interface GameState {
    *  Gated UI-side: the panel only mounts when the server says the user
    *  is admin, so the reducer trusting this flag is fine. */
   debug: boolean;
+  /** Per-day find-list for daily manifest runs (T-0241). Frozen on the
+   *  state at `newGame` time from `DailyPayload.manifest`. Null for
+   *  endless / fast / manifest-less dailies (the last only exists during
+   *  the T-0241 → T-0242 interlude before the solver fills payloads).
+   *  Order is payload-stable so the UI renders consistently across
+   *  surfaces. */
+  manifest: string[] | null;
+  /** Subset of `manifest` the player has discovered so far, preserved in
+   *  manifest order (not find order). Denormalised from `found` for an
+   *  O(1) win check and so the UI never has to recompute the intersection
+   *  per render. Empty for null-manifest runs. */
+  manifestFound: string[];
   /** The initial seed this run started with. Daily runs only — endless/fast
    *  leave this null. Stamped onto saves so a resume after admin reset-today
    *  can detect the seed mismatch and drop the stale save. */
@@ -243,7 +255,7 @@ export type Event =
 export type TileSource = "tray" | "hold";
 
 export type Action =
-  | { type: "new-game"; theme: ThemeKey; mode: Mode; daily: string | null; size: number; seed?: number }
+  | { type: "new-game"; theme: ThemeKey; mode: Mode; daily: string | null; size: number; seed?: number; manifest?: string[] | null }
   | { type: "place"; slot: number; cell: number; source?: TileSource }
   | { type: "drop-on"; slot: number; cell: number; source?: TileSource }
   | { type: "choose"; outputIndex: number }
@@ -321,6 +333,11 @@ function cloneState(s: GameState): GameState {
     // explicitly null their own `lastSnapshot` at capture time so this
     // never nests more than one level deep.
     lastSnapshot: s.lastSnapshot,
+    // Manifest is frozen per-run; keep the reference stable so equality
+    // checks (e.g. "same manifest since snapshot") stay cheap. Only
+    // `manifestFound` ever changes and it's cloned as a fresh array.
+    manifest: s.manifest,
+    manifestFound: [...s.manifestFound],
     scripted: s.scripted ? s.scripted.slice() : undefined,
   };
 }
@@ -516,6 +533,15 @@ function finishResolve(
     // when they made it. 1-based to match the UI ("Chapter 1").
     state.discoveredAtChapter[recipe.out] = chapterIndex(state.found.length) + 1;
     state.found.push(recipe.out);
+    // Manifest check: if this discovery is on today's find-list, record
+    // it in `manifestFound` in manifest order (not find order). Rebuild
+    // via a filter so the invariant holds even if `manifestFound` ever
+    // ends up out-of-order through a snapshot / resume round-trip.
+    if (state.manifest && state.manifest.includes(recipe.out)) {
+      const foundSet = new Set(state.manifestFound);
+      foundSet.add(recipe.out);
+      state.manifestFound = state.manifest.filter((id) => foundSet.has(id));
+    }
   }
   const first = isClassic(state.mode) && uniqueFind;
   if (first) {
@@ -582,10 +608,20 @@ function afterMove(
   bundle: ThemeBundle,
   events: Event[],
 ): void {
-  // 0. Daily win condition lives in `state.manifest` (T-0241) — the
-  //    target-count win was removed in T-0240 along with the pre-manifest
-  //    playerbase. Until T-0241 lands the manifest field, daily runs end
-  //    only when the board clogs.
+  // 0. Daily manifest win: every item on the frozen per-day find list
+  //    has been discovered. `manifestFound` is kept in manifest order
+  //    denormalised from `found` in `finishResolve`, so the length check
+  //    is O(1). Gated on `state.mode === "daily"` defensively; a non-
+  //    daily run should never carry a non-null manifest.
+  if (
+    state.mode === "daily" &&
+    state.manifest != null &&
+    state.manifestFound.length >= state.manifest.length
+  ) {
+    state.over = true;
+    events.push({ type: "over" });
+    return;
+  }
 
   // 1. Chapter up? Chapters are discovery-driven: each threshold is a
   //    cumulative find count (log-scaled; see progression.ts). Open-ended
@@ -788,6 +824,10 @@ export function newGame(
     daily?: string | null;
     size?: number;
     seed?: number;
+    /** Daily manifest ids (T-0241). Only honoured for `mode === "daily"`;
+     *  silently dropped for endless / fast / tutorial since those modes
+     *  have no manifest win condition. Order is manifest-stable. */
+    manifest?: string[] | null;
     /** Scripted dealer queue — tutorial mode only. Copied into
      *  `state.scripted`; consumed from the front on every `dealTray`.
      *  Tiles must exist in the bundle or the dealer will insert `null`
@@ -803,6 +843,12 @@ export function newGame(
   const size = opts.size ?? 6;
   const seed =
     opts.seed ?? (daily ? dailySeed(daily) : freshEndlessSeed());
+  // Manifest is a daily-only concept. Empty-array manifests are coerced
+  // to null so the engine's win check (`manifestFound.length >= manifest.length`)
+  // doesn't fire immediately on a zero-length list.
+  const rawManifest = mode === "daily" ? opts.manifest ?? null : null;
+  const manifest =
+    rawManifest && rawManifest.length > 0 ? rawManifest.slice() : null;
   const state: GameState = {
     theme,
     mode,
@@ -838,6 +884,8 @@ export function newGame(
     undos: 1,
     lastSnapshot: null,
     debug: false,
+    manifest,
+    manifestFound: [],
     initialSeed: mode === "daily" ? seed : null,
     scripted: opts.scripted ? opts.scripted.slice() : undefined,
   };
@@ -917,6 +965,7 @@ export function reduce(
         daily: action.daily,
         size: action.size,
         seed: action.seed,
+        manifest: action.manifest ?? null,
       });
 
     case "choose": {

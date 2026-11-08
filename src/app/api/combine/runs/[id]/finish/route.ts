@@ -211,6 +211,8 @@ export async function POST(
       mode: run.mode,
       engineVersion: ENGINE_VERSION,
     };
+    const manifestSize = final.manifest?.length ?? 0;
+    const manifestFound = final.manifestFound.length;
     const resultValue =
       run.mode === "daily"
         ? {
@@ -218,8 +220,8 @@ export async function POST(
             daily: run.dailyKey || null,
             turns: final.moves,
             found: final.found.length,
-            // T-0241 will add `manifestFound` + `manifestSize` here for
-            // the leaderboard's manifest-progress sort.
+            manifestFound,
+            manifestSize,
             durationMs,
           }
         : base;

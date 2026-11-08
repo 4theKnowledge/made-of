@@ -22,8 +22,11 @@ import type { Mode, ThemeBundle, ThemeKey } from "./types";
  *     `chapter`; `ageMade` + `madeAtBand` removed; `discoveredAtChapter`
  *     added. Pre-v8 in-progress saves fail hydration and the player
  *     starts fresh — lifetime `combine_discoveries` collection (DB) is
- *     untouched by this version bump. */
-const SAVE_VERSION = 8;
+ *     untouched by this version bump.
+ *  v9 (T-0241): daily runs persist `manifest` + `manifestFound` so a
+ *     resume rehydrates the win-list without round-tripping the day's
+ *     payload. Pre-v9 saves drop. */
+const SAVE_VERSION = 9;
 
 /** Bump to force every player who has already finished today's daily to
  *  be able to play it again. Stamped into DailyResult + the review save
@@ -108,6 +111,14 @@ export interface StoredGame {
   shored?: boolean[];
   closeCalls: number;
   recentTrays: string[][];
+  /** Daily manifest the run was started against. Null for endless/fast
+   *  and for manifest-less dailies (the interlude between T-0240 and the
+   *  T-0242 solver). Persisted so a resume can rebuild the win check
+   *  without re-reading the day's payload. */
+  manifest?: string[] | null;
+  /** Subset of `manifest` already found, in manifest order. Empty when
+   *  no manifest, or when nothing on the list has been made yet. */
+  manifestFound?: string[];
 }
 
 export interface DailyResult {
@@ -170,6 +181,8 @@ function toStored(state: GameState): StoredGame {
     shored: state.shored.slice(),
     closeCalls: state.closeCalls,
     recentTrays: state.recentTrays.map((t) => t.slice()),
+    manifest: state.manifest ? state.manifest.slice() : null,
+    manifestFound: state.manifestFound.slice(),
   };
 }
 
@@ -383,6 +396,8 @@ export function hydrateGame(s: StoredGame): GameState {
     // Debug mode is session-only and never persisted — any save we
     // hydrate from is a real player save, so start clean.
     debug: false,
+    manifest: s.manifest && s.manifest.length > 0 ? s.manifest.slice() : null,
+    manifestFound: s.manifestFound ? s.manifestFound.slice() : [],
     initialSeed: s.mode === "daily" ? s.initialSeed ?? null : null,
   };
 }

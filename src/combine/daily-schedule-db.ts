@@ -20,6 +20,12 @@ import {
 import { getActiveDaily } from "./daily-config-db";
 import { todayKey } from "./rng";
 import type { ThemeKey } from "./types";
+import {
+  buildManifestForDay,
+  resolveManifestPool,
+  UnreachablePin,
+  UnreachableManifest,
+} from "./manifest-solver";
 
 const UTC_TODAY = (): string => todayKey(new Date());
 
@@ -176,15 +182,66 @@ export async function scheduleActiveDaily(
       row.payload.guestOutputIds,
     );
     for (const u of unresolved) unresolvedExamples.add(u);
-    // Keep the original payload — we don't rewrite guestOutputIds based
-    // on resolvability. Runtime drops unresolved ones silently; admin UI
-    // calls out the mismatch.
     toUpsert.push(row);
+  }
+
+  // Manifest build-up (T-0242). Each day's payload gets a frozen
+  // manifest resolved from `config.manifest.pool` membership + rotation
+  // history + the headless simulator. Days where the manifest can't be
+  // built (unreachable pins, simulator failures) have their payload
+  // dropped from the upsert so the admin sees the problem and fixes it
+  // before any player starts a broken run.
+  //
+  // Rotation history for manifests is independent of the guest rotation
+  // — mirror the pattern but key on `manifestHistoryByOutput`. Items
+  // not scheduled in the rotation window win placement priority.
+  if (dailyConfig.manifest) {
+    const pool = await fetchManifestPool(dailyConfig.manifest.pool);
+    const resolvedPool = resolveManifestPool(pool, cappedBundle);
+    const manifestHistory = buildManifestRotation(priorRows, startDay);
+    for (let i = 0; i < toUpsert.length; i++) {
+      const row = toUpsert[i];
+      try {
+        const { manifest } = buildManifestForDay({
+          cappedBundle,
+          theme: themeCode,
+          config: dailyConfig.manifest,
+          day: row.day,
+          pool: resolvedPool,
+          rotation: perDayRotation(manifestHistory, row.day),
+        });
+        row.payload = { ...row.payload, manifest };
+        // Update rolling history so subsequent days see today's picks.
+        for (const id of manifest) manifestHistory.set(id, row.day);
+      } catch (err) {
+        if (err instanceof UnreachablePin || err instanceof UnreachableManifest) {
+          console.error(
+            `[schedule] manifest build failed for ${row.day}:`,
+            err.message,
+          );
+          // Null out so the skip filter below drops the day. The admin
+          // UI sees the unresolved IDs via the pin / manifest's items.
+          if (err instanceof UnreachablePin) unresolvedExamples.add(err.pin);
+          else for (const id of err.manifest) unresolvedExamples.add(id);
+          toUpsert[i] = { day: row.day, payload: null as unknown as DailyPayload };
+        } else {
+          throw err;
+        }
+      }
+    }
   }
 
   let skipped = 0;
   const written: Array<{ day: string; payload: DailyPayload }> = [];
   for (const row of toUpsert) {
+    if (row.payload == null) {
+      // Manifest build failed for this day — skip the write so admin
+      // sees the unresolved IDs and fixes the pool / pins. Players
+      // see no row for that day (resolves to the empty payload
+      // fallback at runtime, which the engine refuses to win).
+      skipped++;
+      continue;
+    }
     if (mode === "extend" && existingDays.has(row.day)) {
       skipped++;
       continue;
@@ -356,4 +413,63 @@ function emptyPayload(): DailyPayload {
     manifest: [],
     generatedAt: new Date(0).toISOString(),
   };
+}
+
+/** Fetch every item id that's a member of a given combine_themes.code.
+ *  Scoped to live items (status=live) so admin-only drafts don't leak
+ *  into a scheduled manifest. */
+export async function fetchManifestPool(themeCode: string): Promise<string[]> {
+  const db = getDb();
+  const rows = await db
+    .select({ itemId: schema.itemCombineThemes.itemId })
+    .from(schema.itemCombineThemes)
+    .innerJoin(
+      schema.items,
+      eq(schema.items.id, schema.itemCombineThemes.itemId),
+    )
+    .where(
+      and(
+        eq(schema.itemCombineThemes.themeCode, themeCode),
+        eq(schema.items.status, "live"),
+      ),
+    );
+  return rows.map((r) => r.itemId);
+}
+
+/** Replay the manifest history across prior rows to build an
+ *  outputId → last-served-day map. Only rows strictly before `before`
+ *  are considered — days scheduled on or after `before` are being
+ *  (re)built and shouldn't count as "already served". */
+function buildManifestRotation(
+  priorRows: Array<{ day: string; payload: DailyPayload }>,
+  before: string,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  const sorted = priorRows
+    .filter((r) => r.day < before)
+    .slice()
+    .sort((a, b) => a.day.localeCompare(b.day));
+  for (const row of sorted) {
+    for (const id of row.payload.manifest ?? []) {
+      map.set(id, row.day);
+    }
+  }
+  return map;
+}
+
+/** From a rolling history map and a day, compute per-id
+ *  days-since-last-served. Matches the shape `pickGuests` / the
+ *  solver expects. */
+function perDayRotation(
+  history: Map<string, string>,
+  day: string,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  const target = new Date(`${day}T00:00:00Z`).getTime();
+  for (const [id, served] of history) {
+    const t = new Date(`${served}T00:00:00Z`).getTime();
+    const delta = Math.round((target - t) / 86400000);
+    if (delta >= 0) out.set(id, delta);
+  }
+  return out;
 }

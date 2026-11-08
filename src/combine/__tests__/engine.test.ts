@@ -1505,10 +1505,7 @@ function cloneForTest(s: GameState): GameState {
 }
 
 describe("daily age-progression victory is disabled", () => {
-  // T-0240 removed target-count daily. Daily runs now have NO engine-driven
-  // win condition until T-0241 adds the manifest-win in `afterMove`. This
-  // suite only verifies the endless-only age-progression final-age victory
-  // still doesn't fire for daily (regression guard from T-0180).
+  // Daily runs have no final-age victory (regression guard from T-0180).
   const bundle = fakeBundle({
     recipes: [
       R("dough", ["flour", "water"]),
@@ -1533,6 +1530,111 @@ describe("daily age-progression victory is disabled", () => {
     const s1 = reduce(s0, bundle, { type: "place", slot: 0, cell: 0 });
     const s2 = reduce(s1.state, bundle, { type: "place", slot: 1, cell: 1 });
     expect(s2.state.made).toBeGreaterThan(0);
+    expect(s2.state.over).toBe(false);
+  });
+});
+
+describe("daily manifest win (T-0241)", () => {
+  const bundle = fakeBundle({
+    recipes: [
+      R("dough", ["flour", "water"]),
+      R("cake", ["dough", "sugar"]),
+      R("bread", ["dough", "heat"]),
+    ],
+  });
+
+  it("initialises manifest + manifestFound for daily runs", () => {
+    const s = newGame("everything", bundle, {
+      mode: "daily",
+      daily: "2026-11-08",
+      size: 3,
+      seed: 1,
+      manifest: ["dough", "cake"],
+    }).state;
+    expect(s.manifest).toEqual(["dough", "cake"]);
+    expect(s.manifestFound).toEqual([]);
+  });
+
+  it("coerces empty-array manifest to null so win doesn't auto-fire", () => {
+    const s = newGame("everything", bundle, {
+      mode: "daily",
+      daily: "2026-11-08",
+      size: 3,
+      seed: 1,
+      manifest: [],
+    }).state;
+    expect(s.manifest).toBeNull();
+    expect(s.manifestFound).toEqual([]);
+  });
+
+  it("silently drops manifest for non-daily modes", () => {
+    const s = newGame("everything", bundle, {
+      mode: "endless",
+      size: 3,
+      seed: 1,
+      manifest: ["dough"],
+    }).state;
+    expect(s.manifest).toBeNull();
+  });
+
+  it("appends a manifest item to manifestFound when it's first discovered", () => {
+    const s0 = newGame("everything", bundle, {
+      mode: "daily",
+      daily: "2026-11-08",
+      size: 3,
+      seed: 1,
+      manifest: ["dough", "cake"],
+    }).state;
+    s0.board = Array(9).fill(null);
+    s0.tray = ["flour", "water", null];
+    const s1 = reduce(s0, bundle, { type: "place", slot: 0, cell: 0 });
+    const s2 = reduce(s1.state, bundle, { type: "place", slot: 1, cell: 1 });
+    expect(s2.state.found).toContain("dough");
+    expect(s2.state.manifestFound).toEqual(["dough"]);
+    // Game not over — manifest still has cake.
+    expect(s2.state.over).toBe(false);
+  });
+
+  it("ends with a win once every manifest item is discovered", () => {
+    const s0 = newGame("everything", bundle, {
+      mode: "daily",
+      daily: "2026-11-08",
+      size: 3,
+      seed: 1,
+      manifest: ["dough", "cake"],
+    }).state;
+    s0.board = Array(9).fill(null);
+    s0.tray = ["flour", "water", "sugar"];
+    const s1 = reduce(s0, bundle, { type: "place", slot: 0, cell: 0 });
+    const s2 = reduce(s1.state, bundle, { type: "place", slot: 1, cell: 1 });
+    expect(s2.state.manifestFound).toEqual(["dough"]);
+    const doughCell = s2.state.board.indexOf("dough");
+    const n = s2.state.n;
+    const neighbours = [doughCell - 1, doughCell + 1, doughCell - n, doughCell + n]
+      .filter((c) => c >= 0 && c < n * n)
+      .filter((c) => s2.state.board[c] == null);
+    expect(neighbours.length).toBeGreaterThan(0);
+    const sugarCell = neighbours[0];
+    const s3 = reduce(s2.state, bundle, { type: "place", slot: 2, cell: sugarCell });
+    expect(s3.state.manifestFound).toEqual(["dough", "cake"]);
+    expect(s3.state.over).toBe(true);
+    expect(s3.events.some((e) => e.type === "over")).toBe(true);
+  });
+
+  it("non-manifest discoveries do not bump manifestFound", () => {
+    const s0 = newGame("everything", bundle, {
+      mode: "daily",
+      daily: "2026-11-08",
+      size: 3,
+      seed: 1,
+      manifest: ["cake"],
+    }).state;
+    s0.board = Array(9).fill(null);
+    s0.tray = ["flour", "water", null];
+    const s1 = reduce(s0, bundle, { type: "place", slot: 0, cell: 0 });
+    const s2 = reduce(s1.state, bundle, { type: "place", slot: 1, cell: 1 });
+    expect(s2.state.found).toContain("dough");
+    expect(s2.state.manifestFound).toEqual([]);
     expect(s2.state.over).toBe(false);
   });
 });

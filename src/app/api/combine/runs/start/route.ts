@@ -89,10 +89,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "bundle unavailable" }, { status: 500 });
   }
   const seed = mintSeed(mode, dailyKey);
-  // T-0240: target-count dailies removed; manifest is the daily win
-  // condition. The engine field itself (`state.manifest`) lands in
-  // T-0241 — this step only plumbs the payload through so T-0241 has
-  // something to receive.
+  // Manifest is the daily win condition (T-0241). Null for endless/fast.
+  // Empty list = daily without a solver-filled manifest (T-0242
+  // interlude); the engine coerces that to null so the win check
+  // doesn't fire on a zero-length list.
   const manifest = await dailyManifestForRun(theme, dailyKey);
   const state = newServerGame({
     mode,

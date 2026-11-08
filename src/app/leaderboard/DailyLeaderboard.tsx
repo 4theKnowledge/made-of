@@ -4,9 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type Row = {
   handle: string | null;
-  found: number;
+  manifestFound: number;
+  manifestSize: number;
   turns: number;
   score: number;
+  durationMs?: number | null;
 };
 
 /** Public leaderboard view for today's Combine daily plus the past 6 days.
@@ -70,7 +72,9 @@ export function DailyLeaderboard({
     void fetchDay(selectedDay);
   }, [selectedDay, fetchDay]);
 
-  const target = targetByDay[selectedDay] ?? null;
+  // Manifest size per day; T-0244 will swap the "Found" column label
+  // for "Manifest" once player UI copy stabilises.
+  const manifestSize = targetByDay[selectedDay] ?? null;
 
   return (
     <section className="feat lb-wrap">
@@ -90,7 +94,7 @@ export function DailyLeaderboard({
       <header className="lb-header">
         <span className="lb-sub">
           {selectedDay}
-          {target != null && <span className="lb-target"> · target {target}</span>}
+          {manifestSize != null && <span className="lb-target"> · find {manifestSize}</span>}
         </span>
       </header>
 
@@ -146,9 +150,9 @@ export function DailyLeaderboard({
                       <span className="lb-score-mobile">{r.score.toLocaleString("en")} pts</span>
                     </td>
                     <td className="lb-num">
-                      {r.found}
-                      {target != null && (
-                        <span className="lb-muted"> / {target}</span>
+                      {r.manifestFound}
+                      {manifestSize != null && (
+                        <span className="lb-muted"> / {manifestSize}</span>
                       )}
                     </td>
                     <td className="lb-num">{r.turns}</td>
