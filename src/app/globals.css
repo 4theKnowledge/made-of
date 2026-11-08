@@ -1711,6 +1711,22 @@ a.btn.primary{color:var(--bg)}
   .cbmanifest-tile .ic{width:30px;height:30px}
   .cbmanifest-name{font-size:10px}
 }
+/* Row list variant of the manifest, used in-run inside the Daily Journey
+   sheet. Icon + name + "Nt ago" chip. Found rows dim like the grid tiles;
+   unfound stay vivid so the eye is pulled to what's left. */
+.cbmanifest-rows{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:5px;width:100%}
+.cbmanifest-row{margin:0;padding:0}
+.cbmanifest-row-btn{display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:10px;width:100%;padding:6px 8px;border:1.5px solid var(--ink);border-radius:4px;background:var(--surface);color:var(--ink);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.cbmanifest-row-btn:disabled{cursor:default}
+.cbmanifest-row-ic{position:relative;width:32px;height:32px;display:grid;place-items:center;border:1.5px solid var(--pk);border-radius:4px;background:var(--fill);box-shadow:2px 2px 0 var(--pk);color:#111417}
+.cbmanifest-row-ic .ic{width:22px;height:22px;border:0;background:transparent}
+.cbmanifest-row-ic .ic svg{width:100%;height:100%}
+.cbmanifest-row-check{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;padding:0 3px;box-sizing:border-box;border-radius:8px;background:#111417;color:#fff;font-family:var(--mono);font-size:10px;font-weight:700;line-height:16px;text-align:center;box-shadow:0 0 0 1.5px var(--bg)}
+.cbmanifest-row-name{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.cbmanifest-row-meta{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--muted);text-transform:lowercase}
+.cbmanifest-row.found .cbmanifest-row-ic{opacity:.6}
+.cbmanifest-row.found .cbmanifest-row-name{color:color-mix(in srgb, var(--ink) 65%, transparent)}
+.cbmanifest-row.found .cbmanifest-row-meta{color:var(--ink);opacity:.75}
 /* T-0244: in-run manifest tracker pill. One-line summary above the
    shelf; taps through to the JourneySheet so the player can see the
    full manifest grid. */

@@ -223,7 +223,7 @@ export function GameOverCard({
             ? manifestSize > 0
               ? won
                 ? `Found every item in ${state.moves} turn${state.moves === 1 ? "" : "s"}.`
-                : `${manifestFoundCount} / ${manifestSize} manifest items in ${state.moves} turn${state.moves === 1 ? "" : "s"}. The board ran out.`
+                : `${manifestFoundCount} / ${manifestSize} items found in ${state.moves} turn${state.moves === 1 ? "" : "s"}. The board ran out.`
               : `${state.found.length} discover${state.found.length === 1 ? "y" : "ies"} in ${state.moves} turns. The board ran out.`
             : newBest
               ? "A new best!"
@@ -244,7 +244,7 @@ export function GameOverCard({
                     ? `${manifestFoundCount} / ${manifestSize}`
                     : state.found.length}
                 </b>
-                <span>{manifestSize > 0 ? "manifest" : "discoveries"}</span>
+                <span>{manifestSize > 0 ? "found" : "discoveries"}</span>
               </div>
               <div>
                 <b>{durationMs != null ? formatDuration(durationMs) : "—"}</b>

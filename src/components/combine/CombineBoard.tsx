@@ -2472,10 +2472,10 @@ export function CombineBoard({
                   ? "cbmanifest-pill done"
                   : "cbmanifest-pill"
               }
-              aria-label="Manifest progress — tap to see today's find list"
+              aria-label="Daily progress — tap to see today's find list"
               onClick={() => setAgesOpen(true)}
             >
-              <span>Manifest</span>
+              <span>Find list</span>
               <span className="cbmanifest-pill-count">
                 {state.manifestFound.length}/{state.manifest.length}
               </span>

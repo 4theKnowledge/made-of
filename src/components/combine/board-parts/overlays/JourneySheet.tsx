@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
 import { chapterIndex, chapterThreshold } from "@/combine/progression";
@@ -6,7 +6,6 @@ import type { CombineItem, ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
-import { ManifestGrid } from "@/components/combine/board-parts/ManifestGrid";
 
 /** Journey dialog. Two modes:
  *  - Daily: a fixed-target run, so chapter grouping is noise. Shows the
@@ -68,16 +67,17 @@ function DailyJourney({
       {total > 0 ? (
         <>
           <h3>
-            Daily — {foundCount} of {total} manifest items
+            Daily — {foundCount} of {total} items found
           </h3>
           <p>
             {foundCount < total
               ? `${total - foundCount} to find · ${state.moves} turn${state.moves === 1 ? "" : "s"} so far. Fewer turns ranks higher.`
               : `Complete in ${state.moves} turn${state.moves === 1 ? "" : "s"}.`}
           </p>
-          <ManifestGrid
+          <ManifestRowList
             manifest={manifest}
             manifestFound={state.manifestFound}
+            moves={state.moves}
             bundle={bundle}
             onInfo={onInfo}
           />
@@ -255,6 +255,90 @@ function ChapterJourney({
         Done
       </button>
     </ResponsiveSheet>
+  );
+}
+
+/** In-run manifest list for the Daily Journey sheet. One row per manifest
+ *  item, with a trailing "Nt ago" chip for found items. Attribution is
+ *  tracked client-side via a ref — the engine state does not record a
+ *  per-manifest `foundAt`, and the data is cosmetic only. The ref resets
+ *  when the manifest identity changes (daily rollover or new run). */
+function ManifestRowList({
+  manifest,
+  manifestFound,
+  moves,
+  bundle,
+  onInfo,
+}: {
+  manifest: string[];
+  manifestFound: string[];
+  moves: number;
+  bundle: ThemeBundle;
+  onInfo: (id: string) => void;
+}) {
+  const foundSet = useMemo(() => new Set(manifestFound), [manifestFound]);
+  const manifestKey = manifest.join(",");
+
+  // id → moves value at the turn the item was first marked found.
+  const foundAtRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    foundAtRef.current = new Map();
+  }, [manifestKey]);
+
+  useEffect(() => {
+    const map = foundAtRef.current;
+    for (const id of manifestFound) {
+      if (!map.has(id)) map.set(id, moves);
+    }
+  }, [manifestFound, moves]);
+
+  return (
+    <ol className="cbmanifest-rows" aria-label="Today's find list">
+      {manifest.map((id) => {
+        const it = bundle.items.get(id);
+        const found = foundSet.has(id);
+        const foundAt = foundAtRef.current.get(id);
+        const delta = found && foundAt != null ? Math.max(0, moves - foundAt) : null;
+        const label = it ? cap(it.name) : id;
+        const meta = found
+          ? delta === 0 || delta == null
+            ? "just now"
+            : `${delta}t ago`
+          : "to find";
+        const title = `${label} · ${found ? "found" : "to find"}`;
+        return (
+          <li key={id} className={`cbmanifest-row${found ? " found" : ""}`}>
+            <button
+              type="button"
+              className="cbmanifest-row-btn"
+              onClick={() => onInfo(id)}
+              aria-label={title}
+              title={title}
+              disabled={!it}
+            >
+              <span
+                className="cbmanifest-row-ic"
+                style={it ? fillVar(it) : undefined}
+                aria-hidden="true"
+              >
+                {it ? (
+                  <Pictogram
+                    name={it.name}
+                    tier={it.tier}
+                    kind={it.kind}
+                    symbol={it.symbol}
+                  />
+                ) : null}
+                {found && <span className="cbmanifest-row-check">✓</span>}
+              </span>
+              <span className="cbmanifest-row-name">{label}</span>
+              <span className="cbmanifest-row-meta">{meta}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

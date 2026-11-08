@@ -134,3 +134,5 @@
 {"id": "C-0134", "ts": "2026-11-08T12:46:55Z", "kind": "feature", "summary": "combine admin debug: restart-today's-daily button + endpoint (deletes own run + progress; audit logged)", "refs": {"task": "T-0253"}}
 {"id": "C-0135", "ts": "2026-11-08T20:51:33Z", "kind": "fix", "summary": "daily Journey sheet now renders the manifest grid from the first render — client newGame receives manifest + partnerBias from the server page (T-0254)", "refs": {"task": "T-0254"}}
 {"id": "C-0136", "ts": "2026-11-08T21:04:39Z", "kind": "fix", "summary": "daily day-keys are now UTC — client and server agree on puzzle rollover regardless of viewer tz; display still localizes (T-0255)", "refs": {"task": "T-0255"}}
+{"id": "C-0137", "ts": "2026-11-08T21:24:35Z", "kind": "feature", "summary": "Daily Journey manifest UI now renders as a row list w/ turns-ago chips", "refs": {"task": "T-0264"}}
+{"id": "C-0138", "ts": "2026-11-08T21:25:35Z", "kind": "fix", "summary": "ChapterBar reads manifest progress (Daily · X/Y) in daily mode instead of chapter progression", "refs": {"task": "T-0265"}}

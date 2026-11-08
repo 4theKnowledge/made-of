@@ -42,7 +42,7 @@ export function ManifestGrid({
 }) {
   const foundSet = new Set(manifestFound);
   return (
-    <div className="cbmanifest" role="list" aria-label="Today's manifest">
+    <div className="cbmanifest" role="list" aria-label="Today's find list">
       {manifest.map((id) => {
         const it = bundle.items.get(id);
         const found = foundSet.has(id);
