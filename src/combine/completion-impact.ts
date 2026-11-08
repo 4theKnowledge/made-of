@@ -12,7 +12,7 @@
  * payloads so the admin UI can confirm before proceeding.
  */
 
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { schema } from "@/db/client";
 import type { DbOrTx } from "./theme-version";
 
@@ -33,7 +33,7 @@ export async function countUsersAffectedByItemRemoval(
     .where(
       and(
         eq(schema.combineDiscoveries.scope, "endless"),
-        sql`${schema.combineDiscoveries.itemId} = ANY(${itemIds})`,
+        inArray(schema.combineDiscoveries.itemId, itemIds),
       ),
     );
   return row?.n ?? 0;
