@@ -261,6 +261,19 @@ export function clearLastMode(): void {
   }
 }
 
+/** Wipe today's daily save slot. Used when the player backs out of the
+ *  Start-daily gate: any previously-persisted unstarted daily would make
+ *  the next startDaily() take the resume branch and skip the gate. */
+export function clearDailySave(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(DAILY_KEY);
+    if (loadLastMode() === "daily") clearLastMode();
+  } catch {
+    // ignore
+  }
+}
+
 /* ========================================================================
  * Load
  * ====================================================================== */

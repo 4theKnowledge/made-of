@@ -34,6 +34,7 @@ import {
   saveBest,
   saveDailyDone,
   saveGame,
+  clearDailySave,
   saveSound,
   loadNewUnlocks,
   addNewUnlocks,
@@ -1358,12 +1359,16 @@ export function CombineBoard({
   );
 
   // Save after every settled state transition. Skip while a choice is open
-  // or a drag is in flight so we don't persist half-moves.
+  // or a drag is in flight so we don't persist half-moves. Also skip while
+  // a fresh daily is sitting behind the Start gate: writing its unstarted
+  // state to the daily slot would make the next startDaily() tap take the
+  // resume branch (clock-running, no gate) instead of re-showing the gate.
   useEffect(() => {
     if (!didResume.current) return;
     if (state.choosing) return;
+    if (dailyStartPending) return;
     saveGame(state);
-  }, [state]);
+  }, [state, dailyStartPending]);
 
   const resetTransient = useCallback(() => {
     setFx({});
@@ -1540,6 +1545,11 @@ export function CombineBoard({
     setDailyStartPending(false);
     dailyStartRef.current = null;
     setDailyDurationMs(null);
+    // Wipe any daily save that leaked to storage while the gate was up.
+    // Without this, a subsequent startDaily() tap would find a save and
+    // take the resume branch (clock-running, no gate) instead of the
+    // fresh-daily branch that shows the gate again.
+    clearDailySave();
     const fastSave = loadGame(fastBundles[activeTheme], { daily: null, mode: "fast" });
     if (fastSave) {
       setState(hydrateGame(fastSave));
