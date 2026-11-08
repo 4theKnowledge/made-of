@@ -5,11 +5,18 @@ import { getActiveDaily } from "@/combine/daily-config-db";
 import { buildThemeBundle } from "@/combine/data";
 import { fetchManifestPool } from "@/combine/daily-schedule-db";
 import {
+  buildClusterManifest,
   buildManifestForDay,
+  computeDifficulty,
+  poolStats,
   resolveManifestPool,
   UnreachablePin,
   UnreachableManifest,
 } from "@/combine/manifest-solver";
+
+/** Must match CLUSTER_SAMPLER_MIN_POOL in daily-schedule-db.ts so the
+ *  preview mirrors what the actual schedule build will do. */
+const CLUSTER_SAMPLER_MIN_POOL = 20;
 import { todayKey } from "@/combine/rng";
 
 export const runtime = "nodejs";
@@ -59,15 +66,35 @@ export async function GET(req: NextRequest) {
   const poolMembers = await fetchManifestPool(active.config.manifest.pool);
   const pool = resolveManifestPool(poolMembers, cappedBundle);
 
+  // Precompute per-item difficulty and summarise the pool. The admin UI
+  // renders this even when the preview itself succeeds — it's a health
+  // check on the pool, not a failure indicator.
+  const difficulty = computeDifficulty(cappedBundle, active.themeCode);
+  const stats = poolStats(pool, difficulty);
+
+  const useClusterSampler = pool.length >= CLUSTER_SAMPLER_MIN_POOL;
   try {
-    const { manifest, turnsToSolve } = buildManifestForDay({
-      cappedBundle,
-      theme: active.themeCode,
-      config: active.config.manifest,
-      day,
-      pool,
-      rotation: new Map(),
-    });
+    const build = useClusterSampler
+      ? buildClusterManifest({
+          cappedBundle,
+          theme: active.themeCode,
+          config: active.config.manifest,
+          day,
+          pool,
+          rotation: new Map(),
+          difficulty,
+        })
+      : buildManifestForDay({
+          cappedBundle,
+          theme: active.themeCode,
+          config: active.config.manifest,
+          day,
+          pool,
+          rotation: new Map(),
+          difficulty,
+        });
+    const { manifest, turnsToSolve } = build;
+    const clusters = "clusters" in build ? build.clusters : null;
     const pinned = active.config.manifest.pins ?? [];
     const pinnedSet = new Set(pinned);
     const generated = manifest.filter((id) => !pinnedSet.has(id));
@@ -79,6 +106,9 @@ export async function GET(req: NextRequest) {
       generated,
       manifest,
       turnsToSolve,
+      poolStats: stats,
+      clusters,
+      sampler: useClusterSampler ? "cluster" : "single",
     });
   } catch (err) {
     if (err instanceof UnreachablePin) {
@@ -87,6 +117,7 @@ export async function GET(req: NextRequest) {
           error: "unreachable_pin",
           pin: err.pin,
           message: err.message,
+          poolStats: stats,
         },
         { status: 400 },
       );
@@ -96,7 +127,9 @@ export async function GET(req: NextRequest) {
         {
           error: "unreachable_manifest",
           manifest: err.manifest,
+          breakers: err.breakers ?? null,
           message: err.message,
+          poolStats: stats,
         },
         { status: 400 },
       );

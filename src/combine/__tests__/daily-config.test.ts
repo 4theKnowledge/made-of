@@ -75,7 +75,7 @@ describe("normaliseDailyConfig", () => {
     expect(() => normaliseDailyConfig({ manifest: {} })).toThrow(/pool/);
     expect(() => normaliseDailyConfig({ manifest: { pool: "" } })).toThrow(/pool/);
     expect(() =>
-      normaliseDailyConfig({ manifest: { pool: "x", size: 5 } }),
+      normaliseDailyConfig({ manifest: { pool: "x", size: 0 } }),
     ).toThrow(/size/);
     expect(() =>
       normaliseDailyConfig({ manifest: { pool: "x", size: 13 } }),

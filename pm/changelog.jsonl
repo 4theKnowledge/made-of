@@ -130,3 +130,4 @@
 {"id": "C-0130", "ts": "2026-11-08T07:13:46Z", "kind": "fix", "summary": "Combine daily: server-authoritative start-daily closes the peek-and-reload exploit; durationMs is now server-computed", "refs": {"task": "T-0247", "commit": "25c9f59"}}
 {"id": "C-0131", "ts": "2026-11-08T07:15:48Z", "kind": "fix", "summary": "Combine mode/theme picker now paints the actively-running mode/theme purple so it's clearly distinguished from the user's pending selection (T-0248)", "refs": {"task": "T-0248"}}
 {"id": "C-0132", "ts": "2026-11-08T07:20:41Z", "kind": "refactor", "summary": "Drop COMBINE_SERVER_RUNS flag; server-authoritative Combine runs are unconditional (T-0249)", "refs": {"task": "T-0249"}}
+{"id": "C-0133", "ts": "2026-11-08T12:32:57Z", "kind": "feature", "summary": "combine daily: cluster-sampled manifests (shared-precursor m-group seeds) + sim's direct-precursor priority; size floor dropped to 1", "refs": {"task": "T-0251"}}

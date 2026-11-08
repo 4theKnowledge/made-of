@@ -21,11 +21,19 @@ import { getActiveDaily } from "./daily-config-db";
 import { todayKey } from "./rng";
 import type { ThemeKey } from "./types";
 import {
+  buildClusterManifest,
   buildManifestForDay,
+  computeDifficulty,
   resolveManifestPool,
   UnreachablePin,
   UnreachableManifest,
 } from "./manifest-solver";
+
+/** Pool size below which cluster sampling degenerates — not enough items
+ *  to find `m` seeds at `MIN_SEED_DISTANCE` apart. Below this threshold
+ *  we fall through to the older single-pool sampler which just enforces
+ *  reachability + difficulty. */
+const CLUSTER_SAMPLER_MIN_POOL = 20;
 
 const UTC_TODAY = (): string => todayKey(new Date());
 
@@ -198,18 +206,36 @@ export async function scheduleActiveDaily(
   if (dailyConfig.manifest) {
     const pool = await fetchManifestPool(dailyConfig.manifest.pool);
     const resolvedPool = resolveManifestPool(pool, cappedBundle);
+    // Precompute per-item difficulty once per bundle (cached in a
+    // WeakMap keyed on the bundle object). Lets `buildManifestForDay`
+    // run a budgeted sample + skip sim-unsolvable items instead of
+    // discovering them day-by-day through failed sim retries.
+    const difficulty = computeDifficulty(cappedBundle, themeCode);
     const manifestHistory = buildManifestRotation(priorRows, startDay);
+    const useClusterSampler = resolvedPool.length >= CLUSTER_SAMPLER_MIN_POOL;
     for (let i = 0; i < toUpsert.length; i++) {
       const row = toUpsert[i];
       try {
-        const { manifest } = buildManifestForDay({
-          cappedBundle,
-          theme: themeCode,
-          config: dailyConfig.manifest,
-          day: row.day,
-          pool: resolvedPool,
-          rotation: perDayRotation(manifestHistory, row.day),
-        });
+        const build = useClusterSampler
+          ? buildClusterManifest({
+              cappedBundle,
+              theme: themeCode,
+              config: dailyConfig.manifest,
+              day: row.day,
+              pool: resolvedPool,
+              rotation: perDayRotation(manifestHistory, row.day),
+              difficulty,
+            })
+          : buildManifestForDay({
+              cappedBundle,
+              theme: themeCode,
+              config: dailyConfig.manifest,
+              day: row.day,
+              pool: resolvedPool,
+              rotation: perDayRotation(manifestHistory, row.day),
+              difficulty,
+            });
+        const { manifest } = build;
         row.payload = { ...row.payload, manifest };
         // Update rolling history so subsequent days see today's picks.
         for (const id of manifest) manifestHistory.set(id, row.day);
@@ -335,7 +361,7 @@ export async function resetTodaySchedule(
   }
 
   const input: ScheduleInput = { theme: themeCode, fullBundle, dailyConfig };
-  const payload = buildDailyPayload(input, today, recent);
+  let payload = buildDailyPayload(input, today, recent);
 
   // Collect unresolved guests for the admin feedback card.
   const { unresolved } = resolveGuestRecipes(
@@ -343,6 +369,60 @@ export async function resetTodaySchedule(
     cappedBundle,
     payload.guestOutputIds,
   );
+
+  // Manifest (T-0242 / T-0251). Mirrors the schedule-build path: when the
+  // active daily has a manifest config, resolve its pool, build (or
+  // cluster-sample) the day's manifest, and splice it into the payload.
+  // Without this, resetTodaySchedule would write an empty manifest and
+  // today's run would never satisfy the win condition.
+  const unresolvedFromManifest = new Set<string>();
+  if (dailyConfig.manifest) {
+    const poolRaw = await fetchManifestPool(dailyConfig.manifest.pool);
+    const resolvedPool = resolveManifestPool(poolRaw, cappedBundle);
+    const difficulty = computeDifficulty(cappedBundle, themeCode);
+    // Rotation for manifest items (independent of guests). Replay the
+    // manifest history across prior rows.
+    const manifestRotation = new Map<string, number>();
+    const manifestHistory = new Map<string, string>();
+    for (const row of history) {
+      for (const id of row.payload.manifest ?? []) {
+        manifestHistory.set(id, row.day);
+      }
+    }
+    for (const [id, served] of manifestHistory) {
+      const a = new Date(`${served}T00:00:00Z`).getTime();
+      const b = new Date(`${today}T00:00:00Z`).getTime();
+      manifestRotation.set(id, Math.round((b - a) / 86_400_000));
+    }
+    try {
+      const useCluster = resolvedPool.length >= CLUSTER_SAMPLER_MIN_POOL;
+      const build = useCluster
+        ? buildClusterManifest({
+            cappedBundle,
+            theme: themeCode,
+            config: dailyConfig.manifest,
+            day: today,
+            pool: resolvedPool,
+            rotation: manifestRotation,
+            difficulty,
+          })
+        : buildManifestForDay({
+            cappedBundle,
+            theme: themeCode,
+            config: dailyConfig.manifest,
+            day: today,
+            pool: resolvedPool,
+            rotation: manifestRotation,
+            difficulty,
+          });
+      payload = { ...payload, manifest: build.manifest };
+    } catch (err) {
+      if (err instanceof UnreachablePin) unresolvedFromManifest.add(err.pin);
+      else if (err instanceof UnreachableManifest) {
+        for (const id of err.manifest) unresolvedFromManifest.add(id);
+      } else throw err;
+    }
+  }
 
   await db
     .insert(schema.combineDailies)
@@ -355,7 +435,10 @@ export async function resetTodaySchedule(
   return {
     themeCode,
     payload,
-    unresolvedExamples: unresolved.slice(0, 20),
+    unresolvedExamples: [
+      ...unresolved,
+      ...unresolvedFromManifest,
+    ].slice(0, 20),
   };
 }
 

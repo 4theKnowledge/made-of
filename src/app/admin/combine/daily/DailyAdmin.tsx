@@ -20,6 +20,16 @@ interface PoolMember {
   name: string;
 }
 
+interface PoolStatsPayload {
+  total: number;
+  reachable: number;
+  solvable: number;
+  unsolvable: number;
+  unsolvableIds: string[];
+  medianDifficulty: number;
+  difficultyBuckets: Array<{ range: string; count: number }>;
+}
+
 interface ManifestPreview {
   day: string;
   themeCode: string;
@@ -28,6 +38,9 @@ interface ManifestPreview {
   generated: string[];
   manifest: string[];
   turnsToSolve: number;
+  poolStats?: PoolStatsPayload;
+  clusters?: Array<{ seed: string; members: string[] }> | null;
+  sampler?: "cluster" | "single";
 }
 
 interface ManifestPreviewError {
@@ -35,6 +48,8 @@ interface ManifestPreviewError {
   message: string;
   pin?: string;
   manifest?: string[];
+  breakers?: Array<{ id: string; difficulty: number | null }> | null;
+  poolStats?: PoolStatsPayload;
 }
 
 export interface ScheduleRow {
@@ -457,11 +472,18 @@ export function DailyAdmin({
               >
                 <Field
                   label="Size"
-                  hint={<>Items on the list. 6–12; 8 is the sweet spot.</>}
+                  hint={
+                    <>
+                      Items on the list. 1–12; 8 is the sweet spot, but on
+                      broad pools (e.g. Everything) the current solver
+                      handles 1–3 reliably — raise as the KB and solver
+                      grow.
+                    </>
+                  }
                 >
                   <input
                     type="number"
-                    min={6}
+                    min={1}
                     max={12}
                     value={manifestSize}
                     onChange={(e) => setManifestSize(e.target.value)}
@@ -649,7 +671,31 @@ export function DailyAdmin({
                   Unreachable pin: <code>{itemNamesById[previewError.pin] ?? previewError.pin}</code>
                 </div>
               )}
+              {previewError.breakers && previewError.breakers.length > 0 && (
+                <div style={{ marginTop: 8, fontSize: 12, color: "var(--muted)" }}>
+                  <div style={{ marginBottom: 4 }}>
+                    Last attempt&apos;s picks, with simulator turn-cost per item
+                    (null = sim can&apos;t solve alone):
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {previewError.breakers.map((b) => (
+                      <li key={b.id}>
+                        {itemNamesById[b.id] ?? b.id}
+                        <span style={{ marginLeft: 6, opacity: 0.7 }}>
+                          — {b.difficulty === null ? "unsolvable" : `${b.difficulty} turns`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
+          )}
+          {(preview?.poolStats || previewError?.poolStats) && (
+            <PoolHealth
+              stats={(preview?.poolStats ?? previewError?.poolStats)!}
+              itemNamesById={itemNamesById}
+            />
           )}
           {preview && (
             <div
@@ -666,6 +712,13 @@ export function DailyAdmin({
               <div style={{ fontSize: 11, color: "var(--muted)" }}>
                 Preview ({preview.day}) · pool {preview.poolSize} items ·
                 simulator solved in <strong>{preview.turnsToSolve}</strong> turns
+                {preview.sampler === "cluster" && preview.clusters && (
+                  <>
+                    {" "}
+                    · <strong>{preview.clusters.length}</strong> cluster
+                    {preview.clusters.length === 1 ? "" : "s"}
+                  </>
+                )}
               </div>
               {preview.pinned.length > 0 && (
                 <div>
@@ -677,14 +730,31 @@ export function DailyAdmin({
                   ))}
                 </div>
               )}
-              <div>
-                <span style={{ fontSize: 11, color: "var(--muted)" }}>GENERATED </span>
-                {preview.generated.map((id) => (
-                  <span key={id} style={pillStyle}>
-                    {itemNamesById[id] ?? id}
-                  </span>
-                ))}
-              </div>
+              {preview.sampler === "cluster" && preview.clusters ? (
+                <div style={{ display: "grid", gap: 6 }}>
+                  {preview.clusters.map((c, i) => (
+                    <div key={c.seed}>
+                      <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                        CLUSTER {i + 1} · seed {itemNamesById[c.seed] ?? c.seed}{" "}
+                      </span>
+                      {c.members.map((id) => (
+                        <span key={id} style={pillStyle}>
+                          {itemNamesById[id] ?? id}
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>GENERATED </span>
+                  {preview.generated.map((id) => (
+                    <span key={id} style={pillStyle}>
+                      {itemNamesById[id] ?? id}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1026,6 +1096,89 @@ export function DailyAdmin({
         </div>
       </section>
       {confirmDialog}
+    </div>
+  );
+}
+
+function PoolHealth({
+  stats,
+  itemNamesById,
+}: {
+  stats: PoolStatsPayload;
+  itemNamesById: Record<string, string>;
+}) {
+  const [showUnsolvable, setShowUnsolvable] = useState(false);
+  const warnColor = stats.unsolvable > 0 ? "var(--warn, #a66400)" : "var(--muted)";
+  return (
+    <div
+      style={{
+        border: "1px solid var(--line)",
+        borderRadius: 3,
+        padding: 10,
+        background: "var(--surface)",
+        fontSize: 12,
+        display: "grid",
+        gap: 6,
+      }}
+    >
+      <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        Pool health
+      </div>
+      <div>
+        <strong>{stats.total}</strong> in pool ·{" "}
+        <strong>{stats.reachable}</strong> reachable ·{" "}
+        <strong>{stats.solvable}</strong> solvable by sim ·{" "}
+        <span style={{ color: warnColor }}>
+          <strong>{stats.unsolvable}</strong> unsolvable
+        </span>
+      </div>
+      <div style={{ color: "var(--muted)" }}>
+        Median solo-solve: <strong>{stats.medianDifficulty.toFixed(1)}</strong> turns
+      </div>
+      {stats.difficultyBuckets.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          {stats.difficultyBuckets.map((b) => (
+            <span
+              key={b.range}
+              style={{
+                border: "1px solid var(--line)",
+                borderRadius: 10,
+                padding: "1px 8px",
+                fontSize: 11,
+                color: "var(--muted)",
+              }}
+            >
+              {b.range}t · {b.count}
+            </span>
+          ))}
+        </div>
+      )}
+      {stats.unsolvable > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowUnsolvable((v) => !v)}
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              fontSize: 11,
+              color: "var(--warn, #a66400)",
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+          >
+            {showUnsolvable ? "Hide" : "Show"} {stats.unsolvable} unsolvable item{stats.unsolvable === 1 ? "" : "s"}
+          </button>
+          {showUnsolvable && (
+            <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+              {stats.unsolvableIds.map((id) => (
+                <li key={id}>{itemNamesById[id] ?? id}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

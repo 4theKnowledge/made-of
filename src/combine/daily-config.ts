@@ -93,8 +93,8 @@ export function normaliseDailyConfig(raw: unknown): DailyConfig | null {
     }
     const size =
       m.size == null ? DEFAULT_MANIFEST_SIZE : Number(m.size);
-    if (!Number.isInteger(size) || size < 6 || size > 12) {
-      throw new Error("dailyConfig.manifest.size must be an integer in [6, 12]");
+    if (!Number.isInteger(size) || size < 1 || size > 12) {
+      throw new Error("dailyConfig.manifest.size must be an integer in [1, 12]");
     }
     let pins: string[] | undefined;
     if (m.pins != null) {
