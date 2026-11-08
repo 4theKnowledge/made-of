@@ -1529,6 +1529,38 @@ export function CombineBoard({
     void markStartedDaily();
   }, [dailyStartPending, markStartedDaily]);
 
+  // Player tapped "Not ready" on the Start-daily sheet — back out
+  // without starting the clock. Mirrors the mount-time fallback
+  // ladder (fast → endless → fresh endless for activeTheme) rather
+  // than restoring a snapshot, because the prior state could be a
+  // stale previous-day daily that we never want to walk the player
+  // back onto.
+  const cancelStartDaily = useCallback(() => {
+    if (!dailyStartPending) return;
+    setDailyStartPending(false);
+    dailyStartRef.current = null;
+    setDailyDurationMs(null);
+    const fastSave = loadGame(fastBundles[activeTheme], { daily: null, mode: "fast" });
+    if (fastSave) {
+      setState(hydrateGame(fastSave));
+      resetTransient();
+      return;
+    }
+    const endlessSave = loadGame(bundles[activeTheme], { daily: null });
+    if (endlessSave) {
+      setState(hydrateGame(endlessSave));
+      resetTransient();
+      return;
+    }
+    setState(
+      newGame(activeTheme, bundles[activeTheme], {
+        seed: freshEndlessSeed(),
+        size: 6,
+      }).state,
+    );
+    resetTransient();
+  }, [dailyStartPending, activeTheme, bundles, fastBundles, resetTransient]);
+
   // Admin "Replay daily" — restart today's daily server-side with
   // restart:true and reset the local engine to a fresh daily state. Not
   // offered to non-admins (the button on GameOverCard is gated on the
@@ -2610,6 +2642,13 @@ export function CombineBoard({
               </>
             )}
             <ButtonGroup>
+              <button
+                type="button"
+                className="cbh"
+                onClick={cancelStartDaily}
+              >
+                Not ready
+              </button>
               <button
                 type="button"
                 className="cbh"
