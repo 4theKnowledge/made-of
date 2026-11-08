@@ -8,6 +8,8 @@ import {
   isInvariantViolation,
 } from "@/lib/admin";
 import type { Confidence } from "@/db/schema";
+import { invalidateRunsForItems } from "@/combine/run-store";
+import { reloadSnapshot } from "@/graph/live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +41,15 @@ export async function PATCH(
   const [updated] = await db.update(schema.links).set(patch).where(eq(schema.links.id, id)).returning();
   if (!updated) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  return NextResponse.json({ link: updated });
+  // confidence and note are cosmetic; isCanary gates whether the link enters
+  // the bundle so it's structural.
+  let invalidatedRuns = 0;
+  if ("isCanary" in patch) {
+    await reloadSnapshot();
+    const itemsTouched = await resolveItemsForLink(updated);
+    invalidatedRuns = await invalidateRunsForItems(itemsTouched);
+  }
+  return NextResponse.json({ link: updated, invalidatedRuns });
 }
 
 /** DELETE /api/admin/links/[id] — removes the link and cascades its evidence. */
@@ -64,9 +74,31 @@ export async function DELETE(
       await assertInvariants(tx);
     });
     if (!deleted) return NextResponse.json({ error: "not_found" }, { status: 404 });
-    return NextResponse.json({ ok: true });
+    await reloadSnapshot();
+    const itemsTouched = await resolveItemsForLink(deleted);
+    const invalidatedRuns = await invalidateRunsForItems(itemsTouched);
+    return NextResponse.json({ ok: true, invalidatedRuns });
   } catch (err) {
     if (isInvariantViolation(err)) return invariantResponse(err.audit);
     throw err;
   }
+}
+
+/** Resolve the item ids affected by a link mutation: the target item, the
+ *  source item (for item-scoped links), and the recipe's parent item (for
+ *  recipe-scoped links). */
+async function resolveItemsForLink(link: typeof schema.links.$inferSelect): Promise<string[]> {
+  const ids = new Set<string>();
+  if (link.targetItemId) ids.add(link.targetItemId);
+  if (link.itemId) ids.add(link.itemId);
+  if (link.recipeId) {
+    const db = getDb();
+    const [recipe] = await db
+      .select({ itemId: schema.recipes.itemId })
+      .from(schema.recipes)
+      .where(eq(schema.recipes.id, link.recipeId))
+      .limit(1);
+    if (recipe) ids.add(recipe.itemId);
+  }
+  return [...ids];
 }

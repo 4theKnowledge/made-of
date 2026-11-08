@@ -112,8 +112,14 @@ export async function PATCH(
   if ("closure_config" in body) {
     await bumpCollectionVersion(db, code);
   }
-  await reloadSnapshot();
-  const invalidated = await invalidateRunsForTheme(code);
+  // Only structural fields invalidate runs. label/description/position/
+  // pictogram are cosmetic.
+  const structural = "closure_config" in body || "is_published" in body;
+  let invalidated = 0;
+  if (structural) {
+    await reloadSnapshot();
+    invalidated = await invalidateRunsForTheme(code);
+  }
   return NextResponse.json({ theme: updated, invalidatedRuns: invalidated });
 }
 

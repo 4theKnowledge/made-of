@@ -8,6 +8,8 @@ import {
   isInvariantViolation,
 } from "@/lib/admin";
 import type { ItemStatus } from "@/db/schema";
+import { invalidateRunsForThemes } from "@/combine/run-store";
+import { reloadSnapshot } from "@/graph/live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -216,5 +218,29 @@ export async function POST(req: NextRequest) {
     throw err;
   }
 
-  return NextResponse.json(result);
+  // Only structural changes affect the playable bundle. Tag edits are
+  // cosmetic. Status, isCombineExcluded, and isCanary gate whether an
+  // item enters the bundle at all. Theme adds/removes always invalidate.
+  const coreStructural =
+    typeof status === "string" ||
+    typeof isCombineExcluded === "boolean" ||
+    typeof isCanary === "boolean";
+  const themeStructural = themeAdd.length > 0 || themeRemove.length > 0;
+  let invalidatedRuns = 0;
+  if (coreStructural || themeStructural) {
+    await reloadSnapshot();
+    const themeRows = coreStructural && presentIds.length
+      ? await db
+          .selectDistinct({ themeCode: schema.itemCombineThemes.themeCode })
+          .from(schema.itemCombineThemes)
+          .where(inArray(schema.itemCombineThemes.itemId, presentIds))
+      : [];
+    const themes = new Set<string>([
+      ...themeRows.map((r) => r.themeCode),
+      ...themeAdd,
+      ...themeRemove,
+    ]);
+    invalidatedRuns = await invalidateRunsForThemes([...themes]);
+  }
+  return NextResponse.json({ ...result, invalidatedRuns });
 }

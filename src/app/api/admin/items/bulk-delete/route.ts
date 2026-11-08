@@ -7,6 +7,8 @@ import {
   invariantResponse,
   isInvariantViolation,
 } from "@/lib/admin";
+import { invalidateRunsForThemes } from "@/combine/run-store";
+import { reloadSnapshot } from "@/graph/live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,6 +50,17 @@ export async function POST(req: NextRequest) {
 
   const deletable = itemIds.filter((id) => !blockedByLinks.has(id));
 
+  // Resolve affected themes before the delete so cascaded join rows don't
+  // disappear before we can read them.
+  const affectedThemes = deletable.length
+    ? (
+        await db
+          .selectDistinct({ themeCode: schema.itemCombineThemes.themeCode })
+          .from(schema.itemCombineThemes)
+          .where(inArray(schema.itemCombineThemes.itemId, deletable))
+      ).map((r) => r.themeCode)
+    : [];
+
   let deletedCount = 0;
   if (deletable.length) {
     try {
@@ -65,9 +78,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  let invalidatedRuns = 0;
+  if (deletedCount > 0) {
+    await reloadSnapshot();
+    invalidatedRuns = await invalidateRunsForThemes(affectedThemes);
+  }
+
   return NextResponse.json({
     requested: itemIds.length,
     deleted: deletedCount,
     blocked: Array.from(blockedByLinks),
+    invalidatedRuns,
   });
 }

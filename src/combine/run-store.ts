@@ -7,7 +7,7 @@
  * one-way) have a single enforcer.
  */
 
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import type { CombineRun, CombineRunOwnerKind } from "@/db/schema";
 import { ENGINE_VERSION, type GameState } from "./engine";
@@ -193,4 +193,60 @@ export async function invalidateRunsForTheme(theme: string): Promise<number> {
     )
     .returning({ id: schema.combineRuns.id });
   return rows.length;
+}
+
+/** Invalidate every active run across all themes. Used by broad admin
+ *  operations (bulk uploads, pictogram uploads) where we can't cheaply
+ *  enumerate which themes were touched. Returns the count. */
+export async function invalidateAllActiveRuns(): Promise<number> {
+  const db = getDb();
+  const rows = await db
+    .update(schema.combineRuns)
+    .set({
+      status: "invalidated",
+      endedAt: new Date(),
+      updatedAt: new Date(),
+      epoch: sql`${schema.combineRuns.epoch} + 1`,
+    })
+    .where(eq(schema.combineRuns.status, "active"))
+    .returning({ id: schema.combineRuns.id });
+  return rows.length;
+}
+
+/** Invalidate active runs for a set of theme codes. Safe with an empty
+ *  list (no-op). Returns the count of rows transitioned. */
+export async function invalidateRunsForThemes(themes: string[]): Promise<number> {
+  if (themes.length === 0) return 0;
+  const db = getDb();
+  const rows = await db
+    .update(schema.combineRuns)
+    .set({
+      status: "invalidated",
+      endedAt: new Date(),
+      updatedAt: new Date(),
+      epoch: sql`${schema.combineRuns.epoch} + 1`,
+    })
+    .where(
+      and(
+        inArray(schema.combineRuns.theme, themes),
+        eq(schema.combineRuns.status, "active"),
+      ),
+    )
+    .returning({ id: schema.combineRuns.id });
+  return rows.length;
+}
+
+/** Invalidate active runs for every theme that contains any of the given
+ *  items. Used by item/link/recipe admin mutations where the surface knows
+ *  which items were touched but not which themes they're in — the join
+ *  table resolves that here. Safe with an empty list (no-op). Must be
+ *  called BEFORE a delete that would cascade the join rows. */
+export async function invalidateRunsForItems(itemIds: string[]): Promise<number> {
+  if (itemIds.length === 0) return 0;
+  const db = getDb();
+  const themeRows = await db
+    .selectDistinct({ themeCode: schema.itemCombineThemes.themeCode })
+    .from(schema.itemCombineThemes)
+    .where(inArray(schema.itemCombineThemes.itemId, itemIds));
+  return invalidateRunsForThemes(themeRows.map((r) => r.themeCode));
 }

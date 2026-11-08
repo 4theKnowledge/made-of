@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
+import { invalidateRunsForItems } from "@/combine/run-store";
+import { reloadSnapshot } from "@/graph/live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,5 +54,7 @@ export async function POST(req: NextRequest) {
     .values({ itemId, label, position })
     .returning();
 
-  return NextResponse.json({ recipe: inserted }, { status: 201 });
+  await reloadSnapshot();
+  const invalidatedRuns = await invalidateRunsForItems([itemId]);
+  return NextResponse.json({ recipe: inserted, invalidatedRuns }, { status: 201 });
 }

@@ -10,6 +10,8 @@ import {
 import { parseYear } from "@/data/load";
 import { sanitisePictogram } from "@/pictograms/sanitise";
 import type { ItemKind, ItemStatus, Tier } from "@/db/schema";
+import { invalidateRunsForItems, invalidateRunsForThemes } from "@/combine/run-store";
+import { reloadSnapshot } from "@/graph/live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -123,7 +125,22 @@ export async function PATCH(
       if (needsAudit) await assertInvariants(tx);
     });
     if (!updated) return NextResponse.json({ error: "not_found" }, { status: 404 });
-    return NextResponse.json({ item: updated });
+    // Only structural changes alter the playable bundle. isCanary gates
+    // whether an item/link enters the bundle at all. Editorial edits
+    // (name, pictogram, fact, tags, firstAppeared, symbol) are cosmetic —
+    // don't disrupt runs.
+    const structural =
+      "tier" in patch ||
+      "kind" in patch ||
+      "status" in patch ||
+      "isCombineExcluded" in patch ||
+      "isCanary" in patch;
+    let invalidatedRuns = 0;
+    if (structural) {
+      await reloadSnapshot();
+      invalidatedRuns = await invalidateRunsForItems([id]);
+    }
+    return NextResponse.json({ item: updated, invalidatedRuns });
   } catch (err) {
     if (isInvariantViolation(err)) return invariantResponse(err.audit);
     throw err;
@@ -152,6 +169,13 @@ export async function DELETE(
     );
   }
 
+  // Resolve themes before the delete so the cascaded itemCombineThemes rows
+  // don't disappear before we can read them.
+  const themeRowsBefore = await db
+    .select({ themeCode: schema.itemCombineThemes.themeCode })
+    .from(schema.itemCombineThemes)
+    .where(eq(schema.itemCombineThemes.itemId, id));
+
   try {
     let deleted: typeof schema.items.$inferSelect | undefined;
     await db.transaction(async (tx) => {
@@ -164,7 +188,11 @@ export async function DELETE(
       await assertInvariants(tx);
     });
     if (!deleted) return NextResponse.json({ error: "not_found" }, { status: 404 });
-    return NextResponse.json({ ok: true });
+    await reloadSnapshot();
+    const invalidatedRuns = await invalidateRunsForThemes(
+      themeRowsBefore.map((r) => r.themeCode),
+    );
+    return NextResponse.json({ ok: true, invalidatedRuns });
   } catch (err) {
     if (isInvariantViolation(err)) return invariantResponse(err.audit);
     throw err;

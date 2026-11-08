@@ -45,5 +45,7 @@ export async function POST(
       ),
     );
 
+  // Promote only flips the `source` provenance (closure→manual). The item
+  // stays in the theme either way, so the playable bundle is unchanged.
   return NextResponse.json({ ok: true, promoted: itemIds });
 }

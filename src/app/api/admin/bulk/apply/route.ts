@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAdminApi } from "@/lib/admin";
 import { applyBulk } from "@/lib/bulk-upload/apply";
 import { reloadSnapshot } from "@/graph/live";
+import { invalidateAllActiveRuns } from "@/combine/run-store";
 import type { BulkPack, ItemDecision } from "@/lib/bulk-upload/types";
 
 export const runtime = "nodejs";
@@ -40,7 +41,8 @@ export async function POST(req: NextRequest) {
 
   if (result.ok && !result.dryRun) {
     const snap = await reloadSnapshot();
-    return NextResponse.json({ ...result, snapshotVersion: snap.version });
+    const invalidatedRuns = await invalidateAllActiveRuns();
+    return NextResponse.json({ ...result, snapshotVersion: snap.version, invalidatedRuns });
   }
   return NextResponse.json(result, { status: result.ok ? 200 : 400 });
 }

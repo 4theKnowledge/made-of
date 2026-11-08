@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
 import { reloadSnapshot } from "@/graph/live";
+import { invalidateRunsForItems } from "@/combine/run-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,5 +27,6 @@ export async function POST(
   if (!updated) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   const snap = await reloadSnapshot();
-  return NextResponse.json({ item: updated, snapshotVersion: snap.version });
+  const invalidatedRuns = await invalidateRunsForItems([id]);
+  return NextResponse.json({ item: updated, snapshotVersion: snap.version, invalidatedRuns });
 }

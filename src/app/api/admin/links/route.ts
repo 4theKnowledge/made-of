@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
 import type { Confidence, LinkType } from "@/db/schema";
+import { invalidateRunsForItems } from "@/combine/run-store";
+import { reloadSnapshot } from "@/graph/live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -101,5 +103,17 @@ export async function POST(req: NextRequest) {
     })
     .returning();
 
-  return NextResponse.json({ link: inserted }, { status: 201 });
+  await reloadSnapshot();
+  const touched = new Set<string>([targetItemId]);
+  if (itemId) touched.add(itemId);
+  if (recipeId) {
+    const [recipe] = await db
+      .select({ itemId: schema.recipes.itemId })
+      .from(schema.recipes)
+      .where(eq(schema.recipes.id, recipeId))
+      .limit(1);
+    if (recipe) touched.add(recipe.itemId);
+  }
+  const invalidatedRuns = await invalidateRunsForItems([...touched]);
+  return NextResponse.json({ link: inserted, invalidatedRuns }, { status: 201 });
 }

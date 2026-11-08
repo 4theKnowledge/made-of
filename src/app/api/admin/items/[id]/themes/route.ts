@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
+import { invalidateRunsForThemes } from "@/combine/run-store";
+import { reloadSnapshot } from "@/graph/live";
 import { bumpCollectionVersion } from "@/combine/theme-version";
 import {
   countUsersAffectedByItemRemoval,
@@ -150,5 +152,10 @@ export async function PUT(
     }
   });
 
-  return NextResponse.json({ themes: themeCodes });
+  let invalidatedRuns = 0;
+  if (changed.length > 0) {
+    await reloadSnapshot();
+    invalidatedRuns = await invalidateRunsForThemes(changed);
+  }
+  return NextResponse.json({ themes: themeCodes, invalidatedRuns });
 }

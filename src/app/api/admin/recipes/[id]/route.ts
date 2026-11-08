@@ -7,6 +7,8 @@ import {
   invariantResponse,
   isInvariantViolation,
 } from "@/lib/admin";
+import { invalidateRunsForItems } from "@/combine/run-store";
+import { reloadSnapshot } from "@/graph/live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +51,14 @@ export async function PATCH(
       .where(eq(schema.recipes.id, id))
       .returning();
     if (!updated) return NextResponse.json({ error: "not_found" }, { status: 404 });
-    return NextResponse.json({ recipe: updated });
+    // Position affects recipe ordering (which recipe is primary). Label
+    // is cosmetic — skip invalidation for label-only edits.
+    let invalidatedRuns = 0;
+    if ("position" in patch) {
+      await reloadSnapshot();
+      invalidatedRuns = await invalidateRunsForItems([updated.itemId]);
+    }
+    return NextResponse.json({ recipe: updated, invalidatedRuns });
   } catch (e) {
     // unique_violation on (itemId, position)
     if (e instanceof Error && /unique/i.test(e.message)) {
@@ -81,7 +90,9 @@ export async function DELETE(
       await assertInvariants(tx);
     });
     if (!deleted) return NextResponse.json({ error: "not_found" }, { status: 404 });
-    return NextResponse.json({ ok: true });
+    await reloadSnapshot();
+    const invalidatedRuns = await invalidateRunsForItems([deleted.itemId]);
+    return NextResponse.json({ ok: true, invalidatedRuns });
   } catch (err) {
     if (isInvariantViolation(err)) return invariantResponse(err.audit);
     throw err;

@@ -118,3 +118,5 @@
 {"id": "C-0118", "ts": "2026-11-08T01:33:30Z", "kind": "feature", "summary": "Combine Helpers trigger moved from TopBar to right edge of the hold bar (thumb-zone reachable)", "refs": {"task": "T-0229"}}
 {"id": "C-0119", "ts": "2026-11-08T01:49:13Z", "kind": "feature", "summary": "combine: shimmer skeleton while a saved run loads, replacing the empty-board flash", "refs": {"task": "T-0228"}}
 {"id": "C-0120", "ts": "2026-11-08T01:53:45Z", "kind": "fix", "summary": "JourneySheet: split daily/chapter branches so hooks don't follow an early return (unblocks Railway build)", "refs": {"task": "T-0230"}}
+{"id": "C-0121", "ts": "2026-11-08T02:01:35Z", "kind": "fix", "summary": "Combine run invalidation now covers item/link/recipe/kind edits, not just theme-direct routes (T-0209)", "refs": {"task": "T-0209"}}
+{"id": "C-0122", "ts": "2026-11-08T02:40:34Z", "kind": "refactor", "summary": "Combine run invalidation gated on structural changes only; cosmetic edits (name/pictogram/label/etc.) no longer kick players (T-0209)", "refs": {"task": "T-0209"}}

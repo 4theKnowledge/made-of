@@ -68,7 +68,8 @@ export async function PATCH(
     .where(eq(schema.kinds.code, code))
     .returning();
   if (!updated) return NextResponse.json({ error: "not_found" }, { status: 404 });
-
+  // Kind PATCH only accepts cosmetic fields (label, description, position,
+  // pictogram) — none affect which items are playable. No invalidation.
   return NextResponse.json({ kind: updated });
 }
 
