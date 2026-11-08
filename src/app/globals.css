@@ -1723,7 +1723,7 @@ a.btn.primary{color:var(--bg)}
 @media (max-width:420px){
   .cbmanifest{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
   .cbmanifest-tile{padding:6px 4px 4px}
-  .cbmanifest-tile .ic{width:30px;height:30px}
+  .cbmanifest-tile .ic{width:24px;height:24px}
   .cbmanifest-name{font-size:10px}
 }
 /* Row list variant of the manifest, used in-run inside the Daily Journey
