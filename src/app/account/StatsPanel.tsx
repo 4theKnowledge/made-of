@@ -108,9 +108,23 @@ export function StatsPanel({ stats }: { stats: AccountStats }) {
       )}
 
       <div>
-        <h4 style={{ margin: "0 0 10px", fontSize: 14, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted)" }}>
-          Combine
-        </h4>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            gap: 12,
+            margin: "0 0 10px",
+          }}
+        >
+          <h4 style={{ margin: 0, fontSize: 14, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted)" }}>
+            Combine
+          </h4>
+          <span style={{ display: "flex", gap: 16, fontSize: 13 }}>
+            <Link href="/account/combine">Run history →</Link>
+            <Link href="/account/collections">Collections →</Link>
+          </span>
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
           <Stat label="Best score" value={combine.bestScoreEver.toLocaleString()} hint={combine.totalRuns > 0 ? `across ${combine.totalRuns} runs` : "no runs yet"} />
           <Stat label="Total score" value={combine.totalScoreEver.toLocaleString()} />
