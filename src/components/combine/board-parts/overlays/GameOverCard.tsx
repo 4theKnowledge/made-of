@@ -7,6 +7,7 @@ import { cap } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 import { ButtonGroup } from "@/components/common/ButtonGroup";
+import { ManifestGrid } from "@/components/combine/board-parts/ManifestGrid";
 
 /** T-0217 Slice 1b: the newest completion row for the active theme, or
  *  null if the player has never completed it (or isn't signed in). */
@@ -70,12 +71,16 @@ export function GameOverCard({
   const endChapter = chapterIndex(state.found.length) + 1;
   const progressionLabel = `Chapter ${endChapter}`;
   const newBest = state.newBest;
-  // T-0240: target-count daily removed; "daily run" now means any daily.
-  // T-0244 will replace `won` with manifest completeness once
-  // GameState.manifest lands; until then a daily run that ended (board
-  // clogged) is a loss.
+  // Manifest-win for daily runs (T-0244). A run "won" when the engine
+  // ended the run with every manifest item found; a board-clog ends
+  // the run as a loss (partial completion still ranks via the
+  // leaderboard's manifestFound sort).
   const isDailyTargetRun = state.mode === "daily";
-  const won = false;
+  const manifest = state.manifest ?? [];
+  const manifestFoundCount = state.manifestFound.length;
+  const manifestSize = manifest.length;
+  const won =
+    isDailyTargetRun && manifestSize > 0 && manifestFoundCount >= manifestSize;
   const rank = useDailyRank({
     // Gate on `!finishing` so we don't fetch before `/finish` commits
     // the `progress` row. Pre-fix, the fetch fired on mount and almost
@@ -215,7 +220,11 @@ export function GameOverCard({
         <b className="big">{state.score.toLocaleString("en")}</b>
         <span className="sub">
           {isDailyTargetRun
-            ? `${state.found.length} discover${state.found.length === 1 ? "y" : "ies"} in ${state.moves} turns. The board ran out.`
+            ? manifestSize > 0
+              ? won
+                ? `Found every item in ${state.moves} turn${state.moves === 1 ? "" : "s"}.`
+                : `${manifestFoundCount} / ${manifestSize} manifest items in ${state.moves} turn${state.moves === 1 ? "" : "s"}. The board ran out.`
+              : `${state.found.length} discover${state.found.length === 1 ? "y" : "ies"} in ${state.moves} turns. The board ran out.`
             : newBest
               ? "A new best!"
               : best > state.score
@@ -230,8 +239,12 @@ export function GameOverCard({
                 <span>turns</span>
               </div>
               <div>
-                <b>{state.found.length}</b>
-                <span>discoveries</span>
+                <b>
+                  {manifestSize > 0
+                    ? `${manifestFoundCount} / ${manifestSize}`
+                    : state.found.length}
+                </b>
+                <span>{manifestSize > 0 ? "manifest" : "discoveries"}</span>
               </div>
               <div>
                 <b>{durationMs != null ? formatDuration(durationMs) : "—"}</b>
@@ -287,34 +300,48 @@ export function GameOverCard({
             })}
           </div>
         )}
-        {state.found.length > 0 && (
+        {manifestSize > 0 ? (
           <>
             <p className="sub" style={{ marginTop: 4 }}>
-              New discoveries
+              Manifest
             </p>
-            <div className="cbchip cbfound">
-              {state.found.slice(0, 10).map((id) => {
-                const it = bundle.items.get(id);
-                if (!it) return null;
-                return (
-                  <span key={id} style={fillVar(it)}>
-                    <Pictogram
-                      name={it.name}
-                      tier={it.tier}
-                      kind={it.kind}
-                      symbol={it.symbol}
-                    />
-                    <em>{cap(it.name)}</em>
-                  </span>
-                );
-              })}
-              {state.found.length > 10 && (
-                <span className="more">
-                  +{state.found.length - 10} more in your collection
-                </span>
-              )}
-            </div>
+            <ManifestGrid
+              manifest={manifest}
+              manifestFound={state.manifestFound}
+              bundle={bundle}
+              mode="end"
+            />
           </>
+        ) : (
+          state.found.length > 0 && (
+            <>
+              <p className="sub" style={{ marginTop: 4 }}>
+                New discoveries
+              </p>
+              <div className="cbchip cbfound">
+                {state.found.slice(0, 10).map((id) => {
+                  const it = bundle.items.get(id);
+                  if (!it) return null;
+                  return (
+                    <span key={id} style={fillVar(it)}>
+                      <Pictogram
+                        name={it.name}
+                        tier={it.tier}
+                        kind={it.kind}
+                        symbol={it.symbol}
+                      />
+                      <em>{cap(it.name)}</em>
+                    </span>
+                  );
+                })}
+                {state.found.length > 10 && (
+                  <span className="more">
+                    +{state.found.length - 10} more in your collection
+                  </span>
+                )}
+              </div>
+            </>
+          )
         )}
         <p className="sub">
           {themeDiscovered} of {totalOutputs} things discovered in{" "}

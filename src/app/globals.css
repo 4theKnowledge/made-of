@@ -1687,6 +1687,38 @@ a.btn.primary{color:var(--bg)}
    beyond the ResponsiveSheet defaults. The modifier exists so a future
    layout tweak can find this surface distinctly. */
 .rsheet.cbstartdaily{}
+/* T-0244: manifest grid. Shared across the start-daily sheet, the
+   JourneySheet's daily branch, and the GameOverCard end summary.
+   4 columns at the default (8-item) size; auto-fit so 6 / 10 / 12
+   also render tidily. Tiles reuse the `.cbslot` palette (tier-coloured
+   border + fill); `-found` dims the inner graphics but keeps the
+   coloured frame so the eye is pulled to what's still to do. `-missed`
+   mutes the whole tile for the end-of-run review surface. */
+.cbmanifest{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:100%;margin:6px 0}
+.cbmanifest-tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;padding:8px 6px 6px;border:1.5px solid var(--pk);border-radius:4px;background:var(--fill);box-shadow:2px 2px 0 var(--pk);color:#111417;cursor:pointer;font:inherit;text-align:center;-webkit-tap-highlight-color:transparent}
+.cbmanifest-tile .ic{width:36px;height:36px;border:0;background:transparent}
+.cbmanifest-tile .ic svg{width:100%;height:100%}
+.cbmanifest-name{display:block;font-style:normal;font-size:10.5px;font-weight:600;line-height:1.1;letter-spacing:.01em;color:#111417;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.cbmanifest-tile-found{opacity:.55}
+.cbmanifest-tile-found .ic{opacity:.7}
+.cbmanifest-tile-found .cbmanifest-name{color:color-mix(in srgb, #111417 70%, transparent)}
+.cbmanifest-tile-missed{opacity:.45;filter:saturate(.3)}
+.cbmanifest-check,.cbmanifest-cross{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#111417;color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;line-height:18px;text-align:center;box-shadow:0 0 0 1.5px var(--bg)}
+.cbmanifest-cross{background:#6a6f74}
+@media (max-width:420px){
+  .cbmanifest{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+  .cbmanifest-tile{padding:6px 4px 4px}
+  .cbmanifest-tile .ic{width:30px;height:30px}
+  .cbmanifest-name{font-size:10px}
+}
+/* T-0244: in-run manifest tracker pill. One-line summary above the
+   shelf; taps through to the JourneySheet so the player can see the
+   full manifest grid. */
+.cbmanifest-pill{display:inline-flex;align-items:center;gap:10px;padding:5px 10px;border:1.5px solid var(--ink);border-radius:999px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;cursor:pointer;line-height:1}
+.cbmanifest-pill:disabled{opacity:.5;cursor:default}
+.cbmanifest-pill-chev{font-family:inherit;opacity:.6}
+.cbmanifest-pill-count{font-family:var(--mono);letter-spacing:.02em;color:var(--ink)}
+.cbmanifest-pill.done{background:color-mix(in srgb, var(--accent,#2a7a2a) 18%, var(--surface));border-color:var(--accent,#2a7a2a)}
 /* T-0217 Slice 1b: Combine theme-completion ceremony. Inline banner that
    lives above the GameOverCard stats when the player's run tipped them
    over the threshold for the current collection_version. Quiet and

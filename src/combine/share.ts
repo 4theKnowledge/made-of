@@ -27,15 +27,25 @@ export function dailyShareText(
   const ages = bundle.theme.ages;
   const ageName = ages[state.chapter] ?? "";
   const top = bestShelfItem(state, bundle);
-  // T-0240 ripped out target-count; T-0244 will swap this to manifest
-  // progress once GameState.manifest lands. Until then, the daily share
-  // uses the discovery-count headline unchanged from endless.
+  const manifest = state.manifest ?? [];
+  const manifestSize = manifest.length;
+  const manifestFound = state.manifestFound.length;
   const found = state.found.length;
-  const squares = ages.map((_, k) => (k <= state.chapter ? "🟩" : "⬜")).join("");
-  const headline = `${squares} reached ${ageName}`;
-  const foundLine = found
-    ? ` · ${found} new discover${found > 1 ? "ies" : "y"}`
-    : "";
+  // Manifest-mode daily: squares show manifest progress (4×2 grid
+  // folded into one line), headline reads "N/M in T turns". Legacy
+  // (no manifest) dailies fall through to the chapter-progression
+  // line so pre-manifest share URLs still render sensibly.
+  const hasManifest = manifestSize > 0;
+  const squares = hasManifest
+    ? manifest.map((id) => (state.manifestFound.includes(id) ? "🟩" : "⬜")).join("")
+    : ages.map((_, k) => (k <= state.chapter ? "🟩" : "⬜")).join("");
+  const headline = hasManifest
+    ? `${squares} ${manifestFound}/${manifestSize} in ${state.moves} turn${state.moves === 1 ? "" : "s"}`
+    : `${squares} reached ${ageName}`;
+  const foundLine =
+    !hasManifest && found
+      ? ` · ${found} new discover${found > 1 ? "ies" : "y"}`
+      : "";
   const chainLine = state.longest > 1 ? ` · longest chain ×${state.longest}` : "";
   const shelfLine = state.shelf.length
     ? ` · ${state.shelf.length} finished thing${state.shelf.length > 1 ? "s" : ""}`

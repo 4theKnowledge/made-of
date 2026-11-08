@@ -76,6 +76,7 @@ import {
   type MasteryInfo,
 } from "@/components/combine/board-parts/types";
 import { vibrate } from "@/components/combine/board-parts/util";
+import { ManifestGrid } from "@/components/combine/board-parts/ManifestGrid";
 import {
   GlyphAges,
   GlyphCombine,
@@ -2425,6 +2426,26 @@ export function CombineBoard({
           bundle={bundle}
           onAges={() => setAgesOpen(true)}
         />
+        {state.manifest && state.manifest.length > 0 && (
+          <div style={{ display: "flex", justifyContent: "center", margin: "4px 0 0" }}>
+            <button
+              type="button"
+              className={
+                state.manifestFound.length >= state.manifest.length
+                  ? "cbmanifest-pill done"
+                  : "cbmanifest-pill"
+              }
+              aria-label="Manifest progress — tap to see today's find list"
+              onClick={() => setAgesOpen(true)}
+            >
+              <span>Manifest</span>
+              <span className="cbmanifest-pill-count">
+                {state.manifestFound.length}/{state.manifest.length}
+              </span>
+              <span className="cbmanifest-pill-chev" aria-hidden="true">›</span>
+            </button>
+          </div>
+        )}
         <Shelf
           state={state}
           bundle={bundle}
@@ -2550,11 +2571,26 @@ export function CombineBoard({
             className="cbresult cbstartdaily"
           >
             <span className="k">Daily · {state.daily}</span>
-            <b className="big">Ready?</b>
-            <span className="sub">
-              {/* T-0244 will render the manifest grid here. */}
-              Your time starts when you tap Start.
-            </span>
+            {state.manifest && state.manifest.length > 0 ? (
+              <>
+                <b className="big">Find these {state.manifest.length}</b>
+                <span className="sub">
+                  Your time starts when you tap Start.
+                </span>
+                <ManifestGrid
+                  manifest={state.manifest}
+                  manifestFound={[]}
+                  bundle={bundle}
+                />
+              </>
+            ) : (
+              <>
+                <b className="big">Ready?</b>
+                <span className="sub">
+                  Your time starts when you tap Start.
+                </span>
+              </>
+            )}
             <ButtonGroup>
               <button
                 type="button"

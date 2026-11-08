@@ -6,6 +6,7 @@ import type { CombineItem, ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
+import { ManifestGrid } from "@/components/combine/board-parts/ManifestGrid";
 
 /** Journey dialog. Two modes:
  *  - Daily: a fixed-target run, so chapter grouping is noise. Shows the
@@ -57,24 +58,65 @@ function DailyJourney({
   onInfo: (id: string) => void;
   onDismiss: () => void;
 }) {
-  // T-0244 replaces this with the manifest grid. T-0240 leaves a flat
-  // discovery list + turn count so the sheet still renders usefully.
-  const foundCount = state.found.length;
+  const manifest = state.manifest ?? [];
+  const foundCount = state.manifestFound.length;
+  const total = manifest.length;
+  // Items the player made that aren't on the manifest — tracked
+  // separately so the player sees progress without the list turning
+  // into noise. Rendered compactly below the grid.
+  const extras = state.found.filter((id) => !manifest.includes(id));
   return (
     <ResponsiveSheet open onDismiss={onDismiss} ariaLabel="Journey" className="cbagesheet">
       <span className="k">Journey</span>
-      <h3>Daily — {foundCount} discover{foundCount === 1 ? "y" : "ies"} this run</h3>
-      <p>
-        {state.moves} turn{state.moves === 1 ? "" : "s"} so far. Fewer turns ranks higher on today&apos;s leaderboard.
-      </p>
-      {foundCount > 0 && (
-        <div className="cbagefinds" aria-label="Found this run">
-          {state.found.map((id) => {
-            const it = bundle.items.get(id);
-            if (!it) return null;
-            return <DiscoveryTile key={id} item={it} onInfo={onInfo} />;
-          })}
-        </div>
+      {total > 0 ? (
+        <>
+          <h3>
+            Daily — {foundCount} of {total} manifest items
+          </h3>
+          <p>
+            {foundCount < total
+              ? `${total - foundCount} to find · ${state.moves} turn${state.moves === 1 ? "" : "s"} so far. Fewer turns ranks higher.`
+              : `Complete in ${state.moves} turn${state.moves === 1 ? "" : "s"}.`}
+          </p>
+          <ManifestGrid
+            manifest={manifest}
+            manifestFound={state.manifestFound}
+            bundle={bundle}
+            onInfo={onInfo}
+          />
+          {extras.length > 0 && (
+            <>
+              <p className="k" style={{ marginTop: 8 }}>
+                Extra discoveries
+              </p>
+              <div className="cbagefinds" aria-label="Extra discoveries">
+                {extras.map((id) => {
+                  const it = bundle.items.get(id);
+                  if (!it) return null;
+                  return <DiscoveryTile key={id} item={it} onInfo={onInfo} />;
+                })}
+              </div>
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <h3>
+            Daily — {state.found.length} discover{state.found.length === 1 ? "y" : "ies"} this run
+          </h3>
+          <p>
+            {state.moves} turn{state.moves === 1 ? "" : "s"} so far. Fewer turns ranks higher on today&apos;s leaderboard.
+          </p>
+          {state.found.length > 0 && (
+            <div className="cbagefinds" aria-label="Found this run">
+              {state.found.map((id) => {
+                const it = bundle.items.get(id);
+                if (!it) return null;
+                return <DiscoveryTile key={id} item={it} onInfo={onInfo} />;
+              })}
+            </div>
+          )}
+        </>
       )}
       <button type="button" className="cbh cbback" onClick={onDismiss}>
         Done
