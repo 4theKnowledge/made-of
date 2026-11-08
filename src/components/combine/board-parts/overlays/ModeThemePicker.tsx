@@ -359,10 +359,10 @@ export function ModeThemePicker({
         disabled={!canConfirm || !dirty}
         style={{
           padding: "10px 14px",
-          border: "1.5px solid var(--ink)",
+          border: `1.5px solid ${canConfirm && dirty ? "var(--accent)" : "var(--ink)"}`,
           borderRadius: 3,
-          background: canConfirm && dirty ? "var(--ink)" : "var(--surface)",
-          color: canConfirm && dirty ? "var(--bg)" : "var(--muted)",
+          background: canConfirm && dirty ? "var(--accent)" : "var(--surface)",
+          color: canConfirm && dirty ? "#fff" : "var(--muted)",
           cursor: canConfirm && dirty ? "pointer" : "default",
           fontWeight: 600,
         }}
@@ -385,7 +385,13 @@ export function ModeThemePicker({
               onRestart();
             }
           }}
-          style={{ marginTop: 6, width: "100%" }}
+          style={{
+            marginTop: 6,
+            width: "100%",
+            border: "1.5px solid var(--accent)",
+            background: "var(--accent)",
+            color: "#fff",
+          }}
         >
           Restart current run
         </button>
@@ -395,7 +401,13 @@ export function ModeThemePicker({
           type="button"
           className="cbh"
           onClick={onShareDaily}
-          style={{ marginTop: 6, width: "100%" }}
+          style={{
+            marginTop: 6,
+            width: "100%",
+            border: "1.5px solid var(--accent)",
+            background: "var(--accent)",
+            color: "#fff",
+          }}
         >
           Share today&rsquo;s result
         </button>
