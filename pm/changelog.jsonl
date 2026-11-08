@@ -127,3 +127,4 @@
 {"id": "C-0127", "ts": "2026-11-08T04:06:53Z", "kind": "feature", "summary": "Combine daily: admin manifest config UI (pool, size, pins, preview)", "refs": {"task": "T-0243", "commit": "75f687b"}}
 {"id": "C-0128", "ts": "2026-11-08T04:12:20Z", "kind": "feature", "summary": "Combine daily: player-visible manifest (start sheet, tracker pill, JourneySheet, end card, share)", "refs": {"task": "T-0244", "commit": "9f646d3"}}
 {"id": "C-0129", "ts": "2026-11-08T05:47:32Z", "kind": "feature", "summary": "Combine daily: dealer partner-bias toward unfound manifest items (completes T-0237)", "refs": {"task": "T-0245", "commit": "c8fac28"}}
+{"id": "C-0130", "ts": "2026-11-08T07:13:46Z", "kind": "fix", "summary": "Combine daily: server-authoritative start-daily closes the peek-and-reload exploit; durationMs is now server-computed", "refs": {"task": "T-0247", "commit": "25c9f59"}}
