@@ -120,3 +120,4 @@
 {"id": "C-0120", "ts": "2026-11-08T01:53:45Z", "kind": "fix", "summary": "JourneySheet: split daily/chapter branches so hooks don't follow an early return (unblocks Railway build)", "refs": {"task": "T-0230"}}
 {"id": "C-0121", "ts": "2026-11-08T02:01:35Z", "kind": "fix", "summary": "Combine run invalidation now covers item/link/recipe/kind edits, not just theme-direct routes (T-0209)", "refs": {"task": "T-0209"}}
 {"id": "C-0122", "ts": "2026-11-08T02:40:34Z", "kind": "refactor", "summary": "Combine run invalidation gated on structural changes only; cosmetic edits (name/pictogram/label/etc.) no longer kick players (T-0209)", "refs": {"task": "T-0209"}}
+{"id": "C-0123", "ts": "2026-11-08T03:26:18Z", "kind": "fix", "summary": "Combine daily: rank race fixed, start-daily dialog + elapsed timer, end-card style/badge polish, admin can replay daily", "refs": {"tasks": ["T-0234", "T-0235", "T-0236"], "commit": "c3d4011"}}
