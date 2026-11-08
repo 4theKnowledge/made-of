@@ -3,6 +3,10 @@ import type { GameState } from "@/combine/engine";
 import type { ThemeBundle } from "@/combine/types";
 import { cap } from "@/lib/taxonomy";
 import { CombineTile } from "@/components/combine/board-parts/CombineTile";
+import {
+  HelpersButton,
+  type HelperKey,
+} from "@/components/combine/board-parts/board/HelpersButton";
 
 export function Hold({
   state,
@@ -14,6 +18,13 @@ export function Hold({
   onSlotTap,
   onSlotPointerDown,
   onHoldTap,
+  helpersOpen,
+  clearMode,
+  moveMode,
+  shoreMode,
+  pluckMode,
+  onToggleHelpers,
+  onHelper,
 }: {
   state: GameState;
   bundle: ThemeBundle;
@@ -37,6 +48,13 @@ export function Hold({
     e: React.PointerEvent<HTMLButtonElement>,
   ) => void;
   onHoldTap: () => void;
+  helpersOpen: boolean;
+  clearMode: boolean;
+  moveMode: boolean;
+  shoreMode: boolean;
+  pluckMode: boolean;
+  onToggleHelpers: () => void;
+  onHelper: (which: HelperKey) => void;
 }) {
   const empty = state.hold.every((v) => v == null);
   const heldCount = state.hold.reduce((n, v) => n + (v == null ? 0 : 1), 0);
@@ -76,7 +94,8 @@ export function Hold({
   if (overflow.left) classes.push("ov-l");
   if (overflow.right) classes.push("ov-r");
   return (
-    <div
+    <div className="cbholdrow">
+      <div
       ref={holdRef}
       className={classes.join(" ")}
       data-cbholdzone="1"
@@ -124,6 +143,17 @@ export function Hold({
         </svg>
         {empty ? <em>Hold</em> : <em>{heldCount} held</em>}
       </span>
+      </div>
+      <HelpersButton
+        state={state}
+        helpersOpen={helpersOpen}
+        clearMode={clearMode}
+        moveMode={moveMode}
+        shoreMode={shoreMode}
+        pluckMode={pluckMode}
+        onToggleHelpers={onToggleHelpers}
+        onHelper={onHelper}
+      />
     </div>
   );
 }

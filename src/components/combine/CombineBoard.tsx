@@ -2253,35 +2253,9 @@ export function CombineBoard({
           best={
             (state.mode === "fast" ? fastBest : best)[state.theme] ?? 0
           }
-          helpersOpen={helpersOpen}
-          clearMode={clearMode}
-          moveMode={moveMode != null}
-          shoreMode={shoreMode}
-          pluckMode={pluckMode}
           soundOn={sound.music !== "off" || sound.sfxPack !== "off"}
           signedIn={signedIn}
           isAdmin={admin}
-          onToggleHelpers={() => {
-            // If a mode is active, the button is Cancel: exit the mode.
-            if (clearMode) {
-              setClearMode(false);
-              return;
-            }
-            if (moveMode) {
-              setMoveMode(null);
-              return;
-            }
-            if (shoreMode) {
-              setShoreMode(false);
-              return;
-            }
-            if (pluckMode) {
-              setPluckMode(false);
-              return;
-            }
-            setHelpersOpen((o) => !o);
-          }}
-          onHelper={onHelper}
           onTheme={() => setThemeOpen(true)}
           moreOpen={moreOpen}
           onToggleMore={() => setMoreOpen((o) => !o)}
@@ -2386,6 +2360,32 @@ export function CombineBoard({
           selected={selectedSlot}
           onSlotTap={onSlotTap}
           onSlotPointerDown={onSlotPointerDown}
+          helpersOpen={helpersOpen}
+          clearMode={clearMode}
+          moveMode={moveMode != null}
+          shoreMode={shoreMode}
+          pluckMode={pluckMode}
+          onToggleHelpers={() => {
+            // If a mode is active, the button is Cancel: exit the mode.
+            if (clearMode) {
+              setClearMode(false);
+              return;
+            }
+            if (moveMode) {
+              setMoveMode(null);
+              return;
+            }
+            if (shoreMode) {
+              setShoreMode(false);
+              return;
+            }
+            if (pluckMode) {
+              setPluckMode(false);
+              return;
+            }
+            setHelpersOpen((o) => !o);
+          }}
+          onHelper={onHelper}
           onHoldTap={() => {
             // A trailing click from a completed drag (drop onto hold)
             // must not re-fire the hold action.
