@@ -12,6 +12,7 @@ import { useMemo, useState } from "react";
 import type { GameState, Action } from "@/combine/engine";
 import type { ThemeBundle } from "@/combine/types";
 import { catalogueByKind } from "@/combine/data";
+import { useConfirm } from "@/components/common/useConfirm";
 
 interface Props {
   state: GameState;
@@ -47,7 +48,58 @@ export function CombineDebugPanel({
 }: Props) {
   const [query, setQuery] = useState("");
   const [slot, setSlot] = useState(0);
+  const [restartMsg, setRestartMsg] = useState<string | null>(null);
+  const [restartBusy, setRestartBusy] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const cat = useMemo(() => catalogueByKind(bundle), [bundle]);
+
+  const restartDaily = async () => {
+    const dayKey = state.daily;
+    if (!dayKey) return;
+    if (
+      !(await confirm({
+        title: "Restart today's daily for me?",
+        body:
+          "Deletes your active run and the completed-daily progress row " +
+          "for today so you can play again. Discoveries are kept. Other " +
+          "players are unaffected.",
+        confirmLabel: "Restart",
+        destructive: true,
+      }))
+    )
+      return;
+    setRestartBusy(true);
+    setRestartMsg(null);
+    try {
+      const res = await fetch(
+        "/api/admin/combine/runs/restart-daily-for-me",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ confirmDay: dayKey }),
+        },
+      );
+      const j = (await res.json()) as {
+        ok?: boolean;
+        deletedRuns?: number;
+        deletedProgress?: number;
+        error?: string;
+        message?: string;
+      };
+      if (!res.ok || !j.ok) {
+        throw new Error(j.message ?? j.error ?? `request_failed_${res.status}`);
+      }
+      setRestartMsg(
+        `Deleted ${j.deletedRuns ?? 0} run(s) and ${j.deletedProgress ?? 0} progress row(s). Reloading…`,
+      );
+      // Full reload so the daily page re-fetches the fresh state (no
+      // active run, manifest preview re-renders).
+      setTimeout(() => window.location.reload(), 600);
+    } catch (e) {
+      setRestartMsg(e instanceof Error ? e.message : String(e));
+      setRestartBusy(false);
+    }
+  };
 
   const q = query.trim().toLowerCase();
   const matches = useMemo(() => {
@@ -123,6 +175,28 @@ export function CombineDebugPanel({
           </button>
         </div>
       </section>
+
+      {state.mode === "daily" && (
+        <section className="cbdebug-sec">
+          <h4>Daily run</h4>
+          <div className="cbdebug-ages">
+            <button
+              type="button"
+              className="cbdebug-btn"
+              onClick={restartDaily}
+              disabled={restartBusy || !state.daily}
+              title="Delete your own run + progress for today's daily so you can play it again"
+            >
+              {restartBusy ? "restarting…" : "restart today's daily (me only)"}
+            </button>
+          </div>
+          {restartMsg && (
+            <p className="cbdebug-note" style={{ marginTop: 6 }}>
+              {restartMsg}
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="cbdebug-sec">
         <h4>Last chance preview</h4>
@@ -207,6 +281,7 @@ export function CombineDebugPanel({
           )}
         </ul>
       </section>
+      {confirmDialog}
     </div>
   );
 }
