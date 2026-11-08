@@ -92,15 +92,17 @@ export async function POST(req: Request) {
   // Manifest is the daily win condition (T-0241). Null for endless/fast.
   // Empty list = daily without a solver-filled manifest (T-0242
   // interlude); the engine coerces that to null so the win check
-  // doesn't fire on a zero-length list.
-  const manifest = await dailyManifestForRun(theme, dailyKey);
+  // doesn't fire on a zero-length list. `partnerBias` (T-0245) comes
+  // from the same payload's config.
+  const manifestInfo = await dailyManifestForRun(theme, dailyKey);
   const state = newServerGame({
     mode,
     theme,
     dailyKey,
     seed,
     bundle,
-    manifest,
+    manifest: manifestInfo?.manifest ?? null,
+    manifestPartnerBias: manifestInfo?.partnerBias ?? null,
   });
 
   // Admin flag shadows onto the row via the state field; non-admin

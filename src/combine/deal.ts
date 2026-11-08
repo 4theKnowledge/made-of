@@ -39,6 +39,16 @@ export interface DealerView {
   /** Items the player has discovered this run. Drives the reachability
    *  pool and the discovered-tile down-weight. */
   found: string[];
+  /** Daily find-list (T-0245). When present + `manifestPartnerBias > 0`,
+   *  the weighted pick multiplies tiles that are direct partners of
+   *  unfound manifest items by `1 + partnerBias`. Null = no bias. */
+  manifest?: string[] | null;
+  /** Subset of `manifest` already found; those items' partners drop
+   *  out of the bias set so the dealer stops over-serving them. */
+  manifestFound?: string[];
+  /** Dealer weight multiplier for unfound-manifest partners. 0 disables.
+   *  Clamped to [0, 2] at `newGame` time. */
+  manifestPartnerBias?: number;
   /** Internal: non-null when the current pick should avoid partners of
    *  this piled tile. Set by the escape hatch. */
   _diversifyAway?: string | null;
@@ -50,6 +60,11 @@ export interface DealerView {
    *  dealTray (iterates all recipes, expensive for 439-item themes),
    *  shared across the ~180+ pickOne calls per deal retry loop. */
   _softPool?: SoftPool;
+  /** Internal: lazily-populated Set of tile ids that are direct partners
+   *  (`in` sides) of recipes producing an unfound manifest item. Built
+   *  once per `dealTray` and recomputed when manifest / manifestFound
+   *  changes between deals (cheap: O(|recipes| * |manifest|)). */
+  _manifestPartnerSet?: Set<string>;
   /** Scripted dealer queue (tutorial mode). When present, `dealTray` shifts
    *  from the front of this array to fill tray slots and skips the normal
    *  reachability / anti-pile / playsInOne heuristics entirely. The caller
@@ -73,22 +88,63 @@ function tallyBoard(view: DealerView): Map<string, number> {
   return counts;
 }
 
+/** Build the set of direct recipe-partners of unfound manifest items
+ *  (T-0245). A tile `x` is in the set iff some recipe `r` with
+ *  `r.out ∈ manifest \ manifestFound` has `x ∈ r.all` and `x` is not
+ *  itself a manifest item. Manifest items are excluded so the bias
+ *  doesn't double up on the manifest tiles themselves (the player can
+ *  make them directly when the dealer surfaces them via the normal
+ *  reachability pool). */
+function manifestPartnerSet(view: DealerView): Set<string> {
+  const out = new Set<string>();
+  const manifest = view.manifest;
+  if (!manifest || manifest.length === 0) return out;
+  const found = new Set(view.manifestFound ?? []);
+  const manifestSet = new Set(manifest);
+  const unfound = manifest.filter((m) => !found.has(m));
+  if (unfound.length === 0) return out;
+  const unfoundSet = new Set(unfound);
+  for (const r of view.bundle.recipes) {
+    if (!unfoundSet.has(r.out)) continue;
+    for (const ing of r.all) {
+      if (!manifestSet.has(ing)) out.add(ing);
+    }
+  }
+  return out;
+}
+
 /** Weighted pick: already-discovered tiles get `DISCOVERED_WEIGHT`,
- *  undiscovered ones get 1.0. Reduces tray dominance of exhausted items so
- *  the player sees fresh things more often, without removing ingredients
- *  that may still be needed for future combos. Lazily caches `_foundSet`
- *  on the view so the many pick calls per tray share one O(n) construction. */
+ *  undiscovered ones get 1.0. Unfound-manifest partners (T-0245) get an
+ *  additional `(1 + manifestPartnerBias)` multiplier so the dealer
+ *  surfaces the parts a player needs to make the day's list. Reduces
+ *  tray dominance of exhausted items so the player sees fresh things
+ *  more often, without removing ingredients that may still be needed
+ *  for future combos. Lazily caches `_foundSet` + `_manifestPartnerSet`
+ *  on the view so the many pick calls per tray share one O(n)
+ *  construction each. */
 function pickWeighted(view: DealerView, arr: readonly string[]): string | undefined {
   if (arr.length === 0) return undefined;
   if (!view._foundSet) view._foundSet = new Set(view.found);
   const found = view._foundSet;
+  const bias = view.manifestPartnerBias ?? 0;
+  let partners: Set<string> | null = null;
+  if (bias > 0 && view.manifest && view.manifest.length > 0) {
+    if (!view._manifestPartnerSet) {
+      view._manifestPartnerSet = manifestPartnerSet(view);
+    }
+    partners = view._manifestPartnerSet;
+  }
+  const weightFor = (x: string): number => {
+    let w = found.has(x) ? DISCOVERED_WEIGHT : 1;
+    if (partners && partners.has(x)) w *= 1 + bias;
+    return w;
+  };
   let total = 0;
-  for (const x of arr) total += found.has(x) ? DISCOVERED_WEIGHT : 1;
+  for (const x of arr) total += weightFor(x);
   if (total <= 0) return pick(view.rng, arr);
   let r = rand(view.rng) * total;
   for (const x of arr) {
-    const w = found.has(x) ? DISCOVERED_WEIGHT : 1;
-    r -= w;
+    r -= weightFor(x);
     if (r <= 0) return x;
   }
   return arr[arr.length - 1];

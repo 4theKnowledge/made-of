@@ -104,18 +104,20 @@ export async function bundleForRun(
   return built;
 }
 
-/** Resolve the per-day manifest for today's daily (T-0240/T-0241). Null
- *  for non-daily runs; for daily runs, returns the payload's frozen
- *  manifest or `[]` if the payload is missing / pre-manifest. The
- *  engine (T-0241) will refuse to start a daily with an empty manifest
- *  — scheduling should always pre-fill it. */
+/** Resolve the per-day manifest + dealer partner-bias for today's daily
+ *  (T-0240/T-0241/T-0245). Null for non-daily runs; for daily runs,
+ *  returns the payload's frozen manifest (or `[]` for pre-manifest
+ *  rows) and the bias value from the payload's config. */
 export async function dailyManifestForRun(
   theme: ThemeKey,
   dailyKey: string | null,
-): Promise<string[] | null> {
+): Promise<{ manifest: string[]; partnerBias: number } | null> {
   if (!dailyKey) return null;
   const payload = await getDailyPayload(theme, dailyKey);
-  return payload?.manifest ?? [];
+  return {
+    manifest: payload?.manifest ?? [],
+    partnerBias: payload?.config.manifest?.partnerBias ?? 0,
+  };
 }
 
 /** Mint a seed for a new server run. Daily runs are keyed by day so
@@ -141,6 +143,9 @@ export function newServerGame(opts: {
    *  can run the win check locally; the client gets the same manifest
    *  from the server-authoritative start response. */
   manifest?: string[] | null;
+  /** Dealer partner-bias (T-0245). Frozen onto `GameState.manifestPartnerBias`
+   *  so the dealer's weighting matches between client + server replay. */
+  manifestPartnerBias?: number | null;
 }): GameState {
   const { state } = newGame(opts.theme, opts.bundle, {
     mode: opts.mode as Mode,
@@ -148,6 +153,7 @@ export function newServerGame(opts: {
     size: 6,
     seed: opts.seed,
     manifest: opts.manifest ?? null,
+    manifestPartnerBias: opts.manifestPartnerBias ?? null,
   });
   return state;
 }

@@ -25,8 +25,11 @@ import type { Mode, ThemeBundle, ThemeKey } from "./types";
  *     untouched by this version bump.
  *  v9 (T-0241): daily runs persist `manifest` + `manifestFound` so a
  *     resume rehydrates the win-list without round-tripping the day's
- *     payload. Pre-v9 saves drop. */
-const SAVE_VERSION = 9;
+ *     payload. Pre-v9 saves drop.
+ *  v10 (T-0245): persist `manifestPartnerBias` so the dealer's bias
+ *     survives resumes without re-fetching the daily config. Pre-v10
+ *     saves drop. */
+const SAVE_VERSION = 10;
 
 /** Bump to force every player who has already finished today's daily to
  *  be able to play it again. Stamped into DailyResult + the review save
@@ -119,6 +122,9 @@ export interface StoredGame {
   /** Subset of `manifest` already found, in manifest order. Empty when
    *  no manifest, or when nothing on the list has been made yet. */
   manifestFound?: string[];
+  /** Dealer partner-bias multiplier (T-0245). Persisted so a resume
+   *  rebuilds the dealer's bias without reading the daily payload. */
+  manifestPartnerBias?: number;
 }
 
 export interface DailyResult {
@@ -183,6 +189,7 @@ function toStored(state: GameState): StoredGame {
     recentTrays: state.recentTrays.map((t) => t.slice()),
     manifest: state.manifest ? state.manifest.slice() : null,
     manifestFound: state.manifestFound.slice(),
+    manifestPartnerBias: state.manifestPartnerBias,
   };
 }
 
@@ -398,6 +405,7 @@ export function hydrateGame(s: StoredGame): GameState {
     debug: false,
     manifest: s.manifest && s.manifest.length > 0 ? s.manifest.slice() : null,
     manifestFound: s.manifestFound ? s.manifestFound.slice() : [],
+    manifestPartnerBias: s.manifestPartnerBias ?? 0,
     initialSeed: s.mode === "daily" ? s.initialSeed ?? null : null,
   };
 }

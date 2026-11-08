@@ -63,7 +63,7 @@ export const TIER_VALUE: Record<string, number> = {
  * It is fine (and expected) to skip bumping for pure refactors that
  * leave the reducer's output-for-input identical.
  */
-export const ENGINE_VERSION = 3;
+export const ENGINE_VERSION = 4;
 
 /** Baseline hold-zone capacity at chapter 0. */
 const HOLD_CAPACITY_BASE = 2;
@@ -208,6 +208,12 @@ export interface GameState {
    *  O(1) win check and so the UI never has to recompute the intersection
    *  per render. Empty for null-manifest runs. */
   manifestFound: string[];
+  /** Dealer weight multiplier for tiles that are direct partners of
+   *  unfound manifest items (T-0245). Frozen from
+   *  `DailyPayload.config.manifest.partnerBias` at `newGame`; 0 disables
+   *  the bias (also the implicit value for null-manifest runs). Only the
+   *  dealer reads this; UI doesn't surface it. */
+  manifestPartnerBias: number;
   /** The initial seed this run started with. Daily runs only — endless/fast
    *  leave this null. Stamped onto saves so a resume after admin reset-today
    *  can detect the seed mismatch and drop the stale save. */
@@ -255,7 +261,7 @@ export type Event =
 export type TileSource = "tray" | "hold";
 
 export type Action =
-  | { type: "new-game"; theme: ThemeKey; mode: Mode; daily: string | null; size: number; seed?: number; manifest?: string[] | null }
+  | { type: "new-game"; theme: ThemeKey; mode: Mode; daily: string | null; size: number; seed?: number; manifest?: string[] | null; manifestPartnerBias?: number | null }
   | { type: "place"; slot: number; cell: number; source?: TileSource }
   | { type: "drop-on"; slot: number; cell: number; source?: TileSource }
   | { type: "choose"; outputIndex: number }
@@ -338,6 +344,7 @@ function cloneState(s: GameState): GameState {
     // `manifestFound` ever changes and it's cloned as a fresh array.
     manifest: s.manifest,
     manifestFound: [...s.manifestFound],
+    manifestPartnerBias: s.manifestPartnerBias,
     scripted: s.scripted ? s.scripted.slice() : undefined,
   };
 }
@@ -603,6 +610,25 @@ function finishResolve(
  * After a move: age bar, crumble, deal, game over.
  * ====================================================================== */
 
+/** Compose the dealer's view from the current state + bundle. Centralises
+ *  the manifest / partner-bias plumbing (T-0245) so every `dealTray`
+ *  caller gets the same shape without reconstructing the object. */
+function dealerViewFromState(state: GameState, bundle: ThemeBundle) {
+  return {
+    bundle,
+    board: state.board,
+    tray: state.tray,
+    size: state.n,
+    rng: state.rng,
+    recentTrays: state.recentTrays,
+    found: state.found,
+    scripted: state.scripted,
+    manifest: state.manifest,
+    manifestFound: state.manifestFound,
+    manifestPartnerBias: state.manifestPartnerBias,
+  };
+}
+
 function afterMove(
   state: GameState,
   bundle: ThemeBundle,
@@ -707,16 +733,7 @@ function afterMove(
 
   // 3. Deal if the tray is empty.
   if (state.tray.every((t) => t == null)) {
-    dealTray({
-      bundle,
-      board: state.board,
-      tray: state.tray,
-      size: state.n,
-      rng: state.rng,
-      recentTrays: state.recentTrays,
-      found: state.found,
-      scripted: state.scripted,
-    });
+    dealTray(dealerViewFromState(state, bundle));
     events.push({ type: "dealt" });
   }
 
@@ -828,6 +845,10 @@ export function newGame(
      *  silently dropped for endless / fast / tutorial since those modes
      *  have no manifest win condition. Order is manifest-stable. */
     manifest?: string[] | null;
+    /** Dealer partner-bias multiplier for unfound manifest items (T-0245).
+     *  Only honoured when `mode === "daily"` AND a non-empty manifest is
+     *  set; falls back to 0 (no-op) otherwise. */
+    manifestPartnerBias?: number | null;
     /** Scripted dealer queue — tutorial mode only. Copied into
      *  `state.scripted`; consumed from the front on every `dealTray`.
      *  Tiles must exist in the bundle or the dealer will insert `null`
@@ -849,6 +870,13 @@ export function newGame(
   const rawManifest = mode === "daily" ? opts.manifest ?? null : null;
   const manifest =
     rawManifest && rawManifest.length > 0 ? rawManifest.slice() : null;
+  // Partner-bias is a dealer tweak; irrelevant without a manifest. Clamp
+  // negative / absurdly large values to [0, 2] to match
+  // `normaliseDailyConfig`'s validation.
+  const rawBias = manifest ? opts.manifestPartnerBias ?? 0 : 0;
+  const manifestPartnerBias = Number.isFinite(rawBias)
+    ? Math.max(0, Math.min(2, rawBias as number))
+    : 0;
   const state: GameState = {
     theme,
     mode,
@@ -886,6 +914,7 @@ export function newGame(
     debug: false,
     manifest,
     manifestFound: [],
+    manifestPartnerBias,
     initialSeed: mode === "daily" ? seed : null,
     scripted: opts.scripted ? opts.scripted.slice() : undefined,
   };
@@ -930,16 +959,7 @@ export function newGame(
     if (!m) state.board[cell] = x;
   });
 
-  dealTray({
-    bundle,
-    board: state.board,
-    tray: state.tray,
-    size: state.n,
-    rng: state.rng,
-    recentTrays: state.recentTrays,
-    found: state.found,
-    scripted: state.scripted,
-  });
+  dealTray(dealerViewFromState(state, bundle));
   events.push({ type: "dealt" });
 
   return { state, events };
@@ -966,6 +986,7 @@ export function reduce(
         size: action.size,
         seed: action.seed,
         manifest: action.manifest ?? null,
+        manifestPartnerBias: action.manifestPartnerBias ?? null,
       });
 
     case "choose": {
@@ -1094,16 +1115,7 @@ export function reduce(
       if (!state.debug && state.swaps <= 0) return { state: prev, events: [] };
       if (!state.debug) state.swaps--;
       state.tray = [null, null, null];
-      dealTray({
-        bundle,
-        board: state.board,
-        tray: state.tray,
-        size: state.n,
-        rng: state.rng,
-        recentTrays: state.recentTrays,
-        found: state.found,
-        scripted: state.scripted,
-      });
+      dealTray(dealerViewFromState(state, bundle));
       events.push({ type: "dealt" });
       return { state, events };
     }
@@ -1294,16 +1306,7 @@ export function reduce(
       events.push({ type: "wipe", age: state.chapter });
       // Re-deal a fresh tray from the current age's pool so the player
       // has something to act on after confirming the wipe.
-      dealTray({
-        bundle,
-        board: state.board,
-        tray: state.tray,
-        size: state.n,
-        rng: state.rng,
-        recentTrays: state.recentTrays,
-        found: state.found,
-        scripted: state.scripted,
-      });
+      dealTray(dealerViewFromState(state, bundle));
       events.push({ type: "dealt" });
       return { state, events };
     }
@@ -1380,16 +1383,7 @@ export function reduce(
       state.hold = Array(holdCapacity(target)).fill(null);
       state.choosing = null;
       state.lastSnapshot = null;
-      dealTray({
-        bundle,
-        board: state.board,
-        tray: state.tray,
-        size: state.n,
-        rng: state.rng,
-        recentTrays: state.recentTrays,
-        found: state.found,
-        scripted: state.scripted,
-      });
+      dealTray(dealerViewFromState(state, bundle));
       // Debug jump mirrors a real chapter-up's grants so the UI toast
       // renders normally; admin-only path, never reached in prod play.
       const grants = helperGrants(target);
