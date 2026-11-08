@@ -125,3 +125,4 @@
 {"id": "C-0125", "ts": "2026-11-08T03:50:11Z", "kind": "fix", "summary": "Combine theme item removal no longer crashes with malformed array literal (T-0246)", "refs": {"task": "T-0246"}}
 {"id": "C-0126", "ts": "2026-11-08T03:59:48Z", "kind": "feature", "summary": "Combine daily: manifest engine + solver + schedule integration (T-0241+T-0242)", "refs": {"tasks": ["T-0241", "T-0242"], "commit": "133c73a"}}
 {"id": "C-0127", "ts": "2026-11-08T04:06:53Z", "kind": "feature", "summary": "Combine daily: admin manifest config UI (pool, size, pins, preview)", "refs": {"task": "T-0243", "commit": "75f687b"}}
+{"id": "C-0128", "ts": "2026-11-08T04:12:20Z", "kind": "feature", "summary": "Combine daily: player-visible manifest (start sheet, tracker pill, JourneySheet, end card, share)", "refs": {"task": "T-0244", "commit": "9f646d3"}}
