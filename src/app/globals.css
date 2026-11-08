@@ -1749,6 +1749,15 @@ a.btn.primary{color:var(--bg)}
 .cbbook .big2 small{font-size:14px;color:var(--muted)}
 .cbbar{width:100%;height:8px;border:1.5px solid var(--ink);border-radius:5px;overflow:hidden;background:var(--surface);flex:none}
 .cbbar i{display:block;height:100%;background:var(--fN)}
+/* T-0217 slice 2: Completion-aware header accents for the CollectionBook. */
+.cbbar.done{border-color:var(--ink);background:color-mix(in srgb, var(--ink) 4%, var(--surface))}
+.cbbar.done i{background:var(--ink);animation:cbbar-sweep .6s ease-out}
+@keyframes cbbar-sweep{from{width:0%}to{width:100%}}
+.cbbook-complete{display:inline-flex;align-items:center;margin-left:8px;padding:1px 6px;border:1.5px solid var(--ink);border-radius:3px;background:var(--ink);color:var(--bg);font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.cbbook .big2 .cbbook-new{display:inline-flex;align-items:center;margin-left:10px;padding:0 6px;border-radius:7px;background:color-mix(in srgb, var(--accent) 22%, var(--surface));color:var(--accent);font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.02em;line-height:1.5;vertical-align:middle}
+.cbbook-caughtup{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border:1.5px solid var(--ink);border-radius:4px;background:color-mix(in srgb, var(--ink) 4%, var(--surface));color:var(--ink);font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;animation:mdin .22s ease-out}
+.cbbook-caughtup-x{border:0;background:transparent;color:var(--ink);font:inherit;font-size:16px;line-height:1;padding:0 2px;cursor:pointer;opacity:.6}
+.cbbook-caughtup-x:hover{opacity:1}
 /* Left/right padding leaves room for badges that poke past the tile edge
  * (★ at left:-6px, ◆ at left:-6px, n/m at right:-6px) without being
  * clipped by the overflow:auto. Top/bottom small so the grid still hugs

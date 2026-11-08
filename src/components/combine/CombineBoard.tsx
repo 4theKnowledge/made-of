@@ -2544,6 +2544,23 @@ export function CombineBoard({
             newUnlocks={newUnlocks}
             authed={collectionAuthed}
             authPending={collectionPending}
+            themeCompletion={currentThemeCompletion}
+            onCompletionRecorded={(row) => {
+              setThemeCompletions((prev) => {
+                // Replace prior row for this theme+version, else append.
+                const i = prev.findIndex(
+                  (r) =>
+                    r.themeCode === row.themeCode &&
+                    r.completedVersion === row.completedVersion,
+                );
+                if (i >= 0) {
+                  const next = prev.slice();
+                  next[i] = row;
+                  return next;
+                }
+                return [...prev, row];
+              });
+            }}
             onInfo={(id) => setInfoTile(id)}
             onAcknowledge={(id) => {
               if (!newUnlocks.has(id)) return;

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Pictogram } from "@/pictograms/Pictogram";
 import { catalogue, catalogueByKind } from "@/combine/data";
@@ -11,6 +11,16 @@ import { computeMastery } from "@/components/combine/board-parts/types";
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
 
+/** T-0217 slice 2: newest completion row for the active theme, or null if
+ *  never completed. Shape mirrors the row from
+ *  GET /api/me/combine/theme-completion. */
+export interface ThemeCompletion {
+  themeCode: string;
+  completedVersion: number;
+  completedAt: string;
+  itemCount: number;
+}
+
 export function CollectionBook({
   bundle,
   state,
@@ -19,8 +29,10 @@ export function CollectionBook({
   newUnlocks,
   authed,
   authPending,
+  themeCompletion = null,
   onInfo,
   onAcknowledge,
+  onCompletionRecorded,
   onDismiss,
 }: {
   bundle: ThemeBundle;
@@ -37,11 +49,18 @@ export function CollectionBook({
   newUnlocks?: ReadonlySet<string>;
   authed: boolean;
   authPending: boolean;
+  /** T-0217 slice 2: newest completion row for this theme (null if never).
+   *  Drives the "Complete" header badge, the "X new" stale banner, and the
+   *  "Caught up" re-completion toast. */
+  themeCompletion?: ThemeCompletion | null;
   onInfo: (id: string) => void;
   /** Called with an item id when the player taps a tile with a ★ badge,
    *  so the parent can clear the new-unlock marker. Also fires on list-row
    *  taps for consistency. Safe to omit if newUnlocks is empty. */
   onAcknowledge?: (id: string) => void;
+  /** T-0217 slice 2: parent updates its cached completions when a
+   *  re-completion POST succeeds. Fires once per mount at most. */
+  onCompletionRecorded?: (row: ThemeCompletion) => void;
   onDismiss: () => void;
 }) {
   const cat = useMemo(() => catalogue(bundle), [bundle]);
@@ -76,6 +95,78 @@ export function CollectionBook({
   }, [collection, state.found, state.mode, collectables]);
   const got = findsForTheme.size;
   const pct = Math.round((100 * got) / Math.max(1, total));
+
+  // T-0217 slice 2: three completion-aware states. Fast mode is excluded
+  // (its finds never persist); daily is excluded (daily uses its own
+  // target/win surface). Signed-out players can't persist completions at
+  // all so they always see the baseline N-of-M.
+  const currentVersion = bundle.theme.collectionVersion;
+  const completionEligible = authed && state.mode === "endless";
+  const isComplete = completionEligible && got >= total && total > 0;
+  const atCurrentVersion =
+    themeCompletion?.completedVersion === currentVersion;
+  const headerComplete = isComplete && atCurrentVersion;
+  const staleGrowable =
+    completionEligible &&
+    !!themeCompletion &&
+    themeCompletion.completedVersion < currentVersion &&
+    got < total;
+  const newSinceComplete = staleGrowable
+    ? Math.max(0, total - themeCompletion!.itemCount)
+    : 0;
+  const caughtUp =
+    completionEligible &&
+    !!themeCompletion &&
+    themeCompletion.completedVersion < currentVersion &&
+    got >= total;
+
+  // Fire-once POST + toast for the re-completion path. Also runs on true
+  // first-time completion if the GameOverCard never got a chance to POST
+  // (e.g. player opened the book mid-run that completed the theme).
+  const [caughtUpBannerVisible, setCaughtUpBannerVisible] = useState(false);
+  const posted = useRef(false);
+  useEffect(() => {
+    if (!completionEligible || !isComplete || atCurrentVersion) return;
+    if (posted.current) return;
+    posted.current = true;
+    const delta = themeCompletion
+      ? Math.max(0, total - themeCompletion.itemCount)
+      : total;
+    if (caughtUp) setCaughtUpBannerVisible(true);
+    void (async () => {
+      try {
+        const res = await fetch("/api/me/combine/theme-completion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            themeCode: bundle.theme.k,
+            version: currentVersion,
+          }),
+        });
+        if (!res.ok) return;
+        onCompletionRecorded?.({
+          themeCode: bundle.theme.k,
+          completedVersion: currentVersion,
+          itemCount: total,
+          completedAt: new Date().toISOString(),
+        });
+      } catch {
+        // best-effort; server reconciles on next GET
+      }
+    })();
+    // delta referenced only by the toast message below — see JSX
+    void delta;
+  }, [
+    completionEligible,
+    isComplete,
+    atCurrentVersion,
+    caughtUp,
+    bundle.theme.k,
+    currentVersion,
+    total,
+    themeCompletion,
+    onCompletionRecorded,
+  ]);
   // "Known" for mastery = everything in findsForTheme (lifetime + this-run
   // merged) plus raw base ingredients. The computeMastery helper also
   // consults bundle.base, but passing a fully-formed known set keeps the
@@ -167,13 +258,51 @@ export function CollectionBook({
     >
       <span className="k">
         Collection · {state.daily ? "Daily" : bundle.theme.name}
+        {headerComplete && (
+          <span className="cbbook-complete" aria-label="Complete">
+            ✓ Complete
+          </span>
+        )}
       </span>
         <b className="big2">
-          {got} <small>of {total}</small>
+          {headerComplete ? (
+            <>
+              {total} <small>of {total}</small>
+            </>
+          ) : (
+            <>
+              {got} <small>of {total}</small>
+            </>
+          )}
+          {staleGrowable && newSinceComplete > 0 && (
+            <span className="cbbook-new" aria-label={`${newSinceComplete} new`}>
+              {newSinceComplete} new
+            </span>
+          )}
         </b>
-        <div className="cbbar">
+        <div className={`cbbar${headerComplete ? " done" : ""}`}>
           <i style={{ width: `${pct}%` }} />
         </div>
+        {caughtUpBannerVisible && (
+          <div
+            className="cbbook-caughtup"
+            role="status"
+            aria-live="polite"
+          >
+            <span>
+              Caught up · {Math.max(0, total - (themeCompletion?.itemCount ?? total))} new item
+              {Math.max(0, total - (themeCompletion?.itemCount ?? total)) === 1 ? "" : "s"} collected
+            </span>
+            <button
+              type="button"
+              className="cbbook-caughtup-x"
+              aria-label="Dismiss"
+              onClick={() => setCaughtUpBannerVisible(false)}
+            >
+              ×
+            </button>
+          </div>
+        )}
         {masteredCount > 0 && (
           <div className="cbbook-mastery" aria-label={`Mastered: ${masteredCount}`}>
             <span aria-hidden="true">◆</span> {masteredCount} mastered
