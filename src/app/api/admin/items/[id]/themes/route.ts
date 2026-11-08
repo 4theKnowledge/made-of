@@ -3,6 +3,10 @@ import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
 import { bumpCollectionVersion } from "@/combine/theme-version";
+import {
+  countUsersAffectedByItemRemoval,
+  countUsersCompletedAtVersion,
+} from "@/combine/completion-impact";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +50,7 @@ export async function PUT(
   const themeCodes = Array.from(
     new Set((body.themes as unknown[]).filter((t): t is string => typeof t === "string")),
   );
+  const force = body.force === true;
 
   const db = getDb();
 
@@ -82,9 +87,56 @@ export async function PUT(
     .where(eq(schema.itemCombineThemes.itemId, id));
   const oldSet = new Set(oldRows.map((r) => r.themeCode));
   const newSet = new Set(themeCodes);
-  const changed: string[] = [];
-  for (const c of oldSet) if (!newSet.has(c)) changed.push(c);
-  for (const c of newSet) if (!oldSet.has(c)) changed.push(c);
+  const removed = [...oldSet].filter((c) => !newSet.has(c));
+  const added = [...newSet].filter((c) => !oldSet.has(c));
+  const changed = [...removed, ...added];
+
+  // T-0222: friction when the delta affects players. Added themes will bump
+  // their collection_version, dropping completed players below 100%.
+  // Removed themes orphan this item's discoveries against those themes'
+  // collection bars. Bulk-safe: counts completion rows for the affected
+  // themes and endless-scope discoveries of this item.
+  if (!force && changed.length > 0) {
+    const [bumpedThemes] = await Promise.all([
+      Promise.all(
+        changed.map(async (themeCode) => {
+          const [v] = await db
+            .select({ v: schema.combineThemes.collectionVersion })
+            .from(schema.combineThemes)
+            .where(eq(schema.combineThemes.code, themeCode))
+            .limit(1);
+          return v ? await countUsersCompletedAtVersion(db, themeCode, v.v) : 0;
+        }),
+      ),
+    ]);
+    const completedUsers = bumpedThemes.reduce((a, b) => a + b, 0);
+    const discoveryUsers = removed.length
+      ? await countUsersAffectedByItemRemoval(db, [id])
+      : 0;
+    if (completedUsers > 0 || discoveryUsers > 0) {
+      const bits: string[] = [];
+      if (completedUsers > 0) {
+        bits.push(
+          `${completedUsers} completion${completedUsers === 1 ? "" : "s"} across ${changed.length} theme${changed.length === 1 ? "" : "s"} will drop below 100%`,
+        );
+      }
+      if (discoveryUsers > 0) {
+        bits.push(
+          `${discoveryUsers} player${discoveryUsers === 1 ? "'s" : "s'"} discoveries reference this item`,
+        );
+      }
+      return NextResponse.json(
+        {
+          error: "confirm_required",
+          reason: "item_theme_change_affects_players",
+          completedUsers,
+          discoveryUsers,
+          message: `${bits.join("; ")}. Pass { force: true } to proceed.`,
+        },
+        { status: 409 },
+      );
+    }
+  }
 
   await db.transaction(async (tx) => {
     await tx.delete(schema.itemCombineThemes).where(eq(schema.itemCombineThemes.itemId, id));

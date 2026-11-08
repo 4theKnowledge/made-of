@@ -4,6 +4,10 @@ import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
 import { invalidateRunsForTheme } from "@/combine/run-store";
 import { bumpCollectionVersion } from "@/combine/theme-version";
+import {
+  countCompletionRowsForTheme,
+  countUsersCompletedAtVersion,
+} from "@/combine/completion-impact";
 import { reloadSnapshot } from "@/graph/live";
 
 export const runtime = "nodejs";
@@ -70,6 +74,32 @@ export async function PATCH(
   }
 
   const db = getDb();
+  // T-0222: confirm-to-proceed when a closure_config change would bump
+  // the collection_version and drop completed players below 100%.
+  // Admins can override with `{ force: true }`. Bulk-safe:
+  // over-warns when the config is semantically a no-op, which is fine.
+  const force = body.force === true;
+  if (!force && "closure_config" in body) {
+    const [existing] = await db
+      .select({ v: schema.combineThemes.collectionVersion })
+      .from(schema.combineThemes)
+      .where(eq(schema.combineThemes.code, code))
+      .limit(1);
+    const completedUsers = existing
+      ? await countUsersCompletedAtVersion(db, code, existing.v)
+      : 0;
+    if (completedUsers > 0) {
+      return NextResponse.json(
+        {
+          error: "confirm_required",
+          reason: "closure_config_change_breaks_completions",
+          completedUsers,
+          message: `${completedUsers} player${completedUsers === 1 ? "" : "s"} will drop below 100% on this theme. Pass { force: true } to proceed.`,
+        },
+        { status: 409 },
+      );
+    }
+  }
   const [updated] = await db
     .update(schema.combineThemes)
     .set(patch)
@@ -104,6 +134,22 @@ export async function DELETE(
   if (usage && usage.n > 0) {
     return NextResponse.json(
       { error: "in_use", message: `${usage.n} item(s) are still in this theme. Remove them first.` },
+      { status: 409 },
+    );
+  }
+  // T-0222: strict block (no force override) — completion rows are
+  // historical player stats; orphaning them would silently rewrite the
+  // /account/stats journey. If the theme really needs to go, admin can
+  // unpublish (`is_published=false`) which hides it from the picker
+  // without touching the rows.
+  const completions = await countCompletionRowsForTheme(db, code);
+  if (completions > 0) {
+    return NextResponse.json(
+      {
+        error: "has_completions",
+        completionRows: completions,
+        message: `${completions} completion stamp${completions === 1 ? "" : "s"} reference this theme. Unpublish instead — delete would orphan player stats.`,
+      },
       { status: 409 },
     );
   }

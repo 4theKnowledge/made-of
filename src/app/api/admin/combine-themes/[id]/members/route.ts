@@ -5,6 +5,10 @@ import { requireAdminApi } from "@/lib/admin";
 import { computeClosure, isClosureEnabled, type ClosureConfig } from "@/combine/closure";
 import { invalidateRunsForTheme } from "@/combine/run-store";
 import { bumpCollectionVersion } from "@/combine/theme-version";
+import {
+  countUsersAffectedByItemRemoval,
+  countUsersCompletedAtVersion,
+} from "@/combine/completion-impact";
 import { reloadSnapshot } from "@/graph/live";
 import { loadGraphForClosure } from "../../_lib";
 
@@ -44,6 +48,7 @@ export async function POST(
   const addRaw = toStringArray(body.add);
   const remove = toStringArray(body.remove);
   const applyClosure = body.applyClosure !== false; // default true
+  const force = body.force === true;
 
   if (addRaw.length === 0 && remove.length === 0) {
     return NextResponse.json({ error: "no_changes" }, { status: 400 });
@@ -59,11 +64,52 @@ export async function POST(
   const db = getDb();
 
   const [theme] = await db
-    .select({ code: schema.combineThemes.code, closureConfig: schema.combineThemes.closureConfig })
+    .select({
+      code: schema.combineThemes.code,
+      closureConfig: schema.combineThemes.closureConfig,
+      collectionVersion: schema.combineThemes.collectionVersion,
+    })
     .from(schema.combineThemes)
     .where(eq(schema.combineThemes.code, themeCode))
     .limit(1);
   if (!theme) return NextResponse.json({ error: "theme_not_found" }, { status: 404 });
+
+  // T-0222: admin friction. The membership write bumps the collection_version,
+  // which drops players at 100% below the threshold. Removing items also
+  // orphans every endless-scope discovery of those items from this theme's
+  // bar. Report both counts up-front so the admin UI can confirm; the client
+  // re-POSTs with `{ force: true }` to proceed.
+  if (!force) {
+    const [completedUsers, discoveryUsers] = await Promise.all([
+      countUsersCompletedAtVersion(db, themeCode, theme.collectionVersion),
+      remove.length > 0
+        ? countUsersAffectedByItemRemoval(db, remove)
+        : Promise.resolve(0),
+    ]);
+    if (completedUsers > 0 || discoveryUsers > 0) {
+      const bits: string[] = [];
+      if (completedUsers > 0) {
+        bits.push(
+          `${completedUsers} player${completedUsers === 1 ? " will" : "s will"} drop below 100% on this theme`,
+        );
+      }
+      if (discoveryUsers > 0) {
+        bits.push(
+          `${discoveryUsers} player${discoveryUsers === 1 ? "'s" : "s'"} discoveries reference the removed item${remove.length === 1 ? "" : "s"}`,
+        );
+      }
+      return NextResponse.json(
+        {
+          error: "confirm_required",
+          reason: "membership_change_affects_players",
+          completedUsers,
+          discoveryUsers,
+          message: `${bits.join("; ")}. Pass { force: true } to proceed.`,
+        },
+        { status: 409 },
+      );
+    }
+  }
 
   // Compute the effective add set. If the theme has closure enabled and the
   // caller didn't opt out, expand the add set to include every dependency
