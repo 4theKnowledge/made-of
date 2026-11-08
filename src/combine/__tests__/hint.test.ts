@@ -27,6 +27,7 @@ function fakeBundle(recipes: CombineRecipe[]): ThemeBundle {
       name: "Test",
       desc: "",
       ages: ["one", "two"],
+      collectionVersion: 0,
     },
     recipes,
     byIngredient,

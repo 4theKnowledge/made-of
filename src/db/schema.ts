@@ -517,6 +517,10 @@ export const combineThemes = pgTable(
      *  Non-null = closure is applied when items are added. Shape matches
      *  ClosureConfig in src/combine/closure.ts. */
     closureConfig: jsonb("closure_config"),
+    /** Bumped whenever membership or closureConfig changes — drives
+     *  completion acknowledgements (T-0217). Pure label/description/
+     *  pictogram edits don't bump. */
+    collectionVersion: integer("collection_version").notNull().default(0),
     /** Public visibility. FALSE (default) = admin-only draft; TRUE = shows
      *  up in the player's theme picker. Lets curators iterate without
      *  leaking work-in-progress themes to the game. */

@@ -53,6 +53,7 @@ export function defaultThemeMeta(code: ThemeKey): ThemeMeta {
       ? "The whole map: atoms, stars, life, food, factories, machines."
       : "",
     ages: themeAgePool(code),
+    collectionVersion: 0,
   };
 }
 
@@ -61,12 +62,14 @@ export function themeMetaFromRow(row: {
   code: string;
   label: string;
   description: string | null;
+  collectionVersion?: number | null;
 }): ThemeMeta {
   return {
     k: row.code,
     name: row.label,
     desc: row.description ?? "",
     ages: themeAgePool(row.code),
+    collectionVersion: row.collectionVersion ?? 0,
   };
 }
 

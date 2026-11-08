@@ -20,6 +20,12 @@ export interface Snapshot {
   byName: Map<string, GraphNode>;
   /** Convenience lookup by URL slug (e.g. "big-bang"). */
   bySlug: Map<string, GraphNode>;
+  /** Per-theme DB-backed metadata. `combineThemes.code` → current
+   *  `collection_version` (plus label/description for callers that need
+   *  them). Only populated when the snapshot is built from the DB;
+   *  empty when built from the KB file so Combine tests still work
+   *  without DB access. */
+  themeMeta?: Map<string, { code: string; label: string; description: string | null; collectionVersion: number }>;
 }
 
 export function buildSnapshot(rows: SeedRows): Snapshot {
@@ -123,7 +129,7 @@ export function buildSnapshot(rows: SeedRows): Snapshot {
     n.neighbours = [...nbSet];
   }
 
-  return { nodes, byName, bySlug };
+  return { nodes, byName, bySlug, themeMeta: rows.themeMeta };
 }
 
 /**

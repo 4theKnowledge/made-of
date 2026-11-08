@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
+import { bumpCollectionVersion } from "@/combine/theme-version";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,12 +73,28 @@ export async function PUT(
     }
   }
 
+  // Compute the symmetric-difference of old vs new theme sets so we only
+  // bump collection_version for themes that actually gained or lost this
+  // item. See T-0217.
+  const oldRows = await db
+    .select({ themeCode: schema.itemCombineThemes.themeCode })
+    .from(schema.itemCombineThemes)
+    .where(eq(schema.itemCombineThemes.itemId, id));
+  const oldSet = new Set(oldRows.map((r) => r.themeCode));
+  const newSet = new Set(themeCodes);
+  const changed: string[] = [];
+  for (const c of oldSet) if (!newSet.has(c)) changed.push(c);
+  for (const c of newSet) if (!oldSet.has(c)) changed.push(c);
+
   await db.transaction(async (tx) => {
     await tx.delete(schema.itemCombineThemes).where(eq(schema.itemCombineThemes.itemId, id));
     if (themeCodes.length) {
       await tx
         .insert(schema.itemCombineThemes)
         .values(themeCodes.map((themeCode) => ({ itemId: id, themeCode })));
+    }
+    for (const themeCode of changed) {
+      await bumpCollectionVersion(tx, themeCode);
     }
   });
 

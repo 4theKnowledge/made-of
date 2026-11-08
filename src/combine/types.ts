@@ -47,6 +47,11 @@ export interface ThemeMeta {
    *  bundle. On the authored config this is a *pool* that may be longer than
    *  today's numAges; `buildThemeBundle` slices it down. */
   ages: string[];
+  /** Monotonic counter bumped when the theme's discoverable set changes.
+   *  Drives completion acknowledgements (T-0217). Zero when built outside
+   *  of a DB-backed snapshot (tests, legacy paths) — the DB is the source
+   *  of truth. */
+  collectionVersion: number;
 }
 
 /** One recipe projected into Combine's world. In Combine both `f` (made

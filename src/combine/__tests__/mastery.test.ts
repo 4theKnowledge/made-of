@@ -34,7 +34,7 @@ function fakeBundle(
     sameIngredients.set(key, cur);
   }
   return {
-    theme: { k: "everything", name: "Test", desc: "", ages: ["one"] },
+    theme: { k: "everything", name: "Test", desc: "", ages: ["one"], collectionVersion: 0 },
     recipes,
     byIngredient,
     outputs: new Set(recipes.map((r) => r.out)),

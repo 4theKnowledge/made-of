@@ -4,6 +4,7 @@ import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
 import { computeClosure, isClosureEnabled, type ClosureConfig } from "@/combine/closure";
 import { invalidateRunsForTheme } from "@/combine/run-store";
+import { bumpCollectionVersion } from "@/combine/theme-version";
 import { reloadSnapshot } from "@/graph/live";
 import { loadGraphForClosure } from "../../_lib";
 
@@ -151,6 +152,11 @@ export async function POST(
           .values(closureRows)
           .onConflictDoNothing(); // keep whatever source already there (manual stays manual)
       }
+    }
+    // Any membership mutation changes the discoverable set. See T-0217.
+    const wroteSomething = remove.length > 0 || rows.length > 0;
+    if (wroteSomething) {
+      await bumpCollectionVersion(tx, themeCode);
     }
   });
 

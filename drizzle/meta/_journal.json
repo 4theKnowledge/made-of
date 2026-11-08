@@ -204,6 +204,13 @@
       "when": 1794055964232,
       "tag": "0028_chunky_calypso",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794098693032,
+      "tag": "0029_theme_collection_version",
+      "breakpoints": true
     }
   ]
 }

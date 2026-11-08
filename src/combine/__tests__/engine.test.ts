@@ -70,6 +70,7 @@ function fakeBundle(opts: {
       name: "Test",
       desc: "",
       ages: ["one", "two", "three"],
+      collectionVersion: 0,
     },
     recipes: opts.recipes,
     byIngredient,

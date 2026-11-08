@@ -3,6 +3,7 @@ import { count, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
 import { invalidateRunsForTheme } from "@/combine/run-store";
+import { bumpCollectionVersion } from "@/combine/theme-version";
 import { reloadSnapshot } from "@/graph/live";
 
 export const runtime = "nodejs";
@@ -75,6 +76,12 @@ export async function PATCH(
     .where(eq(schema.combineThemes.code, code))
     .returning();
   if (!updated) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  // Closure config drives the auto-expanded set of theme members. Bump
+  // when the key is present — a no-op "same shape" patch is rare enough
+  // that comparing old vs new isn't worth the extra read. See T-0217.
+  if ("closure_config" in body) {
+    await bumpCollectionVersion(db, code);
+  }
   await reloadSnapshot();
   const invalidated = await invalidateRunsForTheme(code);
   return NextResponse.json({ theme: updated, invalidatedRuns: invalidated });

@@ -9,7 +9,7 @@
 import type { Snapshot } from "../graph/snapshot";
 import type { GraphNode } from "../graph/types";
 import type { DailyConfig } from "./daily-config";
-import { THEMES, inCombineTheme, themeAgePool } from "./filters";
+import { THEMES, inCombineTheme, themeAgePool, themeMetaFromRow } from "./filters";
 import { computeRefine } from "./levels";
 import { isPlayableRecipe } from "./parts";
 import type {
@@ -391,7 +391,11 @@ export function buildThemeBundle(
   dailyConfig: DailyConfig | null = null,
   guestRecipes: GuestRecipeExtension[] | null = null,
 ): ThemeBundle {
-  const base_meta = THEMES[theme];
+  // Prefer DB-backed meta from the snapshot (threads `collectionVersion`
+  // for completion acknowledgements, T-0217). Fall back to the Proxy
+  // default when the snapshot was built without the DB (tests).
+  const dbMeta = snapshot.themeMeta?.get(theme);
+  const base_meta = dbMeta ? themeMetaFromRow(dbMeta) : THEMES[theme];
   let recipes = recipesForTheme(snapshot, theme);
   if (mode === "fast") {
     // Fast mode: short recipes only (≤ 3 ingredients). Pair-only was too
