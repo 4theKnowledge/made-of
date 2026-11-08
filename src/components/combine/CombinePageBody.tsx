@@ -19,7 +19,6 @@ import { getDailyPayload, resolveGuestRecipes } from "@/combine/daily-schedule-d
 import { todayKey } from "@/combine/rng";
 import { getSession, isAdmin } from "@/lib/session";
 import { listActiveRuns } from "@/combine/run-store";
-import { serverRunsEnabled } from "@/lib/anon-session";
 
 /** Feature flag: set `COMBINE_DAILY_ENABLED=0` in env to hide the daily
  *  mode for non-admins. Admins always see daily (so they can test/reset
@@ -159,12 +158,11 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
   // T-0228: cheap server-side hint — do we have a saved run to restore?
   // When `true`, CombineBoard shows a shimmer skeleton on mount instead of
   // flashing the deterministic empty board. When `false` (signed-in user
-  // with no saves AND server-runs enabled), CombineBoard boots straight
-  // into the fresh starter state with no shimmer. `null` means "unknown"
-  // (guest, or server-runs disabled) → CombineBoard assumes maybe and
-  // shows shimmer briefly.
+  // with no saves), CombineBoard boots straight into the fresh starter
+  // state with no shimmer. `null` means "unknown" (guest) → CombineBoard
+  // assumes maybe and shows shimmer briefly.
   let hasActiveRunHint: boolean | null = null;
-  if (signedIn && session?.user?.id && serverRunsEnabled()) {
+  if (signedIn && session?.user?.id) {
     const runs = await listActiveRuns({ kind: "user", id: session.user.id });
     hasActiveRunHint = runs.length > 0;
   }

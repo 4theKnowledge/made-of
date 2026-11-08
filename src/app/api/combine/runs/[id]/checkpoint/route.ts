@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getRunOwner, serverRunsEnabled } from "@/lib/anon-session";
+import { getRunOwner } from "@/lib/anon-session";
 import { getSession, isAdmin } from "@/lib/session";
 import { bundleForRun, isEngineVersionCurrent, replayActions, ReplayError, validateActionShape, type ServerMode } from "@/combine/server-engine";
 import { getRunForOwner, saveRunCheckpoint } from "@/combine/run-store";
@@ -30,9 +30,6 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!serverRunsEnabled()) {
-    return NextResponse.json({ error: "feature off" }, { status: 404 });
-  }
   const owner = await getRunOwner({ mint: false });
   if (!owner) {
     return NextResponse.json({ error: "no identity" }, { status: 401 });

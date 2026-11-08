@@ -117,10 +117,3 @@ export async function getRunOwner(
   if (!anonId) return null;
   return { kind: "anon", id: anonId };
 }
-
-/** Feature flag — when off (default), server-run routes return a
- *  disabled response and the client falls back to localStorage play.
- *  Flipped to "1" in env to roll out the server-authoritative path. */
-export function serverRunsEnabled(): boolean {
-  return process.env.COMBINE_SERVER_RUNS === "1";
-}

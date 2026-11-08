@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRunOwner, serverRunsEnabled } from "@/lib/anon-session";
+import { getRunOwner } from "@/lib/anon-session";
 import { isAdmin } from "@/lib/session";
 import {
   bundleForRun,
@@ -25,13 +25,9 @@ export const runtime = "nodejs";
  *   mints a fresh one. Default behaviour returns the existing run
  *   when present, so a refresh doesn't erase in-flight play.
  *
- * Returns 404 if feature-flag off (`COMBINE_SERVER_RUNS` unset).
  * Returns 400 on bad body; 500 on bundle-build errors.
  */
 export async function POST(req: Request) {
-  if (!serverRunsEnabled()) {
-    return NextResponse.json({ error: "feature off" }, { status: 404 });
-  }
   const owner = await getRunOwner();
   if (!owner) {
     return NextResponse.json({ error: "no identity" }, { status: 500 });

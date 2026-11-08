@@ -34,8 +34,8 @@ Counts: **0 Critical**, **3 High**, **4 Medium**, **5 Low/Info**.
 - **Severity**: High.
 - **File**: `src/app/api/combine/result/route.ts` (whole file, see lines 14-18 comment).
 - **What's wrong**: The route explicitly comments "we trust the client's totals" and writes to `progress` with only clamping. Any signed-in user can POST a crafted body and claim a near-maximum legitimate score (`score` is clamped to 1,000,000, which is huge).
-- **Impact**: Leaderboard poisoning. The newer server-authoritative path (`/api/combine/runs/*`) exists but is behind feature flag `COMBINE_SERVER_RUNS`. As long as `/api/combine/result` is live, the server-auth path doesn't close the hole.
-- **Fix**: Either (a) retire this endpoint once `COMBINE_SERVER_RUNS=1` is on in prod, or (b) require that submissions reference a finished `combine_runs` row owned by the user with matching totals. The route has no rate limit either — add `limiters.dailyResult` at minimum while it exists.
+- **Impact**: Leaderboard poisoning. The newer server-authoritative path (`/api/combine/runs/*`) is now the sole leaderboard writer.
+- **Fix** (applied): Route deleted in T-0195. `/runs/[id]/finish` writes the `progress` row from server-computed totals derived from replay. Flag plumbing (`COMBINE_SERVER_RUNS`) removed in T-0249 — server-authoritative runs are unconditional.
 
 ### H3b. `/api/combine/collection` accepts client-trusted discoveries
 - **Status**: **Resolved** — T-0195. POST returns 410 Gone; server derives discoveries from replay-validated state in `discoveries-writer.ts` on every `/checkpoint` and `/finish`.
@@ -43,7 +43,7 @@ Counts: **0 Critical**, **3 High**, **4 Medium**, **5 Low/Info**.
 - **File**: `src/app/api/combine/collection/route.ts:59-82` (POST handler).
 - **What's wrong**: The endpoint writes `combine_discoveries` rows from whatever `ids` + `signatures` the client POSTs. Validation is shape/scope/size only — the server does not cross-check that the user actually made those items in a real run. Caller at `src/combine/useCollection.ts:183`.
 - **Impact**: Any signed-in user can POST arbitrary item ids and unlock their lifetime collection (endless *or* daily scope) without play. This defeats the daily-isolation design (CLAUDE.md: "endless grinding can't walk a daily into pre-unlocked items") and poisons any future discovery/badge leaderboard. Orthogonal to H3 — closing the score hole does not close this one.
-- **Fix**: Make `/api/combine/collection` read-only, and move discovery writes behind the server-run replay path. `/api/combine/runs/[id]/finish` already computes `final.found` via replay (`src/app/api/combine/runs/[id]/finish/route.ts:138-145`); that list should be the authoritative input to `combine_discoveries`. Checkpoint-time writes are also fine for faster feedback. Client keeps optimistic UI; the server is the write arbiter. Depends on H3's `COMBINE_SERVER_RUNS=1` prerequisite.
+- **Fix** (applied): `/api/combine/collection` POST returns 410 Gone. Discovery writes are derived server-side from replay-validated state via `src/combine/discoveries-writer.ts`, called from `/checkpoint` and `/finish`. Client keeps optimistic UI; the server is the write arbiter.
 
 ### H3c. Server run replay does not pin engine/bundle version
 - **Status**: **Resolved** — T-0195 + T-0201. `combine_runs.engine_version` is stamped at `/start`; `/checkpoint` and `/finish` reject replay with 409 + `engineVersionMismatch` on drift. `progress.result.engineVersion` is also stamped at `/finish` so finished leaderboard rows carry which reducer scored them. Discipline note in CLAUDE.md.

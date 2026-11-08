@@ -185,12 +185,11 @@ interface Props {
    *  leaderboard. Null for anon players. */
   currentUserHandle?: string | null;
   /** T-0228 — server-side hint about whether this viewer has any active
-   *  saved Combine run. Signed-in viewers under COMBINE_SERVER_RUNS get
-   *  `true`/`false`; guests and viewers under the local-only path get
-   *  `null` (unknown). When unknown or true, CombineBoard shows a
-   *  shimmer skeleton on first paint so there's no empty-board flash
-   *  before the resume effect loads a save. When `false`, we skip
-   *  straight to the fresh starter state. */
+   *  saved Combine run. Signed-in viewers get `true`/`false`; guests get
+   *  `null` (unknown). When unknown or true, CombineBoard shows a shimmer
+   *  skeleton on first paint so there's no empty-board flash before the
+   *  resume effect loads a save. When `false`, we skip straight to the
+   *  fresh starter state. */
   hasActiveRunHint?: boolean | null;
 }
 
@@ -285,9 +284,9 @@ export function CombineBoard({
     isPending: collectionPending,
     record: recordDiscoveries,
   } = useCollection(collectionScope);
-  // Server-authoritative run lifecycle. Opt-in via COMBINE_SERVER_RUNS;
-  // when the flag is off, `serverBacked` stays false and every call is
-  // a no-op (local reducer + localStorage remains source of truth).
+  // Server-authoritative run lifecycle. The local reducer + localStorage
+  // still own transient UI state (best scores, tutorial flag); this hook
+  // owns the authoritative run record and scoring path.
   const run = useCombineRun();
   // Per-theme best scores + today's daily result. Loaded in an effect so
   // SSR/hydration stay deterministic. Fast mode keeps its own best record
@@ -802,10 +801,11 @@ export function CombineBoard({
   // T-0247: the primary "has committed?" signal is the server's
   // `run.context.startedAt` — it survives reloads and clearing
   // localStorage, closing the peek-and-reload exploit. The in-memory
-  // `dailyStartRef` is still consulted as a fallback for the
-  // server-runs-off path (no `run.context`). `state.moves > 0` is a
-  // soft fallback too — once the player has placed a tile, don't
-  // re-show the sheet even if the server was unreachable.
+  // `dailyStartRef` is still consulted as a fallback for the brief
+  // window before the server run has loaded (no `run.context` yet).
+  // `state.moves > 0` is a soft fallback too — once the player has
+  // placed a tile, don't re-show the sheet even if the server was
+  // unreachable.
   const serverStartedAt = run.context?.startedAt ?? null;
   useEffect(() => {
     if (!state.daily) {

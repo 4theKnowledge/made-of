@@ -12,9 +12,8 @@
  *     reducer can swap to it — see `opts.onReconcile` (T-0181).
  *   - Finishing the run when the engine terminates.
  *
- * The hook is a no-op when `COMBINE_SERVER_RUNS` is off (the start
- * route returns 404). Callers treat that as "server not available,
- * stay on localStorage" without branching on the env.
+ * Network errors and 404 responses leave `context` null; callers keep
+ * their local reducer running until the next successful `start()`.
  */
 
 "use client";
@@ -52,7 +51,7 @@ export interface StartResult {
 }
 
 /** Fire-and-forget POST wrapper that threads JSON in/out. Returns null
- *  on network error or 404 (feature flag off); throws only on bugs the
+ *  on network error or 404 (route unreachable); throws only on bugs the
  *  caller can't recover from. */
 async function postJSON<T>(url: string, body: unknown): Promise<T | null> {
   try {
@@ -265,11 +264,11 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
     return startedAt;
   }, []);
 
-  // Mark ready when the feature flag is off. We detect that with a
-  // GET /active probe on mount — a 200 with `{ runs: [] }` while the
-  // caller hasn't called `start` means we're on a server that's live.
-  // A 404 means the flag is off; either way we flip ready so the UI
-  // can proceed.
+  // Probe the server on mount with GET /active; readiness flips as soon
+  // as we hear back. We don't actually consume the list here — the hook
+  // only owns a run once the caller invokes `start`. The probe exists
+  // so the UI can distinguish "server reachable, no save" from
+  // "haven't talked to the server yet" during first paint.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -278,9 +277,9 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
           credentials: "same-origin",
         });
         if (cancelled) return;
-        // 404 = flag off; 200 = flag on but we only use this probe as
-        // a readiness signal — callers must still invoke `start` to
-        // own a run (they pass the mode/theme).
+        // Response status doesn't matter — the probe is a readiness
+        // signal only. Callers must still invoke `start` to own a run
+        // (they pass the mode/theme).
         if (!res.ok) {
           setReady(true);
           return;
