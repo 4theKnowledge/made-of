@@ -2426,7 +2426,7 @@ export function CombineBoard({
           bundle={bundle}
           onAges={() => setAgesOpen(true)}
         />
-        {state.manifest && state.manifest.length > 0 && (
+        {state.manifest && state.manifest.length > 0 && !dailyStartPending && (
           <div style={{ display: "flex", justifyContent: "center", margin: "4px 0 0" }}>
             <button
               type="button"
@@ -2453,8 +2453,10 @@ export function CombineBoard({
           newUnlocks={newUnlocks}
           onInfo={(id) => setInfoTile(id)}
         />
-        {!loaded && <BoardPlaceholder size={6} traySlots={3} holdSlots={3} />}
-        {loaded && (
+        {(!loaded || dailyStartPending) && (
+          <BoardPlaceholder size={6} traySlots={3} holdSlots={3} />
+        )}
+        {loaded && !dailyStartPending && (
         <>
         <BoardErrorBoundary>
           <Board
@@ -2560,13 +2562,14 @@ export function CombineBoard({
         {dailyStartPending && state.daily && !state.over && (
           <ResponsiveSheet
             open
-            onDismiss={() => {
-              // Dismissing the sheet without starting leaves the clock
-              // uninitialised; the board stays hidden until the player
-              // either starts or navigates away. Treat dismiss as
-              // confirm-start so there's no "stuck" hidden-board state.
-              confirmStartDaily();
-            }}
+            // Commitment gate: scrim click + Escape are disabled so a
+            // stray tap can't skip the player past the manifest preview
+            // (and silently start their clock). The only way forward is
+            // the Start button below. The board behind the scrim is
+            // covered by the shimmer skeleton (see `loaded` gate below)
+            // so the player can't peek at the tray before committing.
+            onDismiss={confirmStartDaily}
+            dismissOnScrim={false}
             ariaLabel="Start today's daily"
             className="cbresult cbstartdaily"
           >
@@ -2575,7 +2578,7 @@ export function CombineBoard({
               <>
                 <b className="big">Find these {state.manifest.length}</b>
                 <span className="sub">
-                  Your time starts when you tap Start.
+                  Tap Start when you&apos;re ready.
                 </span>
                 <ManifestGrid
                   manifest={state.manifest}
@@ -2586,9 +2589,7 @@ export function CombineBoard({
             ) : (
               <>
                 <b className="big">Ready?</b>
-                <span className="sub">
-                  Your time starts when you tap Start.
-                </span>
+                <span className="sub">Tap Start when you&apos;re ready.</span>
               </>
             )}
             <ButtonGroup>
