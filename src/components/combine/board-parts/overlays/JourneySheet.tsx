@@ -23,38 +23,82 @@ export function JourneySheet({
   onInfo: (id: string) => void;
   onDismiss: () => void;
 }) {
-  const foundCount = state.found.length;
   const dailyTarget = state.mode === "daily" ? state.target : null;
-
   if (dailyTarget != null) {
-    const left = Math.max(0, dailyTarget - foundCount);
     return (
-      <ResponsiveSheet open onDismiss={onDismiss} ariaLabel="Journey" className="cbagesheet">
-        <span className="k">Journey</span>
-        <h3>Daily — {foundCount} of {dailyTarget} discoveries</h3>
-        <p>
-          {left > 0 ? (
-            <>{left} more to win · {state.moves} turn{state.moves === 1 ? "" : "s"} so far. Fewer turns ranks higher on today&apos;s leaderboard.</>
-          ) : (
-            <>Daily goal reached in {state.moves} turn{state.moves === 1 ? "" : "s"}.</>
-          )}
-        </p>
-        {foundCount > 0 && (
-          <div className="cbagefinds" aria-label="Found this run">
-            {state.found.map((id) => {
-              const it = bundle.items.get(id);
-              if (!it) return null;
-              return <DiscoveryTile key={id} item={it} onInfo={onInfo} />;
-            })}
-          </div>
-        )}
-        <button type="button" className="cbh cbback" onClick={onDismiss}>
-          Done
-        </button>
-      </ResponsiveSheet>
+      <DailyJourney
+        state={state}
+        bundle={bundle}
+        dailyTarget={dailyTarget}
+        onInfo={onInfo}
+        onDismiss={onDismiss}
+      />
     );
   }
+  return (
+    <ChapterJourney
+      state={state}
+      bundle={bundle}
+      onInfo={onInfo}
+      onDismiss={onDismiss}
+    />
+  );
+}
 
+function DailyJourney({
+  state,
+  bundle,
+  dailyTarget,
+  onInfo,
+  onDismiss,
+}: {
+  state: GameState;
+  bundle: ThemeBundle;
+  dailyTarget: number;
+  onInfo: (id: string) => void;
+  onDismiss: () => void;
+}) {
+  const foundCount = state.found.length;
+  const left = Math.max(0, dailyTarget - foundCount);
+  return (
+    <ResponsiveSheet open onDismiss={onDismiss} ariaLabel="Journey" className="cbagesheet">
+      <span className="k">Journey</span>
+      <h3>Daily — {foundCount} of {dailyTarget} discoveries</h3>
+      <p>
+        {left > 0 ? (
+          <>{left} more to win · {state.moves} turn{state.moves === 1 ? "" : "s"} so far. Fewer turns ranks higher on today&apos;s leaderboard.</>
+        ) : (
+          <>Daily goal reached in {state.moves} turn{state.moves === 1 ? "" : "s"}.</>
+        )}
+      </p>
+      {foundCount > 0 && (
+        <div className="cbagefinds" aria-label="Found this run">
+          {state.found.map((id) => {
+            const it = bundle.items.get(id);
+            if (!it) return null;
+            return <DiscoveryTile key={id} item={it} onInfo={onInfo} />;
+          })}
+        </div>
+      )}
+      <button type="button" className="cbh cbback" onClick={onDismiss}>
+        Done
+      </button>
+    </ResponsiveSheet>
+  );
+}
+
+function ChapterJourney({
+  state,
+  bundle,
+  onInfo,
+  onDismiss,
+}: {
+  state: GameState;
+  bundle: ThemeBundle;
+  onInfo: (id: string) => void;
+  onDismiss: () => void;
+}) {
+  const foundCount = state.found.length;
   const currentChapter = chapterIndex(foundCount) + 1;
   const nextThreshold = chapterThreshold(currentChapter);
   const finite = Number.isFinite(nextThreshold);
