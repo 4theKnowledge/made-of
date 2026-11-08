@@ -480,7 +480,10 @@ export function CombineBoard({
       return;
     }
     const lastMode = loadLastMode();
-    if (lastMode === "daily" && dailyEnabled && !loadDailyDone(today)) {
+    // Admins bypass the dailyDone lock so they can replay today's daily
+    // for playtesting. Non-admin players still get the single-attempt
+    // behaviour (loadDailyDone truthy → skip auto-resume).
+    if (lastMode === "daily" && dailyEnabled && (admin || !loadDailyDone(today))) {
       const dailyBundle = dailyBundles[dailyHostTheme];
       const saved = loadGame(dailyBundle, { daily: today, expectedSeed: dailyPayloadSeed });
       if (saved) {
@@ -512,7 +515,7 @@ export function CombineBoard({
       setState(hydrateGame(endlessSave));
       return;
     }
-    if (dailyEnabled && !loadDailyDone(today)) {
+    if (dailyEnabled && (admin || !loadDailyDone(today))) {
       const dailyBundle = dailyBundles[dailyHostTheme];
       const saved = loadGame(dailyBundle, { daily: today, expectedSeed: dailyPayloadSeed });
       setState(
@@ -526,7 +529,7 @@ export function CombineBoard({
             }).state,
       );
     }
-  }, [activeTheme, initialMode, themeFromUrl, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyTarget, dailyPayloadSeed, dailyEnabled, run.ready]);
+  }, [activeTheme, initialMode, themeFromUrl, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyTarget, dailyPayloadSeed, dailyEnabled, run.ready, admin]);
 
   // Server run alignment. Each time the local state settles on a fresh
   // (mode, theme, dailyKey) slot, register a matching server run. The
@@ -781,6 +784,37 @@ export function CombineBoard({
   // player can dismiss it to review the final board (especially useful for
   // a finished daily they re-entered from the theme menu).
   const [overCardOpen, setOverCardOpen] = useState(false);
+  // Daily run timer. `startedAt` is captured when the player confirms the
+  // Start-daily dialog (so the clock doesn't tick while they're deciding
+  // whether to engage). `durationMs` is sealed when the run ends and
+  // threaded through to /finish + GameOverCard. Null for endless/fast.
+  const dailyStartRef = useRef<number | null>(null);
+  const [dailyDurationMs, setDailyDurationMs] = useState<number | null>(null);
+  // Start-daily gate. When the daily deep-link fires and there is no
+  // saved in-progress daily, the board is hidden behind a Start sheet
+  // until the player taps "Start". Resumes bypass the gate — the player
+  // already committed when they started earlier. Admins bypass the
+  // dailyDone lock entirely (admin replay for playtesting).
+  const [dailyStartPending, setDailyStartPending] = useState(false);
+  // Detect "entered a fresh daily" via the auto-resume path (deep link,
+  // last-mode pointer, fallback). A game that's daily + has no moves +
+  // hasn't ticked the clock yet means the player hasn't committed yet.
+  // Fires the start sheet so endless-first players still see the gate
+  // instead of landing straight on the board.
+  useEffect(() => {
+    if (!state.daily) {
+      setDailyStartPending(false);
+      return;
+    }
+    if (state.over) return;
+    if (state.moves > 0) return;
+    if (dailyStartRef.current != null) return;
+    if (!didResume.current) return;
+    setDailyStartPending(true);
+    // We intentionally only re-run when the daily identity or run status
+    // changes — mid-run state ticks shouldn't re-open the sheet.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.daily, state.over]);
   const prevOverRef = useRef(false);
   useEffect(() => {
     if (state.over && !prevOverRef.current && !state.debug) {
@@ -1210,12 +1244,24 @@ export function CombineBoard({
           }
           r.state.newBest = true;
         }
+        // Seal the daily duration before `/finish` runs so the client
+        // sends the same number it displays on the end card. For non-
+        // daily runs the timer stays null — the server stores null on
+        // `progress.result.durationMs` and the card renders "—".
+        let sealedDurationMs: number | null = null;
+        if (r.state.daily && dailyStartRef.current != null) {
+          sealedDurationMs = Math.max(0, Date.now() - dailyStartRef.current);
+          setDailyDurationMs(sealedDurationMs);
+        }
         // /finish writes the progress row server-side using the
         // replay-validated event log. Anon runs (no server-backed
         // context) just end locally — a signed-out player's best is
         // still kept in localStorage via the saveBest() call above.
         if (run.serverBacked) {
-          void run.finish();
+          void run.finish(
+            [],
+            sealedDurationMs != null ? { durationMs: sealedDurationMs } : {},
+          );
         }
         if (r.state.daily) {
           const bestShelfId =
@@ -1399,27 +1445,32 @@ export function CombineBoard({
     // (stale onClick ref, keyboard shortcut) short-circuits here too.
     if (!dailyEnabled) return;
     const day = todayKey();
-    // Resume today's daily save if any (including the finished state kept
-    // for review). Only start a fresh daily when there's no save at all AND
-    // today's puzzle hasn't been completed yet — otherwise we'd silently
-    // let a player replay today's run.
-    //
-    // Order matters: loadDailyDone has to run first because, on a
-    // DAILY_EPOCH mismatch, it side-effect-clears the review save slot.
-    // If we read loadGame first we'd hydrate the stale finished state
-    // instead of starting the fresh run the reset is meant to allow.
-    const done = loadDailyDone(day);
+    // Admins bypass the dailyDone lock so they can replay today's daily
+    // as many times as they want for playtesting. Regular players still
+    // get the single-attempt behaviour.
+    const done = admin ? null : loadDailyDone(day);
     const dailyBundle = dailyBundles[dailyHostTheme];
     const saved = loadGame(dailyBundle, { daily: day, expectedSeed: dailyPayloadSeed });
     if (saved) {
+      // Resume path: the player's clock is already running from their
+      // first Start-daily tap; no gate shown and no new timer started.
+      // (If `dailyStartRef.current` was cleared by a reload, we accept
+      //  the clock drift — resumed-runs show time from this mount.)
       saveGame(state);
       setState(hydrateGame(saved, { target: dailyTarget }));
+      if (dailyStartRef.current == null) {
+        dailyStartRef.current = Date.now();
+      }
+      setDailyDurationMs(null);
     } else if (done) {
       // Done, but the final state is no longer in storage (older save or
       // storage got cleared). Nothing to resume into; keep the current
       // game as-is so the player doesn't accidentally start a replay.
       return;
     } else {
+      // Fresh daily: hide the board behind a Start sheet so the player
+      // doesn't see the tiles before committing to the run. The timer
+      // starts only when they confirm — see `confirmStartDaily`.
       saveGame(state);
       setState(
         newGame(dailyHostTheme, dailyBundle, {
@@ -1429,9 +1480,55 @@ export function CombineBoard({
           target: dailyTarget,
         }).state,
       );
+      dailyStartRef.current = null;
+      setDailyDurationMs(null);
+      setDailyStartPending(true);
     }
     resetTransient();
-  }, [bundles, dailyBundles, dailyHostTheme, state, resetTransient, dailyTarget, dailyPayloadSeed, dailyEnabled]);
+  }, [bundles, dailyBundles, dailyHostTheme, state, resetTransient, dailyTarget, dailyPayloadSeed, dailyEnabled, admin]);
+
+  // Player tapped "Start" on the Start-daily sheet. Seals the clock and
+  // reveals the board. Idempotent — a second tap is a no-op.
+  const confirmStartDaily = useCallback(() => {
+    if (!dailyStartPending) return;
+    dailyStartRef.current = Date.now();
+    setDailyDurationMs(null);
+    setDailyStartPending(false);
+  }, [dailyStartPending]);
+
+  // Admin "Replay daily" — restart today's daily server-side with
+  // restart:true and reset the local engine to a fresh daily state. Not
+  // offered to non-admins (the button on GameOverCard is gated on the
+  // `isAdmin` prop).
+  const replayDaily = useCallback(() => {
+    if (!admin) return;
+    const day = todayKey();
+    const dailyBundle = dailyBundles[dailyHostTheme];
+    if (!dailyBundle) return;
+    // Nuke local daily-done so the fresh run doesn't resume into the
+    // finished state. Then mint a fresh engine run and let the
+    // slot-alignment effect POST /runs/start with the current state —
+    // the server already ends the old run on restart:true semantics.
+    try {
+      window.localStorage.removeItem("madeof:cbdaily");
+    } catch {
+      // ignore — the done record is a UI gate, not a hard dependency
+    }
+    setDailyDone(null);
+    setState(
+      newGame(dailyHostTheme, dailyBundle, {
+        daily: day,
+        size: 6,
+        seed: dailySeed(day),
+        target: dailyTarget,
+      }).state,
+    );
+    dailyStartRef.current = null;
+    setDailyDurationMs(null);
+    setDailyStartPending(true);
+    setOverCardOpen(false);
+    resetTransient();
+  }, [admin, dailyBundles, dailyHostTheme, dailyTarget, resetTransient]);
 
   const shareDaily = useCallback(async () => {
     const dr = dailyDone;
@@ -2443,6 +2540,35 @@ export function CombineBoard({
             onCancel={() => act({ type: "cancel-choice" })}
           />
         )}
+        {dailyStartPending && state.daily && !state.over && (
+          <ResponsiveSheet
+            open
+            onDismiss={() => {
+              // Dismissing the sheet without starting leaves the clock
+              // uninitialised; the board stays hidden until the player
+              // either starts or navigates away. Treat dismiss as
+              // confirm-start so there's no "stuck" hidden-board state.
+              confirmStartDaily();
+            }}
+            ariaLabel="Start today's daily"
+            className="cbresult cbstartdaily"
+          >
+            <span className="k">Daily · {state.daily}</span>
+            <b className="big">{state.target ?? dailyTarget ?? "—"}</b>
+            <span className="sub">
+              Discoveries to make. Your time starts when you tap Start.
+            </span>
+            <ButtonGroup>
+              <button
+                type="button"
+                className="cbh"
+                onClick={confirmStartDaily}
+              >
+                Start
+              </button>
+            </ButtonGroup>
+          </ResponsiveSheet>
+        )}
         {state.over && overCardOpen && (
           <GameOverCard
             state={state}
@@ -2454,6 +2580,9 @@ export function CombineBoard({
             currentUserHandle={currentUserHandle}
             authed={collectionAuthed}
             themeCompletion={currentThemeCompletion}
+            durationMs={state.daily ? dailyDurationMs : null}
+            finishing={run.finishing}
+            isAdmin={admin}
             onClose={() => setOverCardOpen(false)}
             onPlayAgain={() => {
               // From a finished daily, "Play endless" starts a fresh
@@ -2477,6 +2606,7 @@ export function CombineBoard({
                   : endlessShareText(state, bundle);
               await shareText(text);
             }}
+            onReplayDaily={admin && state.daily ? replayDaily : undefined}
           />
         )}
         {state.over && !overCardOpen && !state.debug && (
@@ -2506,19 +2636,26 @@ export function CombineBoard({
             </ButtonGroup>
           </div>
         )}
-        {ageToast && (
+        {/* Chapter toasts are endless-only. Daily runs are target-list
+            ended (fit in ~15 min) so the chapter-up celebration + the
+            mount-time "has emerged" banner are both noise for a daily
+            player. Fast is also suppressed since fast has no bands. */}
+        {ageToast && state.mode === "endless" && !state.daily && (
           <AgeToast
             toast={ageToast}
             bundle={bundle}
             onDismiss={() => setAgeToast(null)}
           />
         )}
-        {!ageToast && activeAgeBanner && (
-          <AgePromoToast
-            ageName={activeAgeBanner}
-            onDismiss={dismissAgeBanner}
-          />
-        )}
+        {!ageToast &&
+          activeAgeBanner &&
+          state.mode === "endless" &&
+          !state.daily && (
+            <AgePromoToast
+              ageName={activeAgeBanner}
+              onDismiss={dismissAgeBanner}
+            />
+          )}
         {discovery && (
           <DiscoveryToast
             discovery={discovery}

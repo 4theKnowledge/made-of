@@ -152,6 +152,11 @@ export interface UseCombineRunApi {
   /** True when a server run is owned by this hook. Shortcut for
    *  `context != null`. */
   serverBacked: boolean;
+  /** True while a `/finish` request is in flight. Callers gate
+   *  post-run UI that depends on the `progress` row being committed
+   *  (e.g. daily leaderboard rank lookup) on this flipping back to
+   *  false so they don't race the insert. */
+  finishing: boolean;
   /** Start (or resume) a run. Returns the server's initial state so
    *  the caller can hydrate its local reducer. */
   start: (args: StartArgs) => Promise<StartResult | null>;
@@ -162,8 +167,13 @@ export interface UseCombineRunApi {
   /** Force an immediate flush (e.g. on blur / unmount). */
   flush: () => Promise<void>;
   /** Close the run server-side. Flushes the buffer first, then calls
-   *  /finish with any trailing actions. */
-  finish: (trailingActions?: Action[]) => Promise<GameState | null>;
+   *  /finish with any trailing actions. Optionally pass `extras` to
+   *  thread extra fields into the finish body (e.g. `durationMs` for
+   *  daily timing). */
+  finish: (
+    trailingActions?: Action[],
+    extras?: Record<string, unknown>,
+  ) => Promise<GameState | null>;
   /** Register (or replace) the reconcile callback at any point in
    *  render. Useful when the hook has to be called early (e.g. for
    *  `ready`), but the reconcile closure depends on state declared
@@ -178,6 +188,7 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
 
   const [ready, setReady] = useState(false);
   const [context, setContext] = useState<RunContext | null>(null);
+  const [finishing, setFinishing] = useState(false);
   const bufferRef = useRef<Action[]>([]);
   const inFlightRef = useRef<Promise<void> | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -368,26 +379,35 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
   );
 
   const finish = useCallback(
-    async (trailing: Action[] = []): Promise<GameState | null> => {
+    async (
+      trailing: Action[] = [],
+      extras: Record<string, unknown> = {},
+    ): Promise<GameState | null> => {
       const ctx = contextRef.current;
       if (!ctx) return null;
-      // Drain any pending flush first so the server sees everything
-      // in order.
-      await flush();
-      const pending = [...bufferRef.current, ...trailing];
-      bufferRef.current = [];
-      const base = contextRef.current?.eventCount ?? ctx.eventCount;
-      const res = await postJSON<
-        | { state: GameState; eventCount: number; ended: boolean }
-        | { __error: true }
-      >(`/api/combine/runs/${ctx.runId}/finish`, {
-        baseEventCount: base,
-        actions: pending,
-      });
-      if (!res || "__error" in res) return null;
-      // Clear the context — a finished run isn't ours to checkpoint anymore.
-      setContext(null);
-      return res.state;
+      setFinishing(true);
+      try {
+        // Drain any pending flush first so the server sees everything
+        // in order.
+        await flush();
+        const pending = [...bufferRef.current, ...trailing];
+        bufferRef.current = [];
+        const base = contextRef.current?.eventCount ?? ctx.eventCount;
+        const res = await postJSON<
+          | { state: GameState; eventCount: number; ended: boolean }
+          | { __error: true }
+        >(`/api/combine/runs/${ctx.runId}/finish`, {
+          baseEventCount: base,
+          actions: pending,
+          ...extras,
+        });
+        if (!res || "__error" in res) return null;
+        // Clear the context — a finished run isn't ours to checkpoint anymore.
+        setContext(null);
+        return res.state;
+      } finally {
+        setFinishing(false);
+      }
     },
     [flush],
   );
@@ -436,6 +456,7 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
     ready,
     context,
     serverBacked: context != null,
+    finishing,
     start,
     push,
     flush,

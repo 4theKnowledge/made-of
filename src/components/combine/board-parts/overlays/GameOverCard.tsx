@@ -25,9 +25,13 @@ export function GameOverCard({
   currentUserHandle,
   authed = false,
   themeCompletion = null,
+  durationMs = null,
+  finishing = false,
+  isAdmin = false,
   onClose,
   onPlayAgain,
   onShare,
+  onReplayDaily,
 }: {
   state: GameState;
   bundle: ThemeBundle;
@@ -41,9 +45,25 @@ export function GameOverCard({
    *  completed; `completedVersion < bundle.theme.collectionVersion` = a
    *  re-completion opportunity against newer admin-added items. */
   themeCompletion?: ThemeCompletion | null;
+  /** Elapsed time for the run in ms (client-measured, server-trusted).
+   *  Null for endless/fast runs and legacy daily runs that pre-date the
+   *  timer. */
+  durationMs?: number | null;
+  /** True while `/finish` is still in flight. Gates the daily-rank
+   *  fetch so we don't race the `progress` insert — before T-0234 the
+   *  rank lookup fired on card mount and almost always lost the race,
+   *  which is why ranks showed "—" / unranked. */
+  finishing?: boolean;
+  /** Admin viewer — unlocks the "Replay daily" button for playtesting
+   *  without affecting non-admin flow. */
+  isAdmin?: boolean;
   onClose: () => void;
   onPlayAgain: () => void;
   onShare: () => void;
+  /** Admin-only — restarts today's daily server-side with `restart:true`.
+   *  When omitted (non-admin / endless / fast), the Replay-daily button
+   *  is suppressed. */
+  onReplayDaily?: () => void;
 }) {
   // Chapter the player ended at, computed from their cumulative finds so
   // the summary can say "Chapter 3" regardless of mid-game state drift.
@@ -55,7 +75,11 @@ export function GameOverCard({
   const won =
     isDailyTargetRun && state.found.length >= (state.target ?? 0);
   const rank = useDailyRank({
-    enabled: !!(won && state.daily && currentUserHandle),
+    // Gate on `!finishing` so we don't fetch before `/finish` commits
+    // the `progress` row. Pre-fix, the fetch fired on mount and almost
+    // always lost the race — leaderboard returned the pre-insert list
+    // and the player appeared "unranked" even on completions.
+    enabled: !!(won && state.daily && currentUserHandle && !finishing),
     theme: state.theme,
     day: state.daily,
     handle: currentUserHandle ?? null,
@@ -132,7 +156,12 @@ export function GameOverCard({
   const ceremonyItemCount = collectables.size;
 
   return (
-    <ResponsiveSheet open onDismiss={onClose} ariaLabel="Run over">
+    <ResponsiveSheet
+      open
+      onDismiss={onClose}
+      ariaLabel="Run over"
+      className="cbresult"
+    >
       <button
         type="button"
         className="cbx"
@@ -193,7 +222,7 @@ export function GameOverCard({
                 ? `Your best is ${best.toLocaleString("en")}. ${(best - state.score).toLocaleString("en")} to go.`
                 : `You reached ${progressionLabel}.`}
         </span>
-        <div className="cb3">
+        <div className={isDailyTargetRun ? "cb4" : "cb3"}>
           {isDailyTargetRun ? (
             <>
               <div>
@@ -205,8 +234,16 @@ export function GameOverCard({
                 <span>discoveries</span>
               </div>
               <div>
-                <b>{formatRank(rank, won, !!currentUserHandle)}</b>
-                <span>{rankLabel(rank, won, !!currentUserHandle)}</span>
+                <b>{durationMs != null ? formatDuration(durationMs) : "—"}</b>
+                <span>time</span>
+              </div>
+              <div>
+                <b>
+                  {formatRank(rank, won, !!currentUserHandle, finishing)}
+                </b>
+                <span>
+                  {rankLabel(rank, won, !!currentUserHandle, finishing)}
+                </span>
               </div>
             </>
           ) : (
@@ -290,9 +327,36 @@ export function GameOverCard({
           <button type="button" className="cbh" onClick={onPlayAgain}>
             {state.daily ? "Play endless" : "Play again"}
           </button>
+          {isAdmin && state.daily && onReplayDaily && (
+            <button
+              type="button"
+              className="cbh"
+              onClick={onReplayDaily}
+              title="Admin: replay today's daily"
+            >
+              Replay daily
+            </button>
+          )}
         </ButtonGroup>
     </ResponsiveSheet>
   );
+}
+
+/** Render a run duration as `mm:ss` (or `h:mm:ss` beyond one hour).
+ *  Rounds down to the nearest second — the daily clock is tracked at
+ *  millisecond precision so leaderboard tie-breaks stay decisive, but
+ *  the display rounds so "1:23.456" doesn't flicker. */
+function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (hours > 0) {
+    return `${hours}:${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  }
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 type RankState =
@@ -351,17 +415,31 @@ function useDailyRank({
   return state;
 }
 
-function formatRank(rank: RankState, won: boolean, signedIn: boolean): string {
+function formatRank(
+  rank: RankState,
+  won: boolean,
+  signedIn: boolean,
+  finishing: boolean,
+): string {
   if (!won) return "—";
   if (!signedIn) return "Sign in";
-  if (rank.kind === "loading" || rank.kind === "idle") return "…";
+  // While /finish is in flight the fetch is suppressed and `rank.kind`
+  // stays `idle` — show the same spinner glyph as `loading` so the
+  // player sees "working" rather than a flash of "—".
+  if (finishing || rank.kind === "loading" || rank.kind === "idle") return "…";
   if (rank.kind === "ranked") return `#${rank.position}`;
   return "—";
 }
 
-function rankLabel(rank: RankState, won: boolean, signedIn: boolean): string {
+function rankLabel(
+  rank: RankState,
+  won: boolean,
+  signedIn: boolean,
+  finishing: boolean,
+): string {
   if (!won) return "rank";
-  if (!signedIn) return "to rank today";
+  if (!signedIn) return "set handle to rank";
+  if (finishing) return "saving run";
   if (rank.kind === "ranked") return `of ${rank.total} today`;
   if (rank.kind === "loading" || rank.kind === "idle") return "ranking";
   return "rank unavailable";

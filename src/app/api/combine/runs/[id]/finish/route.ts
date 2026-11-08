@@ -26,6 +26,13 @@ interface FinishBody {
    *  of play before a forfeit). May be empty if the client has already
    *  flushed everything via `/checkpoint`. */
   actions?: unknown;
+  /** Elapsed wall-clock time for the run, measured client-side from the
+   *  moment the player confirmed "Start" (daily) or opened the board
+   *  (endless/fast). Stored on the `progress` row's `result.durationMs`
+   *  for daily leaderboard tie-breaks and end-card display. Server-
+   *  trusted — anti-cheat is weak here, but the number isn't a scoring
+   *  input. */
+  durationMs?: unknown;
 }
 
 /**
@@ -83,6 +90,16 @@ export async function POST(
   }
   if (body.actions.length > 100) {
     return NextResponse.json({ error: "batch too large" }, { status: 413 });
+  }
+  // Cap duration at 24h — anything longer is almost certainly a stale
+  // tab / clock skew, and we don't want absurd values polluting the
+  // leaderboard tie-break.
+  let durationMs: number | null = null;
+  if (body.durationMs != null) {
+    const n = Number(body.durationMs);
+    if (Number.isFinite(n) && n >= 0 && n <= 24 * 60 * 60 * 1000) {
+      durationMs = Math.floor(n);
+    }
   }
   const parsed: Action[] = [];
   for (let i = 0; i < body.actions.length; i++) {
@@ -202,6 +219,7 @@ export async function POST(
             turns: final.moves,
             found: final.found.length,
             target: final.target ?? 0,
+            durationMs,
           }
         : base;
     try {

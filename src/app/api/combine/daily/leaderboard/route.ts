@@ -10,8 +10,9 @@ const THEMES = new Set(["everything"] as const);
 /**
  * Daily leaderboard for Combine. Returns up to the top 100 players for a
  * given (theme, day). Target-list daily rows sort by
- * `(found DESC, turns ASC, score DESC)` — completions float to the top,
- * partial runs rank below by how much was found, and ties break by score.
+ * `(found DESC, turns ASC, durationMs ASC, score DESC)` — completions
+ * float to the top, partial runs rank below by how much was found, ties
+ * break first by turns, then by time-taken, then by score.
  *
  * Each user appears once (their best attempt at the day). No userIds leak
  * — only the public handle is returned.
@@ -37,18 +38,22 @@ export async function GET(req: Request) {
 
   // `DISTINCT ON (user_id)` pinned to the leaderboard sort keeps each user
   // at their best attempt for the day. The outer ORDER BY applies after the
-  // distinct is resolved.
+  // distinct is resolved. `durationMs` may be missing on legacy rows — the
+  // COALESCE treats missing as "slowest possible" so new timed runs win
+  // tie-breaks against pre-timer rows.
   const rows = await getDb().execute<{
     handle: string | null;
     found: number | null;
     turns: number | null;
+    duration_ms: number | null;
     score: number | null;
   }>(sql`
-    SELECT handle, found, turns, score FROM (
+    SELECT handle, found, turns, duration_ms, score FROM (
       SELECT DISTINCT ON (p.user_id)
         u.handle AS handle,
         COALESCE((p.result->>'found')::int, 0) AS found,
         COALESCE((p.result->>'turns')::int, 0) AS turns,
+        COALESCE((p.result->>'durationMs')::bigint, 9223372036854775807) AS duration_ms,
         COALESCE((p.result->>'score')::int, 0) AS score
       FROM progress p
       INNER JOIN "user" u ON u.id = p.user_id
@@ -58,25 +63,52 @@ export async function GET(req: Request) {
       ORDER BY p.user_id,
                COALESCE((p.result->>'found')::int, 0) DESC,
                COALESCE((p.result->>'turns')::int, 0) ASC,
+               COALESCE((p.result->>'durationMs')::bigint, 9223372036854775807) ASC,
                COALESCE((p.result->>'score')::int, 0) DESC
     ) best
-    ORDER BY best.found DESC, best.turns ASC, best.score DESC
+    ORDER BY best.found DESC,
+             best.turns ASC,
+             best.duration_ms ASC,
+             best.score DESC
     LIMIT 100
   `);
 
   const list = (rows as unknown as {
-    rows?: Array<{ handle: string | null; found: number; turns: number; score: number }>;
+    rows?: Array<{
+      handle: string | null;
+      found: number;
+      turns: number;
+      duration_ms: number | string | null;
+      score: number;
+    }>;
   }).rows
-    ?? (rows as unknown as Array<{ handle: string | null; found: number; turns: number; score: number }>);
+    ?? (rows as unknown as Array<{
+      handle: string | null;
+      found: number;
+      turns: number;
+      duration_ms: number | string | null;
+      score: number;
+    }>);
 
   return NextResponse.json({
     day,
     theme,
-    rows: list.map((r) => ({
-      handle: r.handle ?? null,
-      found: Number(r.found) || 0,
-      turns: Number(r.turns) || 0,
-      score: Number(r.score) || 0,
-    })),
+    rows: list.map((r) => {
+      // bigint comes back as string from pg; the sentinel for "no duration"
+      // is Number.MAX_SAFE_INTEGER-ish — treat that as null on the wire so
+      // the client can render "—" instead of 292M years.
+      const raw = r.duration_ms == null ? null : Number(r.duration_ms);
+      const durationMs =
+        raw != null && Number.isFinite(raw) && raw < 24 * 60 * 60 * 1000 + 1
+          ? raw
+          : null;
+      return {
+        handle: r.handle ?? null,
+        found: Number(r.found) || 0,
+        turns: Number(r.turns) || 0,
+        durationMs,
+        score: Number(r.score) || 0,
+      };
+    }),
   });
 }

@@ -925,7 +925,7 @@ a.btn.primary{color:var(--bg)}
 .cbslot{position:relative;flex:none;width:30px;height:30px;box-sizing:border-box;border:1.5px solid var(--pk);border-radius:3px;background:var(--fill);box-shadow:1.5px 1.5px 0 var(--pk);display:grid;place-items:center;color:#111417;cursor:pointer;padding:0;font:inherit;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .cbslot .ic{width:22px;height:22px;border:0;background:transparent}
 .cbslot .ic svg{width:100%;height:100%}
-.cbslot > b{position:absolute;right:-6px;bottom:-6px;min-width:15px;height:15px;padding:0 3px;box-sizing:border-box;border-radius:8px;background:#111417;color:#fff;font-family:var(--mono);font-size:9.5px;line-height:15px;text-align:center}
+.cbslot > b{position:absolute;right:-7px;bottom:-7px;min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#111417;color:#fff;font-family:var(--mono);font-size:10.5px;font-weight:700;line-height:17px;text-align:center;white-space:nowrap;letter-spacing:.01em;box-shadow:0 0 0 1.5px var(--bg)}
 .cbshelf-empty{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);font-family:var(--mono);letter-spacing:.04em;text-transform:uppercase}
 .cbshelf-empty svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.7}
 .cbshelf-empty em{font-style:normal}
@@ -1652,7 +1652,7 @@ a.btn.primary{color:var(--bg)}
 
 /* Age-promo toast — mount-time "new content since last visit" notice.
    Calmer than cbagebig: paper surface, no sweep, no celebration. */
-.cbdisc.cbagepromo{background:var(--paper);border-width:1.5px;box-shadow:3px 3px 0 var(--ink)}
+.cbdisc.cbagepromo{background:var(--surface);border-width:1.5px;border-color:var(--ink);color:var(--ink);box-shadow:3px 3px 0 var(--ink)}
 .cbdisc.cbagepromo b{font-size:16px}
 
 /* Age-up: level-up feel. Bigger frame, thicker border, a bright colour ribbon
@@ -1667,14 +1667,26 @@ a.btn.primary{color:var(--bg)}
 .cbdisc.cbagebig .cbagesample span{opacity:0;transform:translateY(6px);animation:cbagepop .35s cubic-bezier(.2,.9,.3,1.5) forwards;animation-delay:calc(260ms + var(--i, 0) * 90ms)}
 @keyframes cbagepop{0%{opacity:0;transform:translateY(6px) scale(.9)}60%{opacity:1;transform:translateY(0) scale(1.05)}100%{opacity:1;transform:none}}
 
-/* End-of-game summary — prototype lines 3870–3879 */
-.cbover .k{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
-.cbover .big{font-family:var(--mono);font-size:52px;line-height:1}
-.cbover .sub{margin:0;font-size:13.5px;color:var(--muted)}
-.cb3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
-.cb3 div{padding:8px 4px;border:1.5px solid var(--ink);border-radius:3px;background:var(--surface)}
-.cb3 b{display:block;font-family:var(--mono);font-size:20px}
-.cb3 span{font-size:11.5px}
+/* End-of-game summary — prototype lines 3870–3879.
+   `.cbresult` is the ResponsiveSheet variant used by GameOverCard; the
+   legacy `.cbover` selector stays for the admin tree-root modal. Keep
+   both selectors on each rule so a future `.cbover`-only caller isn't
+   silently restyled. */
+.cbover .k,.rsheet.cbresult .k{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.cbover .big,.rsheet.cbresult .big{font-family:var(--mono);font-size:52px;line-height:1}
+.cbover .sub,.rsheet.cbresult .sub{margin:0;font-size:13.5px;color:var(--muted)}
+.cb3,.cb4{display:grid;gap:8px;width:100%}
+.cb3{grid-template-columns:repeat(3,1fr)}
+.cb4{grid-template-columns:repeat(4,1fr)}
+.cb3 div,.cb4 div{padding:8px 4px;border:1.5px solid var(--ink);border-radius:3px;background:var(--surface);min-width:0;overflow:hidden}
+.cb3 b,.cb4 b{display:block;font-family:var(--mono);font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cb4 b{font-size:17px}
+.cb3 span,.cb4 span{font-size:11.5px}
+.cb4 span{font-size:10.5px}
+/* Start-daily sheet reuses `.cbresult` typography; no extra styling needed
+   beyond the ResponsiveSheet defaults. The modifier exists so a future
+   layout tweak can find this surface distinctly. */
+.rsheet.cbstartdaily{}
 /* T-0217 Slice 1b: Combine theme-completion ceremony. Inline banner that
    lives above the GameOverCard stats when the player's run tipped them
    over the threshold for the current collection_version. Quiet and
