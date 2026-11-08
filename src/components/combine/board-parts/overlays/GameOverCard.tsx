@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
 import { chapterIndex } from "@/combine/progression";
@@ -8,12 +8,23 @@ import { fillVar } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 import { ButtonGroup } from "@/components/common/ButtonGroup";
 
+/** T-0217 Slice 1b: the newest completion row for the active theme, or
+ *  null if the player has never completed it (or isn't signed in). */
+export interface ThemeCompletion {
+  themeCode: string;
+  completedVersion: number;
+  completedAt: string;
+  itemCount: number;
+}
+
 export function GameOverCard({
   state,
   bundle,
   collection,
   best,
   currentUserHandle,
+  authed = false,
+  themeCompletion = null,
   onClose,
   onPlayAgain,
   onShare,
@@ -23,6 +34,13 @@ export function GameOverCard({
   collection: Map<string, number>;
   best: number;
   currentUserHandle?: string | null;
+  /** Signed-in flag — gates the completion ceremony. Signed-out players
+   *  don't persist discoveries so completion is meaningless for them. */
+  authed?: boolean;
+  /** Newest completion row for `state.theme`, if any. Null = never
+   *  completed; `completedVersion < bundle.theme.collectionVersion` = a
+   *  re-completion opportunity against newer admin-added items. */
+  themeCompletion?: ThemeCompletion | null;
   onClose: () => void;
   onPlayAgain: () => void;
   onShare: () => void;
@@ -62,6 +80,57 @@ export function GameOverCard({
   }
   const themeDiscovered = themeDiscoveredSet.size;
   const totalOutputs = bundle.outputs.size;
+
+  // T-0217 Slice 1b: completion ceremony. Collectables mirror
+  // CollectionBook's derivation (outputs ∪ base). `got` merges the
+  // lifetime collection with this run's finds so the ceremony can fire
+  // on the very run that pushed the player over.
+  const collectables = useMemo(() => {
+    const s = new Set<string>(bundle.outputs);
+    for (const id of bundle.base) s.add(id);
+    return s;
+  }, [bundle.outputs, bundle.base]);
+  const got = useMemo(() => {
+    const s = new Set<string>();
+    for (const id of collection.keys()) if (collectables.has(id)) s.add(id);
+    for (const id of state.found) if (collectables.has(id)) s.add(id);
+    return s;
+  }, [collection, state.found, collectables]);
+  const isComplete = got.size >= collectables.size && collectables.size > 0;
+  const currentVersion = bundle.theme.collectionVersion;
+  const isCurrentVersion =
+    themeCompletion?.completedVersion === currentVersion;
+  const showCeremony =
+    authed &&
+    state.mode === "endless" &&
+    isComplete &&
+    !isCurrentVersion;
+
+  // Fire-once POST per mount when the ceremony is showing. 409/403/network
+  // errors are swallowed — the UI is truthful from the client's perspective
+  // and the server reconciles on next GET.
+  const posted = useRef(false);
+  useEffect(() => {
+    if (!showCeremony || posted.current) return;
+    posted.current = true;
+    void fetch("/api/me/combine/theme-completion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        themeCode: state.theme,
+        version: currentVersion,
+      }),
+    }).catch(() => {
+      // best-effort; nothing to do
+    });
+  }, [showCeremony, state.theme, currentVersion]);
+
+  // Badge pictogram: ThemeMeta doesn't yet carry a pictogram (slice 1a
+  // threaded label/description/collectionVersion only). Use a static
+  // diamond glyph for now — follow-up to plumb `combineThemes.pictogram`
+  // through ThemeMeta.
+  const ceremonyItemCount = collectables.size;
+
   return (
     <ResponsiveSheet open onDismiss={onClose} ariaLabel="Run over">
       <button
@@ -74,6 +143,26 @@ export function GameOverCard({
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
         </button>
+        {showCeremony && (
+          <section className="cbcomplete" aria-label="Collection complete">
+            <div className="cbcomplete-badge" aria-hidden="true">
+              <svg viewBox="0 0 32 32">
+                <path
+                  d="M16 3 L29 16 L16 29 L3 16 Z"
+                  fill="currentColor"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <b className="cbcomplete-title">COLLECTION COMPLETE</b>
+            <span className="cbcomplete-theme">{bundle.theme.name}</span>
+            <span className="cbcomplete-count">
+              {ceremonyItemCount} of {ceremonyItemCount}
+            </span>
+          </section>
+        )}
         <span className="k">
           {isDailyTargetRun
             ? won

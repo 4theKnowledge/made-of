@@ -1622,6 +1622,18 @@ a.btn.primary{color:var(--bg)}
 .cb3 div{padding:8px 4px;border:1.5px solid var(--ink);border-radius:3px;background:var(--surface)}
 .cb3 b{display:block;font-family:var(--mono);font-size:20px}
 .cb3 span{font-size:11.5px}
+/* T-0217 Slice 1b: Combine theme-completion ceremony. Inline banner that
+   lives above the GameOverCard stats when the player's run tipped them
+   over the threshold for the current collection_version. Quiet and
+   classy — ink border, hard shadow, chivo-mono eyebrow. One-shot scale
+   fade on mount via @keyframes cbcomplete-in. */
+.cbcomplete{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 18px;margin:0 0 12px;border:2.5px solid var(--ink);border-radius:4px;background:var(--surface);box-shadow:4px 4px 0 var(--ink);animation:cbcomplete-in .34s ease-out}
+.cbcomplete-badge{width:56px;height:56px;display:grid;place-items:center;border:2px solid var(--ink);border-radius:50%;background:var(--fill, var(--surface));color:var(--ink)}
+.cbcomplete-badge svg{width:36px;height:36px}
+.cbcomplete-title{font-family:var(--mono);font-size:13px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+.cbcomplete-theme{font-size:16px;font-weight:700}
+.cbcomplete-count{font-family:var(--mono);font-size:12px;color:var(--muted)}
+@keyframes cbcomplete-in{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
 /* Mini-tile chip primitive — one source of truth for the
    pictogram-plus-inline-label pill used across DetailCard,
    toasts, CollectionBook rows, and the end-of-run discoveries

@@ -187,6 +187,15 @@ interface Props {
 // "no signatures recorded yet" case keeps a stable reference.
 const EMPTY_SIG_SET: ReadonlySet<string> = new Set();
 
+// T-0217 Slice 1b: shape returned by GET /api/me/combine/theme-completion.
+// Kept inline — one consumer (this file), one producer (route handler).
+interface ThemeCompletionRow {
+  themeCode: string;
+  completedVersion: number;
+  completedAt: string;
+  itemCount: number;
+}
+
 /** The top-level client component that owns engine state. */
 export function CombineBoard({
   bundles: serialised,
@@ -266,6 +275,46 @@ export function CombineBoard({
   const [best, setBest] = useState<Record<ThemeKey, number>>({ [activeTheme]: 0 });
   const [fastBest, setFastBest] = useState<Record<ThemeKey, number>>({ [activeTheme]: 0 });
   const [dailyDone, setDailyDone] = useState<DailyResult | null>(null);
+  // T-0217 Slice 1b: theme-completion rows per user. Fetched once for
+  // signed-in viewers; signed-out viewers never hit the endpoint (it
+  // returns 401 and completions don't persist for them anyway).
+  const [themeCompletions, setThemeCompletions] = useState<
+    ReadonlyArray<ThemeCompletionRow>
+  >([]);
+  useEffect(() => {
+    if (!collectionAuthed) {
+      setThemeCompletions([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/me/combine/theme-completion", {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const j = (await res.json()) as { completions?: ThemeCompletionRow[] };
+        if (cancelled) return;
+        setThemeCompletions(Array.isArray(j.completions) ? j.completions : []);
+      } catch {
+        // swallow — completion UI is best-effort and the server reconciles
+        // on POST
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [collectionAuthed]);
+  // Pick the newest row for the active theme (the GET endpoint returns
+  // oldest-first, so a reduce on createdAt max keeps re-completions honest).
+  const currentThemeCompletion = useMemo<ThemeCompletionRow | null>(() => {
+    let best: ThemeCompletionRow | null = null;
+    for (const row of themeCompletions) {
+      if (row.themeCode !== state.theme) continue;
+      if (!best || row.completedVersion > best.completedVersion) best = row;
+    }
+    return best;
+  }, [themeCompletions, state.theme]);
   // When a theme's numAges has grown since the player last saw it, surface
   // a one-time banner with the new age's label. Keyed by theme → label.
   const [newAgeBanner, setNewAgeBanner] = useState<Partial<Record<ThemeKey, string>>>({});
@@ -2339,6 +2388,8 @@ export function CombineBoard({
               (state.mode === "fast" ? fastBest : best)[state.theme] ?? 0
             }
             currentUserHandle={currentUserHandle}
+            authed={collectionAuthed}
+            themeCompletion={currentThemeCompletion}
             onClose={() => setOverCardOpen(false)}
             onPlayAgain={() => {
               // From a finished daily, "Play endless" starts a fresh
