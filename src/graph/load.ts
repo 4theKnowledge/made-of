@@ -54,11 +54,12 @@ export async function loadRowsFromDb(opts?: {
         label: schema.combineThemes.label,
         description: schema.combineThemes.description,
         collectionVersion: schema.combineThemes.collectionVersion,
+        pictogram: schema.combineThemes.pictogram,
       })
       .from(schema.combineThemes),
   ]);
 
-  const themeMeta = new Map<string, { code: string; label: string; description: string | null; collectionVersion: number }>();
+  const themeMeta = new Map<string, { code: string; label: string; description: string | null; collectionVersion: number; pictogram: string | null }>();
   for (const t of themes) themeMeta.set(t.code, t);
 
   const combineThemesByItem = new Map<string, string[]>();

@@ -52,6 +52,11 @@ export interface ThemeMeta {
    *  of a DB-backed snapshot (tests, legacy paths) — the DB is the source
    *  of truth. */
   collectionVersion: number;
+  /** 32×32 SVG inner-markup for the theme's pictogram, or null when the
+   *  theme has none (call sites fall back to a generic badge).
+   *  Surfaced on the bundle for ceremonies and theme-summary UIs
+   *  (T-0217 slice 1b → T-0223). Optional for test literals. */
+  pictogram?: string | null;
 }
 
 /** One recipe projected into Combine's world. In Combine both `f` (made

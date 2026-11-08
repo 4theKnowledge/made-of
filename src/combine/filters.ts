@@ -54,6 +54,7 @@ export function defaultThemeMeta(code: ThemeKey): ThemeMeta {
       : "",
     ages: themeAgePool(code),
     collectionVersion: 0,
+    pictogram: null,
   };
 }
 
@@ -63,6 +64,7 @@ export function themeMetaFromRow(row: {
   label: string;
   description: string | null;
   collectionVersion?: number | null;
+  pictogram?: string | null;
 }): ThemeMeta {
   return {
     k: row.code,
@@ -70,6 +72,7 @@ export function themeMetaFromRow(row: {
     desc: row.description ?? "",
     ages: themeAgePool(row.code),
     collectionVersion: row.collectionVersion ?? 0,
+    pictogram: row.pictogram ?? null,
   };
 }
 

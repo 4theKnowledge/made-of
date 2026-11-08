@@ -25,7 +25,7 @@ export interface Snapshot {
    *  them). Only populated when the snapshot is built from the DB;
    *  empty when built from the KB file so Combine tests still work
    *  without DB access. */
-  themeMeta?: Map<string, { code: string; label: string; description: string | null; collectionVersion: number }>;
+  themeMeta?: Map<string, { code: string; label: string; description: string | null; collectionVersion: number; pictogram: string | null }>;
 }
 
 export function buildSnapshot(rows: SeedRows): Snapshot {

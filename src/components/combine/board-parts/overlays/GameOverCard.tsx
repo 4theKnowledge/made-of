@@ -146,15 +146,24 @@ export function GameOverCard({
         {showCeremony && (
           <section className="cbcomplete" aria-label="Collection complete">
             <div className="cbcomplete-badge" aria-hidden="true">
-              <svg viewBox="0 0 32 32">
-                <path
-                  d="M16 3 L29 16 L16 29 L3 16 Z"
-                  fill="currentColor"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinejoin="round"
+              {bundle.theme.pictogram ? (
+                <Pictogram
+                  name={`theme:${bundle.theme.k}`}
+                  tier="M"
+                  kind="object"
+                  pictogram={bundle.theme.pictogram}
                 />
-              </svg>
+              ) : (
+                <svg viewBox="0 0 32 32">
+                  <path
+                    d="M16 3 L29 16 L16 29 L3 16 Z"
+                    fill="currentColor"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
             </div>
             <b className="cbcomplete-title">COLLECTION COMPLETE</b>
             <span className="cbcomplete-theme">{bundle.theme.name}</span>

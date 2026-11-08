@@ -41,7 +41,7 @@ export interface SeedRows {
   /** Per-theme DB-backed metadata, keyed by theme code. Threaded into the
    *  Snapshot so `buildThemeBundle` can expose `collectionVersion` on the
    *  bundle's ThemeMeta (T-0217). Only populated when reading from the DB. */
-  themeMeta?: Map<string, { code: string; label: string; description: string | null; collectionVersion: number }>;
+  themeMeta?: Map<string, { code: string; label: string; description: string | null; collectionVersion: number; pictogram: string | null }>;
   /** name → item uuid. Only populated when building rows from the knowledge
    *  base; empty when rows are loaded straight from the DB. */
   itemIdByName: Map<string, string>;
