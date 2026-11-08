@@ -1,7 +1,11 @@
 "use client";
 
-import { Fragment, useCallback, useState } from "react";
-import type { DailyConfig } from "@/combine/daily-config";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  DEFAULT_MANIFEST_PARTNER_BIAS,
+  DEFAULT_MANIFEST_SIZE,
+  type DailyConfig,
+} from "@/combine/daily-config";
 import type { DailyPayload } from "@/combine/daily-schedule";
 import { useConfirm } from "@/components/common/useConfirm";
 
@@ -9,6 +13,28 @@ import { useConfirm } from "@/components/common/useConfirm";
 export interface ThemeOption {
   code: string;
   label: string;
+}
+
+interface PoolMember {
+  id: string;
+  name: string;
+}
+
+interface ManifestPreview {
+  day: string;
+  themeCode: string;
+  poolSize: number;
+  pinned: string[];
+  generated: string[];
+  manifest: string[];
+  turnsToSolve: number;
+}
+
+interface ManifestPreviewError {
+  error: string;
+  message: string;
+  pin?: string;
+  manifest?: string[];
 }
 
 export interface ScheduleRow {
@@ -50,7 +76,30 @@ export function DailyAdmin({
   const [guestMinBand, setGuestMinBand] = useState<string>(
     initialActive?.config.guestIngredient?.minBand?.toString() ?? "",
   );
-  // T-0240: target-count daily removed. Manifest inputs land in T-0243.
+  // Manifest config state (T-0243). `manifestPool` empty-string =
+  // manifest is disabled; the admin opts in by picking a pool.
+  const [manifestPool, setManifestPool] = useState<string>(
+    initialActive?.config.manifest?.pool ?? "",
+  );
+  const [manifestSize, setManifestSize] = useState<string>(
+    initialActive?.config.manifest?.size?.toString() ??
+      DEFAULT_MANIFEST_SIZE.toString(),
+  );
+  const [manifestPartnerBias, setManifestPartnerBias] = useState<string>(
+    initialActive?.config.manifest?.partnerBias?.toString() ??
+      DEFAULT_MANIFEST_PARTNER_BIAS.toString(),
+  );
+  const [manifestPins, setManifestPins] = useState<string[]>(
+    initialActive?.config.manifest?.pins?.slice() ?? [],
+  );
+  // Pool members for the currently-selected pool. Fetched lazily on
+  // pool change — only needed for pin typeahead. `null` = not loaded.
+  const [poolMembers, setPoolMembers] = useState<PoolMember[] | null>(null);
+  const [poolLoading, setPoolLoading] = useState<boolean>(false);
+  const [pinQuery, setPinQuery] = useState<string>("");
+  const [preview, setPreview] = useState<ManifestPreview | null>(null);
+  const [previewError, setPreviewError] = useState<ManifestPreviewError | null>(null);
+  const [previewBusy, setPreviewBusy] = useState<boolean>(false);
   const [schedule, setSchedule] = useState<ScheduleRow[]>(initialSchedule);
   const [busy, setBusy] = useState<"save" | "regen" | "clear" | "reset" | null>(null);
   const [wipeResults, setWipeResults] = useState(false);
@@ -65,14 +114,122 @@ export function DailyAdmin({
         minBand: Number(guestMinBand || "1"),
       };
     }
-    // T-0240: target-count removed. Manifest config lands in T-0243 and
-    // will preserve the initialActive.config.manifest value until the
-    // admin edits it explicitly.
-    if (initialActive?.config.manifest) {
-      cfg.manifest = initialActive.config.manifest;
+    if (manifestPool.trim()) {
+      const size = Number(manifestSize || DEFAULT_MANIFEST_SIZE);
+      const partnerBias = Number(
+        manifestPartnerBias || DEFAULT_MANIFEST_PARTNER_BIAS,
+      );
+      cfg.manifest = {
+        pool: manifestPool,
+        size,
+        partnerBias,
+      };
+      if (manifestPins.length > 0) cfg.manifest.pins = manifestPins.slice();
     }
     return cfg;
-  }, [guestPerRun, guestMinBand, initialActive]);
+  }, [
+    guestPerRun,
+    guestMinBand,
+    manifestPool,
+    manifestSize,
+    manifestPartnerBias,
+    manifestPins,
+  ]);
+
+  // Fetch pool members when the admin picks (or changes) the manifest
+  // pool. Kept lazy so visiting the page with no manifest configured
+  // doesn't hit the DB for an empty pool.
+  useEffect(() => {
+    if (!manifestPool) {
+      setPoolMembers(null);
+      return;
+    }
+    let cancelled = false;
+    setPoolLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/combine/daily/pool-members?pool=${encodeURIComponent(manifestPool)}`,
+        );
+        if (!res.ok) throw new Error(`pool_fetch_${res.status}`);
+        const j = (await res.json()) as { items: PoolMember[] };
+        if (!cancelled) setPoolMembers(j.items);
+      } catch (e) {
+        if (!cancelled) {
+          setPoolMembers([]);
+          setMsg({
+            text: e instanceof Error ? e.message : String(e),
+            kind: "err",
+          });
+        }
+      } finally {
+        if (!cancelled) setPoolLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [manifestPool]);
+
+  // Filtered pin typeahead matches. Excludes already-pinned items.
+  const pinSuggestions = useMemo<PoolMember[]>(() => {
+    if (!poolMembers) return [];
+    const q = pinQuery.trim().toLowerCase();
+    const already = new Set(manifestPins);
+    const matches = poolMembers.filter((m) => !already.has(m.id));
+    if (!q) return matches.slice(0, 8);
+    return matches
+      .filter((m) => m.name.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [poolMembers, pinQuery, manifestPins]);
+
+  const addPin = useCallback((id: string) => {
+    setManifestPins((cur) => {
+      if (cur.includes(id)) return cur;
+      const size = Number(manifestSize || DEFAULT_MANIFEST_SIZE);
+      if (cur.length >= size) return cur;
+      return [...cur, id];
+    });
+    setPinQuery("");
+  }, [manifestSize]);
+
+  const removePin = useCallback((id: string) => {
+    setManifestPins((cur) => cur.filter((p) => p !== id));
+  }, []);
+
+  const previewManifest = useCallback(async () => {
+    if (!manifestPool) return;
+    setPreviewBusy(true);
+    setPreview(null);
+    setPreviewError(null);
+    try {
+      // First save the pending config so the preview endpoint sees the
+      // admin's live edits — the preview reads from getActiveDaily().
+      const saveRes = await fetch("/api/admin/combine/daily", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ themeCode, config: payloadConfig() }),
+      });
+      if (!saveRes.ok) {
+        const j = (await saveRes.json()) as { error?: string; message?: string };
+        throw new Error(j.message ?? j.error ?? `save_failed_${saveRes.status}`);
+      }
+      const res = await fetch("/api/admin/combine/daily/preview-manifest");
+      const j = (await res.json()) as ManifestPreview | ManifestPreviewError;
+      if (!res.ok) {
+        setPreviewError(j as ManifestPreviewError);
+      } else {
+        setPreview(j as ManifestPreview);
+      }
+    } catch (e) {
+      setPreviewError({
+        error: "preview_failed",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setPreviewBusy(false);
+    }
+  }, [manifestPool, themeCode, payloadConfig]);
 
   const refreshSchedule = useCallback(async () => {
     const res = await fetch("/api/admin/combine/daily");
@@ -212,6 +369,12 @@ export function DailyAdmin({
       if (!res.ok) throw new Error(`request_failed_${res.status}`);
       setGuestPerRun("");
       setGuestMinBand("");
+      setManifestPool("");
+      setManifestSize(DEFAULT_MANIFEST_SIZE.toString());
+      setManifestPartnerBias(DEFAULT_MANIFEST_PARTNER_BIAS.toString());
+      setManifestPins([]);
+      setPreview(null);
+      setPreviewError(null);
       setMsg({ text: "Cleared.", kind: "ok" });
       await refreshSchedule();
     } catch (e) {
@@ -246,12 +409,201 @@ export function DailyAdmin({
       </section>
 
       <section className="feat">
-        <h3 style={{ marginTop: 0, fontSize: 16 }}>Daily shape</h3>
+        <h3 style={{ marginTop: 0, fontSize: 16 }}>Manifest</h3>
         <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
-          Manifest config (pool, size, pins, partner-bias) lands in T-0243.
-          Until then the daily runs open-ended and no manifest is scheduled.
+          Players win by discovering every item on the per-day find list.
+          Pick the pool (any combine theme), how big the list is, and
+          optionally pin items that must always appear. The solver fills
+          the rest and verifies the list is reachable from the daily
+          seed before scheduling.
         </p>
-        <div style={{ display: "grid", gap: 10, maxWidth: 520 }}>
+        <div style={{ display: "grid", gap: 10, maxWidth: 560 }}>
+          <Field
+            label="Pool"
+            hint={
+              <>
+                Combine theme whose membership defines the items available
+                for the manifest. Blank = daily disabled (not recommended
+                post-T-0240).
+              </>
+            }
+          >
+            <select
+              value={manifestPool}
+              onChange={(e) => {
+                setManifestPool(e.target.value);
+                setManifestPins([]); // reset pins when pool changes
+                setPreview(null);
+                setPreviewError(null);
+              }}
+              style={input}
+            >
+              <option value="">— disabled —</option>
+              {themes.map((t) => (
+                <option key={t.code} value={t.code}>
+                  {t.label} ({t.code})
+                </option>
+              ))}
+            </select>
+          </Field>
+          {manifestPool && (
+            <>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 10,
+                }}
+              >
+                <Field
+                  label="Size"
+                  hint={<>Items on the list. 6–12; 8 is the sweet spot.</>}
+                >
+                  <input
+                    type="number"
+                    min={6}
+                    max={12}
+                    value={manifestSize}
+                    onChange={(e) => setManifestSize(e.target.value)}
+                    style={input}
+                  />
+                </Field>
+                <Field
+                  label="Partner bias"
+                  hint={
+                    <>
+                      Dealer weight multiplier for tiles that are direct
+                      partners of unfound manifest items. 0 disables; 0.3
+                      is default.
+                    </>
+                  }
+                >
+                  <input
+                    type="number"
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    value={manifestPartnerBias}
+                    onChange={(e) => setManifestPartnerBias(e.target.value)}
+                    style={input}
+                  />
+                </Field>
+              </div>
+              <Field
+                label={`Pinned items (${manifestPins.length} / ${manifestSize || "?"})`}
+                hint={
+                  <>
+                    Pins land on every day&apos;s list. The generator fills
+                    the rest. Each pin must be reachable from the capped
+                    bundle — unreachable pins reject on save + preview.
+                  </>
+                }
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 6,
+                    marginBottom: 6,
+                  }}
+                >
+                  {manifestPins.map((id) => {
+                    const name = itemNamesById[id] ?? id;
+                    return (
+                      <span
+                        key={id}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          border: "1px solid var(--ink)",
+                          borderRadius: 10,
+                          padding: "2px 4px 2px 10px",
+                          fontSize: 12,
+                        }}
+                      >
+                        {name}
+                        <button
+                          type="button"
+                          aria-label={`Remove ${name}`}
+                          onClick={() => removePin(id)}
+                          style={{
+                            width: 18,
+                            height: 18,
+                            lineHeight: "16px",
+                            borderRadius: 9,
+                            border: "1px solid var(--line)",
+                            background: "var(--surface)",
+                            cursor: "pointer",
+                            fontSize: 12,
+                          }}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
+                  {manifestPins.length === 0 && (
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                      No pins yet.
+                    </span>
+                  )}
+                </div>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="text"
+                    value={pinQuery}
+                    onChange={(e) => setPinQuery(e.target.value)}
+                    placeholder={
+                      poolLoading
+                        ? "Loading pool…"
+                        : `Search ${poolMembers?.length ?? 0} items to pin…`
+                    }
+                    disabled={poolLoading}
+                    style={input}
+                  />
+                  {pinQuery && pinSuggestions.length > 0 && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        right: 0,
+                        marginTop: 4,
+                        background: "var(--surface)",
+                        border: "1px solid var(--ink)",
+                        borderRadius: 3,
+                        maxHeight: 220,
+                        overflowY: "auto",
+                        zIndex: 20,
+                      }}
+                    >
+                      {pinSuggestions.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => addPin(m.id)}
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            textAlign: "left",
+                            padding: "6px 10px",
+                            border: "none",
+                            background: "transparent",
+                            cursor: "pointer",
+                            fontSize: 13,
+                            color: "var(--ink)",
+                          }}
+                        >
+                          {m.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Field>
+            </>
+          )}
           <div className="cb-daily-actions">
             <button
               type="button"
@@ -264,17 +616,82 @@ export function DailyAdmin({
             <button type="button" className="btn" disabled={busy !== null} onClick={clearConfig}>
               Clear
             </button>
+            {manifestPool && (
+              <button
+                type="button"
+                className="btn"
+                disabled={previewBusy || busy !== null}
+                onClick={previewManifest}
+                title="Save current config + preview today's manifest"
+              >
+                {previewBusy ? "…" : "Preview today's manifest"}
+              </button>
+            )}
             {msg && (
               <span style={{ fontSize: 12, color: msg.kind === "err" ? "#f85149" : "var(--good, #2a7a2a)", flexBasis: "100%" }}>
                 {msg.text}
               </span>
             )}
           </div>
+          {previewError && (
+            <div
+              style={{
+                border: "1.5px solid #f85149",
+                borderRadius: 3,
+                padding: 10,
+                background: "color-mix(in srgb, #f85149 10%, var(--surface))",
+                fontSize: 13,
+              }}
+            >
+              <strong>Preview failed:</strong> {previewError.message}
+              {previewError.pin && (
+                <div style={{ marginTop: 4, fontSize: 12, color: "var(--muted)" }}>
+                  Unreachable pin: <code>{itemNamesById[previewError.pin] ?? previewError.pin}</code>
+                </div>
+              )}
+            </div>
+          )}
+          {preview && (
+            <div
+              style={{
+                border: "1px solid var(--line)",
+                borderRadius: 3,
+                padding: 10,
+                background: "var(--surface)",
+                fontSize: 13,
+                display: "grid",
+                gap: 6,
+              }}
+            >
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                Preview ({preview.day}) · pool {preview.poolSize} items ·
+                simulator solved in <strong>{preview.turnsToSolve}</strong> turns
+              </div>
+              {preview.pinned.length > 0 && (
+                <div>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>PINNED </span>
+                  {preview.pinned.map((id) => (
+                    <span key={id} style={pillStyle}>
+                      {itemNamesById[id] ?? id}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div>
+                <span style={{ fontSize: 11, color: "var(--muted)" }}>GENERATED </span>
+                {preview.generated.map((id) => (
+                  <span key={id} style={pillStyle}>
+                    {itemNamesById[id] ?? id}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
       <section className="feat">
-        <h3 style={{ marginTop: 0, fontSize: 16 }}>Daily shape</h3>
+        <h3 style={{ marginTop: 0, fontSize: 16 }}>Dealer tuning</h3>
         <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
           Controls what&apos;s in the deal — how deep the recipe pool goes and
           what rare items drip in via guests. These don&apos;t change how long
@@ -435,25 +852,38 @@ export function DailyAdmin({
                       </span>
                       <span className="cb-seed">seed {r.payload.seed || "—"}</span>
                     </div>
-                    {r.payload.guestOutputIds.length === 0 ? (
-                      <span style={{ opacity: 0.5 }}>—</span>
-                    ) : (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                        {r.payload.guestOutputIds.map((id) => (
-                          <span
-                            key={id}
-                            style={{
-                              border: "1px solid var(--line)",
-                              borderRadius: 10,
-                              padding: "1px 8px",
-                              fontSize: 11,
-                            }}
-                          >
-                            {itemNamesById[id] ?? id}
-                          </span>
-                        ))}
+                    {r.payload.manifest && r.payload.manifest.length > 0 && (
+                      <div style={{ marginTop: 4 }}>
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 2 }}>
+                          MANIFEST ({r.payload.manifest.length})
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {r.payload.manifest.map((id) => (
+                            <span key={id} style={pillStyle}>
+                              {itemNamesById[id] ?? id}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
+                    {r.payload.guestOutputIds.length > 0 && (
+                      <div style={{ marginTop: 4 }}>
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 2 }}>
+                          GUESTS
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {r.payload.guestOutputIds.map((id) => (
+                            <span key={id} style={pillStyle}>
+                              {itemNamesById[id] ?? id}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {(!r.payload.manifest || r.payload.manifest.length === 0) &&
+                      r.payload.guestOutputIds.length === 0 && (
+                        <span style={{ opacity: 0.5 }}>—</span>
+                      )}
                   </div>
                 </Fragment>
               );
@@ -464,6 +894,7 @@ export function DailyAdmin({
               <thead>
                 <tr style={{ textAlign: "left", borderBottom: "1px solid var(--line)" }}>
                   <th style={th}>Day</th>
+                  <th style={th}>Manifest</th>
                   <th style={th}>Guests</th>
                   <th style={th}>Seed</th>
                 </tr>
@@ -477,7 +908,7 @@ export function DailyAdmin({
                       {showTodayDivider && (
                         <tr>
                           <td
-                            colSpan={3}
+                            colSpan={4}
                             style={{
                               padding: "4px 10px",
                               fontSize: 10,
@@ -508,20 +939,25 @@ export function DailyAdmin({
                           )}
                         </td>
                         <td style={td}>
+                          {!r.payload.manifest || r.payload.manifest.length === 0 ? (
+                            <span style={{ opacity: 0.5 }}>—</span>
+                          ) : (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                              {r.payload.manifest.map((id) => (
+                                <span key={id} style={pillStyle}>
+                                  {itemNamesById[id] ?? id}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td style={td}>
                           {r.payload.guestOutputIds.length === 0 ? (
                             <span style={{ opacity: 0.5 }}>—</span>
                           ) : (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                               {r.payload.guestOutputIds.map((id) => (
-                                <span
-                                  key={id}
-                                  style={{
-                                    border: "1px solid var(--line)",
-                                    borderRadius: 10,
-                                    padding: "1px 8px",
-                                    fontSize: 11,
-                                  }}
-                                >
+                                <span key={id} style={pillStyle}>
                                   {itemNamesById[id] ?? id}
                                 </span>
                               ))}
@@ -633,3 +1069,11 @@ const input: React.CSSProperties = {
 };
 const th: React.CSSProperties = { padding: "6px 10px", fontSize: 11, color: "var(--muted)" };
 const td: React.CSSProperties = { padding: "6px 10px", verticalAlign: "top" };
+const pillStyle: React.CSSProperties = {
+  display: "inline-block",
+  border: "1px solid var(--line)",
+  borderRadius: 10,
+  padding: "1px 8px",
+  margin: "0 4px 4px 0",
+  fontSize: 11,
+};
