@@ -7,6 +7,7 @@ import {
   type DailyConfig,
 } from "@/combine/daily-config";
 import type { DailyPayload } from "@/combine/daily-schedule";
+import { todayKey } from "@/combine/rng";
 import { useConfirm } from "@/components/common/useConfirm";
 
 
@@ -334,11 +335,7 @@ export function DailyAdmin({
       )
         return;
     }
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, "0");
-    const d = String(today.getDate()).padStart(2, "0");
-    const dayKey = `${y}-${m}-${d}`;
+    const dayKey = todayKey();
 
     setBusy("reset");
     setMsg(null);

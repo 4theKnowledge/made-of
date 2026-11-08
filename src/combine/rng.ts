@@ -74,11 +74,13 @@ export function freshEndlessSeed(): number {
   return (Math.random() * 4294967296) | 0;
 }
 
-/** Local-date key in YYYY-MM-DD form, used to seed the daily game and
- *  to key the daily save slot. */
+/** UTC-date key in YYYY-MM-DD form, used to seed the daily game and
+ *  to key the daily save slot. UTC so client and server agree on the
+ *  rollover instant (midnight UTC) regardless of the viewer's timezone;
+ *  display layers format this back into local time. */
 export function todayKey(now: Date = new Date()): string {
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(now.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
