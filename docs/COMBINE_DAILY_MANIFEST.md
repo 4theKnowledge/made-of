@@ -1,9 +1,12 @@
 # Combine Daily — Manifest / Find-List Variant (Design Spike)
 
-**Task:** T-0237 · **Status:** design · **Parent:** T-0233 · **Author:** claude
-**Date:** 2026-11-08
+**Task:** T-0237 · **Status:** approved — implementation in progress
+**Parent:** T-0233 · **Implementation subtasks:** T-0240..T-0245 · **Priority:** P1 (daily is unplayable without this)
+**Author:** claude · **Date:** 2026-11-08
 
 > A 40-discovery daily finishes in ~2 min because "any 40 discoveries" degenerates to "combine fast". The manifest variant replaces the count with a **named shopping list** — identical for every player on the day, surfaced up-front, tracked during play, and settled on the end card.
+
+**Scope — daily only.** Endless and fast modes are untouched. Every change is gated on `state.manifest != null`; absent that, the engine, dealer, and UI behave exactly as they do today. Manifest is a daily-only play mode.
 
 ---
 
