@@ -3,7 +3,7 @@ import { Pictogram } from "@/pictograms/Pictogram";
 import type { GameState } from "@/combine/engine";
 import { chapterIndex } from "@/combine/progression";
 import type { ThemeBundle } from "@/combine/types";
-import { cap } from "@/lib/taxonomy";
+import { cap, TIER_ORDER } from "@/lib/taxonomy";
 import { fillVar } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 import { ButtonGroup } from "@/components/common/ButtonGroup";
@@ -100,6 +100,25 @@ export function GameOverCard({
   for (const id of state.shelf) {
     shelfCounts.set(id, (shelfCounts.get(id) ?? 0) + 1);
   }
+  // Top-3 most-made outputs this run. Metric is `state.madeCounts`
+  // (outputs produced, incremented in finishResolve). Ties broken by
+  // tier then id so the row is deterministic across clients.
+  const topMade = useMemo(() => {
+    const entries: Array<[string, number]> = [];
+    for (const [id, n] of Object.entries(state.madeCounts)) {
+      if (n > 0 && bundle.items.has(id)) entries.push([id, n]);
+    }
+    entries.sort((a, b) => {
+      if (b[1] !== a[1]) return b[1] - a[1];
+      const ta = bundle.items.get(a[0])?.tier;
+      const tb = bundle.items.get(b[0])?.tier;
+      const ia = ta ? TIER_ORDER.indexOf(ta) : TIER_ORDER.length;
+      const ib = tb ? TIER_ORDER.indexOf(tb) : TIER_ORDER.length;
+      if (ia !== ib) return ia - ib;
+      return a[0].localeCompare(b[0]);
+    });
+    return entries.slice(0, 3);
+  }, [state.madeCounts, bundle.items]);
   // "N of Y discovered so far" is a lifetime figure, so merge this run's
   // new finds with the lifetime collection (mirrors CollectionBook). Fast
   // mode's finds never persist, so skip the merge there — the summary
@@ -280,6 +299,35 @@ export function GameOverCard({
             </>
           )}
         </div>
+        {topMade.length > 0 && (
+          <>
+            <p className="sub" style={{ marginTop: 4 }}>
+              Most made
+            </p>
+            <div className="cbshelf sum">
+              {topMade.map(([id, n]) => {
+                const it = bundle.items.get(id);
+                if (!it) return null;
+                return (
+                  <span
+                    key={id}
+                    className="cbslot"
+                    style={fillVar(it)}
+                    title={`${cap(it.name)} · made ${n}`}
+                  >
+                    <Pictogram
+                      name={it.name}
+                      tier={it.tier}
+                      kind={it.kind}
+                      symbol={it.symbol}
+                    />
+                    {n > 1 && <b>{n}</b>}
+                  </span>
+                );
+              })}
+            </div>
+          </>
+        )}
         {state.shelf.length > 0 && (
           <div className="cbshelf sum">
             {[...shelfCounts.entries()].map(([id, n]) => {
