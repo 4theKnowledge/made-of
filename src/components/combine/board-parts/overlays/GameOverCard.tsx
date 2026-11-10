@@ -284,7 +284,7 @@ export function GameOverCard({
                 <span>things made</span>
               </div>
               <div>
-                <b>{progressionLabel}</b>
+                <b>{endChapter}</b>
                 <span>chapter reached</span>
               </div>
               <div>
