@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Confidence, ItemKind, ItemStatus, LinkType, Tier } from "@/db/schema";
@@ -1241,10 +1241,9 @@ function Toolbar({
 
 // Shared tooltip state: only one open at a time. Hover still works via CSS
 // for desktop; tap toggles explicit visibility for touch.
-let tooltipOpenSeq = 0;
-const tooltipListeners = new Set<(id: number | null) => void>();
-let currentOpenTooltip: number | null = null;
-function setOpenTooltip(id: number | null) {
+const tooltipListeners = new Set<(id: string | null) => void>();
+let currentOpenTooltip: string | null = null;
+function setOpenTooltip(id: string | null) {
   currentOpenTooltip = id;
   for (const fn of tooltipListeners) fn(id);
 }
@@ -1258,11 +1257,14 @@ function Tooltip({
   title: string;
   body?: string;
 }) {
-  const [id] = useState(() => ++tooltipOpenSeq);
+  // `useId` is hydration-safe (React guarantees the same id on server
+  // and client). The previous module-level counter mismatched under
+  // StrictMode's double-invoked initializer in dev.
+  const id = useId();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const listener = (openId: number | null) => setOpen(openId === id);
+    const listener = (openId: string | null) => setOpen(openId === id);
     tooltipListeners.add(listener);
     return () => {
       tooltipListeners.delete(listener);
