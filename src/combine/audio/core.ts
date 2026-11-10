@@ -43,6 +43,14 @@ let singleton: AudioCore | null = null;
 export function ensureContext(settings: AudioSettings): AudioCore | null {
   if (singleton) {
     singleton.applySettings(settings);
+    // Safari suspends on tab-hide and sometimes stays suspended after a
+    // visibility-return. Any gesture-driven call here is our chance to
+    // resume it — cheap no-op when already running.
+    if (singleton.ctx.state === "suspended") {
+      void singleton.ctx.resume().catch(() => {
+        /* best-effort */
+      });
+    }
     return singleton;
   }
   if (typeof window === "undefined") return null;
@@ -54,6 +62,14 @@ export function ensureContext(settings: AudioSettings): AudioCore | null {
   const AC = WebkitWin.AudioContext ?? WebkitWin.webkitAudioContext;
   if (!AC) return null;
   const ctx = new AC();
+  // iOS Safari ships new contexts in "suspended". Resume while we're still
+  // in the user-gesture call stack — otherwise the resume promise rejects
+  // silently and the first notes get scheduled into a dead graph.
+  if (ctx.state === "suspended") {
+    void ctx.resume().catch(() => {
+      /* best-effort; a later gesture-driven call will retry */
+    });
+  }
 
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -18;
@@ -112,7 +128,10 @@ export function ensureContext(settings: AudioSettings): AudioCore | null {
 /** Resume a suspended context (iOS keeps it suspended until a gesture). */
 export function resume(core: AudioCore): void {
   if (core.ctx.state === "suspended") {
-    void core.ctx.resume();
+    void core.ctx.resume().catch(() => {
+      /* Safari rejects resumes outside a gesture stack — the next call from
+       * a gesture handler will retry. */
+    });
   }
 }
 

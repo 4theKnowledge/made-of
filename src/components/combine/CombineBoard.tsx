@@ -697,20 +697,31 @@ export function CombineBoard({
     else startMusic({ busyGetter: () => state.chapter });
   }, [sound, state.chapter]);
 
-  // First pointerdown: create the audio context and start music if the
-  // user has chosen a track. We attach a one-shot listener to the document.
+  // First user gesture: create the audio context and start music if the
+  // user has chosen a track. Browsers block audio until a gesture; Safari is
+  // the pickiest — it rejects resume() calls outside the gesture call stack
+  // and ships new contexts in "suspended". We listen on both pointerdown and
+  // touchstart (Safari sometimes fires touchstart before pointerdown and we
+  // want to catch whichever arrives first), and we keep listening until the
+  // context is actually `running` — otherwise a first gesture that landed on
+  // a spot Safari doesn't treat as "activating" leaves audio silently dead.
   useEffect(() => {
-    const onDown = () => {
-      ensureContext({ ...sound, vol: sound.vol / 100 });
+    const onGesture = () => {
+      const core = ensureContext({ ...sound, vol: sound.vol / 100 });
       if (sound.music !== "off") {
         startMusic({ busyGetter: () => state.chapter });
       }
+      if (core && core.ctx.state === "running") {
+        document.removeEventListener("pointerdown", onGesture);
+        document.removeEventListener("touchstart", onGesture);
+      }
     };
-    document.addEventListener("pointerdown", onDown, {
-      passive: true,
-      once: true,
-    });
-    return () => document.removeEventListener("pointerdown", onDown);
+    document.addEventListener("pointerdown", onGesture, { passive: true });
+    document.addEventListener("touchstart", onGesture, { passive: true });
+    return () => {
+      document.removeEventListener("pointerdown", onGesture);
+      document.removeEventListener("touchstart", onGesture);
+    };
     // We intentionally use the latest `sound` and `state.chapter` captured on
     // mount; the effect above handles later changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps

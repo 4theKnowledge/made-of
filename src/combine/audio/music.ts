@@ -277,7 +277,11 @@ export function startMusic(opts?: { busyGetter?: () => number }): void {
   if (core.settings.music === "off") return;
   if (state.timer) return;
   if (opts?.busyGetter) state.busyGetter = opts.busyGetter;
-  if (core.ctx.state === "suspended") void core.ctx.resume();
+  if (core.ctx.state === "suspended") {
+    void core.ctx.resume().catch(() => {
+      /* Safari rejects resume outside a gesture; next gesture retries. */
+    });
+  }
   restoreMusicBusGain();
   state.nextT = core.ctx.currentTime + 0.2;
   state.step = 0;

@@ -51,9 +51,6 @@ The thinking here evolves significantly across the notes. Earlier entries treat 
 
 ### 2c. Known Combine bugs/fixes
 
-- **`bug` · P1 · S** — Hold tray: can't click to select like the normal tray.
-- **`fix` · P2 · S** — Toasts still show `+` inside badges.
-- **`feature` · P2 · S** — In collection UI, mark items as "found this round" for new finds.
 
 ---
 
@@ -74,8 +71,6 @@ The thinking here evolves significantly across the notes. Earlier entries treat 
 
 ### 3c. Admin — theme editor bugs
 
-- **`bug` · P1 · M** — **Auto-settings don't prune.** When auto settings (e.g., depth) change, previously auto-added items aren't pruned. Need to distinguish *chain-added* vs *manually-added* items. Add tests.
-- **`bug` · P1 · S** — Theme editor doesn't live-update when items are selected — stuck on "Add items to publish" until manual refresh.
 - **`fix` · P1 · S** — `"Save failed: 1 player will drop below 100% on this theme. Pass {force:true} to proceed."` — this guard should default to `force: true`.
 - **`fix` · P2 · S** — Admin actions need loading indicators — hard to tell when an action is in flight.
 
@@ -109,7 +104,6 @@ The thinking here evolves significantly across the notes. Earlier entries treat 
 
 ## 7. Polish / UI
 
-- **`fix` · P2 · S** — Audio still unreliable on Safari — improve.
 - **`design` · P2 · S** — Move the "more" menu next to the helper button, on the same row as the hold tray.
 
 ---

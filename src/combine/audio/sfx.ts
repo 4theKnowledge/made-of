@@ -73,7 +73,11 @@ export function fx(kind: SfxKind, arg?: number): void {
   if (!core) return;
   const pack = core.settings.sfxPack;
   if (pack === "off") return;
-  if (core.ctx.state === "suspended") void core.ctx.resume();
+  if (core.ctx.state === "suspended") {
+    void core.ctx.resume().catch(() => {
+      /* Safari rejects resume outside a gesture; next gesture retries. */
+    });
+  }
   const t = core.ctx.currentTime + 0.01;
   const S = paletteFor(core);
   const bus = core.fxBus;
