@@ -144,11 +144,7 @@ export async function loadAccountStats(userId: string): Promise<AccountStats> {
 function isCombineRunResult(v: unknown): v is CombineRunResult {
   if (!v || typeof v !== "object") return false;
   const r = v as Record<string, unknown>;
-  return (
-    typeof r.score === "number" &&
-    typeof r.made === "number" &&
-    typeof r.age === "number"
-  );
+  return typeof r.score === "number" && typeof r.made === "number";
 }
 
 function isCraftResult(v: unknown): v is CraftResult {
