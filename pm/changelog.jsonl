@@ -137,3 +137,7 @@
 {"id": "C-0137", "ts": "2026-11-08T21:24:35Z", "kind": "feature", "summary": "Daily Journey manifest UI now renders as a row list w/ turns-ago chips", "refs": {"task": "T-0264"}}
 {"id": "C-0138", "ts": "2026-11-08T21:25:35Z", "kind": "fix", "summary": "ChapterBar reads manifest progress (Daily · X/Y) in daily mode instead of chapter progression", "refs": {"task": "T-0265"}}
 {"id": "C-0139", "ts": "2026-11-08T22:24:42Z", "kind": "fix", "summary": "Combine shimmer placeholder now reserves the Helpers button footprint next to Hold, so there's no layout shift when the real board swaps in.", "refs": {"task": "T-0267"}}
+{"id": "C-0140", "ts": "2026-11-10T11:54:57Z", "kind": "fix", "summary": "admin/tree: cap search render + filter roots to visible-only to prevent page crash", "refs": {"task": "T-0273"}}
+{"id": "C-0141", "ts": "2026-11-10T11:57:52Z", "kind": "fix", "summary": "admin/themes: delete works with a force-cascade path (members + completion stamps)", "refs": {"task": "T-0272"}}
+{"id": "C-0142", "ts": "2026-11-10T11:59:42Z", "kind": "fix", "summary": "admin/themes: scope membership discovery-impact guard to items actually in this theme", "refs": {"task": "T-0271"}}
+{"id": "C-0143", "ts": "2026-11-10T12:01:19Z", "kind": "fix", "summary": "combine/daily: show rank on any daily submit, not just full wins", "refs": {"task": "T-0269"}}

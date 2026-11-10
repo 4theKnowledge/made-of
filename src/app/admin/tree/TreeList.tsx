@@ -763,6 +763,23 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
     return visible;
   }, [matches, views]);
 
+  // Hard cap on tree render under a filter. `visibleIds` counts unique items,
+  // but Row recurses the DAG and can mount a single item many times (once per
+  // ancestor path). Searching for a common substring in a dense KB can
+  // explode into tens of thousands of row mounts and crash the tab. Above
+  // this cap we refuse to render the tree and point the user at flat view.
+  const TREE_RENDER_CAP = 500;
+  const treeOverCap = !!visibleIds && visibleIds.size > TREE_RENDER_CAP;
+
+  // Under a filter, only mount roots that actually contain a match. Without
+  // this, VirtualRootList still iterates every root in `views.roots` (each
+  // Row early-returns null if not in visibleIds, but the virtualiser still
+  // mounts them and measures their height).
+  const rootsToRender = useMemo(() => {
+    if (!visibleIds) return views.roots;
+    return views.roots.filter((r) => visibleIds.has(r));
+  }, [views.roots, visibleIds]);
+
   /**
    * Alpha-sorted list of item ids currently targetable by bulk actions.
    * Under a filter: matches only (not ancestors shown for context). Without
@@ -925,9 +942,33 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
       </div>
 
       {view === "tree" ? (
-        <TreeContext.Provider value={treeContextValue}>
-          <VirtualRootList roots={views.roots} />
-        </TreeContext.Provider>
+        treeOverCap ? (
+          <div
+            style={{
+              padding: "24px 14px",
+              fontSize: 13,
+              color: "var(--muted)",
+              borderBottom: "1px solid var(--line)",
+            }}
+          >
+            Search matches {visibleIds?.size.toLocaleString()} items (plus
+            ancestors). Rendering the tree for more than {TREE_RENDER_CAP} is
+            too expensive — narrow the search or switch to{" "}
+            <button
+              type="button"
+              className="btn"
+              style={{ fontSize: 12, marginLeft: 4 }}
+              onClick={() => setView("flat")}
+            >
+              Flat view
+            </button>
+            .
+          </div>
+        ) : (
+          <TreeContext.Provider value={treeContextValue}>
+            <VirtualRootList roots={rootsToRender} />
+          </TreeContext.Provider>
+        )
       ) : (
         <FlatView
           items={data.items}
