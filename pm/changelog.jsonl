@@ -177,3 +177,4 @@
 {"id": "C-0177", "ts": "2026-11-10T22:14:39Z", "kind": "feature", "summary": "Key-gated dev login endpoint for parallel agent auth (/api/dev/login)", "refs": {"task": "T-0307"}}
 {"id": "C-0178", "ts": "2026-11-10T22:17:19Z", "kind": "note", "summary": "CLAUDE.md documents POST /api/dev/login for agent-authenticated dev sessions.", "refs": {"task": "T-0308"}}
 {"id": "C-0179", "ts": "2026-11-10T22:20:50Z", "kind": "feature", "summary": "combine endless: widen starter-tile pool with discovered mids, weighted by inverse band", "refs": {"task": "T-0302"}}
+{"id": "C-0180", "ts": "2026-11-10T22:27:18Z", "kind": "fix", "summary": "Prevent dev-only pg pool leak by stashing postgres client on globalThis across HMR", "refs": {"task": "T-0311", "file": "src/db/client.ts"}}

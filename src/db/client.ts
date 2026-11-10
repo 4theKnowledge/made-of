@@ -6,8 +6,15 @@ import * as schema from "./schema";
  * Postgres client. We keep a lazy singleton so route handlers, scripts and
  * tests all share one connection pool.
  */
-let _client: ReturnType<typeof postgres> | null = null;
-let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+// Persist across Next.js dev HMR re-evaluations. Without this, every
+// module reload builds a fresh postgres() pool while the previous pool's
+// sockets stay open, and ~10 edits exhaust Postgres's max_connections.
+type PgCache = {
+  client: ReturnType<typeof postgres> | null;
+  db: ReturnType<typeof drizzle<typeof schema>> | null;
+};
+const globalCache = globalThis as unknown as { __madeofPg?: PgCache };
+const cache: PgCache = (globalCache.__madeofPg ??= { client: null, db: null });
 
 function createClient(url: string, max: number) {
   return postgres(url, {
@@ -18,22 +25,22 @@ function createClient(url: string, max: number) {
 }
 
 export function getDb(url: string = requireUrl(), max = 10) {
-  if (_db) return _db;
-  _client = createClient(url, max);
-  _db = drizzle(_client, { schema, casing: "snake_case" });
-  return _db;
+  if (cache.db) return cache.db;
+  cache.client = createClient(url, max);
+  cache.db = drizzle(cache.client, { schema, casing: "snake_case" });
+  return cache.db;
 }
 
 export function getRawClient() {
-  if (!_client) getDb();
-  return _client!;
+  if (!cache.client) getDb();
+  return cache.client!;
 }
 
 export async function closeDb() {
-  if (_client) {
-    await _client.end({ timeout: 5 });
-    _client = null;
-    _db = null;
+  if (cache.client) {
+    await cache.client.end({ timeout: 5 });
+    cache.client = null;
+    cache.db = null;
   }
 }
 
