@@ -130,8 +130,8 @@ export interface StoredGame {
 export interface DailyResult {
   key: string;
   score: number;
-  age: number;
-  ageName: string;
+  chapter: number;
+  chapterName: string;
   made: number;
   /** Top-tier output on the shelf, or null. */
   top: string | null;

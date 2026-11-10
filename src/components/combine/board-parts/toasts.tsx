@@ -25,13 +25,13 @@ export function AgePromoToast({
   );
 }
 
-export function AgeToast({
+export function ChapterToast({
   toast,
   bundle: _bundle,
   onDismiss,
 }: {
   toast: {
-    age: number;
+    chapter: number;
     sample: string[];
     grants: { mv: number; swap: number; clear: number; hint: number; shore: number; pluck: number };
   };
@@ -55,7 +55,7 @@ export function AgeToast({
       <span className="cbagesweep" aria-hidden="true" />
       <div className="cbagebody">
         <span className="k">New chapter · tap to close</span>
-        <b>Chapter {toast.age + 1}</b>
+        <b>Chapter {toast.chapter + 1}</b>
         <p>Fresh partners are joining the deal. Keep discovering.</p>
         {grantBits.length > 0 && (
           <p className="cbagegrants">Replenished: +{grantBits.join(", +")}.</p>

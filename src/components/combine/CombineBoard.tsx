@@ -90,7 +90,7 @@ import {
 } from "@/components/combine/board-parts/onboarding";
 import {
   AgePromoToast,
-  AgeToast,
+  ChapterToast,
   DiscoveryToast,
   HintToast,
 } from "@/components/combine/board-parts/toasts";
@@ -610,8 +610,8 @@ export function CombineBoard({
     firstLifetime: boolean;
     recipeId?: string;
   } | null>(null);
-  const [ageToast, setAgeToast] = useState<{
-    age: number;
+  const [chapterToast, setChapterToast] = useState<{
+    chapter: number;
     sample: string[];
     grants: { mv: number; swap: number; clear: number; hint: number; shore: number; pluck: number };
   } | null>(null);
@@ -905,8 +905,8 @@ export function CombineBoard({
       let latestDiscovery:
         | { out: string; recipe: string[]; firstLifetime: boolean; recipeId?: string }
         | null = null;
-      let latestAgeUp: {
-        age: number;
+      let latestChapterUp: {
+        chapter: number;
         sample: string[];
         grants: { mv: number; swap: number; clear: number; hint: number; shore: number; pluck: number };
       } | null = null;
@@ -1139,7 +1139,7 @@ export function CombineBoard({
             250,
           );
         } else if (e.type === "chapter-up") {
-          latestAgeUp = { age: e.chapter, sample: e.sample, grants: e.grants };
+          latestChapterUp = { chapter: e.chapter, sample: e.sample, grants: e.grants };
           playFx("age");
           vibrate([15, 30, 15, 30, 30]);
         } else if (e.type === "over") {
@@ -1171,8 +1171,8 @@ export function CombineBoard({
           }
         }
       }
-      if (latestAgeUp) {
-        setAgeToast(latestAgeUp);
+      if (latestChapterUp) {
+        setChapterToast(latestChapterUp);
       }
 
       if (Object.keys(immediate).length) {
@@ -1335,8 +1335,8 @@ export function CombineBoard({
           const dr: DailyResult = {
             key: r.state.daily,
             score: r.state.score,
-            age: r.state.chapter,
-            ageName: bundle.theme.ages[r.state.chapter] ?? "",
+            chapter: r.state.chapter,
+            chapterName: bundle.theme.ages[r.state.chapter] ?? "",
             made: r.state.made,
             top: bestShelfId ? bundle.items.get(bestShelfId)?.name ?? null : null,
             found: r.state.found.length,
@@ -1402,7 +1402,7 @@ export function CombineBoard({
   const resetTransient = useCallback(() => {
     setFx({});
     setDiscovery(null);
-    setAgeToast(null);
+    setChapterToast(null);
     setInfoTile(null);
     setInfoCell(null);
     setSelectedSlot(null);
@@ -1657,22 +1657,22 @@ export function CombineBoard({
       dr.shelf && dr.shelf > 0
         ? ` · ${dr.shelf} finished thing${dr.shelf > 1 ? "s" : ""}`
         : "";
-    const dailyAgeCount = dailyBundles[dailyHostTheme].theme.ages.length;
+    const dailyChapterCount = dailyBundles[dailyHostTheme].theme.ages.length;
     const text =
       `Made Of · Daily Combine ${dr.key}\n` +
-      Array.from({ length: dailyAgeCount }, (_, k) =>
-        k <= dr.age ? "🟩" : "⬜",
+      Array.from({ length: dailyChapterCount }, (_, k) =>
+        k <= dr.chapter ? "🟩" : "⬜",
       ).join("") +
-      ` reached Age ${dr.ageName}\n` +
+      ` reached Chapter ${dr.chapterName}\n` +
       `${dr.score.toLocaleString("en")} points · ${dr.made} made${
         topDisplay ? ` · best: ${topDisplay}` : ""
       }${foundLine}${chainLine}${shelfLine}`;
     const query = dailyShareQuery(dr.key, {
       score: dr.score,
-      age: dr.age,
+      chapter: dr.chapter,
       made: dr.made,
-      ageName: dr.ageName,
-      ageCount: dailyAgeCount,
+      chapterName: dr.chapterName,
+      chapterCount: dailyChapterCount,
       best: topDisplay,
       found: dr.found,
       longest: dr.longest,
@@ -1857,8 +1857,8 @@ export function CombineBoard({
         setDiscovery(null);
         return;
       }
-      if (ageToast) {
-        setAgeToast(null);
+      if (chapterToast) {
+        setChapterToast(null);
         return;
       }
       if (hintToast) {
@@ -1923,7 +1923,7 @@ export function CombineBoard({
     state.choosing,
     infoTile,
     discovery,
-    ageToast,
+    chapterToast,
     hintToast,
     themeOpen,
     bookOpen,
@@ -2238,7 +2238,7 @@ export function CombineBoard({
       size: state.n,
       tray: state.tray,
       hold: state.hold,
-      age: state.chapter,
+      chapter: state.chapter,
       found,
     });
   }, [
@@ -2777,14 +2777,14 @@ export function CombineBoard({
             ended (fit in ~15 min) so the chapter-up celebration + the
             mount-time "has emerged" banner are both noise for a daily
             player. Fast is also suppressed since fast has no bands. */}
-        {ageToast && state.mode === "endless" && !state.daily && (
-          <AgeToast
-            toast={ageToast}
+        {chapterToast && state.mode === "endless" && !state.daily && (
+          <ChapterToast
+            toast={chapterToast}
             bundle={bundle}
-            onDismiss={() => setAgeToast(null)}
+            onDismiss={() => setChapterToast(null)}
           />
         )}
-        {!ageToast &&
+        {!chapterToast &&
           activeAgeBanner &&
           state.mode === "endless" &&
           !state.daily && (

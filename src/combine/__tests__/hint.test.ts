@@ -76,7 +76,7 @@ describe("findHint — tier 1: ready", () => {
       size,
       tray: ["water", null, null],
       hold: [],
-      age: 0,
+      chapter: 0,
       found: new Set(),
     });
     expect(h).not.toBeNull();
@@ -94,7 +94,7 @@ describe("findHint — tier 1: ready", () => {
       size,
       tray: [null, null, null],
       hold: ["water"],
-      age: 0,
+      chapter: 0,
       found: new Set(),
     });
     expect(h?.kind).toBe("ready");
@@ -110,7 +110,7 @@ describe("findHint — tier 1: ready", () => {
       size,
       tray: ["stone", null, null],
       hold: [],
-      age: 0,
+      chapter: 0,
       found: new Set(),
     });
     // Falls through to the teach tier.
@@ -133,7 +133,7 @@ describe("findHint — tier 2: one-move", () => {
       size,
       tray: ["water", null, null],
       hold: [],
-      age: 0,
+      chapter: 0,
       found: new Set(),
     });
     expect(h?.kind).toBe("one-move");
@@ -152,7 +152,7 @@ describe("findHint — tier 2: one-move", () => {
       size,
       tray: ["water", null, null],
       hold: [],
-      age: 0,
+      chapter: 0,
       found: new Set(),
     });
     expect(h?.kind).toBe("teach");
@@ -178,7 +178,7 @@ describe("findHint — tier priority", () => {
       size,
       tray: ["water", null, null],
       hold: [],
-      age: 0,
+      chapter: 0,
       found: new Set(),
     });
     expect(h?.kind).toBe("ready");
@@ -202,7 +202,7 @@ describe("findHint — unfound preference", () => {
       size,
       tray: ["water", null, null],
       hold: [],
-      age: 0,
+      chapter: 0,
       found: new Set(["dough"]),
     });
     expect(h?.kind).toBe("ready");
@@ -218,7 +218,7 @@ describe("findHint — unfound preference", () => {
       size,
       tray: ["water", null, null],
       hold: [],
-      age: 0,
+      chapter: 0,
       found: new Set(["dough"]),
     });
     // Still useful: shows the ready combo even though the output is known.
@@ -243,7 +243,7 @@ describe("findHint — board-tile relocation", () => {
       size,
       tray: [null, null, null],
       hold: [],
-      age: 0,
+      chapter: 0,
       found: new Set(),
     });
     expect(h?.kind).toBe("ready");
@@ -271,7 +271,7 @@ describe("findHint — board-tile relocation", () => {
       size,
       tray: [null, null, null],
       hold: [],
-      age: 0,
+      chapter: 0,
       found: new Set(),
     });
     expect(h?.kind).toBe("one-move");
@@ -292,7 +292,7 @@ describe("findHint — board-tile relocation", () => {
       size,
       tray: ["water", null, null],
       hold: [],
-      age: 0,
+      chapter: 0,
       found: new Set(),
     });
     expect(h?.kind).toBe("ready");
@@ -313,7 +313,7 @@ describe("findHint — board-tile relocation", () => {
       size,
       tray: [null, null, null],
       hold: [],
-      age: 0,
+      chapter: 0,
       found: new Set(),
     });
     expect(h?.kind).toBe("ready");
@@ -335,7 +335,7 @@ describe("findHint — tier 3: teach", () => {
       size,
       tray: ["flour", null, null],
       hold: [],
-      age: 0,
+      chapter: 0,
       found: new Set(),
     });
     expect(h?.kind).toBe("teach");

@@ -8,7 +8,7 @@
  *                   some empty cell completes a recipe with the
  *                   adjacent board tiles.
  *   3. "teach"    — nothing is reachable in one placement; fall back
- *                   to a recipe from the current age that overlaps
+ *                   to a recipe from the current chapter that overlaps
  *                   what the player already has.
  *
  * Within each tier we prefer recipes whose output the player hasn't
@@ -40,7 +40,7 @@ export interface HintInput {
   size: number;
   tray: Array<string | null>;
   hold: Array<string | null>;
-  age: number;
+  chapter: number;
   /** Items the player has already discovered (lifetime + this run). */
   found: Set<string>;
 }
@@ -57,7 +57,7 @@ export function findHint(
   bundle: ThemeBundle,
   input: HintInput,
 ): HintResult | null {
-  const { board, size, tray, hold, age, found } = input;
+  const { board, size, tray, hold, chapter, found } = input;
 
   const offBoard: Source[] = [];
   for (const t of tray) if (t) offBoard.push({ item: t });
@@ -79,12 +79,12 @@ export function findHint(
   const oneMove = scanOneMove(bundle, board, size, sources, found);
   if (oneMove) return oneMove;
 
-  // Tier 3 — teach a recipe from the current age. Tray/hold items are
+  // Tier 3 — teach a recipe from the current chapter. Tray/hold items are
   // the natural "stuff you have off-board"; board tiles don't count as
   // teach inputs because the teach tier is about what to aim for next.
   return teach(
     bundle,
-    age,
+    chapter,
     offBoard.map((s) => s.item),
     found,
   );

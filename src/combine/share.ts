@@ -24,8 +24,8 @@ export function dailyShareText(
   state: GameState,
   bundle: ThemeBundle,
 ): SharePayload {
-  const ages = bundle.theme.ages;
-  const ageName = ages[state.chapter] ?? "";
+  const chapters = bundle.theme.ages;
+  const chapterName = chapters[state.chapter] ?? "";
   const top = bestShelfItem(state, bundle);
   const manifest = state.manifest ?? [];
   const manifestSize = manifest.length;
@@ -38,10 +38,10 @@ export function dailyShareText(
   const hasManifest = manifestSize > 0;
   const squares = hasManifest
     ? manifest.map((id) => (state.manifestFound.includes(id) ? "🟩" : "⬜")).join("")
-    : ages.map((_, k) => (k <= state.chapter ? "🟩" : "⬜")).join("");
+    : chapters.map((_, k) => (k <= state.chapter ? "🟩" : "⬜")).join("");
   const headline = hasManifest
     ? `${squares} ${manifestFound}/${manifestSize} in ${state.moves} turn${state.moves === 1 ? "" : "s"}`
-    : `${squares} reached ${ageName}`;
+    : `${squares} reached ${chapterName}`;
   const foundLine =
     !hasManifest && found
       ? ` · ${found} new discover${found > 1 ? "ies" : "y"}`
@@ -61,10 +61,10 @@ export function dailyShareText(
     text,
     url: `${SHARE_URL}?${dailyShareQuery(dayKey, {
       score: state.score,
-      age: state.chapter,
+      chapter: state.chapter,
       made: state.made,
-      ageName,
-      ageCount: ages.length,
+      chapterName,
+      chapterCount: chapters.length,
       best: top,
       found,
       longest: state.longest,
@@ -82,10 +82,10 @@ export function dailyShareQuery(
   dayKey: string,
   r: {
     score: number;
-    age: number;
+    chapter: number;
     made: number;
-    ageName: string;
-    ageCount: number;
+    chapterName: string;
+    chapterCount: number;
     best: string | null;
     found?: number;
     longest?: number;
@@ -97,10 +97,10 @@ export function dailyShareQuery(
   const q = new URLSearchParams({
     d: dayKey,
     s: String(r.score),
-    a: String(r.age),
+    c: String(r.chapter),
     m: String(r.made),
-    an: r.ageName,
-    ac: String(r.ageCount),
+    cn: r.chapterName,
+    cc: String(r.chapterCount),
   });
   if (r.best) q.set("b", r.best);
   if (r.found && r.found > 0) q.set("f", String(r.found));
@@ -115,15 +115,15 @@ export function endlessShareText(
   state: GameState,
   bundle: ThemeBundle,
 ): SharePayload {
-  const ages = bundle.theme.ages;
-  const ageName = ages[state.chapter] ?? "";
+  const chapters = bundle.theme.ages;
+  const chapterName = chapters[state.chapter] ?? "";
   const top = bestShelfItem(state, bundle);
   const foundLine = state.found.length
     ? ` · ${state.found.length} new discover${state.found.length > 1 ? "ies" : "y"}`
     : "";
   const text =
     `Made Of · Combine (${bundle.theme.name})\n` +
-    `${state.score.toLocaleString("en")} points · reached the ${ageName} age · ` +
+    `${state.score.toLocaleString("en")} points · reached chapter ${chapterName} · ` +
     `${state.shelf.length} finished things · longest chain ×${state.longest || 1}` +
     foundLine;
   return {
@@ -131,10 +131,10 @@ export function endlessShareText(
     text,
     url: `${SHARE_URL}?${modeShareQuery("endless", {
       score: state.score,
-      age: state.chapter,
+      chapter: state.chapter,
       made: state.made,
-      ageName,
-      ageCount: ages.length,
+      chapterName,
+      chapterCount: chapters.length,
       themeName: bundle.theme.name,
       best: top,
       found: state.found.length,
@@ -188,9 +188,9 @@ export function modeShareQuery(
     found?: number;
     longest?: number;
     shelf?: number;
-    age?: number;
-    ageName?: string;
-    ageCount?: number;
+    chapter?: number;
+    chapterName?: string;
+    chapterCount?: number;
   },
 ): string {
   const q = new URLSearchParams({
@@ -200,9 +200,9 @@ export function modeShareQuery(
     tn: r.themeName,
   });
   if (mode === "endless") {
-    if (typeof r.age === "number") q.set("a", String(r.age));
-    if (r.ageName) q.set("an", r.ageName);
-    if (typeof r.ageCount === "number") q.set("ac", String(r.ageCount));
+    if (typeof r.chapter === "number") q.set("c", String(r.chapter));
+    if (r.chapterName) q.set("cn", r.chapterName);
+    if (typeof r.chapterCount === "number") q.set("cc", String(r.chapterCount));
   }
   if (r.best) q.set("b", r.best);
   if (r.found && r.found > 0) q.set("f", String(r.found));

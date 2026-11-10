@@ -15,7 +15,11 @@ export type CombineRow = {
 export type CombineRunResult = {
   score: number;
   made: number;
-  age: number;
+  /** Chapter reached. Written as `chapter` since T-0187; legacy rows
+   *  used `age`. Neither is read by the aggregator — kept on the type
+   *  only to document the wire shape. */
+  chapter?: number;
+  age?: number;
   /** The theme's `numAges` at the moment this run finished. Older rows (pre
    *  derived-ages) are missing this field — treat absence as season 0 for
    *  comparison. Leaderboards segment by (ref, season). */

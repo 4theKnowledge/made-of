@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 
 const SIZE = { width: 1200, height: 630 };
 
-const AGE_COUNT_DEFAULT = 6;
+const CHAPTER_COUNT_DEFAULT = 6;
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
@@ -18,13 +18,13 @@ export async function GET(req: NextRequest) {
       : "endless";
   const themeName = (sp.get("tn") ?? "").slice(0, 32);
   const score = Number(sp.get("s") ?? "0") || 0;
-  const age = Math.max(0, Math.min(10, Number(sp.get("a") ?? "0") || 0));
+  const chapter = Math.max(0, Math.min(10, Number(sp.get("c") ?? "0") || 0));
   const made = Math.max(0, Number(sp.get("m") ?? "0") || 0);
   const best = (sp.get("b") ?? "").slice(0, 48);
-  const ageName = (sp.get("an") ?? "").slice(0, 24);
-  const totalAges = Math.max(
-    age + 1,
-    Math.min(10, Number(sp.get("ac") ?? AGE_COUNT_DEFAULT) || AGE_COUNT_DEFAULT),
+  const chapterName = (sp.get("cn") ?? "").slice(0, 24);
+  const totalChapters = Math.max(
+    chapter + 1,
+    Math.min(10, Number(sp.get("cc") ?? CHAPTER_COUNT_DEFAULT) || CHAPTER_COUNT_DEFAULT),
   );
   const found = Math.max(0, Number(sp.get("f") ?? "0") || 0);
   const longest = Math.max(0, Number(sp.get("lc") ?? "0") || 0);
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       : mode === "fast"
         ? `Fast Combine${themeName ? ` · ${themeName}` : ""}`
         : `Combine${themeName ? ` · ${themeName}` : ""}`;
-  const showAges = mode !== "fast";
+  const showChapters = mode !== "fast";
 
   const response = new ImageResponse(
     (
@@ -65,8 +65,8 @@ export async function GET(req: NextRequest) {
           <div style={{ fontSize: 20, color: "#4A4F55" }}>{title}</div>
         </div>
 
-        {/* Ages row — one square per age, filled up to the reached age */}
-        {showAges ? (
+        {/* Chapters row — one square per chapter, filled up to the reached chapter */}
+        {showChapters ? (
           <div
             style={{
               display: "flex",
@@ -74,8 +74,8 @@ export async function GET(req: NextRequest) {
               marginTop: 56,
             }}
           >
-            {Array.from({ length: totalAges }, (_, k) => {
-              const reached = k <= age;
+            {Array.from({ length: totalChapters }, (_, k) => {
+              const reached = k <= chapter;
               return (
                 <div
                   key={k}
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
         ) : null}
 
         {/* Reached line */}
-        {showAges && ageName ? (
+        {showChapters && chapterName ? (
           <div
             style={{
               marginTop: 36,
@@ -103,14 +103,14 @@ export async function GET(req: NextRequest) {
               letterSpacing: "-0.015em",
             }}
           >
-            Reached Chapter {ageName}
+            Reached Chapter {chapterName}
           </div>
         ) : null}
 
         {/* Score + made row */}
         <div
           style={{
-            marginTop: showAges ? (ageName ? 20 : 36) : 80,
+            marginTop: showChapters ? (chapterName ? 20 : 36) : 80,
             display: "flex",
             alignItems: "baseline",
             gap: 32,

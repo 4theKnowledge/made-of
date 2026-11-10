@@ -62,7 +62,7 @@ export function ThemeMenu({
             <b>Daily game · done · review</b>
             <span>
               {dailyDone.score.toLocaleString("en")} points · reached Chapter{" "}
-              {dailyDone.ageName}. A new one tomorrow.
+              {dailyDone.chapterName}. A new one tomorrow.
             </span>
             <button
               type="button"
