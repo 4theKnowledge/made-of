@@ -222,3 +222,41 @@ describe("manifest partner-bias (T-0245)", () => {
     }
   });
 });
+
+describe("terminal tiles are never dealt", () => {
+  // Sun has recipe hydrogen+helium→sun but is consumed by nothing, so it
+  // sits dead on the board/tray until crumble. Terminals must be
+  // craftable but never dealt raw. Sweep a large seed range on empty +
+  // partially-populated boards and confirm no terminal ever appears.
+  it("neither pickOne nor dealTray ever surfaces a terminal", () => {
+    expect(everything.terminal.size).toBeGreaterThan(0);
+    const probes = 400;
+    for (let seed = 1; seed <= probes; seed++) {
+      // Fresh run, no discoveries.
+      const tray = dealTray({
+        bundle: everything,
+        board: emptyBoard(5),
+        tray: [null, null, null],
+        size: 5,
+        rng: makeRng(seed),
+        found: [],
+      });
+      for (const t of tray) {
+        expect(t == null || !everything.terminal.has(t)).toBe(true);
+      }
+      // After the player has "discovered" every terminal — they still
+      // must not be dealt (prior behaviour leaked them in via `known`).
+      const tray2 = dealTray({
+        bundle: everything,
+        board: emptyBoard(5),
+        tray: [null, null, null],
+        size: 5,
+        rng: makeRng(1_000_000 + seed),
+        found: [...everything.terminal],
+      });
+      for (const t of tray2) {
+        expect(t == null || !everything.terminal.has(t)).toBe(true);
+      }
+    }
+  });
+});

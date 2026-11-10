@@ -36,6 +36,7 @@ function minimalBundle(): ThemeBundle {
     sameIngredients: new Map(),
     ageSets: [{ use: new Set(), make: new Set() }],
     dailyConfig: null,
+    terminal: new Set<string>(),
   } as unknown as ThemeBundle;
 }
 

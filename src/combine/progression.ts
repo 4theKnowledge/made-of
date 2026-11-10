@@ -57,16 +57,25 @@ export function softPool(bundle: ThemeBundle, found: string[]): SoftPool {
     for (const x of r.all) if (known.has(x)) knownCount++;
     if (knownCount === r.all.length) {
       reachableRecipes.push(r);
-      pool.add(r.out);
-      // All ingredients were already in known; added to pool via `known`.
+      // Skip terminal outputs: nothing consumes them, so dealing them
+      // raw clogs the board (they sit until crumble). Still reachable —
+      // the player can make them by placing the ingredients themselves.
+      if (!bundle.terminal.has(r.out)) pool.add(r.out);
     } else if (knownCount >= 1 && r.all.length >= 2) {
       // Partial match: add the missing ingredients so the dealer can
-      // introduce them.
+      // introduce them. Terminal ingredients don't exist by definition
+      // (ingredients are by definition consumed), so no gate needed here.
       for (const x of r.all) pool.add(x);
       // Don't add r.out — not reachable yet.
     }
     // knownCount === 0: no attachment; skip entirely (keeps pool graph-local).
   }
+
+  // Terminals never belong in the dealable pool, even if the player has
+  // already discovered them (so they'd otherwise ride in via `known`).
+  // The dealer must never surface a tile with no outgoing recipe —
+  // nothing combines with it and it just sits until crumble.
+  for (const id of bundle.terminal) pool.delete(id);
 
   // Derived views.
   const basePool: string[] = [];
