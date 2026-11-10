@@ -29,6 +29,66 @@ export function ChoicePicker({
   // players muscle-memorising "?-slot 2 is always wood".
   const indexed = state.choosing.options.map((r, i) => ({ r, i }));
   const cancellable = state.choosing.cancellable && onCancel != null;
+  const isIngredients = state.choosing.kind === "ingredients";
+  // T-0270: when the player's drop landed on an ambiguous spot that
+  // could satisfy more than one ingredient set, we show a distinct
+  // picker that highlights the *ingredients* being consumed rather than
+  // the output (which is picked in a follow-up step when the chosen set
+  // has alternatives).
+  if (isIngredients) {
+    return (
+      <div
+        className="cbchoose cbchoose-ingredients"
+        role="dialog"
+        aria-label="Pick which recipe to combine"
+      >
+        <div className="k">These tiles could combine more than one way. Pick which recipe.</div>
+        <div className="opts">
+          {indexed.map(({ r, i }) => {
+            const ingredients = r.all;
+            return (
+              <button
+                key={i}
+                type="button"
+                className="cbopt cbopt-ingredients"
+                onClick={() => onChoose(i)}
+                aria-label={`Combine ${ingredients.map((id) => bundle.items.get(id)?.name ?? id).join(" + ")}`}
+              >
+                <span
+                  className="cbopt-ingredients-row"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, flexWrap: "wrap", justifyContent: "center" }}
+                >
+                  {ingredients.map((id, j) => {
+                    const it = bundle.items.get(id);
+                    return (
+                      <React.Fragment key={`${id}-${j}`}>
+                        {j > 0 && (
+                          <span aria-hidden="true" style={{ opacity: 0.6 }}>+</span>
+                        )}
+                        {it ? (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 2, ...fillVar(it) }}>
+                            <Pictogram
+                              name={it.name}
+                              tier={it.tier}
+                              kind={it.kind}
+                              symbol={it.symbol}
+                            />
+                            <span>{cap(it.name)}</span>
+                          </span>
+                        ) : (
+                          <span>{id}</span>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="cbchoose" role="dialog" aria-label="Pick what to make">
       <div className="k">These make more than one thing. Pick one.</div>

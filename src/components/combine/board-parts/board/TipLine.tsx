@@ -22,7 +22,11 @@ export function TipLine({
 }) {
   let tip: string;
   if (state.over) tip = "Game over.";
-  else if (state.choosing) tip = "These make more than one thing. Pick one.";
+  else if (state.choosing)
+    tip =
+      state.choosing.kind === "ingredients"
+        ? "These tiles could combine more than one way. Pick which recipe."
+        : "These make more than one thing. Pick one.";
   else if (clearMode) tip = "Tap a tile to clear it.";
   else if (shoreMode) tip = "Tap a crumbling tile to steady it.";
   else if (pluckMode) tip = "Tap a tile to pull it into hold.";

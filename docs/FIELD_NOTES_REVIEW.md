@@ -57,7 +57,6 @@ The thinking here evolves significantly across the notes. Earlier entries treat 
 
 ### 2c. Known Combine bugs/fixes
 
-- **`fix` · P0 · M** — When a dropped tile lands between **multiple** possible recipes, throw a distinct decision dialog (different from the normal recipe-selection toast).
 - **`bug` · P1 · S** — Hold tray: can't click to select like the normal tray.
 - **`fix` · P2 · S** — Toasts still show `+` inside badges.
 - **`feature` · P2 · S** — Show **top 3 most-used tiles** at end-of-game for all modes.

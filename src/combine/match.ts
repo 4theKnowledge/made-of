@@ -88,6 +88,45 @@ export function matchAt(
   return null;
 }
 
+/** Deduping key for a recipe's ingredient set — recipes whose ingredient
+ *  multiset is identical share a key, so `alternatives()` already handles
+ *  output disambiguation. The decision dialog cares about *ingredient-set*
+ *  distinctness, so this is what we group by. */
+function ingredientSetKey(r: CombineRecipe): string {
+  return [...r.all].sort().join("");
+}
+
+/**
+ * Like `matchAt` but returns every distinct-ingredient-set recipe that
+ * would fire if `x` sat at cell `i`. The returned list has at most one
+ * entry per ingredient set (`alternatives()` is still the right call for
+ * same-ingredient output variants). T-0270.
+ */
+export function allMatchesAt(
+  bundle: ThemeBundle,
+  board: Board,
+  i: number,
+  x: string,
+  size: number,
+): MatchResult[] {
+  const rs = bundle.byIngredient.get(x);
+  if (!rs) return [];
+  const seen = new Set<string>();
+  const out: MatchResult[] = [];
+  for (const r of rs) {
+    if (r.all.length < 2) continue;
+    const key = ingredientSetKey(r);
+    if (seen.has(key)) continue;
+    const need = r.all.filter((y) => y !== x);
+    const got = grow(board, [i], need, size);
+    if (got) {
+      seen.add(key);
+      out.push({ recipe: r, cells: got });
+    }
+  }
+  return out;
+}
+
 /**
  * What happens if item `x` is dropped on top of cell `j` which already
  * holds item `y`? Both are consumed. Returns the matching recipe + full
@@ -114,6 +153,37 @@ export function matchOn(
     if (got) return { recipe: r, cells: got };
   }
   return null;
+}
+
+/** Like `matchOn` but returns every distinct-ingredient-set recipe that
+ *  would fire. See `allMatchesAt` for the ingredient-set grouping rule.
+ *  T-0270. */
+export function allMatchesOn(
+  bundle: ThemeBundle,
+  board: Board,
+  j: number,
+  x: string,
+  size: number,
+): MatchResult[] {
+  const y = board[j];
+  if (!y || x === y) return [];
+  const rs = bundle.byIngredient.get(x);
+  if (!rs) return [];
+  const seen = new Set<string>();
+  const out: MatchResult[] = [];
+  for (const r of rs) {
+    if (r.all.length < 2) continue;
+    if (!r.all.includes(y)) continue;
+    const key = ingredientSetKey(r);
+    if (seen.has(key)) continue;
+    const need = r.all.filter((z) => z !== x && z !== y);
+    const got = grow(board, [j], need, size);
+    if (got) {
+      seen.add(key);
+      out.push({ recipe: r, cells: got });
+    }
+  }
+  return out;
 }
 
 /** Is there a tile in the tray that combines on *some* empty square (or on

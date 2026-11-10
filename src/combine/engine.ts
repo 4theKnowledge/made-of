@@ -23,12 +23,15 @@ import {
   helperMilestoneIndex,
 } from "./progression";
 import {
+  allMatchesAt,
+  allMatchesOn,
   edgeNeighbours,
   matchAt,
   matchOn,
   playsInOne,
   playsInTwo,
   type Board,
+  type MatchResult,
 } from "./match";
 import { dealTray } from "./deal";
 import { dailySeed, freshEndlessSeed, makeRng, pick, shuffle, type RngState } from "./rng";
@@ -63,7 +66,7 @@ export const TIER_VALUE: Record<string, number> = {
  * It is fine (and expected) to skip bumping for pure refactors that
  * leave the reducer's output-for-input identical.
  */
-export const ENGINE_VERSION = 4;
+export const ENGINE_VERSION = 5;
 
 /** Baseline hold-zone capacity at chapter 0. */
 const HOLD_CAPACITY_BASE = 2;
@@ -113,6 +116,19 @@ export interface ChoosingState {
    *  have already consumed the tray tile or moved the board tile, so
    *  cancelling cleanly is non-trivial and the player must commit. */
   cancellable?: boolean;
+  /** T-0270. Shape of the picker.
+   *  - 'outputs' (default): classic picker. One ingredient set, multiple
+   *    output alternatives. `cells` is the shared ingredient group.
+   *  - 'ingredients': the dropped/placed tile could satisfy more than one
+   *    *distinct* ingredient set. Each option in `options` is one
+   *    representative recipe for its ingredient set, and the matching
+   *    cells for each option live in `optionCells[i]`. Picking resolves
+   *    that ingredient set, and if it has multiple output alternatives
+   *    chains into a second ('outputs') picker. */
+  kind?: "outputs" | "ingredients";
+  /** Per-option cell groups for `kind='ingredients'`. Same length and
+   *  order as `options`. Absent for the classic output picker. */
+  optionCells?: number[][];
 }
 
 export interface GameState {
@@ -333,6 +349,10 @@ function cloneState(s: GameState): GameState {
           cells: [...s.choosing.cells],
           mult: s.choosing.mult,
           cancellable: s.choosing.cancellable,
+          kind: s.choosing.kind,
+          optionCells: s.choosing.optionCells
+            ? s.choosing.optionCells.map((c) => [...c])
+            : undefined,
         }
       : null,
     // Snapshots are frozen captures — pass the reference through. We
@@ -471,6 +491,33 @@ function resolveMatch(
   }
   finishResolve(state, bundle, recipe, seed.cells, seed.mult, events);
   return { needsChoice: false };
+}
+
+/** T-0270. Open a kind='ingredients' picker when a placed/dropped tile
+ *  could satisfy more than one distinct ingredient set at the same cell.
+ *  Each option is one representative recipe per ingredient set; its
+ *  cell group lives in `optionCells[i]`. Ordering follows
+ *  `orderChoosingOptions` — known recipes first, unknowns shuffled by
+ *  `state.rng` so daily layouts are consistent across players. */
+function openIngredientsChoice(
+  state: GameState,
+  _bundle: ThemeBundle,
+  seedCell: number,
+  matches: MatchResult[],
+  mult: number,
+): void {
+  const options = matches.map((m) => m.recipe);
+  const ordered = orderChoosingOptions(state, options);
+  const cellsByRecipe = new Map<CombineRecipe, number[]>();
+  for (const m of matches) cellsByRecipe.set(m.recipe, m.cells);
+  const optionCells = ordered.map((r) => cellsByRecipe.get(r) ?? [seedCell]);
+  state.choosing = {
+    options: ordered,
+    cells: optionCells[0] ?? [seedCell],
+    mult,
+    kind: "ingredients",
+    optionCells,
+  };
 }
 
 /** The non-choice tail of a resolve: consume cells, place the new tile,
@@ -993,8 +1040,30 @@ export function reduce(
       if (!state.choosing) return { state: prev, events: [] };
       const choice = state.choosing.options[action.outputIndex];
       if (!choice) return { state: prev, events: [] };
-      const seedCells = state.choosing.cells;
       const mult = state.choosing.mult;
+      // Ingredients-dialog branch (T-0270): the player picked which
+      // ingredient set to consume. If that recipe has output alternatives,
+      // chain into a classic 'outputs' picker rather than resolving blind.
+      if (state.choosing.kind === "ingredients") {
+        const idx = action.outputIndex;
+        const cells = state.choosing.optionCells?.[idx] ?? state.choosing.cells;
+        const alts = alternatives(bundle, choice);
+        state.choosing = null;
+        if (alts.length > 1) {
+          state.choosing = {
+            options: orderChoosingOptions(state, alts),
+            cells,
+            mult,
+            kind: "outputs",
+          };
+          return { state, events };
+        }
+        finishResolve(state, bundle, choice, cells, mult, events);
+        afterMove(state, bundle, events);
+        sealIfDiscovered(state, events);
+        return { state, events };
+      }
+      const seedCells = state.choosing.cells;
       state.choosing = null;
       finishResolve(state, bundle, choice, seedCells, mult, events);
       afterMove(state, bundle, events);
@@ -1036,7 +1105,12 @@ export function reduce(
       state.shored[action.cell] = false;
       events.push({ type: "placed", at: action.cell, tile: t });
 
-      const m = matchAt(bundle, state.board, action.cell, t, state.n);
+      const matches = allMatchesAt(bundle, state.board, action.cell, t, state.n);
+      if (matches.length > 1) {
+        openIngredientsChoice(state, bundle, action.cell, matches, 1);
+        return { state, events };
+      }
+      const m = matches[0] ?? null;
       if (m) {
         const cells = [action.cell, ...m.cells];
         const r = resolveMatch(
@@ -1050,6 +1124,7 @@ export function reduce(
             options: orderChoosingOptions(state, alternatives(bundle, m.recipe)),
             cells,
             mult: 1,
+            kind: "outputs",
           };
           return { state, events };
         }
@@ -1066,8 +1141,8 @@ export function reduce(
       if (t == null) return { state: prev, events: [] };
       const y = state.board[action.cell];
       if (y == null) return { state: prev, events: [] };
-      const m = matchOn(bundle, state.board, action.cell, t, state.n);
-      if (!m) {
+      const matches = allMatchesOn(bundle, state.board, action.cell, t, state.n);
+      if (matches.length === 0) {
         events.push({ type: "nope", at: action.cell });
         return { state, events };
       }
@@ -1076,6 +1151,11 @@ export function reduce(
       if (src === "hold") compactHold(state.hold);
       state.moves++;
       state.score += 1;
+      if (matches.length > 1) {
+        openIngredientsChoice(state, bundle, action.cell, matches, 1);
+        return { state, events };
+      }
+      const m = matches[0];
       const cells = m.cells.slice(); // includes the target cell
       const r = resolveMatch(
         state,
@@ -1088,6 +1168,7 @@ export function reduce(
           options: orderChoosingOptions(state, alternatives(bundle, m.recipe)),
           cells,
           mult: 1,
+          kind: "outputs",
         };
         return { state, events };
       }
@@ -1146,7 +1227,12 @@ export function reduce(
         state.shored[action.from] = false;
         state.board[action.to] = tile;
         state.shored[action.to] = wasShored;
-        const m = matchAt(bundle, state.board, action.to, tile, state.n);
+        const matches = allMatchesAt(bundle, state.board, action.to, tile, state.n);
+        if (matches.length > 1) {
+          openIngredientsChoice(state, bundle, action.to, matches, 1);
+          return { state, events };
+        }
+        const m = matches[0] ?? null;
         if (m) {
           const cells = [action.to, ...m.cells];
           const r = resolveMatch(
@@ -1160,6 +1246,7 @@ export function reduce(
               options: orderChoosingOptions(state, alternatives(bundle, m.recipe)),
               cells,
               mult: 1,
+              kind: "outputs",
             };
             return { state, events };
           }
@@ -1168,8 +1255,8 @@ export function reduce(
         return { state, events };
       }
       // Moving onto a tile: try drop-on-top.
-      const m = matchOn(bundle, state.board, action.to, tile, state.n);
-      if (!m) {
+      const matches = allMatchesOn(bundle, state.board, action.to, tile, state.n);
+      if (matches.length === 0) {
         events.push({ type: "nope", at: action.to });
         return { state, events };
       }
@@ -1177,6 +1264,11 @@ export function reduce(
       state.board[action.from] = null;
       state.crumb[action.from] = null;
       state.shored[action.from] = false;
+      if (matches.length > 1) {
+        openIngredientsChoice(state, bundle, action.to, matches, 1);
+        return { state, events };
+      }
+      const m = matches[0];
       // The cells involved come from matchOn and already include the target.
       const cells = m.cells.slice();
       const r = resolveMatch(
@@ -1190,6 +1282,7 @@ export function reduce(
           options: orderChoosingOptions(state, alternatives(bundle, m.recipe)),
           cells,
           mult: 1,
+          kind: "outputs",
         };
         return { state, events };
       }
