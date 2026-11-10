@@ -4,6 +4,16 @@
 **Parent:** T-0233 · **Implementation subtasks:** T-0240..T-0245 · **Priority:** P1 (daily is unplayable without this)
 **Author:** claude · **Date:** 2026-11-08
 
+> **Addendum — 2026-11-10 (T-0276 / field notes §1a).** Playtest framing
+> from the field notes proposes a stronger constraint than the
+> partner-bias dealer: **the daily tile world should be bounded to the
+> manifest items plus 1–2 hops of their inputs.** That is a *tile-pool*
+> constraint, not a *dealer-weight* constraint — a different and
+> additive lever. See **Appendix A** at the bottom of this file for
+> the reconciliation. The current approved design (manifest + partner-
+> bias) ships as-is; the hop-bounded pool is filed as an opt-in follow-
+> up on top of it.
+
 > A 40-discovery daily finishes in ~2 min because "any 40 discoveries" degenerates to "combine fast". The manifest variant replaces the count with a **named shopping list** — identical for every player on the day, surfaced up-front, tracked during play, and settled on the end card.
 
 **Scope — daily only.** Endless and fast modes are untouched. Every change is gated on `state.manifest != null`; absent that, the engine, dealer, and UI behave exactly as they do today. Manifest is a daily-only play mode.
@@ -331,3 +341,74 @@ Rollback path at any step: because `DailyConfig.manifest` is opt-in, deleting th
 - **Hint system** for manifest mode (show one unfound item's recipe graph) — spec after playtest.
 - **Daily streaks** with manifest grading (partial = half-streak?) — leaderboard team, not this spike.
 - **Share string** format: `Daily 2026-11-08 · 8/8 · 34t · 3:47` — trivial, bundle into player-UI step.
+
+---
+
+## Appendix A — Hop-bounded tile world (field-notes §1a, 2026-11-10)
+
+**Status:** not shipped. Reconciliation of a field-notes framing with
+the approved design above.
+
+### The claim
+
+> "Daily has a manifest of N things. Each of those things only pulls 1
+> or 2 hops of their inputs into the tile world. The daily tile universe
+> is quite limited, but complete in terms of conceptual understanding.
+> Makes playability guarantees easier. Doesn't stop collection grind —
+> players can still make items past the hop radius if their intermediate
+> tiles reach."
+
+### What this is (and isn't)
+
+It is a **tile-pool constraint**, not a dealer-weight constraint. The
+current approved spec biases the dealer toward manifest partners
+(§Recommendation Q4, `partnerBias +0.3×`) but leaves the full theme
+pool reachable — distant items still get dealt, just less often. The
+hop-bounded variant *excludes* items outside `hops(manifest, k)` from
+the deal pool entirely (where `k ∈ {1, 2}`). Players still finish any
+chain they can build from what gets dealt; they just can't be *dealt*
+an unrelated tile.
+
+### Reconciliation
+
+The two levers are complementary, not competing:
+
+| Lever                | Effect                                    | Shipped |
+| --- | --- | --- |
+| Partner-bias (Q4)    | Soft nudge toward manifest neighbours     | Pending (T-0245) |
+| Hop-bounded tile pool | Hard exclusion of irrelevant tiles       | Not spec'd |
+
+Recommendation: **ship partner-bias first** (already designed, isolated
+revert path per Migration plan step 6), then evaluate whether playtest
+still shows "unrelated tiles crowd the board." If yes, add a
+`manifest.hopRadius?: 1 | 2 | null` to `DailyConfig.manifest` — `null`
+= current behaviour (full pool), `1|2` = restricted deal pool. The
+reachability check in `buildManifestForDay` already produces the hop
+set during manifest validation, so the data is cheap to carry into the
+dealer.
+
+### Open questions for the hop-bounded variant
+
+- **Guest-ingredient interaction.** `guestIngredient` injects manifest
+  items via the dealer's `minBand` scaffolding. Does the hop-bounded
+  pool replace the guest mechanism, or layer on top? Likely layer —
+  guest controls *which* manifest items get dealt with priority; hops
+  control *what else* is dealable.
+- **k = 1 vs k = 2.** k = 1 may starve recipes that need chained
+  intermediates (e.g., `rock → pick → mine`). k = 2 is probably the
+  minimum viable radius for tool-mediated recipes (cf. field-notes §4
+  "Tool-mediated recipes").
+- **Collection grind preservation.** The claim says users can still
+  max their collection. True only if intermediates within the hop
+  radius bootstrap to anything else the player already holds. Needs a
+  sim before shipping.
+- **Chapter/progression implications.** Endless is explicitly out of
+  scope — this is a daily-only pool constraint. Confirm.
+
+### Not reconciled here
+
+- **Levelled dailies** (field-notes §1a option 2: easy/med/hard manifest
+  sizes 1–10 cycled through KB). Separately deferred; needs its own
+  spec once the base manifest mode has playtest data.
+- **Daily leaderboards stay/go.** Field notes flag this as optional;
+  current spec keeps them. No change in Appendix A.
