@@ -114,3 +114,16 @@ Node 22, npm. All run from the repo root.
 - `npm run db:studio` — open Drizzle Studio
 
 Service and account setup (Railway, Cloudflare, Stripe, PostHog, etc.) lives in `docs/SERVICES.md`.
+
+## Dev login for agents
+
+Parallel agents (Playwright, Claude) mint their own Better Auth sessions via **`POST /api/dev/login`** instead of sharing a storage-state file. The browser "Dev sign in" button (`/api/dev/sign-in`) is unchanged and keyless.
+
+- Body: `{ "email": "<seeded user>" }`. Returns `set-cookie` headers for the session.
+- Four fail-closed gates — any failure returns 404 to hide the route:
+  1. `NODE_ENV !== "production"`
+  2. `DEV_LOGIN_KEY` env var set (inert-by-default if accidentally deployed)
+  3. `x-origin-lock` header absent (prod CF requests always carry it)
+  4. `Authorization: Bearer <DEV_LOGIN_KEY>` — compared via `timingSafeEqual`
+- Admin emails (see `isDevAdminEmail`) are auto-promoted to `role=admin` on sign-in.
+- Full source: `src/app/api/dev/login/route.ts`.
