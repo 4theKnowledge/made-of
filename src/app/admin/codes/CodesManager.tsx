@@ -114,11 +114,29 @@ export function CodesManager({ initial }: { initial: CodeRow[] }) {
     }
   }
 
+  function inviteLink(code: string) {
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "";
+    return `${origin}/sign-in?invite=${encodeURIComponent(code)}`;
+  }
+
   async function copyAllNew(count = 10) {
     const picks = rows
       .filter((r) => r.uses === 0 && (r.maxUses == null || r.maxUses > 0))
       .slice(0, count);
     await copy(picks.map((p) => p.code).join("\n"));
+  }
+
+  async function copyAllNewLinks(count = 10) {
+    const picks = rows
+      .filter(
+        (r) =>
+          r.kind === "invite" &&
+          r.uses === 0 &&
+          (r.maxUses == null || r.maxUses > 0),
+      )
+      .slice(0, count);
+    await copy(picks.map((p) => inviteLink(p.code)).join("\n"));
   }
 
   return (
@@ -247,6 +265,16 @@ export function CodesManager({ initial }: { initial: CodeRow[] }) {
           >
             Copy unused
           </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => copyAllNewLinks(count)}
+            disabled={busy || rows.length === 0}
+            style={{ borderStyle: "dashed" }}
+            title="Copy shareable sign-in links for the newest unused invite codes"
+          >
+            Copy unused links
+          </button>
         </div>
       </form>
 
@@ -331,22 +359,43 @@ export function CodesManager({ initial }: { initial: CodeRow[] }) {
                       {new Date(r.createdAt).toLocaleDateString()}
                     </td>
                     <td style={td}>
-                      <button
-                        type="button"
-                        onClick={() => remove(r.code)}
-                        disabled={busy}
-                        style={{
-                          background: "none",
-                          border: 0,
-                          color: "var(--bad)",
-                          cursor: "pointer",
-                          padding: 0,
-                          font: "inherit",
-                          textDecoration: "underline",
-                        }}
-                      >
-                        delete
-                      </button>
+                      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                        {r.kind === "invite" && (
+                          <button
+                            type="button"
+                            onClick={() => copy(inviteLink(r.code))}
+                            title={inviteLink(r.code)}
+                            style={{
+                              background: "none",
+                              border: 0,
+                              color: "var(--ink)",
+                              cursor: "pointer",
+                              padding: 0,
+                              font: "inherit",
+                              textDecoration: "underline",
+                              opacity: spent || expired ? 0.55 : 1,
+                            }}
+                          >
+                            copy link
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => remove(r.code)}
+                          disabled={busy}
+                          style={{
+                            background: "none",
+                            border: 0,
+                            color: "var(--bad)",
+                            cursor: "pointer",
+                            padding: 0,
+                            font: "inherit",
+                            textDecoration: "underline",
+                          }}
+                        >
+                          delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

@@ -1,13 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 const isDev = process.env.NODE_ENV !== "production";
 const DEV_EMAIL = process.env.NEXT_PUBLIC_DEV_ADMIN_EMAIL ?? "";
 
 export function SignInForm({ inviteRequired }: { inviteRequired: boolean }) {
+  const params = useSearchParams();
+  const prefilledInvite = (params.get("invite") ?? "").trim();
   const [email, setEmail] = useState("");
-  const [invite, setInvite] = useState("");
+  const [invite, setInvite] = useState(prefilledInvite);
+  const showInviteField = inviteRequired || Boolean(prefilledInvite);
   const [confirmed, setConfirmed] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(
     "idle",
@@ -121,7 +125,7 @@ export function SignInForm({ inviteRequired }: { inviteRequired: boolean }) {
           font: "inherit",
         }}
       />
-      {inviteRequired && (
+      {showInviteField && (
         <>
           <label
             htmlFor="invite"
