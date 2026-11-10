@@ -17,6 +17,16 @@ export interface ThemeRow {
 
 const CODE_RE = /^[a-z][a-z0-9-]*$/;
 
+class ApiError extends Error {
+  status: number;
+  body: Record<string, unknown> | null;
+  constructor(message: string, status: number, body: Record<string, unknown> | null) {
+    super(message);
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function send<T>(url: string, init: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
@@ -24,14 +34,15 @@ async function send<T>(url: string, init: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     let msg = `request_failed_${res.status}`;
+    let body: Record<string, unknown> | null = null;
     try {
-      const body = await res.json();
-      if (body?.message) msg = body.message;
-      else if (body?.error) msg = body.error;
+      body = (await res.json()) as Record<string, unknown>;
+      if (typeof body?.message === "string") msg = body.message;
+      else if (typeof body?.error === "string") msg = body.error;
     } catch {
       // ignore
     }
-    throw new Error(msg);
+    throw new ApiError(msg, res.status, body);
   }
   return (await res.json()) as T;
 }
@@ -44,8 +55,11 @@ const api = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
-  del: (code: string) =>
-    send<{ ok: true }>(`/api/admin/combine-themes/${encodeURIComponent(code)}`, { method: "DELETE" }),
+  del: (code: string, force = false) =>
+    send<{ ok: true }>(
+      `/api/admin/combine-themes/${encodeURIComponent(code)}${force ? "?force=1" : ""}`,
+      { method: "DELETE" },
+    ),
 };
 
 interface Toast {
@@ -138,9 +152,44 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
 
   const deleteTheme = useCallback(
     async (code: string) => {
-      await mutate((prev) => prev.filter((r) => r.code !== code), () => api.del(code), undefined, "Delete failed");
+      // First attempt — no force. The server returns 409 with member +
+      // completion counts when deletion would cascade; we re-prompt with
+      // those numbers and retry with ?force=1 on confirm.
+      try {
+        await api.del(code);
+        setRows((prev) => prev.filter((r) => r.code !== code));
+        return;
+      } catch (e) {
+        if (!(e instanceof ApiError) || e.status !== 409 || e.body?.error !== "confirm_required") {
+          const msg = e instanceof Error ? e.message : String(e);
+          toast(`Delete failed: ${msg}`);
+          return;
+        }
+        const members = Number(e.body?.memberCount ?? 0);
+        const completions = Number(e.body?.completionRows ?? 0);
+        const parts: string[] = [];
+        if (members > 0) parts.push(`${members} item${members === 1 ? "" : "s"} in the theme`);
+        if (completions > 0)
+          parts.push(
+            `${completions} player completion stamp${completions === 1 ? "" : "s"}`,
+          );
+        const ok = await confirm({
+          title: `Force delete "${code}"?`,
+          body: `This will also remove ${parts.join(" and ")}. This cannot be undone.`,
+          confirmLabel: "Force delete",
+          destructive: true,
+        });
+        if (!ok) return;
+        try {
+          await api.del(code, true);
+          setRows((prev) => prev.filter((r) => r.code !== code));
+        } catch (e2) {
+          const msg = e2 instanceof Error ? e2.message : String(e2);
+          toast(`Delete failed: ${msg}`);
+        }
+      }
     },
-    [mutate],
+    [toast, confirm],
   );
 
   const sorted = rows.slice().sort((a, b) => a.position - b.position);
@@ -254,8 +303,11 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
                         type="button"
                         className="btn"
                         style={{ ...smallBtn, color: "#f85149" }}
-                        disabled={row.itemCount > 0}
-                        title={row.itemCount > 0 ? `${row.itemCount} item(s) still in this theme` : "Delete this theme"}
+                        title={
+                          row.itemCount > 0
+                            ? `Delete this theme (will prompt to cascade ${row.itemCount} item${row.itemCount === 1 ? "" : "s"})`
+                            : "Delete this theme"
+                        }
                         onClick={async () => {
                           if (
                             !(await confirm({

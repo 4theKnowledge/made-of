@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
 import { invalidateRunsForTheme } from "@/combine/run-store";
@@ -124,48 +124,102 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const guard = await requireAdminApi();
   if (guard) return guard;
   const { id } = await params;
   const code = decodeURIComponent(id);
+  const force = req.nextUrl.searchParams.get("force") === "1";
 
   const db = getDb();
-  const [usage] = await db
-    .select({ n: count() })
-    .from(schema.itemCombineThemes)
-    .where(eq(schema.itemCombineThemes.themeCode, code));
-  if (usage && usage.n > 0) {
-    return NextResponse.json(
-      { error: "in_use", message: `${usage.n} item(s) are still in this theme. Remove them first.` },
-      { status: 409 },
-    );
-  }
-  // T-0222: strict block (no force override) — completion rows are
-  // historical player stats; orphaning them would silently rewrite the
-  // /account/stats journey. If the theme really needs to go, admin can
-  // unpublish (`is_published=false`) which hides it from the picker
-  // without touching the rows.
-  const completions = await countCompletionRowsForTheme(db, code);
-  if (completions > 0) {
+
+  // Daily config reference is a hard block regardless of force — the
+  // singleton `combine_daily_config` points at exactly one theme; let the
+  // admin switch the daily theme first rather than delete the one that's
+  // currently serving.
+  const [daily] = await db
+    .select({ theme: schema.combineDailyConfig.themeCode })
+    .from(schema.combineDailyConfig)
+    .limit(1);
+  if (daily?.theme === code) {
     return NextResponse.json(
       {
-        error: "has_completions",
-        completionRows: completions,
-        message: `${completions} completion stamp${completions === 1 ? "" : "s"} reference this theme. Unpublish instead — delete would orphan player stats.`,
+        error: "is_active_daily",
+        message: `This theme is the active Daily. Change the Daily theme first.`,
       },
       { status: 409 },
     );
   }
 
-  const [deleted] = await db
-    .delete(schema.combineThemes)
+  const [usage] = await db
+    .select({ n: count() })
+    .from(schema.itemCombineThemes)
+    .where(eq(schema.itemCombineThemes.themeCode, code));
+  const memberCount = usage?.n ?? 0;
+  const completions = await countCompletionRowsForTheme(db, code);
+
+  if (!force && (memberCount > 0 || completions > 0)) {
+    return NextResponse.json(
+      {
+        error: "confirm_required",
+        memberCount,
+        completionRows: completions,
+        message: buildBlockMessage(memberCount, completions),
+      },
+      { status: 409 },
+    );
+  }
+
+  // Force path: cascade in a transaction so a partial failure doesn't
+  // leave the theme half-deleted. combine_dailies cascades by FK; we have
+  // to do the restricted ones (`item_combine_themes`) plus the no-FK
+  // `progress` completion rows by hand.
+  await db.transaction(async (tx) => {
+    if (memberCount > 0) {
+      await tx
+        .delete(schema.itemCombineThemes)
+        .where(eq(schema.itemCombineThemes.themeCode, code));
+    }
+    if (completions > 0) {
+      await tx
+        .delete(schema.progress)
+        .where(
+          and(
+            eq(schema.progress.kind, "combine-theme-complete"),
+            eq(schema.progress.ref, code),
+          ),
+        );
+    }
+    await tx.delete(schema.combineThemes).where(eq(schema.combineThemes.code, code));
+  });
+
+  // Check after the transaction — delete returns from a tx don't surface
+  // well with Drizzle's pg driver here; re-read to confirm.
+  const [stillThere] = await db
+    .select({ code: schema.combineThemes.code })
+    .from(schema.combineThemes)
     .where(eq(schema.combineThemes.code, code))
-    .returning();
-  if (!deleted) return NextResponse.json({ error: "not_found" }, { status: 404 });
+    .limit(1);
+  if (stillThere) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
   await reloadSnapshot();
   const invalidated = await invalidateRunsForTheme(code);
-  return NextResponse.json({ ok: true, invalidatedRuns: invalidated });
+  return NextResponse.json({
+    ok: true,
+    invalidatedRuns: invalidated,
+    deletedMembers: memberCount,
+    deletedCompletions: completions,
+  });
+}
+
+function buildBlockMessage(members: number, completions: number): string {
+  const parts: string[] = [];
+  if (members > 0) parts.push(`${members} item${members === 1 ? "" : "s"} still in this theme`);
+  if (completions > 0)
+    parts.push(
+      `${completions} player completion stamp${completions === 1 ? "" : "s"} reference it`,
+    );
+  return `${parts.join(" and ")}. Pass ?force=1 to delete anyway (cascades members + completion stamps).`;
 }
