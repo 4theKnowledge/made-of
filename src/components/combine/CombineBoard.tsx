@@ -842,6 +842,22 @@ export function CombineBoard({
     // or the server's startedAt signal changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.daily, state.over, serverStartedAt]);
+  // Rehydrate the local run-timer anchor from the server's `startedAt`.
+  // Without this, a reload mid-daily leaves `dailyStartRef` null → the
+  // finish handler sends `durationMs=null` → the end-card shows "—" for
+  // time even though the server-authoritative duration is correct. Only
+  // seed when we don't already have a local anchor so the in-session
+  // clock keeps ticking from its original Date.now() stamp.
+  useEffect(() => {
+    if (!state.daily) return;
+    if (state.over) return;
+    if (dailyStartRef.current != null) return;
+    if (!serverStartedAt) return;
+    const parsed = Date.parse(serverStartedAt);
+    if (Number.isFinite(parsed)) {
+      dailyStartRef.current = parsed;
+    }
+  }, [state.daily, state.over, serverStartedAt]);
   const prevOverRef = useRef(false);
   useEffect(() => {
     if (state.over && !prevOverRef.current && !state.debug) {
