@@ -188,6 +188,67 @@ export function computeClosure(args: {
   };
 }
 
+/**
+ * Reconcile the `source='closure'` rows of a theme against what the
+ * current config *would* produce from its manual seeds. Returns the
+ * delta so the caller can apply it to the DB.
+ *
+ * Without this, lowering `maxDepth` or adding a stop rule leaves the
+ * previously-wider closure rows sitting in `item_combine_themes` forever
+ * (T-0288). Manual rows are never touched — they are the seeds, not the
+ * output, of closure.
+ *
+ * If closure is disabled (config null / empty-to-no-op), `finalClosure`
+ * is empty and every current closure row is pruned.
+ */
+export function reconcileClosureMembers(args: {
+  items: ClosureItem[];
+  recipes: ClosureRecipe[];
+  /** Items the author explicitly added (`source='manual'`). */
+  manualSeeds: Iterable<string>;
+  /** Items currently in the theme with `source='closure'`. */
+  currentClosure: Iterable<string>;
+  config: ClosureConfig | null | undefined;
+}): {
+  toAdd: string[];
+  toRemove: string[];
+  finalClosure: Set<string>;
+} {
+  const manualSet = new Set(args.manualSeeds);
+  const currentSet = new Set(args.currentClosure);
+
+  // Disabled → final closure is empty; prune every existing closure row.
+  if (!args.config) {
+    return {
+      toAdd: [],
+      toRemove: [...currentSet].sort(),
+      finalClosure: new Set(),
+    };
+  }
+
+  const res = computeClosure({
+    items: args.items,
+    recipes: args.recipes,
+    seeds: manualSet,
+    config: args.config,
+  });
+
+  // The *closure* set is members minus the manual seeds — manuals are
+  // the input, not the output. A row that would be in both ends up as
+  // manual in the DB (the write path tags it that way); here we only
+  // reason about what closure contributes.
+  const finalClosure = new Set<string>();
+  for (const id of res.members) if (!manualSet.has(id)) finalClosure.add(id);
+
+  const toAdd: string[] = [];
+  for (const id of finalClosure) if (!currentSet.has(id)) toAdd.push(id);
+  const toRemove: string[] = [];
+  for (const id of currentSet) if (!finalClosure.has(id)) toRemove.push(id);
+  toAdd.sort();
+  toRemove.sort();
+  return { toAdd, toRemove, finalClosure };
+}
+
 /** Convenience: true if the config would actually do anything. A null or
  *  all-empty config means "no auto-chain" and callers should short-circuit. */
 export function isClosureEnabled(c: ClosureConfig | null | undefined): boolean {

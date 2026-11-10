@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
 import { invalidateRunsForTheme } from "@/combine/run-store";
@@ -9,6 +9,11 @@ import {
   countUsersCompletedAtVersion,
 } from "@/combine/completion-impact";
 import { reloadSnapshot } from "@/graph/live";
+import {
+  reconcileClosureMembers,
+  type ClosureConfig,
+} from "@/combine/closure";
+import { loadGraphForClosure } from "../_lib";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,8 +114,52 @@ export async function PATCH(
   // Closure config drives the auto-expanded set of theme members. Bump
   // when the key is present — a no-op "same shape" patch is rare enough
   // that comparing old vs new isn't worth the extra read. See T-0217.
+  let closureReconcile: { added: number; removed: number } | null = null;
   if ("closure_config" in body) {
     await bumpCollectionVersion(db, code);
+    // T-0288: reconcile `source='closure'` rows against the new config.
+    // Without this, a config change (e.g. lowering maxDepth) leaves the
+    // previously-wider closure rows behind. Manuals are never touched —
+    // they are the seeds of closure, not its output.
+    const rows = await db
+      .select({
+        itemId: schema.itemCombineThemes.itemId,
+        source: schema.itemCombineThemes.source,
+      })
+      .from(schema.itemCombineThemes)
+      .where(eq(schema.itemCombineThemes.themeCode, code));
+    const manualSeeds = rows.filter((r) => r.source === "manual").map((r) => r.itemId);
+    const currentClosure = rows.filter((r) => r.source === "closure").map((r) => r.itemId);
+    const graph = await loadGraphForClosure();
+    const r = reconcileClosureMembers({
+      items: graph.items,
+      recipes: graph.recipes,
+      manualSeeds,
+      currentClosure,
+      config: (updated.closureConfig as ClosureConfig | null) ?? null,
+    });
+    if (r.toAdd.length || r.toRemove.length) {
+      await db.transaction(async (tx) => {
+        if (r.toRemove.length) {
+          await tx
+            .delete(schema.itemCombineThemes)
+            .where(
+              and(
+                eq(schema.itemCombineThemes.themeCode, code),
+                eq(schema.itemCombineThemes.source, "closure"),
+                inArray(schema.itemCombineThemes.itemId, r.toRemove),
+              ),
+            );
+        }
+        if (r.toAdd.length) {
+          await tx
+            .insert(schema.itemCombineThemes)
+            .values(r.toAdd.map((itemId) => ({ itemId, themeCode: code, source: "closure" })))
+            .onConflictDoNothing();
+        }
+      });
+    }
+    closureReconcile = { added: r.toAdd.length, removed: r.toRemove.length };
   }
   // Only structural fields invalidate runs. label/description/position/
   // pictogram are cosmetic.
@@ -120,7 +169,11 @@ export async function PATCH(
     await reloadSnapshot();
     invalidated = await invalidateRunsForTheme(code);
   }
-  return NextResponse.json({ theme: updated, invalidatedRuns: invalidated });
+  return NextResponse.json({
+    theme: updated,
+    invalidatedRuns: invalidated,
+    closureReconcile,
+  });
 }
 
 export async function DELETE(

@@ -2,7 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { requireAdminApi } from "@/lib/admin";
-import { computeClosure, isClosureEnabled, type ClosureConfig } from "@/combine/closure";
+import {
+  isClosureEnabled,
+  reconcileClosureMembers,
+  type ClosureConfig,
+} from "@/combine/closure";
 import { invalidateRunsForTheme } from "@/combine/run-store";
 import { bumpCollectionVersion } from "@/combine/theme-version";
 import {
@@ -138,36 +142,52 @@ export async function POST(
   // caller didn't opt out, expand the add set to include every dependency
   // pulled in by the closure. Everything in addRaw is tagged source=manual;
   // everything added by the closure is source=closure.
+  //
+  // T-0288: closure seeds come from the *manual* set, not the full existing
+  // membership. Using existing rows as seeds re-ingests old closure items
+  // and defeats pruning: removing a manual seed would leave its closure
+  // descendants behind, and tightening the config would never prune. Also
+  // compute closure rows to prune (items that fell out of the new closure)
+  // alongside the explicit `remove` list.
   const manualAdd = new Set(addRaw);
   const closureAdd = new Set<string>();
+  const closureRemove = new Set<string>();
 
   if (
-    addRaw.length > 0 &&
     applyClosure &&
     isClosureEnabled(theme.closureConfig as ClosureConfig | null)
   ) {
     const graph = await loadGraphForClosure();
     const existing = await db
-      .select({ itemId: schema.itemCombineThemes.itemId })
+      .select({
+        itemId: schema.itemCombineThemes.itemId,
+        source: schema.itemCombineThemes.source,
+      })
       .from(schema.itemCombineThemes)
       .where(eq(schema.itemCombineThemes.themeCode, themeCode));
     const removeSet = new Set(remove);
-    const seeds = new Set<string>();
-    for (const r of existing) if (!removeSet.has(r.itemId)) seeds.add(r.itemId);
-    for (const id of addRaw) seeds.add(id);
-
-    const res = computeClosure({
+    // Manual seeds after this op: (existing manuals − explicit removes) ∪ addRaw.
+    const manualSeeds = new Set<string>();
+    for (const r of existing) {
+      if (r.source === "manual" && !removeSet.has(r.itemId)) manualSeeds.add(r.itemId);
+    }
+    for (const id of addRaw) manualSeeds.add(id);
+    // Current closure rows minus the explicit removes (those are going anyway).
+    const currentClosure = existing
+      .filter((r) => r.source === "closure" && !removeSet.has(r.itemId))
+      .map((r) => r.itemId);
+    const reconciled = reconcileClosureMembers({
       items: graph.items,
       recipes: graph.recipes,
-      seeds,
+      manualSeeds,
+      currentClosure,
       config: theme.closureConfig as ClosureConfig,
     });
-    const existingSet = new Set(existing.map((r) => r.itemId));
-    for (const id of res.members) {
-      if (existingSet.has(id) && !removeSet.has(id)) continue; // already in theme
-      if (manualAdd.has(id)) continue; // author-added, keep manual
+    for (const id of reconciled.toAdd) {
+      if (manualAdd.has(id)) continue; // author-added wins, source=manual
       closureAdd.add(id);
     }
+    for (const id of reconciled.toRemove) closureRemove.add(id);
   }
 
   const add = [...manualAdd, ...closureAdd];
@@ -191,6 +211,20 @@ export async function POST(
           and(
             eq(schema.itemCombineThemes.themeCode, themeCode),
             inArray(schema.itemCombineThemes.itemId, remove),
+          ),
+        );
+    }
+    // T-0288: prune closure rows that fell out of the new closure. Guarded
+    // on source='closure' so a row that happens to share an id with a
+    // manual stays safe.
+    if (closureRemove.size) {
+      await tx
+        .delete(schema.itemCombineThemes)
+        .where(
+          and(
+            eq(schema.itemCombineThemes.themeCode, themeCode),
+            eq(schema.itemCombineThemes.source, "closure"),
+            inArray(schema.itemCombineThemes.itemId, [...closureRemove]),
           ),
         );
     }
@@ -223,7 +257,7 @@ export async function POST(
       }
     }
     // Any membership mutation changes the discoverable set. See T-0217.
-    const wroteSomething = remove.length > 0 || rows.length > 0;
+    const wroteSomething = remove.length > 0 || rows.length > 0 || closureRemove.size > 0;
     if (wroteSomething) {
       await bumpCollectionVersion(tx, themeCode);
     }
@@ -240,7 +274,12 @@ export async function POST(
   return NextResponse.json({
     members: finalRows.map((r) => r.itemId),
     memberSources: Object.fromEntries(finalRows.map((r) => [r.itemId, r.source])),
-    applied: { manual: [...manualAdd], closure: [...closureAdd], remove },
+    applied: {
+      manual: [...manualAdd],
+      closure: [...closureAdd],
+      remove,
+      closureRemove: [...closureRemove],
+    },
     invalidatedRuns,
   });
 }

@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { computeClosure, isClosureEnabled, type ClosureItem, type ClosureRecipe } from "../closure";
+import {
+  computeClosure,
+  isClosureEnabled,
+  reconcileClosureMembers,
+  type ClosureItem,
+  type ClosureRecipe,
+} from "../closure";
 
 function it_(
   id: string,
@@ -188,5 +194,97 @@ describe("computeClosure", () => {
     const recipes = [rc("r1", "a", ["ghost"])];
     const res = computeClosure({ items, recipes, seeds: ["a"], config: {} });
     expect(res.members).toEqual(new Set(["a"]));
+  });
+});
+
+describe("reconcileClosureMembers (T-0288)", () => {
+  // Chain: a → b → c → d
+  const items = [it_("a"), it_("b"), it_("c"), it_("d")];
+  const recipes = [
+    rc("r1", "a", ["b"]),
+    rc("r2", "b", ["c"]),
+    rc("r3", "c", ["d"]),
+  ];
+
+  it("prunes closure rows that fall outside a tighter maxDepth", () => {
+    // Previously config was unlimited → db has b, c, d as closure.
+    // Admin drops to maxDepth=1 → closure should keep only b.
+    const r = reconcileClosureMembers({
+      items,
+      recipes,
+      manualSeeds: ["a"],
+      currentClosure: ["b", "c", "d"],
+      config: { maxDepth: 1 },
+    });
+    expect(r.finalClosure).toEqual(new Set(["b"]));
+    expect(r.toAdd).toEqual([]);
+    expect(r.toRemove).toEqual(["c", "d"]);
+  });
+
+  it("adds new closure rows when the config widens (depth up)", () => {
+    const r = reconcileClosureMembers({
+      items,
+      recipes,
+      manualSeeds: ["a"],
+      currentClosure: ["b"],
+      config: { maxDepth: 3 },
+    });
+    expect(r.toAdd).toEqual(["c", "d"]);
+    expect(r.toRemove).toEqual([]);
+  });
+
+  it("prunes rows a newly-added stop tag would exclude", () => {
+    const tagged = [it_("a"), it_("b", "C", ["primitive"]), it_("c"), it_("d")];
+    const r = reconcileClosureMembers({
+      items: tagged,
+      recipes,
+      manualSeeds: ["a"],
+      currentClosure: ["b", "c", "d"],
+      config: { stopAtTags: ["primitive"] },
+    });
+    // b stays (it's a member, just stopped). c and d drop out.
+    expect(r.finalClosure).toEqual(new Set(["b"]));
+    expect(r.toRemove).toEqual(["c", "d"]);
+  });
+
+  it("never touches manual rows (they aren't in currentClosure)", () => {
+    // 'b' is manual, so not passed in currentClosure. reconcile proposes
+    // its own closure (c, d from a → b → c → d) without proposing 'b'
+    // as an add.
+    const r = reconcileClosureMembers({
+      items,
+      recipes,
+      manualSeeds: ["a", "b"],
+      currentClosure: ["c", "d"],
+      config: {},
+    });
+    expect(r.toAdd).toEqual([]);
+    expect(r.toRemove).toEqual([]);
+    expect(r.finalClosure.has("b")).toBe(false);
+  });
+
+  it("null config → prune everything in current closure", () => {
+    const r = reconcileClosureMembers({
+      items,
+      recipes,
+      manualSeeds: ["a"],
+      currentClosure: ["b", "c"],
+      config: null,
+    });
+    expect(r.toAdd).toEqual([]);
+    expect(r.toRemove).toEqual(["b", "c"]);
+    expect(r.finalClosure.size).toBe(0);
+  });
+
+  it("no-op when current matches recomputed closure", () => {
+    const r = reconcileClosureMembers({
+      items,
+      recipes,
+      manualSeeds: ["a"],
+      currentClosure: ["b", "c", "d"],
+      config: {},
+    });
+    expect(r.toAdd).toEqual([]);
+    expect(r.toRemove).toEqual([]);
   });
 });
