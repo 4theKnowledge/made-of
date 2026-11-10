@@ -37,6 +37,27 @@ export function pick<T>(state: RngState, arr: readonly T[]): T | undefined {
   return arr[randInt(state, arr.length)];
 }
 
+/** Pick one element with weighted probability. `weights[i]` is the relative
+ *  weight for `arr[i]`; must be non-negative and the same length as `arr`.
+ *  Returns undefined for empty inputs or an all-zero weight vector. */
+export function pickWeighted<T>(
+  state: RngState,
+  arr: readonly T[],
+  weights: readonly number[],
+): T | undefined {
+  if (arr.length === 0) return undefined;
+  let total = 0;
+  for (let i = 0; i < arr.length; i++) total += Math.max(0, weights[i] ?? 0);
+  if (total <= 0) return undefined;
+  let r = rand(state) * total;
+  for (let i = 0; i < arr.length; i++) {
+    const w = Math.max(0, weights[i] ?? 0);
+    r -= w;
+    if (r <= 0) return arr[i];
+  }
+  return arr[arr.length - 1];
+}
+
 /** Fisher-Yates shuffle using the game RNG. Returns a new array. */
 export function shuffle<T>(state: RngState, arr: readonly T[]): T[] {
   const out = arr.slice();

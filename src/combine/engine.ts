@@ -34,7 +34,7 @@ import {
   type MatchResult,
 } from "./match";
 import { applyDealerWeightHook, dealTray } from "./deal";
-import { dailySeed, freshEndlessSeed, makeRng, pick, shuffle, type RngState } from "./rng";
+import { dailySeed, freshEndlessSeed, makeRng, pick, pickWeighted, shuffle, type RngState } from "./rng";
 import { isClassic } from "./types";
 import type { CombineRecipe, Mode, ThemeBundle, ThemeKey } from "./types";
 
@@ -66,7 +66,7 @@ export const TIER_VALUE: Record<string, number> = {
  * It is fine (and expected) to skip bumping for pure refactors that
  * leave the reducer's output-for-input identical.
  */
-export const ENGINE_VERSION = 5;
+export const ENGINE_VERSION = 6;
 
 /** Baseline hold-zone capacity at chapter 0. */
 const HOLD_CAPACITY_BASE = 2;
@@ -901,6 +901,11 @@ export function newGame(
      *  Tiles must exist in the bundle or the dealer will insert `null`
      *  slots and the reducer will treat them as empty (safe but boring). */
     scripted?: string[];
+    /** Extra item ids eligible as starter seed tiles alongside `bundle.base`
+     *  (T-0302). Endless-only — callers should pass the lifetime collection
+     *  intersected with this theme's `mid` set so previously-discovered items
+     *  can appear on the starting board. Ignored for daily / fast / tutorial. */
+    starterPool?: string[];
   } = {},
 ): ReduceResult {
   const daily = opts.daily ?? null;
@@ -990,10 +995,39 @@ export function newGame(
   const spots = shuffle(state.rng, candidateCells).slice(0, seedCount);
   const seedTiles: string[] = [];
   const events: Event[] = [];
-  // Top up with random base tiles until we have enough, bounded so a tiny
-  // base pool doesn't lock us in a loop.
+  // Starter pool: `bundle.base` by default; endless runs may supply extra
+  // discovered mid items so the first few tiles aren't always the same
+  // handful of fundamental atoms (T-0302). Extras are weighted by inverse
+  // band (1 / (band + 1)) so late-game items don't dominate the starting
+  // board for players with huge collections. Bases always carry weight 1.
+  // A floor of base picks guarantees the player can kick off from scratch.
+  const baseSet = new Set(bundle.base);
+  const extraStarters =
+    mode === "endless" && opts.starterPool
+      ? opts.starterPool.filter(
+          (x) => !baseSet.has(x) && !bundle.tools.has(x),
+        )
+      : [];
+  const wideStarters = extraStarters.length > 0
+    ? [...bundle.base, ...extraStarters]
+    : bundle.base;
+  const wideWeights = extraStarters.length > 0
+    ? wideStarters.map((id) => {
+        if (baseSet.has(id)) return 1;
+        const band = bundle.outBand.get(id) ?? 99;
+        return 1 / (band + 1);
+      })
+    : null;
+  const BASE_FLOOR = Math.min(2, bundle.base.length);
+  // Pick until we hit seedCount, falling back to base-only when we'd miss
+  // the base floor. Weighted when extras are present; uniform otherwise.
   for (let k = 0; seedTiles.length < spots.length && k < 50; k++) {
-    const x = pick(state.rng, bundle.base);
+    const basesSoFar = seedTiles.filter((t) => baseSet.has(t)).length;
+    const remaining = spots.length - seedTiles.length;
+    const needBasesNow = BASE_FLOOR - basesSoFar >= remaining;
+    const x = needBasesNow || !wideWeights
+      ? pick(state.rng, bundle.base)
+      : pickWeighted(state.rng, wideStarters, wideWeights);
     if (x && !seedTiles.includes(x) && !bundle.tools.has(x)) {
       seedTiles.push(x);
     }

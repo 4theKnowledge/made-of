@@ -176,3 +176,4 @@
 {"id": "C-0176", "ts": "2026-11-10T22:07:30Z", "kind": "feature", "summary": "Playwright MCP wired into Claude Code (user scope, headless Chromium)", "refs": {"task": "T-0305"}}
 {"id": "C-0177", "ts": "2026-11-10T22:14:39Z", "kind": "feature", "summary": "Key-gated dev login endpoint for parallel agent auth (/api/dev/login)", "refs": {"task": "T-0307"}}
 {"id": "C-0178", "ts": "2026-11-10T22:17:19Z", "kind": "note", "summary": "CLAUDE.md documents POST /api/dev/login for agent-authenticated dev sessions.", "refs": {"task": "T-0308"}}
+{"id": "C-0179", "ts": "2026-11-10T22:20:50Z", "kind": "feature", "summary": "combine endless: widen starter-tile pool with discovered mids, weighted by inverse band", "refs": {"task": "T-0302"}}

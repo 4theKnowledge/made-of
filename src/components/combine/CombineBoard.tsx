@@ -1437,6 +1437,26 @@ export function CombineBoard({
     };
   }, [setOnReconcile, resetTransient]);
 
+  // Starter pool for endless `newGame` calls (T-0302). The engine's seed
+  // tiles default to `bundle.base`; for Everything that's a small set of
+  // fundamental atoms, so successive Play Agains show the same handful of
+  // starters. Union in the player's discovered mid items from the lifetime
+  // endless collection so later runs start from a wider cast. The engine
+  // still guarantees ≥2 base picks so atoms always have a seat.
+  const endlessStarterPool = useCallback(
+    (theme: ThemeKey): string[] => {
+      const b = bundles[theme];
+      if (!b) return [];
+      const midSet = new Set(b.mid);
+      const out: string[] = [];
+      for (const id of collection.keys()) {
+        if (midSet.has(id)) out.push(id);
+      }
+      return out;
+    },
+    [bundles, collection],
+  );
+
   const switchTheme = useCallback(
     (which: ThemeKey) => {
       // If we're already playing this theme in endless, nothing to do.
@@ -1456,12 +1476,13 @@ export function CombineBoard({
           newGame(which, nextBundle, {
             seed: freshEndlessSeed(),
             size: 6,
+            starterPool: endlessStarterPool(which),
           }).state,
         );
       }
       resetTransient();
     },
-    [state, bundles, resetTransient],
+    [state, bundles, resetTransient, endlessStarterPool],
   );
 
   const restartTheme = useCallback(
@@ -1472,11 +1493,12 @@ export function CombineBoard({
           mode: nextMode,
           seed: freshEndlessSeed(),
           size: 6,
+          starterPool: nextMode === "endless" ? endlessStarterPool(which) : undefined,
         }).state,
       );
       resetTransient();
     },
-    [bundles, fastBundles, resetTransient],
+    [bundles, fastBundles, resetTransient, endlessStarterPool],
   );
 
   const startFast = useCallback(
@@ -1595,10 +1617,11 @@ export function CombineBoard({
       newGame(activeTheme, bundles[activeTheme], {
         seed: freshEndlessSeed(),
         size: 6,
+        starterPool: endlessStarterPool(activeTheme),
       }).state,
     );
     resetTransient();
-  }, [dailyStartPending, activeTheme, bundles, fastBundles, resetTransient]);
+  }, [dailyStartPending, activeTheme, bundles, fastBundles, resetTransient, endlessStarterPool]);
 
   // Admin "Replay daily" — restart today's daily server-side with
   // restart:true and reset the local engine to a fresh daily state. Not
@@ -2731,6 +2754,7 @@ export function CombineBoard({
                   daily: nextDaily,
                   seed: freshEndlessSeed(),
                   size: 6,
+                  starterPool: endlessStarterPool(nextTheme),
                 }).state,
               );
               resetTransient();
