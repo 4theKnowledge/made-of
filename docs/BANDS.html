@@ -1,0 +1,1595 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Combine · difficulty-band slicing</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #F2F3EF; --surface: #FFFFFF; --ink: #111417; --muted: #4A4F55;
+    --line: #B9BCB4; --soft: #E3E5DF; --accent: #2B3FB5; --good: #2C7A36;
+    --warn: #9A6A08; --bad: #B0352B;
+
+    --band1: #d9e4ff; --band2: #c9d7fb; --band3: #b7c9f4; --band4: #a6bbec;
+    --band5: #94ade4;
+
+    --tF: #5A3EAD; --tN: #357030; --tM: #94630A;
+    --tC: #0D6E77; --tP: #B03B2F; --tS: #33528F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121416; --surface: #1B1E21; --ink: #ECEDE8; --muted: #A4A8A0;
+      --line: #3B3F43; --soft: #25282B; --accent: #A9B6FF; --good: #86CC7C;
+      --warn: #E6B552; --bad: #F38C80;
+
+      --band1: #2b344d; --band2: #343f5e; --band3: #3d4a70; --band4: #475682;
+      --band5: #516294;
+
+      --tF: #B3A0F5; --tN: #93D284; --tM: #EDBE5E;
+      --tC: #7DD3CE; --tP: #F49A85; --tS: #9DB0EC;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: "Chivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+    padding: 40px 24px 64px;
+  }
+  main { max-width: 1040px; margin: 0 auto; }
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 18px; margin: 36px 0 12px; letter-spacing: -0.005em; }
+  h3 { font-size: 14px; margin: 20px 0 8px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  p { margin: 0 0 12px; max-width: 72ch; color: var(--ink); }
+  code, .mono { font-family: "Chivo Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+  .lede { color: var(--muted); max-width: 72ch; margin-bottom: 8px; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+
+  .pipeline {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin: 16px 0 8px;
+  }
+  .step {
+    background: var(--soft);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 10px 12px;
+    position: relative;
+  }
+  .step .n {
+    font-family: "Chivo Mono", monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+  .step .t { font-weight: 600; font-size: 13px; margin-top: 2px; }
+  .step .d { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .ladder {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .ladder .row {
+    display: grid;
+    grid-template-columns: 56px 1fr 70px;
+    align-items: stretch;
+    gap: 0;
+    min-height: 48px;
+  }
+  .ladder .lbl {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Chivo Mono", monospace;
+    font-size: 12px;
+    color: var(--ink);
+    border-right: 1px solid var(--line);
+    background: var(--soft);
+  }
+  .ladder .cells {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px;
+    align-content: center;
+  }
+  .ladder .count {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+    font-family: "Chivo Mono", monospace;
+    font-size: 12px;
+    color: var(--muted);
+    border-left: 1px solid var(--line);
+  }
+  .cell {
+    width: 18px; height: 18px;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 3px;
+  }
+  @media (prefers-color-scheme: dark) {
+    .cell { border-color: rgba(255,255,255,0.14); }
+  }
+  .b1 { background: var(--band1); }
+  .b2 { background: var(--band2); }
+  .b3 { background: var(--band3); }
+  .b4 { background: var(--band4); }
+  .b5 { background: var(--band5); }
+
+  .pushforward {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 16px;
+    align-items: center;
+    margin: 12px 0;
+  }
+  .arrow {
+    font-family: "Chivo Mono", monospace;
+    font-size: 20px;
+    color: var(--muted);
+    text-align: center;
+  }
+  .mini-recipe {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    font-family: "Chivo Mono", monospace;
+    font-size: 12px;
+    padding: 6px 8px;
+    background: var(--soft);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    margin: 4px 0;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-family: "Chivo Mono", monospace;
+    font-size: 11px;
+    background: var(--surface);
+  }
+  .pill .sw {
+    width: 10px; height: 10px; border-radius: 2px;
+    border: 1px solid rgba(0,0,0,0.2);
+  }
+  @media (prefers-color-scheme: dark) {
+    .pill .sw { border-color: rgba(255,255,255,0.18); }
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 2px; }
+
+  .cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 760px) {
+    .pipeline { grid-template-columns: repeat(2, 1fr); }
+    .cols { grid-template-columns: 1fr; }
+  }
+
+  .cuts {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-family: "Chivo Mono", monospace;
+    font-size: 12px;
+  }
+  .cuts .lvl-row {
+    display: grid;
+    grid-template-columns: 54px 1fr 60px;
+    gap: 8px;
+    align-items: center;
+  }
+  .bar {
+    height: 14px;
+    background: var(--band3);
+    border-radius: 2px;
+    border: 1px solid var(--line);
+  }
+  .lvl-row .n { color: var(--muted); text-align: right; }
+  .cutmark {
+    border-top: 2px dashed var(--bad);
+    margin: 2px 0;
+    position: relative;
+  }
+  .cutmark::after {
+    content: "cut";
+    position: absolute;
+    right: 0; top: -8px;
+    font-size: 10px;
+    color: var(--bad);
+    background: var(--surface);
+    padding: 0 4px;
+  }
+
+  .note {
+    border-left: 3px solid var(--accent);
+    padding: 8px 12px;
+    background: var(--soft);
+    border-radius: 0 4px 4px 0;
+    margin: 10px 0;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .note b { color: var(--ink); }
+
+  /* Combine tiles — scaled-down echo of the game's look. */
+  .tile {
+    --c: var(--tN);
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 72px;
+    min-height: 72px;
+    padding: 6px 4px 7px;
+    background: color-mix(in srgb, var(--c) 18%, var(--surface));
+    border: 2px solid var(--ink);
+    border-radius: 6px;
+    box-shadow: 2px 2px 0 var(--ink);
+    font-family: "Chivo", system-ui, sans-serif;
+    text-align: center;
+    position: relative;
+  }
+  .tile .sym {
+    width: 24px; height: 24px;
+    border: 1.5px solid var(--ink);
+    border-radius: 3px;
+    background: var(--c);
+    display: flex; align-items: center; justify-content: center;
+    font-family: "Chivo Mono", monospace;
+    font-size: 12px; font-weight: 700;
+    color: var(--surface);
+  }
+  .tile .nm {
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+    color: var(--ink);
+    max-width: 64px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tile .meta {
+    font-family: "Chivo Mono", monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+  .tile.tF { --c: var(--tF); }
+  .tile.tN { --c: var(--tN); }
+  .tile.tM { --c: var(--tM); }
+  .tile.tC { --c: var(--tC); }
+  .tile.tP { --c: var(--tP); }
+  .tile.tS { --c: var(--tS); }
+
+  .recipe-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 8px;
+    background: var(--soft);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    margin: 6px 0;
+  }
+  .recipe-row .op {
+    font-family: "Chivo Mono", monospace;
+    font-size: 14px;
+    color: var(--muted);
+    padding: 0 2px;
+  }
+  .recipe-row .arrow-tile {
+    font-family: "Chivo Mono", monospace;
+    font-size: 16px;
+    color: var(--ink);
+    padding: 0 4px;
+  }
+
+  .band-row {
+    display: grid;
+    grid-template-columns: 70px 1fr;
+    gap: 10px;
+    align-items: stretch;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 6px 0;
+  }
+  .band-row .band-tag {
+    background: var(--soft);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 4px;
+    font-family: "Chivo Mono", monospace;
+    font-size: 11px;
+    border-right: 1px solid var(--line);
+  }
+  .band-row .band-tag .big {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .band-row .band-tag .sub { color: var(--muted); font-size: 10px; margin-top: 2px; }
+  .band-row .band-tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .table-mini {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "Chivo Mono", monospace;
+    font-size: 12px;
+    margin: 8px 0;
+  }
+  .table-mini th, .table-mini td {
+    border-bottom: 1px solid var(--line);
+    padding: 6px 8px;
+    text-align: left;
+  }
+  .table-mini th {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .table-mini td .chip {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+    font-size: 11px;
+    background: var(--surface);
+  }
+  .chip.lifted { background: color-mix(in srgb, var(--warn) 30%, var(--surface)); border-color: var(--warn); }
+
+  /* Animated playground */
+  .player {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0 24px;
+  }
+  .player-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .player-head .title {
+    font-family: "Chivo Mono", monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .player-head .stage-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-top: 2px;
+  }
+  .player-head .stage-desc {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+    max-width: 60ch;
+  }
+  .controls {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .controls button {
+    font-family: "Chivo Mono", monospace;
+    font-size: 12px;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+  }
+  .controls button:hover { background: var(--soft); }
+  .controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .controls button.primary {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+  .controls button.primary:hover {
+    background: color-mix(in srgb, var(--ink) 85%, var(--surface));
+  }
+
+  .stage-dots {
+    display: flex;
+    gap: 4px;
+    margin: 8px 0 14px;
+  }
+  .stage-dots .dot {
+    flex: 1;
+    height: 4px;
+    background: var(--soft);
+    border-radius: 2px;
+    transition: background 0.3s;
+  }
+  .stage-dots .dot.done { background: var(--muted); }
+  .stage-dots .dot.active { background: var(--accent); }
+
+  .stage {
+    display: none;
+    animation: fadein 0.4s ease;
+  }
+  .stage.active { display: block; }
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .recipe-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .r-anim {
+    display: grid;
+    grid-template-columns: 1fr 50px 50px;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 10px;
+    background: var(--soft);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-family: "Chivo Mono", monospace;
+    font-size: 12px;
+    transition: all 0.5s ease;
+  }
+  .r-anim .r-glyphs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    color: var(--ink);
+  }
+  .r-anim .r-glyphs .op {
+    font-size: 11px;
+    color: var(--muted);
+    padding: 0 1px;
+  }
+  .r-anim .r-glyphs .arr {
+    font-size: 12px;
+    color: var(--ink);
+    padding: 0 2px;
+  }
+  .r-glyph {
+    --c: var(--tN);
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    background: var(--c);
+    border: 1.5px solid var(--ink);
+    border-radius: 3px;
+    font-family: "Chivo Mono", monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--surface);
+    box-shadow: 1px 1px 0 var(--ink);
+  }
+  .r-glyph.tF { --c: var(--tF); }
+  .r-glyph.tN { --c: var(--tN); }
+  .r-glyph.tM { --c: var(--tM); }
+  .r-glyph.tC { --c: var(--tC); }
+  .r-glyph.tP { --c: var(--tP); }
+  .r-glyph.tS { --c: var(--tS); }
+  .r-glyph .lvbadge {
+    position: absolute;
+    top: -6px; right: -6px;
+    min-width: 13px; height: 13px;
+    padding: 0 3px;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1.5px solid var(--ink);
+    border-radius: 7px;
+    font-family: "Chivo Mono", monospace;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+  }
+  .recipe-list.show-lvl .r-glyph .lvbadge {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .mini-tile .mt-lvl {
+    font-size: 9px;
+    color: var(--muted);
+    padding-left: 2px;
+    border-left: 1px solid var(--line);
+    margin-left: 2px;
+  }
+  .r-anim .r-lvl, .r-anim .r-band {
+    text-align: center;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    transition: all 0.5s ease;
+  }
+  .r-anim .r-lvl.hidden, .r-anim .r-band.hidden {
+    opacity: 0;
+  }
+  .r-anim .r-band.b-1 { background: var(--band1); border-color: var(--band3); }
+  .r-anim .r-band.b-2 { background: var(--band2); border-color: var(--band3); }
+  .r-anim .r-band.b-3 { background: var(--band3); border-color: var(--band5); }
+  .r-anim .r-band.b-4 { background: var(--band4); }
+  .r-anim .r-band.b-5 { background: var(--band5); }
+  .r-anim.lifted {
+    animation: lift-flash 1.2s ease;
+  }
+  @keyframes lift-flash {
+    0%   { background: var(--soft); }
+    30%  { background: color-mix(in srgb, var(--warn) 40%, var(--surface)); transform: translateX(6px); }
+    100% { background: var(--soft); transform: translateX(0); }
+  }
+  .r-anim.merged {
+    animation: merge-flash 1.2s ease;
+  }
+  @keyframes merge-flash {
+    0%   { background: var(--soft); }
+    30%  { background: color-mix(in srgb, var(--bad) 35%, var(--surface)); }
+    100% { background: var(--soft); }
+  }
+
+  .r-head {
+    display: grid;
+    grid-template-columns: 1fr 50px 50px;
+    gap: 8px;
+    padding: 0 10px 4px;
+    font-family: "Chivo Mono", monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .r-head span:nth-child(2), .r-head span:nth-child(3) { text-align: center; }
+
+  .anim-bands {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .anim-band {
+    display: grid;
+    grid-template-columns: 50px 1fr;
+    gap: 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    min-height: 56px;
+    overflow: hidden;
+    transition: all 0.5s ease;
+  }
+  .anim-band.empty {
+    opacity: 0.4;
+  }
+  .anim-band .ab-tag {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: "Chivo Mono", monospace;
+    font-size: 11px;
+    background: var(--soft);
+    border-right: 1px solid var(--line);
+  }
+  .anim-band .ab-tag .n { font-size: 15px; font-weight: 700; color: var(--ink); }
+  .anim-band .ab-tag .c { font-size: 9px; color: var(--muted); margin-top: 2px; }
+  .anim-band.under .ab-tag .c { color: var(--bad); font-weight: 600; }
+  .anim-band .ab-tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+    align-content: center;
+  }
+  .mini-tile {
+    --c: var(--tN);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: color-mix(in srgb, var(--c) 18%, var(--surface));
+    border: 1.5px solid var(--ink);
+    border-radius: 4px;
+    box-shadow: 1.5px 1.5px 0 var(--ink);
+    font-family: "Chivo Mono", monospace;
+    font-size: 11px;
+    color: var(--ink);
+    transition: all 0.5s ease;
+  }
+  .mini-tile .mt-sym {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px; height: 18px;
+    background: var(--c);
+    border: 1.5px solid var(--ink);
+    border-radius: 3px;
+    font-family: "Chivo Mono", monospace;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--surface);
+  }
+  .mini-tile.tF { --c: var(--tF); }
+  .mini-tile.tN { --c: var(--tN); }
+  .mini-tile.tM { --c: var(--tM); }
+  .mini-tile.tC { --c: var(--tC); }
+  .mini-tile.tP { --c: var(--tP); }
+  .mini-tile.tS { --c: var(--tS); }
+
+  .callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+    border-radius: 4px;
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .callout .ic {
+    font-family: "Chivo Mono", monospace;
+    font-size: 11px;
+    padding: 2px 6px;
+    background: var(--accent);
+    color: var(--surface);
+    border-radius: 3px;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  footer {
+    margin-top: 48px;
+    font-size: 12px;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+  }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Combine · difficulty-band slicing</h1>
+<p class="lede">
+  How a theme's recipes get cut into <strong>discovery-difficulty bands</strong>
+  — numeric tiers indicating how reachable a recipe is from the base pool, not
+  temporal "ages" — pushed forward to satisfy dependencies, and merged until
+  every surviving band is thick enough to play. The identifiers
+  <code>deriveNumAges</code> / <code>assignAges</code> are historical; the
+  concept they implement is difficulty, not time. Source:
+  <code>src/combine/data.ts</code> (line&nbsp;83 and line&nbsp;116).
+</p>
+
+<div class="player" id="player">
+  <div class="player-head">
+    <div>
+      <div class="title">Interactive walkthrough</div>
+      <div class="stage-name" id="stageName">Stage 0 · the raw theme</div>
+      <div class="stage-desc" id="stageDesc">Nine recipes come out of the graph projection with no levels and no bands yet. Parts on the left, output on the right — hover a tile for its name.</div>
+    </div>
+    <div class="controls">
+      <button id="prevBtn">← Prev</button>
+      <button id="playBtn" class="primary">▶ Play</button>
+      <button id="nextBtn">Next →</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+  </div>
+  <div class="stage-dots" id="stageDots"></div>
+
+  <div class="cols" style="gap: 20px;">
+    <div>
+      <div class="r-head">
+        <span>Recipe</span>
+        <span>lvl</span>
+        <span>band</span>
+      </div>
+      <div class="recipe-list" id="recipeList"></div>
+    </div>
+    <div>
+      <div class="r-head">
+        <span>Bands</span>
+        <span></span>
+      </div>
+      <div class="anim-bands" id="bandBoard"></div>
+    </div>
+  </div>
+
+  <div class="callout" id="callout" style="display:none;">
+    <span class="ic">why</span>
+    <span id="calloutText"></span>
+  </div>
+</div>
+
+<section class="panel">
+  <h2>Reading the badges · item-level vs. recipe-level</h2>
+  <p>
+    The animation shows <em>two</em> different levels, and they're easy to
+    conflate.
+  </p>
+
+  <div class="cols" style="gap: 20px;">
+    <div>
+      <h3>Item level · the badge on a tile</h3>
+      <p>
+        A per-item depth. In <code>data.ts</code> it lives in the
+        <code>d</code> map inside <code>assignAges</code> (line&nbsp;126).
+      </p>
+      <ul style="font-size: 13px; padding-left: 18px;">
+        <li>Theme <b>ingredients</b> the theme doesn't make (Wheat, Water,
+          Milk) get their <code>computeRefine()</code> value from the
+          knowledge base. In our mock everything raw starts at <code>0</code>.</li>
+        <li>Theme <b>outputs</b> (Flour, Dough, Bread) start at <code>∞</code>
+          and are solved down to <code>1 + max(part item-levels)</code>,
+          taking the <b>min</b> across all recipes that produce them. If
+          Butter had two recipes with recipe-levels 1 and 2, Butter's item
+          level would be 1.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Recipe level · the <code>lvl</code> column</h3>
+      <p>
+        A per-recipe value, stored on <code>CombineRecipe.lvl</code> and
+        assigned at <code>data.ts:164</code> as
+        <code>r.lvl = 1 + max(item-level of each part)</code>.
+      </p>
+      <ul style="font-size: 13px; padding-left: 18px;">
+        <li>This is the value <b>the band cut reads</b>. The histogram the
+          slicer walks is a histogram of recipe-levels.</li>
+        <li>For a theme output with exactly one recipe,
+          <code>item-level(out) === recipe-level</code>. That's why in our
+          mock the badge on the output tile always matches the number in
+          the <code>lvl</code> column — every item has exactly one recipe.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>So why does Wheat's badge read "0"?</b> Not because of any recipe —
+    Wheat has none in this theme. 0 is its KB refine value. Flour's badge
+    reads "1" because <code>1 + max(0, 0) = 1</code> for the Flour recipe
+    <code>(Wheat + Water → Flour)</code>, and Flour has no cheaper alternative.
+    Bread's badge reads "3" because the Bread recipe is
+    <code>Dough(2) + Yeast(0) → Bread</code>, i.e. <code>1 + 2</code>.
+  </div>
+
+  <div class="note" style="border-left-color: var(--warn);">
+    <b>Where they can diverge.</b> If an item has multiple recipes, the
+    item-level is the <b>min</b> across them while each recipe keeps its
+    own <code>lvl</code>. The slicer bands recipes by <code>r.lvl</code>, so
+    an item with a cheap recipe and an expensive one can appear in the
+    cheap-recipe's band even though an expensive recipe still exists at a
+    later band. The push-forward pass later lifts the <em>recipe</em> if
+    needed, but <code>outBand</code> (the per-item min band) tracks whichever
+    recipe first produces the item.
+  </div>
+</section>
+
+<section class="panel">
+  <h3>Pipeline</h3>
+  <div class="pipeline">
+    <div class="step">
+      <div class="n">1</div>
+      <div class="t">deriveNumAges</div>
+      <div class="d">Pick target band count from recipe volume. Monotonic: never shrinks.</div>
+    </div>
+    <div class="step">
+      <div class="n">2</div>
+      <div class="t">Assign levels</div>
+      <div class="d">Longest-path refine level per recipe: <code>1 + max(level of parts)</code>.</div>
+    </div>
+    <div class="step">
+      <div class="n">3</div>
+      <div class="t">Balanced cut</div>
+      <div class="d">Walk sorted levels, cut when running size hits the per-band target.</div>
+    </div>
+    <div class="step">
+      <div class="n">4</div>
+      <div class="t">Push forward</div>
+      <div class="d">Lift a recipe's band to match its latest-made part.</div>
+    </div>
+    <div class="step">
+      <div class="n">5</div>
+      <div class="t">Merge sparse</div>
+      <div class="d">Fold any band under <code>MIN_BAND_SIZE=10</code> into a neighbour.</div>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Worked example · a mock "Kitchen" theme</h2>
+  <p>
+    Twelve items, nine recipes. Small enough to trace by hand; large enough
+    to exercise every stage. Theme outputs are shown as Combine tiles with
+    their tier colour and a two-letter symbol.
+  </p>
+
+  <h3>The items</h3>
+  <div class="recipe-row" style="background: transparent; border: 0; padding: 0;">
+    <div class="tile tN"><div class="sym">Wh</div><div class="nm">Wheat</div><div class="meta">N · lvl 0</div></div>
+    <div class="tile tN"><div class="sym">Wa</div><div class="nm">Water</div><div class="meta">N · lvl 0</div></div>
+    <div class="tile tN"><div class="sym">Mi</div><div class="nm">Milk</div><div class="meta">N · lvl 0</div></div>
+    <div class="tile tN"><div class="sym">Eg</div><div class="nm">Egg</div><div class="meta">N · lvl 0</div></div>
+    <div class="tile tN"><div class="sym">Ye</div><div class="nm">Yeast</div><div class="meta">N · lvl 0</div></div>
+    <div class="tile tN"><div class="sym">Sb</div><div class="nm">Sugarbt</div><div class="meta">N · lvl 0</div></div>
+    <div class="tile tM"><div class="sym">Fl</div><div class="nm">Flour</div><div class="meta">M · lvl 1</div></div>
+    <div class="tile tM"><div class="sym">Su</div><div class="nm">Sugar</div><div class="meta">M · lvl 1</div></div>
+    <div class="tile tM"><div class="sym">Bu</div><div class="nm">Butter</div><div class="meta">M · lvl 1</div></div>
+    <div class="tile tC"><div class="sym">Do</div><div class="nm">Dough</div><div class="meta">C · lvl 2</div></div>
+    <div class="tile tP"><div class="sym">Br</div><div class="nm">Bread</div><div class="meta">P · lvl 3</div></div>
+    <div class="tile tP"><div class="sym">Ck</div><div class="nm">Cake</div><div class="meta">P · lvl 3</div></div>
+  </div>
+
+  <h3>The recipes</h3>
+  <div class="recipe-row">
+    <div class="tile tN"><div class="sym">Wh</div><div class="nm">Wheat</div></div>
+    <div class="op">+</div>
+    <div class="tile tN"><div class="sym">Wa</div><div class="nm">Water</div></div>
+    <div class="arrow-tile">→</div>
+    <div class="tile tM"><div class="sym">Fl</div><div class="nm">Flour</div></div>
+  </div>
+  <div class="recipe-row">
+    <div class="tile tN"><div class="sym">Sb</div><div class="nm">Sugarbt</div></div>
+    <div class="op">+</div>
+    <div class="tile tN"><div class="sym">Wa</div><div class="nm">Water</div></div>
+    <div class="arrow-tile">→</div>
+    <div class="tile tM"><div class="sym">Su</div><div class="nm">Sugar</div></div>
+  </div>
+  <div class="recipe-row">
+    <div class="tile tN"><div class="sym">Mi</div><div class="nm">Milk</div></div>
+    <div class="arrow-tile">→</div>
+    <div class="tile tM"><div class="sym">Bu</div><div class="nm">Butter</div></div>
+  </div>
+  <div class="recipe-row">
+    <div class="tile tM"><div class="sym">Fl</div><div class="nm">Flour</div></div>
+    <div class="op">+</div>
+    <div class="tile tN"><div class="sym">Wa</div><div class="nm">Water</div></div>
+    <div class="arrow-tile">→</div>
+    <div class="tile tC"><div class="sym">Do</div><div class="nm">Dough</div></div>
+  </div>
+  <div class="recipe-row">
+    <div class="tile tC"><div class="sym">Do</div><div class="nm">Dough</div></div>
+    <div class="op">+</div>
+    <div class="tile tN"><div class="sym">Ye</div><div class="nm">Yeast</div></div>
+    <div class="arrow-tile">→</div>
+    <div class="tile tP"><div class="sym">Br</div><div class="nm">Bread</div></div>
+  </div>
+  <div class="recipe-row">
+    <div class="tile tM"><div class="sym">Fl</div><div class="nm">Flour</div></div>
+    <div class="op">+</div>
+    <div class="tile tM"><div class="sym">Su</div><div class="nm">Sugar</div></div>
+    <div class="op">+</div>
+    <div class="tile tN"><div class="sym">Eg</div><div class="nm">Egg</div></div>
+    <div class="op">+</div>
+    <div class="tile tM"><div class="sym">Bu</div><div class="nm">Butter</div></div>
+    <div class="arrow-tile">→</div>
+    <div class="tile tP"><div class="sym">Ck</div><div class="nm">Cake</div></div>
+  </div>
+
+  <h3>Stage 2–3 · cut by level</h3>
+  <p>
+    With 6 recipes and target 3 bands, the balanced cut splits roughly
+    equally along the level histogram.
+  </p>
+  <table class="table-mini">
+    <thead>
+      <tr><th>Recipe</th><th>lvl</th><th>Cut band</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Wheat + Water → Flour</td><td>1</td><td><span class="chip">b1</span></td></tr>
+      <tr><td>Sugarbt + Water → Sugar</td><td>1</td><td><span class="chip">b1</span></td></tr>
+      <tr><td>Milk → Butter</td><td>1</td><td><span class="chip">b1</span></td></tr>
+      <tr><td>Flour + Water → Dough</td><td>2</td><td><span class="chip">b2</span></td></tr>
+      <tr><td>Dough + Yeast → Bread</td><td>3</td><td><span class="chip">b3</span></td></tr>
+      <tr><td>Flour + Sugar + Egg + Butter → Cake</td><td>2</td><td><span class="chip">b2</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Stage 4 · push forward</h3>
+  <p>
+    Cake sits at <code>b2</code>, but Butter (one of its parts) is produced
+    at <code>b1</code> — fine. Nothing moves here. The classic push-forward
+    case fires when the merge pass earlier compressed a band: watch Bread
+    rise if we introduce a <code>b4</code> ingredient. Below is the stable
+    result after push-forward.
+  </p>
+  <table class="table-mini">
+    <thead>
+      <tr><th>Recipe</th><th>Cut band</th><th>After push-fwd</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Wheat + Water → Flour</td><td><span class="chip">b1</span></td><td><span class="chip">b1</span></td></tr>
+      <tr><td>Sugarbt + Water → Sugar</td><td><span class="chip">b1</span></td><td><span class="chip">b1</span></td></tr>
+      <tr><td>Milk → Butter</td><td><span class="chip">b1</span></td><td><span class="chip">b1</span></td></tr>
+      <tr><td>Flour + Water → Dough</td><td><span class="chip">b2</span></td><td><span class="chip">b2</span></td></tr>
+      <tr><td>Flour + Sugar + Egg + Butter → Cake</td><td><span class="chip">b2</span></td><td><span class="chip">b2</span></td></tr>
+      <tr><td>Dough + Yeast → Bread</td><td><span class="chip">b3</span></td><td><span class="chip">b3</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Final board · tiles on their bands</h3>
+  <p>
+    This is what the dealer sees. On entering <code>b1</code> the player can
+    only ever be dealt Wheat/Water/Milk/Sugarbt type combos. <code>b2</code>
+    unlocks once the band-1 unlock threshold is met, and so on.
+  </p>
+
+  <div class="band-row">
+    <div class="band-tag">
+      <div class="big">b1</div>
+      <div class="sub">3 recipes</div>
+      <div class="sub">Age I</div>
+    </div>
+    <div class="band-tiles">
+      <div class="tile tM"><div class="sym">Fl</div><div class="nm">Flour</div><div class="meta">lvl 1</div></div>
+      <div class="tile tM"><div class="sym">Su</div><div class="nm">Sugar</div><div class="meta">lvl 1</div></div>
+      <div class="tile tM"><div class="sym">Bu</div><div class="nm">Butter</div><div class="meta">lvl 1</div></div>
+    </div>
+  </div>
+  <div class="band-row">
+    <div class="band-tag">
+      <div class="big">b2</div>
+      <div class="sub">2 recipes</div>
+      <div class="sub">Age II</div>
+    </div>
+    <div class="band-tiles">
+      <div class="tile tC"><div class="sym">Do</div><div class="nm">Dough</div><div class="meta">lvl 2</div></div>
+      <div class="tile tP"><div class="sym">Ck</div><div class="nm">Cake</div><div class="meta">lvl 2</div></div>
+    </div>
+  </div>
+  <div class="band-row">
+    <div class="band-tag">
+      <div class="big">b3</div>
+      <div class="sub">1 recipe</div>
+      <div class="sub">Age III</div>
+    </div>
+    <div class="band-tiles">
+      <div class="tile tP"><div class="sym">Br</div><div class="nm">Bread</div><div class="meta">lvl 3</div></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>Real-world note.</b> In this toy KB the band sizes (3, 2, 1) are
+    well below <code>MIN_BAND_SIZE = 10</code>, so a real run of the merge
+    pass would collapse to a single age — <code>MIN_EFFECTIVE_AGES</code>
+    caps that at 3 when enough bands are populated. We've skipped the merge
+    here to keep the example readable; the "sparse-merge" diagram further
+    down shows how it would actually fire on a production-sized theme.
+  </div>
+</section>
+
+<section class="panel">
+  <h2>1 · How many bands?</h2>
+  <p>
+    <code>deriveNumAges(recipeCount, prevNumAges)</code> picks a target band
+    count by three forces:
+  </p>
+  <ul class="mono" style="font-size:13px; margin-top:0;">
+    <li>Volume: <code>floor(recipes / 25)</code></li>
+    <li>Floor:  <code>MIN_AGES = 3</code></li>
+    <li>Sparsity cap: <code>floor(recipes / 3)</code> — don't fabricate ages a tiny KB can't fill</li>
+    <li>Monotonic: result ≥ <code>prevNumAges</code> (leaderboard seasons can't retroactively collapse)</li>
+  </ul>
+  <div class="note">
+    <b>Why monotonic.</b> If an admin deletes recipes, the band count stays
+    put. Past runs on five bands keep their meaning even if today's KB would
+    only justify four.
+  </div>
+</section>
+
+<section class="panel">
+  <h2>2–3 · Levels, then a balanced cut</h2>
+  <p>
+    Each recipe gets a numeric <code>lvl</code> — one plus the max level of
+    its parts, saturating theme outputs that depend on later-made items. Then
+    the sorted level histogram is walked and cut so each band holds a similar
+    recipe count.
+  </p>
+
+  <h3>Example — 60 recipes, target 4 bands</h3>
+  <div class="cuts">
+    <div class="lvl-row"><span>lvl 0</span><div class="bar" style="width:55%"></div><span class="n">7</span></div>
+    <div class="lvl-row"><span>lvl 1</span><div class="bar" style="width:70%"></div><span class="n">9</span></div>
+    <div class="cutmark"></div>
+    <div class="lvl-row"><span>lvl 2</span><div class="bar" style="width:92%"></div><span class="n">12</span></div>
+    <div class="lvl-row"><span>lvl 3</span><div class="bar" style="width:40%"></div><span class="n">5</span></div>
+    <div class="cutmark"></div>
+    <div class="lvl-row"><span>lvl 4</span><div class="bar" style="width:100%"></div><span class="n">14</span></div>
+    <div class="cutmark"></div>
+    <div class="lvl-row"><span>lvl 5</span><div class="bar" style="width:65%"></div><span class="n">8</span></div>
+    <div class="lvl-row"><span>lvl 6</span><div class="bar" style="width:40%"></div><span class="n">5</span></div>
+  </div>
+
+  <div class="note">
+    <b>Three gates on every candidate cut.</b> (1) refuse if cutting would
+    leave more future bands than remaining levels; (2) prefer cuts where the
+    running size hits the target; (3) <em>force</em> a cut when levels-left
+    equals bands-after-cut — otherwise early misses lock us out of ever
+    cutting (the Nov 2026 band-collapse bug).
+  </div>
+</section>
+
+<section class="panel">
+  <h2>4 · Push forward</h2>
+  <p>
+    After the cut, a recipe might land in band 2 while one of its parts is
+    only produced in band 3 — unreachable in order. The push-forward loop
+    bumps each recipe up to the highest band that produces any of its parts,
+    recomputes, and repeats until stable (up to 20 passes).
+  </p>
+
+  <div class="pushforward">
+    <div class="mini-recipe">
+      <span class="pill"><span class="sw b2"></span>Dough (b2)</span>
+      <span>+</span>
+      <span class="pill"><span class="sw b3"></span>Yeast (b3)</span>
+      <span>→</span>
+      <span class="pill"><span class="sw b2"></span>Bread (b2)</span>
+    </div>
+    <div class="arrow">→</div>
+    <div class="mini-recipe">
+      <span class="pill"><span class="sw b2"></span>Dough (b2)</span>
+      <span>+</span>
+      <span class="pill"><span class="sw b3"></span>Yeast (b3)</span>
+      <span>→</span>
+      <span class="pill"><span class="sw b3"></span>Bread (b3)</span>
+    </div>
+  </div>
+  <p class="mono" style="font-size:12px; color:var(--muted);">
+    Bread's band lifts from 2 → 3 so Yeast is already craftable by the time
+    the recipe appears.
+  </p>
+</section>
+
+<section class="panel">
+  <h2>5 · Merge sparse bands</h2>
+  <p>
+    Push-forward tends to gut whichever band exported its outputs upward. Any
+    band with fewer than <code>MIN_BAND_SIZE = 10</code> recipes becomes a
+    "dead age" — the dealer can't surface enough current-age combos for the
+    player to progress. The merge pass folds each sparse band into a
+    neighbour until every surviving band passes the floor, then renumbers.
+  </p>
+
+  <h3>Before merge</h3>
+  <div class="ladder">
+    <div class="row"><div class="lbl">b1</div>
+      <div class="cells">
+        <div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div>
+        <div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div>
+        <div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div>
+      </div>
+      <div class="count">15 ✓</div>
+    </div>
+    <div class="row"><div class="lbl">b2</div>
+      <div class="cells">
+        <div class="cell b2"></div><div class="cell b2"></div><div class="cell b2"></div><div class="cell b2"></div>
+      </div>
+      <div class="count" style="color:var(--bad);">4 ✗</div>
+    </div>
+    <div class="row"><div class="lbl">b3</div>
+      <div class="cells">
+        <div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div>
+        <div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div>
+        <div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div>
+        <div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div>
+      </div>
+      <div class="count">18 ✓</div>
+    </div>
+    <div class="row"><div class="lbl">b4</div>
+      <div class="cells">
+        <div class="cell b4"></div><div class="cell b4"></div><div class="cell b4"></div><div class="cell b4"></div><div class="cell b4"></div>
+        <div class="cell b4"></div><div class="cell b4"></div><div class="cell b4"></div><div class="cell b4"></div><div class="cell b4"></div>
+        <div class="cell b4"></div><div class="cell b4"></div>
+      </div>
+      <div class="count">12 ✓</div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:18px;">After merge (b2 folded into b1, renumbered)</h3>
+  <div class="ladder">
+    <div class="row"><div class="lbl">b1</div>
+      <div class="cells">
+        <div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div>
+        <div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div>
+        <div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div><div class="cell b1"></div>
+        <div class="cell b2"></div><div class="cell b2"></div><div class="cell b2"></div><div class="cell b2"></div>
+      </div>
+      <div class="count">19 ✓</div>
+    </div>
+    <div class="row"><div class="lbl">b2</div>
+      <div class="cells">
+        <div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div>
+        <div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div>
+        <div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div>
+        <div class="cell b3"></div><div class="cell b3"></div><div class="cell b3"></div>
+      </div>
+      <div class="count">18 ✓</div>
+    </div>
+    <div class="row"><div class="lbl">b3</div>
+      <div class="cells">
+        <div class="cell b4"></div><div class="cell b4"></div><div class="cell b4"></div><div class="cell b4"></div><div class="cell b4"></div>
+        <div class="cell b4"></div><div class="cell b4"></div><div class="cell b4"></div><div class="cell b4"></div><div class="cell b4"></div>
+        <div class="cell b4"></div><div class="cell b4"></div>
+      </div>
+      <div class="count">12 ✓</div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="pill"><span class="sw b1"></span>original b1</span>
+    <span class="pill"><span class="sw b2"></span>merged in from old b2</span>
+    <span class="pill"><span class="sw b3"></span>was b3</span>
+    <span class="pill"><span class="sw b4"></span>was b4</span>
+  </div>
+
+  <div class="note">
+    <b>Merge direction.</b> Band <code>X&gt;1</code> folds <em>down</em> into
+    <code>X-1</code>. Band 1 (no predecessor) folds <em>up</em> into band 2.
+    Either way the relative order of parts and outputs is unchanged, so the
+    "no later-age dependency" invariant from push-forward still holds.
+  </div>
+
+  <div class="note">
+    <b>Floor.</b> Merging never drops below <code>MIN_EFFECTIVE_AGES = 3</code>
+    (or the populated-band count, if the KB really is that small). A thin
+    top age is better UX than collapsing to a single age with no visible
+    progression.
+  </div>
+</section>
+
+<section class="panel">
+  <h2>How recipes get sampled · the dealer</h2>
+  <p>
+    Band assignment decides <em>which</em> recipes are reachable at each
+    age. The <b>dealer</b> picks the actual tiles the player sees in the
+    tray from that reachable set, one tile at a time, three tiles per tray.
+    Lives in <code>src/combine/deal.ts</code>.
+  </p>
+
+  <h3>Per-age pool · <code>ageSets(bundle, age)</code></h3>
+  <p>
+    Before any dealing, the engine computes the pool of recipes <em>playable
+    at this age</em>:
+  </p>
+  <ul style="font-size: 13px;">
+    <li><code>dealBands = { age, age + 1 }</code> — the current band and the
+      one just below (0-based → 1-based <code>k - 1, k</code>). Recipes in
+      these two bands make up <code>A.recipes</code>, the set the dealer
+      draws from.</li>
+    <li><code>useBands = { age - 1, age, age + 1 }</code> — a wider halo.
+      Tiles whose recipe sits in these bands won't crumble, so a leftover
+      from the previous age stays useful for one more age before expiring.</li>
+    <li><code>A.ING</code> — every ingredient id appearing in dealBands recipes.
+      <code>A.BASE</code> — ingredients that aren't themselves theme outputs
+      (raw stuff + tools). <code>A.MID</code> — ingredients that <em>are</em>
+      made things (chains start here).</li>
+  </ul>
+
+  <div class="note">
+    <b>Why both current and previous band?</b> If the dealer only served
+    current-band recipes, Age-II tiles would show up the instant the
+    player ages up with no overlap. Including <code>age - 1</code> keeps a
+    short runway of still-useful older items in play — the "age transition"
+    feels like a shift, not a reset.
+  </div>
+
+  <h3>Pick a tile · <code>pickOne()</code> layered strategies</h3>
+  <p>
+    Each tile is picked independently by rolling <code>roll ∈ [0, 1)</code>
+    and falling through a cascade. The percentages below are the roll bands;
+    higher-priority layers eat later ones when they hit.
+  </p>
+
+  <div class="pipeline" style="grid-template-columns: repeat(5, 1fr);">
+    <div class="step">
+      <div class="n">layer -1</div>
+      <div class="t">Diversify escape</div>
+      <div class="d">Pathological pile detected across last 2 trays? First slot picks from <code>A.BASE</code> but skips any ingredient in the pile tile's recipe graph.</div>
+    </div>
+    <div class="step">
+      <div class="n">layer 0</div>
+      <div class="t">Pile partner</div>
+      <div class="d">If a tile is piling on the board (count ≥ 2), roll in <code>[0.45, 0.45 + w)</code> picks a partner from a recipe that <em>uses</em> the piled tile. Window <code>w</code> is 0.15 / 0.30 / 0.45 for pile sizes 2 / 3 / 4+.</div>
+    </div>
+    <div class="step">
+      <div class="n">layer 1</div>
+      <div class="t">Fits now</div>
+      <div class="d"><code>roll &lt; 0.45</code>. Pick any ingredient from <code>A.ING</code> that would combine on <em>some</em> empty cell with the current board. First-order match-maker.</div>
+    </div>
+    <div class="step">
+      <div class="n">layer 2</div>
+      <div class="t">Partner on board</div>
+      <div class="d"><code>roll &lt; 0.80</code>. Something that <em>pairs</em> with a tile already on the board, even if it won't combine immediately. Pile-touching recipes weighted 3× over generic partners.</div>
+    </div>
+    <div class="step">
+      <div class="n">layer 3+4</div>
+      <div class="t">Chain seeds &amp; raw</div>
+      <div class="d"><code>roll &lt; 0.88</code>: a made thing from <code>A.MID</code> (next move can start a chain). Else fall through to <code>A.BASE</code> raw ingredients; ~25% of the time allow tools too.</div>
+    </div>
+  </div>
+
+  <h3>Fill the tray · <code>dealTray()</code></h3>
+  <p>
+    Builds a 3-tile tray by calling <code>pickOne</code> three times, then
+    gates on reachability. Each slot sees the prior slot in the tray so it
+    doesn't pick a duplicate.
+  </p>
+  <ol style="font-size: 13px;">
+    <li>Flip <code>wantOne</code> (75% true): "does this tray need a
+      <em>first-placement</em> combine, or is a two-placement setup OK?"</li>
+    <li>Up to <b>60 attempts</b>: pick 3 tiles, reject if they repeat an
+      obvious pattern (duplicate tile in first 40 tries; a recent tray key
+      in first 40 tries).</li>
+    <li>Accept the tray when <code>playsInOne</code> is true and
+      <code>wantOne</code>, or when <code>playsInTwo</code> is true and
+      <code>!wantOne</code>. A <code>playsInTwo</code> tray is kept as a
+      <code>fallback</code> for use if we never find a <code>wantOne</code>.</li>
+    <li><b>Last-resort</b>: hand over both halves of a random 2-ingredient
+      recipe plus one picked tile, then shuffle slots so the "answer" isn't
+      always slots 0 and 1.</li>
+  </ol>
+
+  <div class="note">
+    <b>Guarantees that drop out of this.</b> Simulation shows ≥98% of trays
+    on empty boards have a play within two placements (see
+    <code>src/combine/__tests__/deal.test.ts</code>). The last-resort path
+    makes the guarantee hard, not statistical — if every random attempt
+    fails, you still get a 2-recipe straight away.
+  </div>
+
+  <h3>What the dealer deliberately doesn't do</h3>
+  <ul style="font-size: 13px;">
+    <li><b>No weighting toward rare recipes.</b> Every reachable recipe in
+      <code>A.recipes</code> is equally available to the layered picks — the
+      shaping is all around <em>board state</em>, not recipe scarcity.</li>
+    <li><b>No peek at <code>madeAtBand</code> or <code>found</code>.</b> The
+      dealer doesn't know what the player has or hasn't discovered this run.
+      That's by design: discovery is a side-effect of play, not a goal the
+      dealer steers toward.</li>
+    <li><b>No band-up pre-staging.</b> The dealer never deals an
+      <code>age + 2</code> tile to "prepare" the player for the next age.
+      The pool is strictly <code>{age - 1, age}</code> for picking.</li>
+  </ul>
+</section>
+
+<section class="panel">
+  <h2>Invariants a correct slicing holds</h2>
+  <ul>
+    <li>Every recipe lands in exactly one band in <code>[1 .. effective]</code>.</li>
+    <li>For every recipe <code>r</code> in band <code>b</code>, every part of
+      <code>r</code> is produced by some recipe in band <code>≤ b</code>.</li>
+    <li>Every surviving band holds at least <code>MIN_BAND_SIZE = 10</code> recipes,
+      unless the <code>MIN_EFFECTIVE_AGES</code> floor is forcing a thin band.</li>
+    <li>Band numbers are contiguous <code>1..M</code> with no gaps after merge.</li>
+  </ul>
+</section>
+
+<footer>
+  Source of truth: <code>src/combine/data.ts</code>. Related tests:
+  <code>src/combine/__tests__/data.test.ts</code>,
+  <code>inspect-bands.ts</code>,
+  <code>stuck-diagnostic.ts</code>.
+</footer>
+
+</main>
+
+<script>
+(function () {
+  // ---- model ----
+  // Same tile vocabulary as the static mock set above: Wh, Wa, Mi, Eg, Ye,
+  // Sb, Fl, Su, Bu, Do, Br, Ck — plus a few extras (Rn=Rennet, Ch=Cheese,
+  // Pa=Pasta, Ba=Batter, La=Lasagna) so the merge pass has material to work on.
+  const ITEMS = {
+    wh: { name: "Wheat",    glyph: "Wh", tier: "N", lvl: 0 },
+    wa: { name: "Water",    glyph: "Wa", tier: "N", lvl: 0 },
+    mi: { name: "Milk",     glyph: "Mi", tier: "N", lvl: 0 },
+    eg: { name: "Egg",      glyph: "Eg", tier: "N", lvl: 0 },
+    ye: { name: "Yeast",    glyph: "Ye", tier: "N", lvl: 0 },
+    sb: { name: "Sugarbeet",glyph: "Sb", tier: "N", lvl: 0 },
+    rn: { name: "Rennet",   glyph: "Rn", tier: "N", lvl: 0 },
+    pa: { name: "Pasta",    glyph: "Pa", tier: "C", lvl: 2 },
+    fl: { name: "Flour",    glyph: "Fl", tier: "M", lvl: 1 },
+    su: { name: "Sugar",    glyph: "Su", tier: "M", lvl: 1 },
+    bu: { name: "Butter",   glyph: "Bu", tier: "M", lvl: 1 },
+    ch: { name: "Cheese",   glyph: "Ch", tier: "M", lvl: 1 },
+    do: { name: "Dough",    glyph: "Do", tier: "C", lvl: 2 },
+    ba: { name: "Batter",   glyph: "Ba", tier: "C", lvl: 2 },
+    ck: { name: "Cake",     glyph: "Ck", tier: "P", lvl: 2 },
+    la: { name: "Lasagna",  glyph: "La", tier: "P", lvl: 2 },
+    br: { name: "Bread",    glyph: "Br", tier: "P", lvl: 3 },
+  };
+
+  // A slightly richer theme than the static tables above: nine recipes so
+  // merge actually has something to collapse.
+  const RECIPES = [
+    { id: "fl", out: "fl", parts: ["wh", "wa"],             lvl: 1, cutBand: 1, pushBand: 1, finalBand: 1 },
+    { id: "su", out: "su", parts: ["sb", "wa"],             lvl: 1, cutBand: 1, pushBand: 1, finalBand: 1 },
+    { id: "bu", out: "bu", parts: ["mi"],                   lvl: 1, cutBand: 1, pushBand: 1, finalBand: 1 },
+    { id: "ch", out: "ch", parts: ["mi", "rn"],             lvl: 1, cutBand: 1, pushBand: 1, finalBand: 1 },
+    { id: "do", out: "do", parts: ["fl", "wa"],             lvl: 2, cutBand: 2, pushBand: 2, finalBand: 2 },
+    { id: "ba", out: "ba", parts: ["do", "eg"],             lvl: 2, cutBand: 2, pushBand: 2, finalBand: 2 },
+    { id: "ck", out: "ck", parts: ["fl", "su", "eg", "bu"], lvl: 2, cutBand: 2, pushBand: 2, finalBand: 2 },
+    // Push-forward demo: this recipe's cut-band is 2, but one of its parts
+    // (Pasta, made at band 3 in a bigger KB) forces it to b3. We simulate
+    // by giving it a lifted pushBand.
+    { id: "la", out: "la", parts: ["pa", "ch"],             lvl: 2, cutBand: 2, pushBand: 3, finalBand: 2, lift: true },
+    { id: "br", out: "br", parts: ["do", "ye"],             lvl: 3, cutBand: 3, pushBand: 3, finalBand: 2, merged: true },
+  ];
+
+  function glyphHtml(id) {
+    const it = ITEMS[id];
+    if (!it) return `<span class="r-glyph">?</span>`;
+    return `<span class="r-glyph t${it.tier}" title="${it.name} · lvl ${it.lvl}">${it.glyph}<span class="lvbadge">${it.lvl}</span></span>`;
+  }
+
+  // After merge: band 3 holds only { lasagna, bread } = 2 recipes, under
+  // MIN_BAND_SIZE. Merge pass folds b3 down into b2. For our 9-recipe toy
+  // we pretend MIN_BAND_SIZE is small enough that only b3 is sparse.
+
+  const STAGES = [
+    {
+      name: "Stage 0 · raw recipes",
+      desc: "Nine recipes come out of the graph projection with no levels and no bands yet. Parts on the left, output on the right — hover a tile for its name.",
+      showLvl: false, showBand: false,
+      bandOf: (r) => null,
+      callout: null,
+    },
+    {
+      name: "Stage 2 · assign levels",
+      desc: "Each recipe gets a refinement level: 1 + max(level of its parts). Flour/Sugar/Butter sit at lvl 1, Dough-ish at lvl 2, Bread at lvl 3.",
+      showLvl: true, showBand: false,
+      bandOf: (r) => null,
+      callout: "The level is a longest-path distance from raw ingredients. It drives where each recipe will land in the cut.",
+    },
+    {
+      name: "Stage 3 · balanced cut",
+      desc: "Walk the sorted level histogram, cut when accumulated size hits a per-band target. 9 recipes / 3 bands → aim for ~3 per band.",
+      showLvl: true, showBand: true,
+      bandOf: (r) => r.cutBand,
+      callout: "Cut 1 fires between lvl 1 and lvl 2. Cut 2 fires between lvl 2 and lvl 3. Three bands land: b1 (4), b2 (4), b3 (1).",
+    },
+    {
+      name: "Stage 4 · push forward",
+      desc: "If a recipe lands in band X but one of its parts is only produced in band Y > X, bump the recipe up to Y.",
+      showLvl: true, showBand: true,
+      bandOf: (r) => r.pushBand,
+      callout: "Lasagna cut to b2, but Pasta is only produced at b3. Lift Lasagna to b3 — otherwise the dealer would offer an uncraftable combo.",
+      highlight: ["la"],
+    },
+    {
+      name: "Stage 5 · merge sparse bands",
+      desc: "After push-forward, b3 holds 2 recipes — under MIN_BAND_SIZE. Fold it into its predecessor b2 so the dealer always has enough current-age combos.",
+      showLvl: true, showBand: true,
+      // Final merge: b3 → b2. In our mock, finalBand already reflects this.
+      bandOf: (r) => r.finalBand,
+      callout: "A dead age (under the floor) is worse UX than a thicker preceding age. The dependency invariant still holds because we only merge adjacent bands.",
+      merged: true,
+    },
+  ];
+
+  // ---- render ----
+  const recipeList = document.getElementById("recipeList");
+  const bandBoard  = document.getElementById("bandBoard");
+  const stageName  = document.getElementById("stageName");
+  const stageDesc  = document.getElementById("stageDesc");
+  const dots       = document.getElementById("stageDots");
+  const callout    = document.getElementById("callout");
+  const calloutT   = document.getElementById("calloutText");
+  const prevBtn    = document.getElementById("prevBtn");
+  const nextBtn    = document.getElementById("nextBtn");
+  const playBtn    = document.getElementById("playBtn");
+  const resetBtn   = document.getElementById("resetBtn");
+
+  // Dots
+  STAGES.forEach((_, i) => {
+    const d = document.createElement("div");
+    d.className = "dot";
+    dots.appendChild(d);
+  });
+
+  // Recipe rows (built once, re-skinned per stage)
+  const rowEls = {};
+  for (const r of RECIPES) {
+    const row = document.createElement("div");
+    row.className = "r-anim";
+    const partsHtml = r.parts
+      .map(glyphHtml)
+      .join('<span class="op">+</span>');
+    row.innerHTML = `
+      <div class="r-glyphs">
+        ${partsHtml}
+        <span class="arr">→</span>
+        ${glyphHtml(r.out)}
+      </div>
+      <div class="r-lvl hidden">${r.lvl}</div>
+      <div class="r-band hidden">—</div>
+    `;
+    recipeList.appendChild(row);
+    rowEls[r.id] = row;
+  }
+
+  // Band board (built per stage)
+  function renderBands(stage) {
+    bandBoard.innerHTML = "";
+    const bandOf = stage.bandOf;
+
+    // Group recipes by band for this stage.
+    const groups = {};
+    for (const r of RECIPES) {
+      const b = bandOf(r);
+      if (b == null) continue;
+      (groups[b] ||= []).push(r);
+    }
+    const maxBand = Math.max(1, ...Object.keys(groups).map(Number));
+    for (let b = 1; b <= Math.max(3, maxBand); b++) {
+      const bandEl = document.createElement("div");
+      const members = groups[b] || [];
+      const under = stage.name.startsWith("Stage 4") && members.length > 0 && members.length < 3;
+      bandEl.className = "anim-band" + (members.length === 0 ? " empty" : "") + (under ? " under" : "");
+      const label = ["Age I", "Age II", "Age III", "Age IV", "Age V"][b - 1] || `Age ${b}`;
+      bandEl.innerHTML = `
+        <div class="ab-tag">
+          <div class="n">b${b}</div>
+          <div class="c">${members.length} ${members.length === 1 ? "recipe" : "recipes"}</div>
+          <div class="c">${label}</div>
+        </div>
+        <div class="ab-tiles"></div>
+      `;
+      const tilesHost = bandEl.querySelector(".ab-tiles");
+      for (const r of members) {
+        const it = ITEMS[r.out];
+        const t = document.createElement("div");
+        t.className = `mini-tile t${it.tier}`;
+        t.innerHTML = `<span class="mt-sym">${it.glyph}</span>${it.name}<span class="mt-lvl">lvl ${it.lvl}</span>`;
+        tilesHost.appendChild(t);
+      }
+      bandBoard.appendChild(bandEl);
+    }
+    if (Object.keys(groups).length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "anim-band empty";
+      empty.innerHTML = `<div class="ab-tag"><div class="c" style="color:var(--muted);">no bands yet</div></div><div class="ab-tiles" style="padding:14px; color: var(--muted); font-family: 'Chivo Mono', monospace; font-size: 12px;">— no slicing until stages 3+</div>`;
+      bandBoard.appendChild(empty);
+    }
+  }
+
+  function paint(i) {
+    const stage = STAGES[i];
+    stageName.textContent = stage.name;
+    stageDesc.textContent = stage.desc;
+
+    [...dots.children].forEach((d, k) => {
+      d.className = "dot" + (k < i ? " done" : k === i ? " active" : "");
+    });
+
+    recipeList.classList.toggle("show-lvl", !!stage.showLvl);
+
+    for (const r of RECIPES) {
+      const row = rowEls[r.id];
+      const lvlEl  = row.querySelector(".r-lvl");
+      const bandEl = row.querySelector(".r-band");
+
+      lvlEl.classList.toggle("hidden", !stage.showLvl);
+
+      const b = stage.bandOf(r);
+      if (stage.showBand && b != null) {
+        bandEl.classList.remove("hidden");
+        bandEl.className = `r-band b-${b}`;
+        bandEl.textContent = `b${b}`;
+      } else {
+        bandEl.className = "r-band hidden";
+        bandEl.textContent = "—";
+      }
+
+      row.classList.remove("lifted", "merged");
+      if (stage.highlight && stage.highlight.includes(r.id)) {
+        requestAnimationFrame(() => row.classList.add("lifted"));
+      }
+      if (stage.merged && r.merged) {
+        requestAnimationFrame(() => row.classList.add("merged"));
+      }
+    }
+
+    renderBands(stage);
+
+    if (stage.callout) {
+      callout.style.display = "flex";
+      calloutT.textContent = stage.callout;
+    } else {
+      callout.style.display = "none";
+    }
+
+    prevBtn.disabled = i === 0;
+    nextBtn.disabled = i === STAGES.length - 1;
+  }
+
+  let cur = 0;
+  let playing = false;
+  let timer = null;
+
+  function stopPlay() {
+    playing = false;
+    playBtn.textContent = "▶ Play";
+    if (timer) { clearTimeout(timer); timer = null; }
+  }
+
+  function tick() {
+    if (!playing) return;
+    if (cur >= STAGES.length - 1) { stopPlay(); return; }
+    cur++;
+    paint(cur);
+    timer = setTimeout(tick, 2400);
+  }
+
+  prevBtn.addEventListener("click", () => { stopPlay(); if (cur > 0) { cur--; paint(cur); } });
+  nextBtn.addEventListener("click", () => { stopPlay(); if (cur < STAGES.length - 1) { cur++; paint(cur); } });
+  resetBtn.addEventListener("click", () => { stopPlay(); cur = 0; paint(cur); });
+  playBtn.addEventListener("click", () => {
+    if (playing) { stopPlay(); return; }
+    if (cur >= STAGES.length - 1) cur = 0;
+    playing = true;
+    playBtn.textContent = "⏸ Pause";
+    paint(cur);
+    timer = setTimeout(tick, 2400);
+  });
+
+  paint(0);
+})();
+</script>
+
+</body>
+</html>

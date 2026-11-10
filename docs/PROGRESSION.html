@@ -305,10 +305,13 @@
 <section class="panel">
   <h2>Chapters — log-scaled progression</h2>
   <p>
-    Ages in banded mode were thematic eras (Big Bang, Formation, Life …) tied
-    to recipe bands. Soft mode has no fixed bands, so "age" becomes a
-    discovery milestone: <strong>Chapter N</strong> starts at a cumulative
-    find count.
+    Bands in Combine are <strong>discovery-difficulty tiers</strong>, not
+    temporal eras — band N contains recipes that are harder to reach than
+    band N-1, scaled by the graph's layout. Chapters are a separate
+    progression concept layered on top: <strong>Chapter N</strong> starts at
+    a cumulative find count, independent of which bands the player has
+    actually unlocked. (Legacy "banded mode" tied chapter-up to band
+    advancement; current play is chapter-driven only.)
   </p>
 
   <h3>Threshold curve</h3>
@@ -446,7 +449,7 @@
 <section class="panel">
   <h2>What stays the same</h2>
   <ul>
-    <li><strong>Catalogue groupings</strong> — still show thematic eras (Big Bang, Formation, …) so the collection view reads chronologically. Soft mode changes the <em>progression</em> UI, not the collection UI.</li>
+    <li><strong>Catalogue groupings</strong> — the collection view still groups items by a thematic/chronological frame (Big Bang, Formation, …) for readability. That ordering is a display convention over the item catalogue; it is not the same thing as the difficulty bands the dealer samples from.</li>
     <li><strong>Scoring</strong> — tier values, chain multipliers, close-call bonuses unchanged.</li>
     <li><strong>Fast mode</strong> — unaffected.</li>
     <li><strong>Daily mode</strong> — still target-list ending (<code>state.target</code>); soft sampler would apply if daily switched to it but current daily is independent.</li>

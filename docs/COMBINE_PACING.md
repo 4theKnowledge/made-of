@@ -191,7 +191,7 @@ User is playtesting on mobile. PostHog captures variant per run.
 
 ## Decisions / direction (2026-11-07)
 
-**On progression bar semantics in soft mode:** the age ladder becomes "stage of your discovery journey" (chapter bands), not "era of the world." Catalogue groupings stay thematic.
+**On progression bar semantics in soft mode:** the progression ladder is "stage of your discovery journey" (chapters), not "era of the world." Difficulty bands remain the dealer's reachability tiers. Catalogue groupings stay thematic as a display convention.
 - **Open sub-question:** how does the progression bar update as the KB grows? The chapter thresholds need to scale sensibly whether the KB is 400 or 40000 items.
 
 **On daily mode:** out of scope for now. If endless soft-bands ships, daily inherits.
