@@ -107,6 +107,7 @@ import { DebugPanel } from "@/components/combine/board-parts/overlays/DebugPanel
 import { SoundMenu } from "@/components/combine/board-parts/overlays/SoundMenu";
 import { ModeThemePicker } from "@/components/combine/board-parts/overlays/ModeThemePicker";
 import { ChapterBar } from "@/components/combine/board-parts/board/ChapterBar";
+import { DailyFindsStrip } from "@/components/combine/board-parts/DailyFindsStrip";
 import { Board } from "@/components/combine/board-parts/board/Board";
 import { BoardErrorBoundary } from "@/components/combine/board-parts/board/BoardErrorBoundary";
 import { BoardPlaceholder } from "@/components/combine/board-parts/board/BoardPlaceholder";
@@ -2506,6 +2507,14 @@ export function CombineBoard({
           bundle={bundle}
           onAges={() => setAgesOpen(true)}
         />
+        {state.mode === "daily" && state.manifest && state.manifest.length > 0 && (
+          <DailyFindsStrip
+            manifest={state.manifest}
+            manifestFound={state.manifestFound}
+            bundle={bundle}
+            onOpen={() => setAgesOpen(true)}
+          />
+        )}
         <Shelf
           state={state}
           bundle={bundle}

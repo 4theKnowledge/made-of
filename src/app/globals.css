@@ -1728,6 +1728,23 @@ a.btn.primary{color:var(--bg)}
   .cbmanifest-tile .ic{width:24px;height:24px}
   .cbmanifest-name{font-size:10px}
 }
+/* Compact in-run finds strip, docked between ChapterBar and Shelf.
+   A horizontal row of pictogram chips; found chips dim and show a check.
+   Whole strip is a button → opens the Journey sheet for the full grid. */
+.cbfindsstrip{display:block;width:100%;padding:4px;border:1.5px solid var(--ink);border-radius:5px;background:var(--surface);cursor:pointer;-webkit-tap-highlight-color:transparent;font:inherit;color:inherit;text-align:left}
+.cbfindsstrip:hover{background:color-mix(in srgb, var(--ink) 6%, var(--surface))}
+.cbfindsstrip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cbfindsstrip-row{display:flex;flex-wrap:nowrap;gap:4px;overflow-x:auto;scrollbar-width:none}
+.cbfindsstrip-row::-webkit-scrollbar{display:none}
+.cbfindsstrip-chip{position:relative;flex:0 0 auto;width:28px;height:28px;display:grid;place-items:center;border:1.5px solid var(--pk);border-radius:4px;background:var(--fill);box-shadow:1.5px 1.5px 0 var(--pk);color:#111417}
+.cbfindsstrip-chip .ic{width:20px;height:20px;border:0;background:transparent}
+.cbfindsstrip-chip .ic svg{width:100%;height:100%}
+.cbfindsstrip-chip.on{opacity:.45;filter:saturate(.6)}
+.cbfindsstrip-check{position:absolute;top:-5px;right:-5px;width:14px;height:14px;border-radius:50%;background:#111417;color:#fff;font-family:var(--mono);font-size:9px;font-weight:700;line-height:14px;text-align:center;box-shadow:0 0 0 1.5px var(--bg)}
+@media (max-width:420px){
+  .cbfindsstrip-chip{width:24px;height:24px}
+  .cbfindsstrip-chip .ic{width:18px;height:18px}
+}
 /* Row list variant of the manifest, used in-run inside the Daily Journey
    sheet. Icon + name + "Nt ago" chip. Found rows dim like the grid tiles;
    unfound stay vivid so the eye is pulled to what's left. */
