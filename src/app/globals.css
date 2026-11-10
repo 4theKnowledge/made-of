@@ -1159,6 +1159,18 @@ a.btn.primary{color:var(--bg)}
 .cbopt.made{position:relative;opacity:.72}
 .cbopt-made{position:absolute;top:-6px;right:-6px;min-width:19px;height:15px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:color-mix(in srgb, var(--ink) 80%, transparent);color:var(--bg);font-family:var(--mono);font-size:9.5px;font-weight:700;line-height:15px;text-align:center;pointer-events:none}
 .cbopt:active{transform:translateY(1px)}
+/* Ingredients-combo variant: button is a neutral container (dark surface + ink
+ * text) because its content is a row of per-ingredient color chips, not a
+ * single tier fill. Each chip inside gets its own tier background via --fill. */
+.cbopt-ingredients{width:auto;min-width:76px;max-width:calc(100% - 4px);background:var(--surface);color:var(--ink);padding:8px}
+.cbopt-ingredients-row{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:center}
+.cbopt-ingredients-plus{font-family:var(--mono);color:var(--muted);font-weight:700}
+.cbopt-ingredients-arrow{font-family:var(--mono);color:var(--muted);font-weight:700;margin:0 2px}
+.cbopt-chip{display:inline-flex;align-items:center;gap:3px;padding:3px 6px;border:1.5px solid var(--pk);border-radius:3px;background:var(--fill);color:#111417}
+.cbopt-chip .ic{width:20px;height:20px;border:0;background:transparent;flex:none}
+.cbopt-chip .ic svg{width:100%;height:100%}
+.cbopt-chip-unk{border-style:dashed;border-color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, var(--surface));color:var(--ink)}
+.cbopt-chip-unk b{font-family:var(--mono);font-size:16px;line-height:20px;color:var(--accent)}
 
 .cbscrim{position:fixed;inset:0;z-index:80;background:rgba(17,20,23,.4)}
 
@@ -1826,6 +1838,13 @@ a.btn.primary{color:var(--bg)}
    a full-width "+N more" tagline underneath. */
 .cbfound{justify-content:center}
 .cbfound > .more{flex-basis:100%;text-align:center;font-size:11px;color:var(--muted);font-weight:600;border:0;background:transparent;padding:4px 0 0}
+/* Single-row scrolling variant for the game-over discoveries list — keeps
+ * the modal a fixed height regardless of discovery count. The "+N more"
+ * tagline stays below the scroller as a sibling block. */
+.cbfound.row{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-mask-image:linear-gradient(to right, transparent, #000 18px, #000 calc(100% - 18px), transparent);mask-image:linear-gradient(to right, transparent, #000 18px, #000 calc(100% - 18px), transparent);padding:2px 8px}
+.cbfound.row::-webkit-scrollbar{display:none}
+.cbfound.row > span{flex:none}
+.cbfound-more{display:block;text-align:center;font-size:11px;color:var(--muted);font-weight:600;padding:4px 0 0}
 
 /* Latent cell states — port the CSS now so the Move/Clear/Hint helpers
    (Phase 4) only need the behavioural wiring, not more CSS. Prototype
@@ -1854,6 +1873,11 @@ a.btn.primary{color:var(--bg)}
 
 /* GameOverCard mini-shelf — prototype line 965 */
 .cbshelf.sum{border:0;justify-content:center;gap:8px;flex-wrap:wrap!important;overflow:visible!important;min-height:0}
+/* Game-over summary variant: single row, horizontal scroll with edge fade.
+ * Used for Most-made so the modal height stays fixed even on long runs. */
+.cbshelf.sum.row{flex-wrap:nowrap!important;overflow-x:auto!important;overflow-y:hidden!important;justify-content:flex-start;scrollbar-width:none;-webkit-mask-image:linear-gradient(to right, transparent, #000 18px, #000 calc(100% - 18px), transparent);mask-image:linear-gradient(to right, transparent, #000 18px, #000 calc(100% - 18px), transparent);padding:4px 8px}
+.cbshelf.sum.row::-webkit-scrollbar{display:none}
+.cbshelf.sum.row > *{flex:none}
 
 /* GameOverCard close ("view board") — dismisses the summary so the player
    can inspect the final board; works for both endless and reviewed daily. */

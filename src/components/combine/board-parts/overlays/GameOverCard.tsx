@@ -95,11 +95,6 @@ export function GameOverCard({
     day: state.daily,
     handle: currentUserHandle ?? null,
   });
-  // Mini-shelf: group by output.
-  const shelfCounts = new Map<string, number>();
-  for (const id of state.shelf) {
-    shelfCounts.set(id, (shelfCounts.get(id) ?? 0) + 1);
-  }
   // Top-3 most-made outputs this run. Metric is `state.madeCounts`
   // (outputs produced, incremented in finishResolve). Ties broken by
   // tier then id so the row is deterministic across clients.
@@ -251,7 +246,7 @@ export function GameOverCard({
             : newBest
               ? "A new best!"
               : best > state.score
-                ? `Your best is ${best.toLocaleString("en")}. ${(best - state.score).toLocaleString("en")} to go.`
+                ? `${(best - state.score).toLocaleString("en")} from best (${best.toLocaleString("en")}).`
                 : `You reached ${progressionLabel}.`}
         </span>
         <div className={isDailyTargetRun ? "cb4" : "cb3"}>
@@ -285,8 +280,8 @@ export function GameOverCard({
           ) : (
             <>
               <div>
-                <b>{state.shelf.length}</b>
-                <span>finished things</span>
+                <b>{Object.values(state.madeCounts).reduce((a, b) => a + b, 0)}</b>
+                <span>things made</span>
               </div>
               <div>
                 <b>{progressionLabel}</b>
@@ -304,7 +299,7 @@ export function GameOverCard({
             <p className="sub" style={{ marginTop: 4 }}>
               Most made
             </p>
-            <div className="cbshelf sum">
+            <div className="cbshelf sum row">
               {topMade.map(([id, n]) => {
                 const it = bundle.items.get(id);
                 if (!it) return null;
@@ -321,36 +316,12 @@ export function GameOverCard({
                       kind={it.kind}
                       symbol={it.symbol}
                     />
-                    {n > 1 && <b>{n}</b>}
+                    <b>{n}</b>
                   </span>
                 );
               })}
             </div>
           </>
-        )}
-        {state.shelf.length > 0 && (
-          <div className="cbshelf sum">
-            {[...shelfCounts.entries()].map(([id, n]) => {
-              const it = bundle.items.get(id);
-              if (!it) return null;
-              return (
-                <span
-                  key={id}
-                  className="cbslot"
-                  style={fillVar(it)}
-                  title={cap(it.name)}
-                >
-                  <Pictogram
-                    name={it.name}
-                    tier={it.tier}
-                    kind={it.kind}
-                    symbol={it.symbol}
-                  />
-                  {n > 1 && <b>{n}</b>}
-                </span>
-              );
-            })}
-          </div>
         )}
         {manifestSize > 0 ? (
           <>
@@ -370,7 +341,7 @@ export function GameOverCard({
               <p className="sub" style={{ marginTop: 4 }}>
                 New discoveries
               </p>
-              <div className="cbchip cbfound">
+              <div className="cbchip cbfound row">
                 {state.found.slice(0, 10).map((id) => {
                   const it = bundle.items.get(id);
                   if (!it) return null;
@@ -386,12 +357,12 @@ export function GameOverCard({
                     </span>
                   );
                 })}
-                {state.found.length > 10 && (
-                  <span className="more">
-                    +{state.found.length - 10} more in your collection
-                  </span>
-                )}
               </div>
+              {state.found.length > 10 && (
+                <p className="cbfound-more">
+                  +{state.found.length - 10} more in your collection
+                </p>
+              )}
             </>
           )
         )}

@@ -46,27 +46,30 @@ export function ChoicePicker({
         <div className="opts">
           {indexed.map(({ r, i }) => {
             const ingredients = r.all;
+            const outItem = bundle.items.get(r.out);
+            const outKnown = found(r.out);
+            const ingredientLabel = ingredients
+              .map((id) => bundle.items.get(id)?.name ?? id)
+              .join(" + ");
+            const outLabel = outKnown && outItem ? cap(outItem.name) : "something new";
             return (
               <button
                 key={i}
                 type="button"
                 className="cbopt cbopt-ingredients"
                 onClick={() => onChoose(i)}
-                aria-label={`Combine ${ingredients.map((id) => bundle.items.get(id)?.name ?? id).join(" + ")}`}
+                aria-label={`Combine ${ingredientLabel} to make ${outLabel}`}
               >
-                <span
-                  className="cbopt-ingredients-row"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 4, flexWrap: "wrap", justifyContent: "center" }}
-                >
+                <span className="cbopt-ingredients-row">
                   {ingredients.map((id, j) => {
                     const it = bundle.items.get(id);
                     return (
                       <React.Fragment key={`${id}-${j}`}>
                         {j > 0 && (
-                          <span aria-hidden="true" style={{ opacity: 0.6 }}>+</span>
+                          <span className="cbopt-ingredients-plus" aria-hidden="true">+</span>
                         )}
                         {it ? (
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 2, ...fillVar(it) }}>
+                          <span className="cbopt-chip" style={fillVar(it)}>
                             <Pictogram
                               name={it.name}
                               tier={it.tier}
@@ -81,6 +84,22 @@ export function ChoicePicker({
                       </React.Fragment>
                     );
                   })}
+                  <span className="cbopt-ingredients-arrow" aria-hidden="true">→</span>
+                  {outKnown && outItem ? (
+                    <span className="cbopt-chip" style={fillVar(outItem)}>
+                      <Pictogram
+                        name={outItem.name}
+                        tier={outItem.tier}
+                        kind={outItem.kind}
+                        symbol={outItem.symbol}
+                      />
+                      <span>{cap(outItem.name)}</span>
+                    </span>
+                  ) : (
+                    <span className="cbopt-chip cbopt-chip-unk" aria-label="Something new">
+                      <b>?</b>
+                    </span>
+                  )}
                 </span>
               </button>
             );
