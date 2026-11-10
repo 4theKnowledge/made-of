@@ -3008,22 +3008,27 @@ export function CombineBoard({
             {
               glyph: <GlyphCombine />,
               title: "Touching things combine",
-              body: "When neighbouring tiles make a recipe, they fuse and the result lands in their place. Everything used is spent.",
+              body: "Side-by-side tiles (up, down, left, right — not diagonal) that match a recipe fuse into the result. Recipes can take two tiles or several.",
             },
             {
               glyph: <GlyphShelf />,
               title: "Finished things go to your shelf",
-              body: "Big, lasting things get shipped and keep for the rest of the run. Tap the book to see your collection.",
+              body: "Some recipes finish into a shipped item. It leaves the board, lands on your shelf for the rest of the run, and scores a bonus.",
+            },
+            {
+              glyph: <span className="msc">+pts</span>,
+              title: "Score builds the run",
+              body: "Every combine scores. Bigger, later-tier results score more, and shipping a finished item pays a bonus. The run's total is what the leaderboard tracks.",
             },
             {
               glyph: <GlyphGlow />,
               title: "Glow means you've found it",
-              body: "A glowing square is a combo you've made before. New combos never glow — try things in new places.",
+              body: "A glowing square marks a combo you've already made. A plain square is a chance to discover something new — try things in fresh places.",
             },
             {
               glyph: <GlyphAges />,
-              title: "Fill the bar to reach the next chapter",
-              body: "Every combine fills the chapter bar. New chapters unlock new recipes. Run out of moves and the game is over.",
+              title: "New discoveries unlock chapters",
+              body: "Each new combo you find fills the chapter bar. Fill it and the next chapter opens with new recipes to chase.",
             },
             {
               glyph: <GlyphCrumble />,

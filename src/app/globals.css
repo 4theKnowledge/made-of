@@ -2188,6 +2188,9 @@ a.btn.primary{color:var(--bg)}
 .howto-glyph .anim-crumble{animation:howtoCrumble 2.4s ease-in-out infinite}
 .howto-glyph .cl .crk{position:absolute;top:-4px;right:-4px;min-width:12px;height:12px;padding:0 2px;box-sizing:border-box;border-radius:7px;background:var(--bad);color:#fff;font-family:var(--mono);font-size:9px;font-weight:700;line-height:12px;text-align:center}
 
+/* Score pill — "+pts" badge for the scoring step. */
+.howto-glyph .msc{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:1.5px solid var(--ink);border-radius:3px;background:var(--good);color:var(--ink);box-shadow:2px 2px 0 var(--ink);font-family:var(--mono);font-weight:800;font-size:16px;letter-spacing:.02em}
+
 @media (prefers-reduced-motion: reduce){
   .howto-glyph .anim-pulse,
   .howto-glyph .anim-nudge,
