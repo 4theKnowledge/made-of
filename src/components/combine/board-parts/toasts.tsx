@@ -107,16 +107,18 @@ export function HintToast({
             const p = bundle.items.get(pid);
             if (!p) return null;
             return (
-              <span key={pid}>
-                <Pictogram
-                  name={p.name}
-                  tier={p.tier}
-                  kind={p.kind}
-                  symbol={p.symbol}
-                />
-                {cap(p.name)}
-                {k < hint.recipe.length - 1 && <i>+</i>}
-              </span>
+              <React.Fragment key={k}>
+                {k > 0 && <i>+</i>}
+                <span>
+                  <Pictogram
+                    name={p.name}
+                    tier={p.tier}
+                    kind={p.kind}
+                    symbol={p.symbol}
+                  />
+                  {cap(p.name)}
+                </span>
+              </React.Fragment>
             );
           })}
           <i>=</i>
@@ -194,16 +196,18 @@ export function DiscoveryToast({
             const p = bundle.items.get(pid);
             if (!p) return null;
             return (
-              <span key={pid}>
-                <Pictogram
-                  name={p.name}
-                  tier={p.tier}
-                  kind={p.kind}
-                  symbol={p.symbol}
-                />
-                {cap(p.name)}
-                {k < discovery.recipe.length - 1 && <i>+</i>}
-              </span>
+              <React.Fragment key={k}>
+                {k > 0 && <i>+</i>}
+                <span>
+                  <Pictogram
+                    name={p.name}
+                    tier={p.tier}
+                    kind={p.kind}
+                    symbol={p.symbol}
+                  />
+                  {cap(p.name)}
+                </span>
+              </React.Fragment>
             );
           })}
           <i>=</i>

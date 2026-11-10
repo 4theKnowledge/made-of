@@ -153,3 +153,5 @@
 {"id": "C-0153", "ts": "2026-11-10T12:33:22Z", "kind": "fix", "summary": "combine: held tiles show selection feedback on tap (parity with tray)", "refs": {"task": "T-0283"}}
 {"id": "C-0154", "ts": "2026-11-10T12:36:56Z", "kind": "feature", "summary": "combine: mark \"found this round\" new finds in collection UI", "refs": {"task": "T-0284"}}
 {"id": "C-0155", "ts": "2026-11-10T12:38:40Z", "kind": "feature", "summary": "Combine game-end card now shows a top-3 \"Most made\" row (all modes).", "refs": {"task": "T-0285", "commit": "a171802"}}
+{"id": "C-0156", "ts": "2026-11-10T12:39:25Z", "kind": "note", "summary": "T-0281 Phase 2: PPO scaffolding (encoder + actor-critic + rollout/update loop) + sanity run. 20 updates on a size-1 manifest: mean return +4.16 → +7.02, found rate 0.51 → 0.68–0.80. ~90s on CPU. Loop learns; ready for full curriculum pending go/no-go.", "refs": {"task": "T-0281"}}
+{"id": "C-0157", "ts": "2026-11-10T12:39:25Z", "kind": "fix", "summary": "combine: render `+` between recipe chips in toasts, not inside", "refs": {"task": "T-0286"}}
