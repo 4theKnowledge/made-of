@@ -76,14 +76,37 @@ export async function POST(
 
   // T-0222: admin friction. The membership write bumps the collection_version,
   // which drops players at 100% below the threshold. Removing items also
-  // orphans every endless-scope discovery of those items from this theme's
+  // affects every endless-scope discovery of those items from this theme's
   // bar. Report both counts up-front so the admin UI can confirm; the client
   // re-POSTs with `{ force: true }` to proceed.
+  //
+  // Scope the discovery-impact count to items that were *actually* in the
+  // theme before this call. Endless-scope discoveries are shared across all
+  // endless themes (CLAUDE.md), so the raw count of "users who discovered
+  // these items" fires even when the items were never in this theme —
+  // e.g. creating a brand-new theme and dragging items around on it should
+  // not warn about players' existing discoveries in another theme. (T-0271)
   if (!force) {
+    const existingMemberIds = remove.length > 0
+      ? new Set(
+          (
+            await db
+              .select({ itemId: schema.itemCombineThemes.itemId })
+              .from(schema.itemCombineThemes)
+              .where(
+                and(
+                  eq(schema.itemCombineThemes.themeCode, themeCode),
+                  inArray(schema.itemCombineThemes.itemId, remove),
+                ),
+              )
+          ).map((r) => r.itemId),
+        )
+      : new Set<string>();
+    const actuallyRemoving = remove.filter((id) => existingMemberIds.has(id));
     const [completedUsers, discoveryUsers] = await Promise.all([
       countUsersCompletedAtVersion(db, themeCode, theme.collectionVersion),
-      remove.length > 0
-        ? countUsersAffectedByItemRemoval(db, remove)
+      actuallyRemoving.length > 0
+        ? countUsersAffectedByItemRemoval(db, actuallyRemoving)
         : Promise.resolve(0),
     ]);
     if (completedUsers > 0 || discoveryUsers > 0) {
@@ -95,7 +118,7 @@ export async function POST(
       }
       if (discoveryUsers > 0) {
         bits.push(
-          `${discoveryUsers} player${discoveryUsers === 1 ? "'s" : "s'"} discoveries reference the removed item${remove.length === 1 ? "" : "s"}`,
+          `${discoveryUsers} player${discoveryUsers === 1 ? "'s" : "s'"} discoveries reference the removed item${actuallyRemoving.length === 1 ? "" : "s"}`,
         );
       }
       return NextResponse.json(
