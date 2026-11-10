@@ -86,7 +86,10 @@ export function GameOverCard({
     // the `progress` row. Pre-fix, the fetch fired on mount and almost
     // always lost the race — leaderboard returned the pre-insert list
     // and the player appeared "unranked" even on completions.
-    enabled: !!(won && state.daily && currentUserHandle && !finishing),
+    // Fetch for any daily run (not just wins) — the leaderboard sorts
+    // by `manifestFound DESC` first, so partial completions rank too.
+    // T-0269.
+    enabled: !!(isDailyTargetRun && state.daily && currentUserHandle && !finishing),
     theme: state.theme,
     day: state.daily,
     handle: currentUserHandle ?? null,
@@ -444,11 +447,10 @@ function useDailyRank({
 
 function formatRank(
   rank: RankState,
-  won: boolean,
+  _won: boolean,
   signedIn: boolean,
   finishing: boolean,
 ): string {
-  if (!won) return "—";
   if (!signedIn) return "Sign in";
   // While /finish is in flight the fetch is suppressed and `rank.kind`
   // stays `idle` — show the same spinner glyph as `loading` so the
@@ -460,11 +462,10 @@ function formatRank(
 
 function rankLabel(
   rank: RankState,
-  won: boolean,
+  _won: boolean,
   signedIn: boolean,
   finishing: boolean,
 ): string {
-  if (!won) return "rank";
   if (!signedIn) return "set handle to rank";
   if (finishing) return "saving run";
   if (rank.kind === "ranked") return `of ${rank.total} today`;
