@@ -214,6 +214,15 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
+  // Debounced copy used for actual matching. Without this, every
+  // keystroke on a dense KB triggers a full tree re-render cascade
+  // (match set → ancestor set → virtualiser remeasure → row remount),
+  // which can crash the tab mid-type even under the cap.
+  const [queryApplied, setQueryApplied] = useState("");
+  useEffect(() => {
+    const h = setTimeout(() => setQueryApplied(query), 180);
+    return () => clearTimeout(h);
+  }, [query]);
 
   useEffect(() => {
     try {
@@ -727,7 +736,7 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
     }
   }, [availableTags, tagFilter]);
 
-  const q = query.trim().toLowerCase();
+  const q = queryApplied.trim().toLowerCase();
   const matches = useMemo(() => {
     const isFiltered =
       q !== "" || statusFilter !== "all" || tierFilter !== "all" || tagFilter !== "all";
@@ -768,7 +777,9 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
   // ancestor path). Searching for a common substring in a dense KB can
   // explode into tens of thousands of row mounts and crash the tab. Above
   // this cap we refuse to render the tree and point the user at flat view.
-  const TREE_RENDER_CAP = 500;
+  // Kept low because DAG multiplicity can mount a single visibleIds entry
+  // many times; 150 unique items with 10× multiplicity is already 1500 rows.
+  const TREE_RENDER_CAP = 150;
   const treeOverCap = !!visibleIds && visibleIds.size > TREE_RENDER_CAP;
 
   // Under a filter, only mount roots that actually contain a match. Without
@@ -943,27 +954,30 @@ export function TreeList({ initialData }: { initialData: TreeData }) {
 
       {view === "tree" ? (
         treeOverCap ? (
-          <div
-            style={{
-              padding: "24px 14px",
-              fontSize: 13,
-              color: "var(--muted)",
-              borderBottom: "1px solid var(--line)",
-            }}
-          >
-            Search matches {visibleIds?.size.toLocaleString()} items (plus
-            ancestors). Rendering the tree for more than {TREE_RENDER_CAP} is
-            too expensive — narrow the search or switch to{" "}
-            <button
-              type="button"
-              className="btn"
-              style={{ fontSize: 12, marginLeft: 4 }}
-              onClick={() => setView("flat")}
+          <>
+            <div
+              style={{
+                padding: "10px 14px",
+                fontSize: 12,
+                color: "var(--muted)",
+                borderBottom: "1px solid var(--line)",
+                background: "var(--soft)",
+              }}
             >
-              Flat view
-            </button>
-            .
-          </div>
+              Search matches {matches?.size.toLocaleString() ?? 0} items —
+              showing flat results (tree view skipped above {TREE_RENDER_CAP}{" "}
+              visible ancestors).
+            </div>
+            <FlatView
+              items={data.items}
+              matches={matches}
+              onEditItem={setEditingItemId}
+              selectedSet={selected}
+              onToggleSelected={(id, shift) =>
+                onRowSelectionToggle(id, shift, visibleOrderedIds)
+              }
+            />
+          </>
         ) : (
           <TreeContext.Provider value={treeContextValue}>
             <VirtualRootList roots={rootsToRender} />
