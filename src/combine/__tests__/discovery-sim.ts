@@ -2,18 +2,27 @@
  * Long-horizon discovery sim: can a motivated player eventually discover
  * everything in a theme by playing many games? Run with:
  *
- *   npx tsx src/combine/__tests__/discovery-sim.ts [theme] [games] [seed]
+ *   npx tsx src/combine/__tests__/discovery-sim.ts [theme] [games] [seed] [strategies]
  *
- * Reports:
- *   - per-game discovery distribution (how much a single run reveals)
- *   - cumulative collection growth (how many games to reach 50%, 90%, 100%)
- *   - items that are stubbornly hard to find (missed by most players)
+ * `strategies` is a comma-separated list; default `baseline` runs today's
+ * dealer. Available: `baseline`, `creatability`, `aggressive-unfound`.
+ * Each strategy runs on identical seeds so attempts/new-find comparisons
+ * are apples-to-apples. See `docs/FIELD_NOTES_REVIEW.md` §2a / T-0279.
+ *
+ * Reports (per strategy):
+ *   - per-game discovery distribution
+ *   - cumulative collection growth (games to 50%, 90%, 100%)
+ *   - attempts/new-find and local-loop percentiles (T-0274)
+ *   - per-recipe local-mining traps (T-0280)
+ *   - rarest-seen items
+ * And at the end: a side-by-side comparison of the key metrics.
  */
 
 import { loadKnowledgeBase } from "../../data/load";
 import { toRows } from "../../data/rows";
 import { buildSnapshot } from "../../graph/snapshot";
 import { buildThemeBundle } from "../data";
+import { setDealerWeightHook } from "../deal";
 import {
   newGame,
   reduce,
@@ -22,29 +31,6 @@ import {
 } from "../engine";
 import { matchAt, matchOn } from "../match";
 import type { CombineRecipe, ThemeBundle, ThemeKey } from "../types";
-
-/** Score a candidate move: strongly prefer discoveries and current-band
- *  progress, with mild preferences otherwise. Represents a motivated
- *  player who's actively trying to find new things. */
-function scoreMove(
-  state: GameState,
-  recipe: CombineRecipe,
-  bundle: ThemeBundle,
-): number {
-  let score = 0;
-  const first = !state.found.includes(recipe.out);
-  if (first) score += 500; // discoveries dominate.
-  // Prefer current-band combines so the age bar advances.
-  const d = recipe.band - (state.chapter + 1);
-  if (d === 0) score += 100;
-  else if (d === 1) score += 60;
-  else if (d === -1) score += 20;
-  else if (d === -2) score += 10;
-  // Larger recipes = more variety per move + chain potential.
-  score += recipe.all.length * 15;
-  if (bundle.terminal.has(recipe.out)) score += 30;
-  return score;
-}
 
 function enumerateCombines(
   state: GameState,
@@ -75,13 +61,107 @@ function firstEmpty(state: GameState): number {
 /** T-0274. Per-session outcome returned by `playOne`. `attempts` is the
  *  number of successful combines, used to compute attempts-per-discovery
  *  as a difficulty metric. `maxLocalLoop` is the longest run of
- *  same-output combines without a new discovery — a "stuck mining" proxy. */
+ *  same-output combines without a new discovery — a "stuck mining" proxy.
+ *  `perOutputLoop` is the max same-output streak observed for each
+ *  output (T-0280 trap tracking). */
 interface GameOutcome {
   found: Set<string>;
   attempts: number;
   newFinds: number;
   maxLocalLoop: number;
+  perOutputLoop: Map<string, number>;
 }
+
+/* ========================================================================
+ * Dealer strategies (T-0279).
+ *
+ * Each strategy is a `(bundle) => WeightHook` factory. The returned hook
+ * is installed via `setDealerWeightHook` and sees every `DealerView` that
+ * flows through the engine. Hooks return a multiplier on the baseline
+ * weight — 1 is a no-op, >1 boosts, <1 suppresses.
+ *
+ * The baseline strategy (null hook) leaves production behavior intact,
+ * so its sim results reproduce the current dealer exactly.
+ * ====================================================================== */
+type Strategy = {
+  id: string;
+  describe: string;
+  install: (bundle: ThemeBundle) => void;
+};
+
+const strategies: Strategy[] = [
+  {
+    id: "baseline",
+    describe: "no override — today's dealer as-is",
+    install: () => setDealerWeightHook(null),
+  },
+  {
+    id: "creatability",
+    describe:
+      "down-weight tiles proportional to how many of their recipe outputs the player has already made",
+    install: (bundle) => {
+      // Precompute: for each tile, which recipes consume it as an input.
+      const consumedBy = new Map<string, CombineRecipe[]>();
+      for (const r of bundle.recipes) {
+        for (const ing of r.all) {
+          let bucket = consumedBy.get(ing);
+          if (!bucket) {
+            bucket = [];
+            consumedBy.set(ing, bucket);
+          }
+          bucket.push(r);
+        }
+      }
+      setDealerWeightHook((view) => {
+        const found = view._foundSet ?? new Set(view.found);
+        return (_view, tile) => {
+          const recipes = consumedBy.get(tile);
+          if (!recipes || recipes.length === 0) return 1;
+          // Fraction of this tile's downstream outputs the player has
+          // already made. A tile whose every recipe produces something
+          // known gets down-weighted heavily; a tile with unseen recipes
+          // left stays at 1.
+          let made = 0;
+          for (const r of recipes) if (found.has(r.out)) made++;
+          const frac = made / recipes.length;
+          // Multiplier: 1 when nothing new is reachable via boost, down
+          // to 0.25 when every output is already found. Keeps a floor so
+          // "all made" tiles still fire when they're the only option.
+          return 1 - 0.75 * frac;
+        };
+      });
+    },
+  },
+  {
+    id: "aggressive-unfound",
+    describe:
+      "strongly boost tiles whose recipes still have unfound outputs; suppress fully-exhausted tiles",
+    install: (bundle) => {
+      const consumedBy = new Map<string, CombineRecipe[]>();
+      for (const r of bundle.recipes) {
+        for (const ing of r.all) {
+          let bucket = consumedBy.get(ing);
+          if (!bucket) {
+            bucket = [];
+            consumedBy.set(ing, bucket);
+          }
+          bucket.push(r);
+        }
+      }
+      setDealerWeightHook((view) => {
+        const found = view._foundSet ?? new Set(view.found);
+        return (_view, tile) => {
+          const recipes = consumedBy.get(tile);
+          if (!recipes || recipes.length === 0) return 1;
+          let unseen = 0;
+          for (const r of recipes) if (!found.has(r.out)) unseen++;
+          if (unseen === 0) return 0.1;
+          return 1 + Math.min(2, unseen); // +1 per unseen downstream output, capped at +2.
+        };
+      });
+    },
+  },
+];
 
 function playOne(
   theme: ThemeKey,
@@ -103,6 +183,16 @@ function playOne(
   let maxLocalLoopLen = 0;
   let curLocalLoopLen = 0;
   let lastOutput: string | null = null;
+  // T-0280: per-output max loop length observed this session. Updated
+  // whenever a same-output streak ends (or when a game ends with a
+  // streak still active). Aggregated across games by the caller.
+  const perOutputLoop = new Map<string, number>();
+  const recordLoop = () => {
+    if (lastOutput && curLocalLoopLen > 0) {
+      const prev = perOutputLoop.get(lastOutput) ?? 0;
+      if (curLocalLoopLen > prev) perOutputLoop.set(lastOutput, curLocalLoopLen);
+    }
+  };
 
   const localScore = (recipe: CombineRecipe): number => {
     let score = 0;
@@ -181,6 +271,7 @@ function playOne(
         lastEvt && lastEvt.type === "combine" ? lastEvt.out : null;
       const grew = foundSet.size > beforeFoundSize;
       if (grew) {
+        recordLoop();
         newFindsCount += foundSet.size - beforeFoundSize;
         curLocalLoopLen = 0;
         lastOutput = outNow;
@@ -188,17 +279,21 @@ function playOne(
         curLocalLoopLen += delta;
         if (curLocalLoopLen > maxLocalLoopLen) maxLocalLoopLen = curLocalLoopLen;
       } else {
+        recordLoop();
         curLocalLoopLen = delta;
         lastOutput = outNow;
       }
     }
   }
+  // Flush the trailing streak when the game ends mid-loop.
+  recordLoop();
 
   return {
     found: new Set(state.found),
     attempts: combinesMade,
     newFinds: newFindsCount,
     maxLocalLoop: maxLocalLoopLen,
+    perOutputLoop,
   };
 }
 
@@ -225,15 +320,32 @@ function histogram(xs: number[], bins: number[]): Record<string, number> {
   return h;
 }
 
-function run(theme: ThemeKey, nGames: number, baseSeed: number) {
-  const kb = loadKnowledgeBase();
-  const snap = buildSnapshot(toRows(kb));
-  const bundle = buildThemeBundle(snap, theme);
+interface StrategyReport {
+  id: string;
+  attemptsPerNewFind: number;
+  loopP50: number;
+  loopP90: number;
+  loopP99: number;
+  loopMax: number;
+  finalCollection: number;
+  totalOutputs: number;
+  gamesTo50: number | null;
+  gamesTo90: number | null;
+}
 
+function run(
+  theme: ThemeKey,
+  nGames: number,
+  baseSeed: number,
+  strategy: Strategy,
+  bundle: ThemeBundle,
+): StrategyReport {
   const totalOutputs = bundle.outputs.size;
-  console.log(`\n== ${theme} ==`);
+  console.log(`\n== ${theme} · strategy=${strategy.id} ==`);
+  console.log(`  ${strategy.describe}`);
   console.log(`Theme has ${totalOutputs} unique outputs (ingredients + terminals).`);
   console.log(`Running ${nGames} games…`);
+  strategy.install(bundle);
 
   const perGameDiscoveries: number[] = [];
   const cumulative = new Set<string>();
@@ -244,6 +356,10 @@ function run(theme: ThemeKey, nGames: number, baseSeed: number) {
   const perGameAttempts: number[] = [];
   const perGameNewFinds: number[] = [];
   const perGameMaxLocalLoop: number[] = [];
+  // T-0280 per-output trap tracking: for each output, keep the max
+  // same-output streak seen *in any single game*. "Worst trap length
+  // observed" is a more actionable metric than a mean across games.
+  const perOutputMaxLoop = new Map<string, number>();
 
   for (let i = 0; i < nGames; i++) {
     const seed = (baseSeed ^ (i * 2654435761)) | 0;
@@ -253,6 +369,10 @@ function run(theme: ThemeKey, nGames: number, baseSeed: number) {
     perGameAttempts.push(outcome.attempts);
     perGameNewFinds.push(outcome.newFinds);
     perGameMaxLocalLoop.push(outcome.maxLocalLoop);
+    for (const [out, loop] of outcome.perOutputLoop) {
+      const prev = perOutputMaxLoop.get(out) ?? 0;
+      if (loop > prev) perOutputMaxLoop.set(out, loop);
+    }
     for (const id of found) {
       timesSeen.set(id, (timesSeen.get(id) ?? 0) + 1);
       if (!cumulative.has(id)) {
@@ -361,9 +481,115 @@ function run(theme: ThemeKey, nGames: number, baseSeed: number) {
     const bands = [...new Set(recipes.map((r) => r.band))].sort((a, b) => a - b);
     console.log(`  ${p.name.padEnd(20)} seen in ${String(p.seen).padStart(5)} games (${pct(p.seen, nGames)})  band ${bands.join(",")}`);
   }
+
+  // T-0280: per-recipe local-mining traps. The outputs with the longest
+  // observed same-output streaks are the places the dealer leaves
+  // players grinding before a new partner tile shows up. Band is added
+  // for context (deep bands can rightfully take longer).
+  const trapPairs = [...perOutputMaxLoop.entries()]
+    .map(([id, loop]) => {
+      const recipes = bundle.recipes.filter((r) => r.out === id);
+      const bands = [...new Set(recipes.map((r) => r.band))].sort((a, b) => a - b);
+      return {
+        id,
+        name: bundle.items.get(id)?.name ?? id,
+        loop,
+        bands: bands.join(","),
+      };
+    })
+    .sort((a, b) => b.loop - a.loop);
+  console.log(`\n20 worst local-mining traps (max same-output streak observed):`);
+  for (const t of trapPairs.slice(0, 20)) {
+    console.log(`  ${t.name.padEnd(20)} max streak=${String(t.loop).padStart(4)}  band ${t.bands}`);
+  }
+
+  return {
+    id: strategy.id,
+    attemptsPerNewFind: isNaN(attemptsPerNewFind) ? Infinity : attemptsPerNewFind,
+    loopP50,
+    loopP90,
+    loopP99,
+    loopMax,
+    finalCollection: cumulative.size,
+    totalOutputs,
+    gamesTo50: (() => {
+      const t = Math.ceil(totalOutputs * 0.5);
+      const idx = cumulativeOverTime.findIndex((v) => v >= t);
+      return idx < 0 ? null : idx + 1;
+    })(),
+    gamesTo90: (() => {
+      const t = Math.ceil(totalOutputs * 0.9);
+      const idx = cumulativeOverTime.findIndex((v) => v >= t);
+      return idx < 0 ? null : idx + 1;
+    })(),
+  };
+}
+
+function printComparison(reports: StrategyReport[]): void {
+  if (reports.length < 2) return;
+  console.log(`\n\n=========================`);
+  console.log(`A/B comparison (T-0279)`);
+  console.log(`=========================`);
+  const cols = [
+    { h: "strategy", w: 22, f: (r: StrategyReport) => r.id },
+    {
+      h: "att/find",
+      w: 10,
+      f: (r: StrategyReport) =>
+        Number.isFinite(r.attemptsPerNewFind) ? r.attemptsPerNewFind.toFixed(2) : "n/a",
+    },
+    { h: "loop p50", w: 10, f: (r: StrategyReport) => String(r.loopP50) },
+    { h: "loop p90", w: 10, f: (r: StrategyReport) => String(r.loopP90) },
+    { h: "loop p99", w: 10, f: (r: StrategyReport) => String(r.loopP99) },
+    { h: "loop max", w: 10, f: (r: StrategyReport) => String(r.loopMax) },
+    {
+      h: "final %",
+      w: 10,
+      f: (r: StrategyReport) =>
+        ((r.finalCollection / r.totalOutputs) * 100).toFixed(1) + "%",
+    },
+    {
+      h: "games→50",
+      w: 10,
+      f: (r: StrategyReport) => (r.gamesTo50 == null ? "—" : String(r.gamesTo50)),
+    },
+    {
+      h: "games→90",
+      w: 10,
+      f: (r: StrategyReport) => (r.gamesTo90 == null ? "—" : String(r.gamesTo90)),
+    },
+  ];
+  console.log(cols.map((c) => c.h.padEnd(c.w)).join(""));
+  console.log(cols.map((c) => "-".repeat(c.w - 1).padEnd(c.w)).join(""));
+  for (const r of reports) {
+    console.log(cols.map((c) => c.f(r).padEnd(c.w)).join(""));
+  }
+  console.log(
+    `\nLower att/find is better (fewer wasted combines per discovery); lower loop p90/p99 is better (less grind).`,
+  );
 }
 
 const theme = (process.argv[2] as ThemeKey) || "everything";
 const nGames = parseInt(process.argv[3] ?? "", 10) || 1000;
 const baseSeed = parseInt(process.argv[4] ?? "", 10) || 0xC0FFEE;
-run(theme, nGames, baseSeed);
+const strategyArg = (process.argv[5] ?? "baseline").toLowerCase();
+const requestedIds = strategyArg.split(",").map((s) => s.trim()).filter(Boolean);
+const toRun =
+  requestedIds.length === 1 && requestedIds[0] === "all"
+    ? strategies
+    : strategies.filter((s) => requestedIds.includes(s.id));
+if (toRun.length === 0) {
+  console.error(
+    `Unknown strategy "${strategyArg}". Available: ${strategies.map((s) => s.id).join(", ")}, or "all".`,
+  );
+  process.exit(1);
+}
+const kb = loadKnowledgeBase();
+const snap = buildSnapshot(toRows(kb));
+const bundle = buildThemeBundle(snap, theme);
+const reports: StrategyReport[] = [];
+for (const s of toRun) {
+  reports.push(run(theme, nGames, baseSeed, s, bundle));
+}
+setDealerWeightHook(null); // clean up module state on exit.
+printComparison(reports);

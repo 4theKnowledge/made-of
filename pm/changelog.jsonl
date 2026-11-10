@@ -146,3 +146,5 @@
 {"id": "C-0146", "ts": "2026-11-10T12:09:39Z", "kind": "fix", "summary": "combine: distinct dialog when a drop could match multiple ingredient sets (ENGINE_VERSION 5)", "refs": {"task": "T-0270"}}
 {"id": "C-0147", "ts": "2026-11-10T12:12:47Z", "kind": "feature", "summary": "combine/sim: attempts-per-discovery and local-loop metrics for dealer tuning", "refs": {"task": "T-0274"}}
 {"id": "C-0148", "ts": "2026-11-10T12:15:42Z", "kind": "fix", "summary": "admin/tree: debounce query + tighter cap + inline flat fallback to kill crash", "refs": {"task": "T-0273"}}
+{"id": "C-0149", "ts": "2026-11-10T12:24:02Z", "kind": "fix", "summary": "combine daily: rank/time show up on end-card after reload; backfill migration repairs historical daily progress rows (T-0268)", "refs": {"task": "T-0268"}}
+{"id": "C-0150", "ts": "2026-11-10T12:26:31Z", "kind": "feature", "summary": "combine/sim: pluggable dealer strategies + per-output trap tracking for A/B research", "refs": {"tasks": ["T-0279", "T-0280"]}}

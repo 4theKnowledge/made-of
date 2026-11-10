@@ -33,7 +33,7 @@ import {
   type Board,
   type MatchResult,
 } from "./match";
-import { dealTray } from "./deal";
+import { applyDealerWeightHook, dealTray } from "./deal";
 import { dailySeed, freshEndlessSeed, makeRng, pick, shuffle, type RngState } from "./rng";
 import { isClassic } from "./types";
 import type { CombineRecipe, Mode, ThemeBundle, ThemeKey } from "./types";
@@ -661,7 +661,7 @@ function finishResolve(
  *  the manifest / partner-bias plumbing (T-0245) so every `dealTray`
  *  caller gets the same shape without reconstructing the object. */
 function dealerViewFromState(state: GameState, bundle: ThemeBundle) {
-  return {
+  return applyDealerWeightHook({
     bundle,
     board: state.board,
     tray: state.tray,
@@ -673,7 +673,7 @@ function dealerViewFromState(state: GameState, bundle: ThemeBundle) {
     manifest: state.manifest,
     manifestFound: state.manifestFound,
     manifestPartnerBias: state.manifestPartnerBias,
-  };
+  });
 }
 
 function afterMove(

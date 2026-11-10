@@ -72,6 +72,28 @@ export interface DealerView {
    *  falls back to the normal flow — so a tutorial that outlives the script
    *  degrades into a regular run instead of hanging. */
   scripted?: string[];
+  /** T-0279 / T-0280 simulator hook. When set, `pickWeighted` multiplies
+   *  each candidate's baseline weight by `weightOverride(view, x)` before
+   *  the random draw. Production never sets this — the research sim uses
+   *  it to A/B test alternative dealer weightings without forking the
+   *  reducer. Must be deterministic given `view` + `x`. */
+  weightOverride?: (view: DealerView, tile: string) => number;
+}
+
+/** T-0279 / T-0280 research hook. The engine composes `DealerView` on
+ *  every deal from internal state (see `dealerViewFromState`); the sim
+ *  can set this callback to attach a `weightOverride` without plumbing a
+ *  field through `GameState`. Production never calls `setDealerWeightHook`.
+ *  Null clears the override. */
+let dealerWeightHook: ((view: DealerView) => DealerView["weightOverride"]) | null = null;
+export function setDealerWeightHook(
+  h: ((view: DealerView) => DealerView["weightOverride"]) | null,
+): void {
+  dealerWeightHook = h;
+}
+export function applyDealerWeightHook(view: DealerView): DealerView {
+  if (dealerWeightHook) view.weightOverride = dealerWeightHook(view);
+  return view;
 }
 
 /** Count how many of each reachable non-tool tile are on the board. */
@@ -134,9 +156,11 @@ function pickWeighted(view: DealerView, arr: readonly string[]): string | undefi
     }
     partners = view._manifestPartnerSet;
   }
+  const override = view.weightOverride;
   const weightFor = (x: string): number => {
     let w = found.has(x) ? DISCOVERED_WEIGHT : 1;
     if (partners && partners.has(x)) w *= 1 + bias;
+    if (override) w *= override(view, x);
     return w;
   };
   let total = 0;
