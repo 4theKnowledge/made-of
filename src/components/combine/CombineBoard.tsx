@@ -78,6 +78,7 @@ import {
 } from "@/components/combine/board-parts/types";
 import { vibrate } from "@/components/combine/board-parts/util";
 import { ManifestGrid } from "@/components/combine/board-parts/ManifestGrid";
+import { NextDailyCountdown } from "@/components/combine/board-parts/NextDailyCountdown";
 import {
   GlyphAges,
   GlyphCombine,
@@ -2651,6 +2652,8 @@ export function CombineBoard({
                 <span className="sub">Tap Start when you&apos;re ready.</span>
               </>
             )}
+            <NextDailyCountdown />
+
             <ButtonGroup>
               <button
                 type="button"

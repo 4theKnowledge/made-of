@@ -8,6 +8,7 @@ import { fillVar } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 import { ButtonGroup } from "@/components/common/ButtonGroup";
 import { ManifestGrid } from "@/components/combine/board-parts/ManifestGrid";
+import { NextDailyCountdown } from "@/components/combine/board-parts/NextDailyCountdown";
 
 /** T-0217 Slice 1b: the newest completion row for the active theme, or
  *  null if the player has never completed it (or isn't signed in). */
@@ -350,6 +351,11 @@ export function GameOverCard({
           {themeDiscovered} of {totalOutputs} things discovered in{" "}
           {bundle.theme.name} so far.
         </p>
+        {isDailyTargetRun && (
+          <p className="sub">
+            <NextDailyCountdown />
+          </p>
+        )}
         <ButtonGroup>
           <button type="button" className="cbh" onClick={onShare}>
             Share
