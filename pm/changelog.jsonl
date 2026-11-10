@@ -174,3 +174,4 @@
 {"id": "C-0174", "ts": "2026-11-10T21:56:35Z", "kind": "fix", "summary": "Game-over card: \"finished things\" → \"things made\" (sum of all combines this run, not tray count)", "refs": {"task": "T-0303"}}
 {"id": "C-0175", "ts": "2026-11-10T22:02:13Z", "kind": "fix", "summary": "Account stats: Combine runs were being filtered out by a stale `age` type guard after the age→chapter rename — bests/totals now count all finished runs again", "refs": {"task": "T-0304"}}
 {"id": "C-0176", "ts": "2026-11-10T22:07:30Z", "kind": "feature", "summary": "Playwright MCP wired into Claude Code (user scope, headless Chromium)", "refs": {"task": "T-0305"}}
+{"id": "C-0177", "ts": "2026-11-10T22:14:39Z", "kind": "feature", "summary": "Key-gated dev login endpoint for parallel agent auth (/api/dev/login)", "refs": {"task": "T-0307"}}

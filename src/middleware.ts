@@ -24,6 +24,7 @@ const STEALTH_PUBLIC_PREFIXES = [
   "/api/sign-in",
   "/api/auth",
   "/api/dev/sign-in",
+  "/api/dev/login",
   "/api/health",
   "/terms",
   "/privacy",
