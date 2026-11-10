@@ -1421,21 +1421,52 @@ export function CombineBoard({
   // `run` itself isn't — depend on the method directly to avoid
   // re-registering every render.
   const setOnReconcile = run.setOnReconcile;
+  // Kept-fresh state mirror so the reconcile handler (registered once)
+  // can read the current GameState at the moment reconcile fires,
+  // specifically for the engine-version → finalizeLegacy path.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const finalizeLegacy = run.finalizeLegacy;
+  const runStart = run.start;
+  const [legacyFinalizeNotice, setLegacyFinalizeNotice] = useState(false);
   useEffect(() => {
     const onReconcile = (event: ReconcileEvent) => {
+      // Engine-version is special: the run stopped under a reducer we
+      // don't ship anymore. We can't replay it, but we can bank the
+      // player's current local score via /finalize-legacy before we
+      // drop the run. See T-0313 for the UX decision.
+      if (event.reason === "engine-version" && event.runId) {
+        const runId = event.runId;
+        const snapshot = stateRef.current;
+        void finalizeLegacy(runId, snapshot).then((ok) => {
+          if (ok) setLegacyFinalizeNotice(true);
+        });
+      }
       if (event.state) {
         setState(event.state);
         resetTransient();
       }
-      // For run-ended / run-invalidated the hook already dropped its
-      // context; the slot-alignment effect will call run.start() again
-      // the next time state settles, which is enough to resync.
+      // For run-ended / run-invalidated / engine-version the hook
+      // dropped its context. Clearing the slot ref alone isn't enough
+      // because the slot-alignment effect only re-fires when state deps
+      // change — kick a fresh /start explicitly so the server mints a
+      // v{CURRENT} row under the player before the next action.
+      if (event.reason === "run-ended" || event.reason === "engine-version") {
+        serverSlotRef.current = "";
+        const cur = stateRef.current;
+        if (
+          !cur.over &&
+          (cur.mode === "endless" || cur.mode === "fast" || cur.mode === "daily")
+        ) {
+          void runStart({ mode: cur.mode, theme: cur.theme, dailyKey: cur.daily });
+        }
+      }
     };
     setOnReconcile(onReconcile);
     return () => {
       setOnReconcile(null);
     };
-  }, [setOnReconcile, resetTransient]);
+  }, [setOnReconcile, resetTransient, finalizeLegacy, runStart]);
 
   // Starter pool for endless `newGame` calls (T-0302). The engine's seed
   // tiles default to `bundle.base`; for Everything that's a small set of
@@ -3071,6 +3102,26 @@ export function CombineBoard({
         />
         {onboardOpen && (
           <OnboardingDemo onDismiss={() => setOnboardOpen(false)} />
+        )}
+        {legacyFinalizeNotice && (
+          <div className="cbtut-nudge" role="status">
+            <div className="cbtut-nudge-inner">
+              <span className="cbtut-nudge-body">
+                Your run was banked — the game got an update. Starting a fresh
+                run on the new rules.
+              </span>
+              <div className="cbtut-nudge-actions">
+                <button
+                  type="button"
+                  className="cbh"
+                  onClick={() => setLegacyFinalizeNotice(false)}
+                  aria-label="Dismiss update notice"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
         )}
         {tutorialNudgeOpen && !tutorialStep && (
           <div className="cbtut-nudge" role="status">

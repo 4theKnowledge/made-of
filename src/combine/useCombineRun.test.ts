@@ -23,6 +23,7 @@ describe("parseReconcile", () => {
     });
     expect(event).toEqual({
       reason: "event-count",
+      runId: null,
       state: FAKE_STATE,
       eventCount: 7,
       epoch: 1,

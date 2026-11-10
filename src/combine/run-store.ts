@@ -50,7 +50,10 @@ export async function createRun(args: CreateRunArgs): Promise<CombineRun> {
   return row;
 }
 
-/** Fetch the active run for (owner, mode, dailyKey) if one exists. */
+/** Fetch the active run for (owner, mode, dailyKey) if one exists.
+ *  Stale-engine rows are auto-invalidated and treated as absent so the
+ *  caller mints a fresh row on the current ENGINE_VERSION instead of
+ *  returning a run whose every checkpoint/finish would 409. */
 export async function getActiveRun(
   owner: RunOwnerKey,
   mode: ServerMode,
@@ -70,7 +73,12 @@ export async function getActiveRun(
       ),
     )
     .limit(1);
-  return row ?? null;
+  if (!row) return null;
+  if (row.engineVersion !== ENGINE_VERSION) {
+    await invalidateRun(row.id);
+    return null;
+  }
+  return row;
 }
 
 /** Fetch a specific run by id, scoped to an owner so one player can't
@@ -98,7 +106,7 @@ export async function getRunForOwner(
  *  to let the client pick which to resume on mount. */
 export async function listActiveRuns(owner: RunOwnerKey): Promise<CombineRun[]> {
   const db = getDb();
-  return db
+  const rows = await db
     .select()
     .from(schema.combineRuns)
     .where(
@@ -109,6 +117,15 @@ export async function listActiveRuns(owner: RunOwnerKey): Promise<CombineRun[]> 
       ),
     )
     .orderBy(desc(schema.combineRuns.updatedAt));
+  // Drop stale-engine rows from the resumable set, invalidating them
+  // so the next /runs/start mints a fresh row on the current engine
+  // version. Without this the client would hydrate from an unplayable
+  // run and every checkpoint/finish would 409.
+  const stale = rows.filter((r) => r.engineVersion !== ENGINE_VERSION);
+  if (stale.length > 0) {
+    await Promise.all(stale.map((r) => invalidateRun(r.id)));
+  }
+  return rows.filter((r) => r.engineVersion === ENGINE_VERSION);
 }
 
 /** Overwrite a run's state + event count. Used after a successful

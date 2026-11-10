@@ -58,7 +58,7 @@ Comments are load-bearing, not optional. A status flip + one-line changelog does
 - **No child data.** No child profiles in Phase 1. Never enable session replay or set person properties on any future child profile.
 - **Analytics go through the typed `track()` helper.** Identify users by their Better Auth user id only, never email or name.
 - **Crawlers:** allow search engines and AI search or citation crawlers on item pages; block AI training crawlers; block `/api/` and `/admin/` for all.
-- **Bump `ENGINE_VERSION` on any scoring-affecting Combine reducer change.** The constant lives in `src/combine/engine.ts`; server runs are stamped with it and replay rejects mismatches. Pure refactors that leave reducer output byte-identical don't need a bump — anything that changes scoring, dealer bias, recipe resolution, or state transitions does. Forgetting this lets a deploy silently re-score in-flight runs.
+- **Bump `ENGINE_VERSION` on any scoring-affecting Combine reducer change.** The constant lives in `src/combine/engine.ts`; server runs are stamped with it and replay rejects mismatches. Pure refactors that leave reducer output byte-identical don't need a bump — anything that changes scoring, dealer bias, recipe resolution, or state transitions does. Forgetting this lets a deploy silently re-score in-flight runs. Stale-engine `combine_runs` rows are auto-invalidated on read (`getActiveRun` / `listActiveRuns`), so a new run always starts clean; a mid-run bump is an abort — the player's current run can't continue under the new reducer. See T-0313 for the planned auto-finalize UX.
 
 ## Content model
 

@@ -84,6 +84,11 @@ export type ReconcileReason =
 
 export interface ReconcileEvent {
   reason: ReconcileReason;
+  /** The run id the hook was tracking when the 409 fired. The hook
+   *  drops its context synchronously, so a caller that wants to talk
+   *  back to the server about this run (e.g. finalizeLegacy on an
+   *  engine-version mismatch) needs this out-of-band. */
+  runId: string | null;
   /** The server's authoritative state at the moment of the 409.
    *  Null only when the run is no longer active (ended / invalidated)
    *  and the server didn't ship a state body — caller should trigger
@@ -123,6 +128,7 @@ export function parseReconcile(body: {
   const serverEpoch = typeof body.epoch === "number" ? body.epoch : null;
   return {
     reason,
+    runId: null,
     state: serverState,
     eventCount: serverEventCount,
     epoch: serverEpoch,
@@ -190,6 +196,18 @@ export interface UseCombineRunApi {
    *  `ready`), but the reconcile closure depends on state declared
    *  further down the component. Pass `null` to clear. */
   setOnReconcile: (fn: ((event: ReconcileEvent) => void) | null) => void;
+  /** Finalize a stale-engine run using a client-supplied GameState.
+   *  Used by the reconcile path when the server returns 409
+   *  engineVersionMismatch — we can't replay the stale run, but we
+   *  can still bank its score. The server stamps the row with the
+   *  stored (old) engine version. Returns true on success. Clears
+   *  the run context on success so the caller can start fresh.
+   *  See T-0313. */
+  finalizeLegacy: (
+    runId: string,
+    state: GameState,
+    extras?: Record<string, unknown>,
+  ) => Promise<boolean>;
 }
 
 /** Owns a single server run across its lifetime. */
@@ -349,11 +367,15 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
         // `parseReconcile` for the wire-shape mapping.
         if (res.status === 409) {
           const event = parseReconcile(res);
+          event.runId = ctx.runId;
           // For ended/invalidated runs, drop the context so the caller
-          // can `start()` a fresh one. For the drift/version cases the
-          // run id is still valid — just rewind our event count to the
-          // server's truth and let the caller swap state.
-          if (event.reason === "run-ended") {
+          // can `start()` a fresh one. Engine-version mismatches are
+          // unrecoverable on the existing run id — the server will 409
+          // every subsequent write — so treat them the same way: drop
+          // the context and let the caller mint a new run. The
+          // event-count-drift case keeps the run id and just rewinds
+          // our local count to the server's truth.
+          if (event.reason === "run-ended" || event.reason === "engine-version") {
             setContext(null);
           } else if (event.eventCount !== null) {
             setContext((cur) =>
@@ -427,13 +449,35 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
         const base = contextRef.current?.eventCount ?? ctx.eventCount;
         const res = await postJSON<
           | { state: GameState; eventCount: number; ended: boolean }
-          | { __error: true }
+          | {
+              __error: true;
+              status: number;
+              engineVersionMismatch?: boolean;
+              serverEventCount?: number;
+              state?: GameState;
+              epoch?: number;
+              error?: string;
+            }
         >(`/api/combine/runs/${ctx.runId}/finish`, {
           baseEventCount: base,
           actions: pending,
           ...extras,
         });
-        if (!res || "__error" in res) return null;
+        if (!res) return null;
+        if ("__error" in res) {
+          // 409 from /finish is the mid-run engine bump case (or a
+          // concurrent end). Mirror the checkpoint reconcile path so
+          // the caller can decide whether to finalize-legacy. Drop the
+          // context on 409 since no further writes against this run id
+          // will succeed.
+          if (res.status === 409) {
+            const event = parseReconcile(res);
+            event.runId = ctx.runId;
+            setContext(null);
+            onReconcileRef.current?.(event);
+          }
+          return null;
+        }
         // Clear the context — a finished run isn't ours to checkpoint anymore.
         setContext(null);
         return res.state;
@@ -484,6 +528,30 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
     [],
   );
 
+  const finalizeLegacy = useCallback(
+    async (
+      runId: string,
+      state: GameState,
+      extras: Record<string, unknown> = {},
+    ): Promise<boolean> => {
+      // Caller passes the runId explicitly because the hook has
+      // usually already dropped its context by the time reconcile
+      // fires — contextRef.current is null here.
+      const res = await postJSON<
+        | { finalized: true; progressWritten: boolean; engineVersion: number }
+        | { __error: true }
+      >(`/api/combine/runs/${runId}/finalize-legacy`, {
+        state,
+        ...extras,
+      });
+      // Nothing to clean up on the hook — the context is already null
+      // by the time this runs. Return true on any 2xx; the server owns
+      // idempotency on the row itself.
+      return !!res && !("__error" in res);
+    },
+    [],
+  );
+
   return {
     ready,
     context,
@@ -495,6 +563,7 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
     flush,
     finish,
     setOnReconcile,
+    finalizeLegacy,
   };
 }
 
