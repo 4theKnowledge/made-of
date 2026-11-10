@@ -80,6 +80,7 @@ export function CollectionBook({
   // record() call, but merging keeps the UI robust). Fast mode is
   // score-only — its finds never persist — so skip the merge there and
   // show only the true lifetime collection (read-only during a fast run).
+  const foundThisRun = useMemo(() => new Set(state.found), [state.found]);
   const findsForTheme = useMemo(() => {
     const now = Date.now();
     const merged = new Map<string, number>();
@@ -368,16 +369,21 @@ export function CollectionBook({
                   !!m && m.available > 1 && m.made < m.available;
                 const madeCount = state.madeCounts[id] ?? 0;
                 const madeThisRun = madeCount > 0;
+                const foundThisRound = foundThisRun.has(id);
                 return (
                   <button
                     key={id}
                     type="button"
                     className={`cbbookrow${isNew ? " unlock" : ""}${
                       isMastered ? " mastered" : ""
-                    }${madeThisRun ? " made" : ""}`}
+                    }${madeThisRun ? " made" : ""}${
+                      foundThisRound ? " this-round" : ""
+                    }`}
                     aria-label={`${cap(it.name)}${
                       isNew ? ", new in your collection" : ""
-                    }${isMastered ? ", mastered" : ""}${
+                    }${foundThisRound ? ", found this round" : ""}${
+                      isMastered ? ", mastered" : ""
+                    }${
                       showProgress
                         ? `, ${m!.made} of ${m!.available} recipes`
                         : ""
@@ -408,6 +414,14 @@ export function CollectionBook({
                       <span className="cbbookrow-text">
                         <b>
                           {cap(it.name)}
+                          {foundThisRound && (
+                            <span
+                              className="cbbookrow-this-round"
+                              aria-hidden="true"
+                            >
+                              new
+                            </span>
+                          )}
                           {isMastered && (
                             <span
                               className="cbbookrow-mastery"
@@ -515,10 +529,12 @@ export function CollectionBook({
                       !!m && m.available > 1 && m.made < m.available;
                     const madeCount = state.madeCounts[id] ?? 0;
                     const madeThisRun = madeCount > 0;
+                    const foundThisRound = foundThisRun.has(id);
                     const tileClasses: string[] = [];
                     if (isNew) tileClasses.push("unlock");
                     if (isMastered) tileClasses.push("mastered");
                     if (madeThisRun) tileClasses.push("made");
+                    if (foundThisRound) tileClasses.push("this-round");
                     return (
                       <CombineTile
                         key={id}
@@ -535,7 +551,9 @@ export function CollectionBook({
                         title={cap(it.name)}
                         aria-label={`${cap(it.name)}${
                           isNew ? ", new in your collection" : ""
-                        }${isMastered ? ", mastered" : ""}${
+                        }${foundThisRound ? ", found this round" : ""}${
+                          isMastered ? ", mastered" : ""
+                        }${
                           showProgress
                             ? `, ${m!.made} of ${m!.available} recipes`
                             : ""
@@ -550,6 +568,9 @@ export function CollectionBook({
                           <span className="cbunlock-star" aria-hidden="true">
                             ★
                           </span>
+                        )}
+                        {foundThisRound && !isNew && (
+                          <span className="cbthisround-dot" aria-hidden="true" />
                         )}
                         {isMastered && (
                           <span className="cbmastery-badge" aria-hidden="true">
