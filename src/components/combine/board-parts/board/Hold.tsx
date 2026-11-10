@@ -7,6 +7,7 @@ import {
   HelpersButton,
   type HelperKey,
 } from "@/components/combine/board-parts/board/HelpersButton";
+import { MoreButton } from "@/components/combine/board-parts/board/MoreButton";
 
 export function Hold({
   state,
@@ -25,6 +26,19 @@ export function Hold({
   pluckMode,
   onToggleHelpers,
   onHelper,
+  moreOpen,
+  soundOn,
+  signedIn,
+  isAdmin,
+  canEndRun,
+  onToggleMore,
+  onBook,
+  onSound,
+  onDebug,
+  onHelp,
+  onIntro,
+  onFeedback,
+  onEndRun,
 }: {
   state: GameState;
   bundle: ThemeBundle;
@@ -55,6 +69,19 @@ export function Hold({
   pluckMode: boolean;
   onToggleHelpers: () => void;
   onHelper: (which: HelperKey) => void;
+  moreOpen: boolean;
+  soundOn: boolean;
+  signedIn: boolean;
+  isAdmin: boolean;
+  canEndRun?: boolean;
+  onToggleMore: () => void;
+  onBook: () => void;
+  onSound: () => void;
+  onDebug?: () => void;
+  onHelp: () => void;
+  onIntro: () => void;
+  onFeedback: () => void;
+  onEndRun?: () => void;
 }) {
   const empty = state.hold.every((v) => v == null);
   const heldCount = state.hold.reduce((n, v) => n + (v == null ? 0 : 1), 0);
@@ -153,6 +180,21 @@ export function Hold({
         pluckMode={pluckMode}
         onToggleHelpers={onToggleHelpers}
         onHelper={onHelper}
+      />
+      <MoreButton
+        moreOpen={moreOpen}
+        soundOn={soundOn}
+        signedIn={signedIn}
+        isAdmin={isAdmin}
+        canEndRun={canEndRun}
+        onToggleMore={onToggleMore}
+        onBook={onBook}
+        onSound={onSound}
+        onDebug={onDebug}
+        onHelp={onHelp}
+        onIntro={onIntro}
+        onFeedback={onFeedback}
+        onEndRun={onEndRun}
       />
     </div>
   );
