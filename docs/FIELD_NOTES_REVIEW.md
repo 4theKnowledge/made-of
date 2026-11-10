@@ -39,7 +39,6 @@ The thinking here evolves significantly across the notes. Earlier entries treat 
 
 ### 2a. Dealer & difficulty (biggest open design question)
 
-- **`research` · P1 · M** — **Bands aren't ages — they're discovery difficulty** (likelihood of finding). Reframe UI/copy accordingly.
 - **`research` · P1 · M** — **Cumulative attempts as a difficulty metric.** Use in sim / dealer tuning.
 - **`bug` · P1 · S** — Sun is being dealt and doesn't leave.
 
