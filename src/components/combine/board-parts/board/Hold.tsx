@@ -100,7 +100,7 @@ export function Hold({
       className={classes.join(" ")}
       data-cbholdzone="1"
       data-tour="hold"
-      aria-label="Hold — drag or tap a tile here to save for later. Held tiles crumble when the age moves past them."
+      aria-label="Hold — drag or tap a tile here to save for later. Held tiles crumble when the chapter moves past them."
       onClick={(e) => {
         if (selected?.source !== "tray") return;
         if ((e.target as HTMLElement).closest(".cbheld")) return;

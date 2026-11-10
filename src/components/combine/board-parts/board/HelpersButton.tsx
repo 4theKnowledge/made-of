@@ -198,8 +198,8 @@ export function HelpersButton({
           disabled={!wipeUnlocked}
           aria-label={
             wipeUnlocked
-              ? "Wipe the board, costs one age"
-              : `Wipe unlocks at age ${WIPE_UNLOCK_CHAPTER + 1}`
+              ? "Wipe the board, costs one chapter"
+              : `Wipe unlocks at chapter ${WIPE_UNLOCK_CHAPTER + 1}`
           }
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -209,8 +209,8 @@ export function HelpersButton({
             <b className="t">Wipe</b>
             <em>
               {wipeUnlocked
-                ? "Clear the board and hold. Costs one age."
-                : `Unlocks at age ${WIPE_UNLOCK_CHAPTER + 1}.`}
+                ? "Clear the board and hold. Costs one chapter."
+                : `Unlocks at chapter ${WIPE_UNLOCK_CHAPTER + 1}.`}
             </em>
           </span>
         </button>

@@ -779,10 +779,10 @@ export function DailyAdmin({
               Guest ingredient of the day (optional)
             </legend>
             <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
-              Each day, inject a deterministic set of above-cap recipes into the dealer.
+              Each day, inject a deterministic set of harder-to-reach recipes into the dealer.
               Everyone sees the same guests; a rotation memory in the scheduler keeps a
               given item out for ~one full cycle before it can repeat. This is what lets
-              players discover rare items that normally live past the daily&apos;s age cap.
+              players discover rare items from difficulty bands past the daily&apos;s cap.
               Leave Per run at 0 to disable.
             </div>
             <div className="cb-daily-guest-grid">
@@ -810,12 +810,13 @@ export function DailyAdmin({
                 />
               </Field>
               <Field
-                label="Min band"
+                label="Min difficulty band"
                 hint={
                   <>
-                    Guests must live in this band or higher (1 = earliest, 14 = latest on
-                    Everything today). The game auto-raises this to at least &ldquo;cap + 1&rdquo;
-                    so guests never overlap the normal daily progression.
+                    Guests must live in this difficulty band or higher (1 = easiest to
+                    discover, 14 = hardest on Everything today). The game auto-raises this
+                    to at least &ldquo;cap + 1&rdquo; so guests never overlap the normal
+                    daily progression.
                     <br />
                     <strong>Just above the cap</strong> = adjacent rare items players nearly
                     reached. <strong>Much higher</strong> = exotic late-game drops.{" "}
@@ -870,8 +871,8 @@ export function DailyAdmin({
             <strong style={{ color: "var(--warn, #a66400)" }}>Unresolved guests</strong>
             <div style={{ color: "var(--muted)", marginTop: 4 }}>
               These guest outputs had no recipe path through the capped bundle. They
-              stay scheduled but won&apos;t surface in the game. Raise Max ages or
-              lower Guest min band to fix.
+              stay scheduled but won&apos;t surface in the game. Raise the difficulty cap
+              or lower Guest min difficulty band to fix.
             </div>
             <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
               {unresolved.map((id) => (

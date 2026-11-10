@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
               letterSpacing: "-0.015em",
             }}
           >
-            Reached the {ageName} age
+            Reached Chapter {ageName}
           </div>
         ) : null}
 
