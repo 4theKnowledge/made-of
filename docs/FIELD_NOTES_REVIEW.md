@@ -53,7 +53,6 @@ The thinking here evolves significantly across the notes. Earlier entries treat 
 
 - **`bug` · P1 · S** — Hold tray: can't click to select like the normal tray.
 - **`fix` · P2 · S** — Toasts still show `+` inside badges.
-- **`feature` · P2 · S** — Show **top 3 most-used tiles** at end-of-game for all modes.
 - **`feature` · P2 · S** — In collection UI, mark items as "found this round" for new finds.
 
 ---

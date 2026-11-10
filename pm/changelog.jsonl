@@ -152,3 +152,4 @@
 {"id": "C-0152", "ts": "2026-11-10T12:32:52Z", "kind": "feature", "summary": "Combine: reframed leftover \"age\" copy to \"chapter\" and admin \"Min band\" to \"Min difficulty band\"; docs now describe bands as discovery-difficulty tiers.", "refs": {"task": "T-0282", "commits": "32b0543, 00b2652"}}
 {"id": "C-0153", "ts": "2026-11-10T12:33:22Z", "kind": "fix", "summary": "combine: held tiles show selection feedback on tap (parity with tray)", "refs": {"task": "T-0283"}}
 {"id": "C-0154", "ts": "2026-11-10T12:36:56Z", "kind": "feature", "summary": "combine: mark \"found this round\" new finds in collection UI", "refs": {"task": "T-0284"}}
+{"id": "C-0155", "ts": "2026-11-10T12:38:40Z", "kind": "feature", "summary": "Combine game-end card now shows a top-3 \"Most made\" row (all modes).", "refs": {"task": "T-0285", "commit": "a171802"}}
