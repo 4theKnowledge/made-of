@@ -8,8 +8,8 @@ import { Breadcrumb } from "../../../Breadcrumb";
 import { collectRecipeParts, isPlayableRecipe, type RecipePartType } from "@/combine/parts";
 import type { Tier, ItemKind } from "@/db/schema";
 import type { ClosureConfig } from "@/combine/closure";
-import { ThemeBuilder, type BuilderItem } from "./ThemeBuilder";
-import { ThemeSettings } from "./ThemeSettings";
+import type { BuilderItem } from "./ThemeBuilder";
+import { ThemePage } from "./ThemePage";
 
 export const dynamic = "force-dynamic";
 
@@ -168,16 +168,11 @@ export default async function AdminCombineThemeDetailPage({
         {theme.description && <p>{theme.description}</p>}
       </section>
 
-      <ThemeSettings
-        themeCode={theme.code}
-        initialIsPublished={theme.isPublished}
-        initialPictogram={theme.pictogram ?? null}
-        memberCount={memberIds.length}
-      />
-
-      <ThemeBuilder
+      <ThemePage
         themeCode={theme.code}
         themeLabel={theme.label}
+        initialIsPublished={theme.isPublished}
+        initialPictogram={theme.pictogram ?? null}
         initialMemberIds={memberIds}
         initialMemberSources={initialMemberSources}
         initialClosureConfig={(theme.closureConfig ?? null) as ClosureConfig | null}

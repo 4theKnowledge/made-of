@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Tier, ItemKind } from "@/db/schema";
 import { computeClosure, isClosureEnabled, type ClosureConfig } from "@/combine/closure";
 import type { RecipePartType } from "@/combine/parts";
@@ -40,6 +40,9 @@ export interface BuilderProps {
   availableTiers: Tier[];
   availableKinds: ItemKind[];
   availableTags: string[];
+  /** Fires whenever the live member count changes, so sibling UI (e.g. the
+   *  publish gate in ThemeSettings) can react without a page reload. */
+  onMembersChange?: (count: number) => void;
 }
 
 interface Toast {
@@ -86,6 +89,10 @@ export function ThemeBuilder(props: BuilderProps) {
   }, [items]);
 
   const [members, setMembers] = useState<Set<string>>(() => new Set(props.initialMemberIds));
+  const { onMembersChange } = props;
+  useEffect(() => {
+    onMembersChange?.(members.size);
+  }, [members, onMembersChange]);
   const [memberSources, setMemberSources] = useState<Map<string, MemberSource>>(() => {
     const m = new Map<string, MemberSource>();
     for (const id of props.initialMemberIds) {
