@@ -141,3 +141,5 @@
 {"id": "C-0141", "ts": "2026-11-10T11:57:52Z", "kind": "fix", "summary": "admin/themes: delete works with a force-cascade path (members + completion stamps)", "refs": {"task": "T-0272"}}
 {"id": "C-0142", "ts": "2026-11-10T11:59:42Z", "kind": "fix", "summary": "admin/themes: scope membership discovery-impact guard to items actually in this theme", "refs": {"task": "T-0271"}}
 {"id": "C-0143", "ts": "2026-11-10T12:01:19Z", "kind": "fix", "summary": "combine/daily: show rank on any daily submit, not just full wins", "refs": {"task": "T-0269"}}
+{"id": "C-0144", "ts": "2026-11-10T12:07:10Z", "kind": "feature", "summary": "Daily: live next-daily countdown in Ready + Game-End; docked in-run finds strip above shelf.", "refs": {"task": "T-0275", "commits": "c2c4730, e4b3cd1"}}
+{"id": "C-0145", "ts": "2026-11-10T12:07:11Z", "kind": "decision", "summary": "Daily manifest spec: hop-bounded tile-world is a complementary tile-pool constraint (opt-in follow-up), not a replacement for partner-bias dealer.", "refs": {"task": "T-0276", "commit": "aa0fd5c", "doc": "docs/COMBINE_DAILY_MANIFEST.md#appendix-a"}}
