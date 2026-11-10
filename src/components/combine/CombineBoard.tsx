@@ -3030,8 +3030,17 @@ export function CombineBoard({
               title: "Old things crumble away",
               body: "When nothing in the current chapter needs a tile, a red counter ticks down from 3. On the 4th turn it falls off the board — combine it, move it on, or shore it up before it goes.",
             },
+            {
+              glyph: (
+                <span className="ml">
+                  <b />
+                  <i />
+                </span>
+              ),
+              title: "Stuck? Use a Helper",
+              body: "Tap the Helpers button mid-run for a hint, a swap, a clear, a move or a shore.",
+            },
           ]}
-          footnote="Need a nudge mid-run? Use the Helpers button for a hint, a swap, a clear, a move or a shore."
         />
         {onboardOpen && (
           <OnboardingDemo onDismiss={() => setOnboardOpen(false)} />

@@ -1997,8 +1997,28 @@ a.btn.primary{color:var(--bg)}
 .howto-x:hover{background:var(--soft)}
 .howto-x svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .howto-ttl{margin:0;font-family:var(--display);font-weight:800;font-size:22px;line-height:1.15;letter-spacing:-.02em;text-wrap:balance}
-.howto-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
-.howto-step{display:flex;gap:16px;align-items:center;font-size:14px;line-height:1.4}
+.howto-car{position:relative;touch-action:pan-y;user-select:none}
+.howto-slide{display:flex;flex-direction:column;align-items:center;gap:14px;padding:12px 4px 4px;font-size:14px;line-height:1.45;text-align:center;min-height:200px;animation:howtoSlideIn .22s ease-out}
+.howto-slide .howto-text{display:flex;flex-direction:column;gap:6px;align-items:center}
+.howto-slide .howto-text b{font-family:var(--display);font-weight:800;font-size:17px;letter-spacing:-.01em}
+.howto-slide .howto-text p{margin:0;color:var(--muted);max-width:36ch;text-wrap:balance}
+.howto-slide .howto-glyph{width:112px;height:112px;padding:14px}
+.howto-live{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+@keyframes howtoSlideIn{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+@media (prefers-reduced-motion:reduce){
+  .howto-slide{animation:howtoFade .18s ease-out}
+  @keyframes howtoFade{from{opacity:0}to{opacity:1}}
+}
+.howto-nav{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.howto-arr{width:36px;height:36px;padding:0;border:1.5px solid var(--ink);background:var(--surface);border-radius:3px;cursor:pointer;display:grid;place-items:center;color:var(--ink);flex:none}
+.howto-arr:hover:not(:disabled){box-shadow:2px 2px 0 var(--ink);transform:translate(-1px,-1px)}
+.howto-arr:disabled{opacity:.35;cursor:not-allowed}
+.howto-arr svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.howto-dots{display:flex;align-items:center;gap:8px}
+.howto-dot{width:9px;height:9px;padding:0;border:1.5px solid var(--ink);background:var(--surface);border-radius:50%;cursor:pointer;transition:background .15s,transform .15s}
+.howto-dot:hover{transform:scale(1.15)}
+.howto-dot.on{background:var(--ink)}
+.howto-count{align-self:center;margin-top:-4px}
 .howto-glyph{flex:none;width:84px;height:84px;padding:10px;box-sizing:border-box;position:relative;display:grid;place-items:center;border:1.5px solid var(--ink);border-radius:4px;background:var(--bg);color:var(--ink);box-shadow:3px 3px 0 var(--ink);overflow:hidden}
 .howto-glyph .sq{width:14px;height:14px;border-radius:2px;border:1.5px solid var(--ink);display:block}
 .howto-glyph .sq.g{background:var(--good)}
