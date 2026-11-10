@@ -43,7 +43,6 @@ The thinking here evolves significantly across the notes. Earlier entries treat 
 
 ### 2a. Dealer & difficulty (biggest open design question)
 
-- **`research` · P0 · XL** — **Does the endless dealer push toward undiscovered items?** Current suspicion: it over-guarantees and users get stuck in local mining loops (seen in sims). Proposal: down-weight in-game finds by their *recipe-tree creatability probability*, propagated through their recipes, so expected-new-chain probability is maximised. Everything starts at a nominal probability. **Needs a simulator.**
 - **`research` · P1 · M** — **Bands aren't ages — they're discovery difficulty** (likelihood of finding). Reframe UI/copy accordingly.
 - **`research` · P1 · M** — **Cumulative attempts as a difficulty metric.** Use in sim / dealer tuning.
 - **`bug` · P1 · S** — Sun is being dealt and doesn't leave.

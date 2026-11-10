@@ -72,17 +72,37 @@ function firstEmpty(state: GameState): number {
   return -1;
 }
 
+/** T-0274. Per-session outcome returned by `playOne`. `attempts` is the
+ *  number of successful combines, used to compute attempts-per-discovery
+ *  as a difficulty metric. `maxLocalLoop` is the longest run of
+ *  same-output combines without a new discovery — a "stuck mining" proxy. */
+interface GameOutcome {
+  found: Set<string>;
+  attempts: number;
+  newFinds: number;
+  maxLocalLoop: number;
+}
+
 function playOne(
   theme: ThemeKey,
   bundle: ThemeBundle,
   seed: number,
   maxMoves = 300,
-): Set<string> {
+): GameOutcome {
   const { state: s0 } = newGame(theme, bundle, { seed });
   let state = s0;
   // Keep a Set view of found items so scoring stays O(1) per lookup.
   let foundSet = new Set(state.found);
   const foundRecipe = (id: string) => foundSet.has(id);
+  // T-0274 metrics. `combinesMade` is the number of successful combines
+  // over the session (dealer attempts against `state.made`). Local loops
+  // count the longest run of same-output combines without finding a new
+  // item — a proxy for "player got stuck making the same thing".
+  let combinesMade = 0;
+  let newFindsCount = 0;
+  let maxLocalLoopLen = 0;
+  let curLocalLoopLen = 0;
+  let lastOutput: string | null = null;
 
   const localScore = (recipe: CombineRecipe): number => {
     let score = 0;
@@ -143,12 +163,43 @@ function playOne(
       action = { type: "place", slot, cell: e };
     }
 
+    const beforeMade = state.made;
+    const beforeFoundSize = foundSet.size;
     const r = reduce(state, bundle, action);
     state = r.state;
     foundSet = new Set(state.found);
+    // Count combines (state.made ticks in finishResolve). A single action
+    // can chain, which bumps made > 1; count each as one attempt.
+    const delta = state.made - beforeMade;
+    if (delta > 0) {
+      combinesMade += delta;
+      // Last produced output for local-loop tracking. We approximate
+      // "same output" by comparing against the previous combine; if
+      // the chain produced multiple outputs, use the terminal one.
+      const lastEvt = r.events.slice().reverse().find((e) => e.type === "combine");
+      const outNow =
+        lastEvt && lastEvt.type === "combine" ? lastEvt.out : null;
+      const grew = foundSet.size > beforeFoundSize;
+      if (grew) {
+        newFindsCount += foundSet.size - beforeFoundSize;
+        curLocalLoopLen = 0;
+        lastOutput = outNow;
+      } else if (outNow && outNow === lastOutput) {
+        curLocalLoopLen += delta;
+        if (curLocalLoopLen > maxLocalLoopLen) maxLocalLoopLen = curLocalLoopLen;
+      } else {
+        curLocalLoopLen = delta;
+        lastOutput = outNow;
+      }
+    }
   }
 
-  return new Set(state.found);
+  return {
+    found: new Set(state.found),
+    attempts: combinesMade,
+    newFinds: newFindsCount,
+    maxLocalLoop: maxLocalLoopLen,
+  };
 }
 
 function pct(a: number, b: number): string {
@@ -189,11 +240,19 @@ function run(theme: ThemeKey, nGames: number, baseSeed: number) {
   const cumulativeOverTime: number[] = []; // cumulative size after each game
   const firstSeenAtGame = new Map<string, number>(); // itemId → game index when first discovered
   const timesSeen = new Map<string, number>();
+  // T-0274 metrics across sessions.
+  const perGameAttempts: number[] = [];
+  const perGameNewFinds: number[] = [];
+  const perGameMaxLocalLoop: number[] = [];
 
   for (let i = 0; i < nGames; i++) {
     const seed = (baseSeed ^ (i * 2654435761)) | 0;
-    const found = playOne(theme, bundle, seed);
+    const outcome = playOne(theme, bundle, seed);
+    const found = outcome.found;
     perGameDiscoveries.push(found.size);
+    perGameAttempts.push(outcome.attempts);
+    perGameNewFinds.push(outcome.newFinds);
+    perGameMaxLocalLoop.push(outcome.maxLocalLoop);
     for (const id of found) {
       timesSeen.set(id, (timesSeen.get(id) ?? 0) + 1);
       if (!cumulative.has(id)) {
@@ -255,6 +314,26 @@ function run(theme: ThemeKey, nGames: number, baseSeed: number) {
     const bar = "█".repeat(Math.round((v / totalOutputs) * 50));
     console.log(`  after ${String(s).padStart(5)} games: ${String(v).padStart(4)}/${totalOutputs} (${pct(v, totalOutputs).padStart(6)}) ${bar}`);
   }
+
+  // T-0274 metrics: attempts-per-discovery + local-loop stats.
+  const totalAttempts = perGameAttempts.reduce((a, b) => a + b, 0);
+  const totalNewFinds = perGameNewFinds.reduce((a, b) => a + b, 0);
+  const attemptsPerNewFind = totalNewFinds > 0 ? totalAttempts / totalNewFinds : NaN;
+  const loopSorted = [...perGameMaxLocalLoop].sort((a, b) => a - b);
+  const loopP50 = loopSorted[Math.floor(loopSorted.length / 2)] ?? 0;
+  const loopP90 = loopSorted[Math.floor(loopSorted.length * 0.9)] ?? 0;
+  const loopP99 = loopSorted[Math.floor(loopSorted.length * 0.99)] ?? 0;
+  const loopMax = loopSorted[loopSorted.length - 1] ?? 0;
+  console.log(`\nDealer-pressure metrics (T-0274):`);
+  console.log(
+    `  attempts/new-find: ${isNaN(attemptsPerNewFind) ? "n/a" : attemptsPerNewFind.toFixed(1)}  (${totalAttempts} combines across ${totalNewFinds} new discoveries)`,
+  );
+  console.log(
+    `  max same-output loop per game: p50=${loopP50}  p90=${loopP90}  p99=${loopP99}  max=${loopMax}`,
+  );
+  console.log(
+    `  (larger = players mine the same recipe before finding something new)`,
+  );
 
   // Items still missing (if any).
   const missing = [...bundle.outputs].filter((id) => !cumulative.has(id));

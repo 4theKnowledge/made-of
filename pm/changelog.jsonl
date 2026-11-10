@@ -144,3 +144,4 @@
 {"id": "C-0144", "ts": "2026-11-10T12:07:10Z", "kind": "feature", "summary": "Daily: live next-daily countdown in Ready + Game-End; docked in-run finds strip above shelf.", "refs": {"task": "T-0275", "commits": "c2c4730, e4b3cd1"}}
 {"id": "C-0145", "ts": "2026-11-10T12:07:11Z", "kind": "decision", "summary": "Daily manifest spec: hop-bounded tile-world is a complementary tile-pool constraint (opt-in follow-up), not a replacement for partner-bias dealer.", "refs": {"task": "T-0276", "commit": "aa0fd5c", "doc": "docs/COMBINE_DAILY_MANIFEST.md#appendix-a"}}
 {"id": "C-0146", "ts": "2026-11-10T12:09:39Z", "kind": "fix", "summary": "combine: distinct dialog when a drop could match multiple ingredient sets (ENGINE_VERSION 5)", "refs": {"task": "T-0270"}}
+{"id": "C-0147", "ts": "2026-11-10T12:12:47Z", "kind": "feature", "summary": "combine/sim: attempts-per-discovery and local-loop metrics for dealer tuning", "refs": {"task": "T-0274"}}
