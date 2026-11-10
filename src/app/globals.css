@@ -960,6 +960,7 @@ a.btn.primary{color:var(--bg)}
 .cbhold.over-bad{border-color:var(--bad);background:color-mix(in srgb, var(--bad) 10%, transparent)}
 .cbslot.cbheld{cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;width:30px;height:30px;padding:0}
 .cbslot.cbheld .ic{width:22px;height:22px;flex:none}
+.cbslot.cbheld.sel{outline:2.5px solid var(--accent);outline-offset:2px;transform:translateY(-3px)}
 
 /* Hold row: wraps the scrolling shelf + the sticky Helpers trigger so the
  * button lives in thumb reach beside Hold rather than up in the TopBar. */
@@ -1842,7 +1843,8 @@ a.btn.primary{color:var(--bg)}
 #cb.cbdone .cbslot.cbheld{opacity:.55;filter:grayscale(.65);cursor:default;transform:none;box-shadow:1px 1px 0 var(--pk)}
 #cb.cbdone .cbp:not(.empty):hover,
 #cb.cbdone .cbslot.cbheld:hover{transform:none}
-#cb.cbdone .cbp.sel{outline:none;transform:none}
+#cb.cbdone .cbp.sel,
+#cb.cbdone .cbslot.cbheld.sel{outline:none;transform:none}
 
 /* GameOverCard mini-shelf — prototype line 965 */
 .cbshelf.sum{border:0;justify-content:center;gap:8px;flex-wrap:wrap!important;overflow:visible!important;min-height:0}
