@@ -17,18 +17,18 @@ The thinking here evolves significantly across the notes. Earlier entries treat 
 
 ### 1a. Design direction (current thinking)
 
-- **`research` · P1 · L** — **Manifest-based daily (current proposal).** Daily has a manifest of N items. Each manifest item only pulls 1–2 hops of its inputs into the tile world. Bounded conceptual universe → easier to guarantee playability; doesn't block users from maxing collection.
-- **`research` · P2 · L** — **Levelled dailies.** First daily = manifest size 1, then 2, … up to 10, across easy/med/hard buckets. Leaderboard score per difficulty/manifest size. Open question: with ~1000 KB items, loop ≈ 18 times (1000/55) — how do we keep this engaging as KB grows?
-- **`decision` · P2** — **Daily leaderboard is optional.** Happy to drop it if the mechanic plays better without it. Goal is retention/delight, not competitiveness.
-- **`research` · P2 · M** — **Sampling heuristic (alternative framing).** Sample two items at the same distance `m` from Big Bang; truncate tiles to those within `n` steps of the manifest. Reduces complexity, preserves natural exploration past `m`. *(Likely folds into the manifest approach above.)*
+- **`research` · P1 · L** · **[DONE — spec reconciled T-0276, aa0fd5c]** — **Manifest-based daily (current proposal).** Daily has a manifest of N items. Each manifest item only pulls 1–2 hops of its inputs into the tile world. Bounded conceptual universe → easier to guarantee playability; doesn't block users from maxing collection. — *Committed to manifest direction. Hop-bounded tile-world filed as opt-in follow-up in `docs/COMBINE_DAILY_MANIFEST.md#appendix-a`; ships after partner-bias dealer (T-0245) playtest.*
+- **`research` · P2 · L** · **[DEFERRED]** — **Levelled dailies.** First daily = manifest size 1, then 2, … up to 10, across easy/med/hard buckets. Leaderboard score per difficulty/manifest size. Open question: with ~1000 KB items, loop ≈ 18 times (1000/55) — how do we keep this engaging as KB grows? — *Needs its own spec after base-manifest playtest data.*
+- **`decision` · P2** · **[KEEP — revisit after playtest]** — **Daily leaderboard is optional.** Happy to drop it if the mechanic plays better without it. Goal is retention/delight, not competitiveness. — *User chose keep-for-now; revisit after playtest.*
+- **`research` · P2 · M** · **[FOLDED]** — **Sampling heuristic (alternative framing).** Sample two items at the same distance `m` from Big Bang; truncate tiles to those within `n` steps of the manifest. Reduces complexity, preserves natural exploration past `m`. *(Likely folds into the manifest approach above.)* — *Folded into the hop-bounded tile-world follow-up in Appendix A.*
 
 ### 1b. Earlier daily ideas (partially superseded)
 
 - **`research` · P2** — Daily should be "a few ages or less" recipes; takes hours currently — simulate to <30 min. **(superseded by manifest design)**
 - **`research` · P3** — Daily as "combine X things" game mode; possibly **inverse scoring** (lowest score wins, like link pars). Keep as a later variant.
-- **`feature` · P1 · M** — **Finds log / explorer-note / quest view** for Daily so users know what they need to find. Currently too easy (40-find game completable in 2 min).
-- **`feature` · P1 · S** — **"Start Daily" dialog** so the timer starts there (not on first tile — users see the board before tapping). Timer runs until end dialog.
-- **`feature` · P1 · S** — **Local-TZ daily rollover.** Release on UTC is sensible operationally but bad UX. Add countdown in "ready" and "game end" dialogs until next daily.
+- **`feature` · P1 · M** · **[DONE — T-0278, e4b3cd1]** — **Finds log / explorer-note / quest view** for Daily so users know what they need to find. Currently too easy (40-find game completable in 2 min). — *Added `DailyFindsStrip`: docked pictogram-chip row between ChapterBar and Shelf during daily runs; found chips dim + checkmark; tap opens JourneySheet for the full grid.*
+- **`feature` · P1 · S** · **[ALREADY BUILT — audit confirmed]** — **"Start Daily" dialog** so the timer starts there (not on first tile — users see the board before tapping). Timer runs until end dialog. — *Landed earlier (`CombineBoard.tsx:2621–2671`, `confirmStartDaily`). Shimmer skeleton covers board until Start is tapped.*
+- **`feature` · P1 · S** · **[DONE — T-0277, c2c4730]** — **Local-TZ daily rollover.** Release on UTC is sensible operationally but bad UX. Add countdown in "ready" and "game end" dialogs until next daily. — *Added `NextDailyCountdown` to both dialogs. Day-keys stay UTC (T-0255); countdown renders viewer-local time-to-next-UTC-midnight as `Hh MMm`.*
 - **`question` · P2** — Does updating themes invalidate user games? Needs an answer / test.
 
 ### 1c. Daily playtest bugs
