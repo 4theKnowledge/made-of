@@ -223,6 +223,182 @@ describe("manifest partner-bias (T-0245)", () => {
   });
 });
 
+/** Build a mid-game "found" set: expand through recipes BFS-style until
+ *  we have >=N discoveries. Keeps the softPool reachability wide so the
+ *  dealer has a diverse candidate set — closer to a real player's mid-game
+ *  state than a fresh run. */
+function midGameFound(target: number): string[] {
+  const found = new Set<string>(everything.base);
+  let changed = true;
+  while (changed && found.size < target) {
+    changed = false;
+    for (const r of everything.recipes) {
+      if (found.has(r.out)) continue;
+      if (r.all.every((x) => found.has(x))) {
+        found.add(r.out);
+        changed = true;
+        if (found.size >= target) break;
+      }
+    }
+  }
+  return [...found];
+}
+
+describe("kind-diversity cap (T-0317)", () => {
+  // Mid-game: two same-kind tiles pre-placed on the board. The dealer
+  // should bias toward other kinds. Low-but-nonzero expected because the
+  // fallback kicks in when a layer's candidate set is all one kind.
+  it("reduces the rate of same-kind thirds when two of a kind are on board", () => {
+    const found = midGameFound(60);
+    // Count reachable items per kind in this found-state so we can
+    // pick a kind that has plenty of same-kind siblings AND competing
+    // kinds — otherwise the fallback dominates and nothing is testable.
+    const byKind = new Map<string, string[]>();
+    for (const id of found) {
+      const it = everything.items.get(id);
+      if (!it) continue;
+      const arr = byKind.get(it.kind) ?? [];
+      arr.push(id);
+      byKind.set(it.kind, arr);
+    }
+    const kindsWithMany = [...byKind.entries()]
+      .filter(([, ids]) => ids.length >= 3)
+      .sort((a, b) => b[1].length - a[1].length);
+    if (kindsWithMany.length < 2) {
+      throw new Error("mid-game found set doesn't have enough kind diversity");
+    }
+    const [targetKind, targetIds] = kindsWithMany[0];
+
+    const size = 5;
+    const trials = 40;
+    let capHits = 0;
+    let noCapHits = 0;
+    for (let i = 0; i < trials; i++) {
+      // With two same-kind tiles on board → cap should fire.
+      const boardCap = emptyBoard(size);
+      boardCap[0] = targetIds[0];
+      boardCap[1] = targetIds[1];
+      const vCap: DealerView = {
+        bundle: everything,
+        board: boardCap,
+        tray: [null, null, null],
+        size,
+        rng: makeRng(40000 + i),
+        found,
+      };
+      const trayCap = dealTray(vCap);
+      for (const t of trayCap) {
+        if (!t) continue;
+        if (everything.items.get(t)?.kind === targetKind) capHits++;
+      }
+      // Baseline: only one of that kind on board → cap doesn't fire.
+      const boardNoCap = emptyBoard(size);
+      boardNoCap[0] = targetIds[0];
+      const vNoCap: DealerView = {
+        bundle: everything,
+        board: boardNoCap,
+        tray: [null, null, null],
+        size,
+        rng: makeRng(40000 + i),
+        found,
+      };
+      const trayNoCap = dealTray(vNoCap);
+      for (const t of trayNoCap) {
+        if (!t) continue;
+        if (everything.items.get(t)?.kind === targetKind) noCapHits++;
+      }
+    }
+    // Cap should materially reduce same-kind draws.
+    expect(capHits).toBeLessThan(noCapHits);
+  });
+});
+
+describe("recency penalty (T-0317)", () => {
+  // With a recent tray stocked with one kind, the next deal should favour
+  // other kinds. We compare "recent tray says kind X" vs "recent tray says
+  // kind Y" and check that X shows up in the next tray *less* in the
+  // first case than the second.
+  it("down-weights kinds seen in recent trays", () => {
+    const size = 5;
+    const trials = 50;
+    const found = midGameFound(60);
+
+    const byKind = new Map<string, string[]>();
+    for (const id of found) {
+      const it = everything.items.get(id);
+      if (!it) continue;
+      const arr = byKind.get(it.kind) ?? [];
+      arr.push(id);
+      byKind.set(it.kind, arr);
+    }
+    const kinds = [...byKind.entries()]
+      .filter(([, ids]) => ids.length >= 3)
+      .map(([k]) => k);
+    if (kinds.length < 2) throw new Error("need at least 2 kinds for test");
+    const kindA = kinds[0];
+    const kindB = kinds[1];
+    const sampleA = byKind.get(kindA)![0];
+
+    let hitsWhenAIsRecent = 0;
+    let hitsWhenBIsRecent = 0;
+    for (let i = 0; i < trials; i++) {
+      // Case 1: recent tray contains a kindA tile → kindA should drop.
+      const vA: DealerView = {
+        bundle: everything,
+        board: emptyBoard(size),
+        tray: [null, null, null],
+        size,
+        rng: makeRng(50000 + i),
+        found,
+        recentTrays: [[sampleA]],
+      };
+      const trayA = dealTray(vA);
+      for (const t of trayA) {
+        if (!t) continue;
+        if (everything.items.get(t)?.kind === kindA) hitsWhenAIsRecent++;
+      }
+      // Case 2: recent tray contains kindB tile → kindA free to appear.
+      const vB: DealerView = {
+        bundle: everything,
+        board: emptyBoard(size),
+        tray: [null, null, null],
+        size,
+        rng: makeRng(50000 + i),
+        found,
+        recentTrays: [[byKind.get(kindB)![0]]],
+      };
+      const trayB = dealTray(vB);
+      for (const t of trayB) {
+        if (!t) continue;
+        if (everything.items.get(t)?.kind === kindA) hitsWhenBIsRecent++;
+      }
+    }
+    expect(hitsWhenAIsRecent).toBeLessThan(hitsWhenBIsRecent);
+  });
+
+  it("stays deterministic for a given seed + recentTrays", () => {
+    const v1: DealerView = {
+      bundle: everything,
+      board: emptyBoard(5),
+      tray: [null, null, null],
+      size: 5,
+      rng: makeRng(12345),
+      found: [],
+      recentTrays: [["hydrogen"]],
+    };
+    const v2: DealerView = {
+      bundle: everything,
+      board: emptyBoard(5),
+      tray: [null, null, null],
+      size: 5,
+      rng: makeRng(12345),
+      found: [],
+      recentTrays: [["hydrogen"]],
+    };
+    expect(dealTray(v1)).toEqual(dealTray(v2));
+  });
+});
+
 describe("terminal tiles are never dealt", () => {
   // Sun has recipe hydrogen+helium→sun but is consumed by nothing, so it
   // sits dead on the board/tray until crumble. Terminals must be

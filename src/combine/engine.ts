@@ -674,6 +674,10 @@ function dealerViewFromState(state: GameState, bundle: ThemeBundle) {
     manifest: state.manifest,
     manifestFound: state.manifestFound,
     manifestPartnerBias: state.manifestPartnerBias,
+    // T-0317: kind-diversity cap + recency penalty apply to endless/fast/
+    // tutorial play. Daily runs skip them so the manifest solver's
+    // reachability budget isn't squeezed by the extra biases.
+    diversify: state.mode !== "daily",
   });
 }
 

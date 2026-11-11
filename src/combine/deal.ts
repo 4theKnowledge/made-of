@@ -14,6 +14,7 @@
  *      recent trays have all been pile-adjacent.
  */
 
+import type { ItemKind } from "../db/schema";
 import { matchAt, playsInOne, playsInTwo, type Board } from "./match";
 import { pick, rand, type RngState } from "./rng";
 import { DISCOVERED_WEIGHT, softPool, type SoftPool } from "./progression";
@@ -25,6 +26,21 @@ const MAX_TOOLS_ON_BOARD = 4;
 
 /** How many trays back the dealer remembers for anti-repetition. */
 const RECENT_TRAY_WINDOW = 2;
+
+/** Soft cap on same-kind tiles on the board at once (T-0317). When a
+ *  candidate's kind is already at this count on the board, it's filtered
+ *  out of the layer's pool. If the filter empties the pool, the dealer
+ *  falls back to the unfiltered list rather than block the deal — the cap
+ *  is a preference, not a hard rule. Tools are exempt (own cap). */
+const KIND_DIVERSITY_CAP = 2;
+
+/** Recency penalty multipliers applied per-kind in `pickWeighted` (T-0317).
+ *  A kind seen in the most recent tray is multiplied by `*_LAST`; a kind
+ *  seen in the tray before that by `*_PREV`. Composes with
+ *  `DISCOVERED_WEIGHT` and the manifest-partner bias. The goal is to stop
+ *  consecutive trays from feeling same-kind. */
+const RECENCY_PENALTY_LAST = 0.4;
+const RECENCY_PENALTY_PREV = 0.7;
 
 /** The dealer only knows about the state it needs — not the whole game. */
 export interface DealerView {
@@ -65,6 +81,21 @@ export interface DealerView {
    *  once per `dealTray` and recomputed when manifest / manifestFound
    *  changes between deals (cheap: O(|recipes| * |manifest|)). */
   _manifestPartnerSet?: Set<string>;
+  /** Internal: lazily-populated count of each `ItemKind` on the board
+   *  right now (T-0317). Used by the kind-diversity cap. Tools excluded
+   *  (they already have their own cap). Built once per `dealTray` and
+   *  shared across the many `pickOne` calls. */
+  _boardKindCounts?: Map<ItemKind, number>;
+  /** Internal: lazily-populated per-kind weight multiplier derived from
+   *  `recentTrays` (T-0317). Keys are kinds seen in the two most recent
+   *  trays; missing keys mean "no penalty, 1.0". */
+  _recentKindPenalty?: Map<ItemKind, number>;
+  /** Enable kind-diversity cap + recency penalty (T-0317). On for endless
+   *  play, off for daily — the daily manifest solver has strict budget
+   *  constraints and these biases can push specific day seeds past the
+   *  solver's reach. Defaults to true when omitted so direct dealer tests
+   *  and endless runs get the new behaviour by default. */
+  diversify?: boolean;
   /** Scripted dealer queue (tutorial mode). When present, `dealTray` shifts
    *  from the front of this array to fill tray slots and skips the normal
    *  reachability / anti-pile / playsInOne heuristics entirely. The caller
@@ -135,6 +166,64 @@ function manifestPartnerSet(view: DealerView): Set<string> {
   return out;
 }
 
+/** Look up a tile's `ItemKind` via the bundle. Returns null for ids the
+ *  bundle doesn't know (shouldn't happen in practice but keeps the
+ *  dealer defensive). */
+function kindOf(view: DealerView, id: string): ItemKind | null {
+  return view.bundle.items.get(id)?.kind ?? null;
+}
+
+/** Count each non-tool kind currently on the board (T-0317). */
+function tallyBoardKinds(view: DealerView): Map<ItemKind, number> {
+  const counts = new Map<ItemKind, number>();
+  for (const v of view.board) {
+    if (!v) continue;
+    if (view.bundle.tools.has(v)) continue;
+    const k = kindOf(view, v);
+    if (!k) continue;
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** Build the per-kind recency-penalty map from `recentTrays` (T-0317).
+ *  Newest tray contributes the stronger penalty; the one before it the
+ *  milder one. A kind in both trays takes the stronger (last) penalty. */
+function buildRecentKindPenalty(view: DealerView): Map<ItemKind, number> {
+  const out = new Map<ItemKind, number>();
+  const recent = view.recentTrays ?? [];
+  // Walk oldest → newest so newer penalties overwrite older ones.
+  for (let i = Math.min(recent.length, 2) - 1; i >= 0; i--) {
+    const penalty = i === 0 ? RECENCY_PENALTY_LAST : RECENCY_PENALTY_PREV;
+    for (const id of recent[i]) {
+      const k = kindOf(view, id);
+      if (!k) continue;
+      out.set(k, penalty);
+    }
+  }
+  return out;
+}
+
+/** Apply the kind-diversity cap to a candidate list (T-0317). Filters
+ *  out tiles whose kind is already at `KIND_DIVERSITY_CAP` on the board.
+ *  If the filter would empty the list, returns the original list
+ *  unchanged so the dealer never deadlocks on a small reachable pool. */
+function applyKindCap(view: DealerView, arr: string[]): string[] {
+  if (arr.length === 0) return arr;
+  if (view.diversify === false) return arr;
+  if (!view._boardKindCounts) view._boardKindCounts = tallyBoardKinds(view);
+  const counts = view._boardKindCounts;
+  const filtered: string[] = [];
+  for (const x of arr) {
+    if (view.bundle.tools.has(x)) { filtered.push(x); continue; }
+    const k = kindOf(view, x);
+    if (!k) { filtered.push(x); continue; }
+    if ((counts.get(k) ?? 0) >= KIND_DIVERSITY_CAP) continue;
+    filtered.push(x);
+  }
+  return filtered.length > 0 ? filtered : arr;
+}
+
 /** Weighted pick: already-discovered tiles get `DISCOVERED_WEIGHT`,
  *  undiscovered ones get 1.0. Unfound-manifest partners (T-0245) get an
  *  additional `(1 + manifestPartnerBias)` multiplier so the dealer
@@ -157,9 +246,22 @@ function pickWeighted(view: DealerView, arr: readonly string[]): string | undefi
     partners = view._manifestPartnerSet;
   }
   const override = view.weightOverride;
+  if (!view._recentKindPenalty) {
+    view._recentKindPenalty = view.diversify === false
+      ? new Map()
+      : buildRecentKindPenalty(view);
+  }
+  const recentKinds = view._recentKindPenalty;
   const weightFor = (x: string): number => {
     let w = found.has(x) ? DISCOVERED_WEIGHT : 1;
     if (partners && partners.has(x)) w *= 1 + bias;
+    if (recentKinds.size > 0 && !view.bundle.tools.has(x)) {
+      const k = kindOf(view, x);
+      if (k) {
+        const p = recentKinds.get(k);
+        if (p != null) w *= p;
+      }
+    }
     if (override) w *= override(view, x);
     return w;
   };
@@ -249,7 +351,7 @@ export function pickOne(view: DealerView): string | null {
           need.push(x);
         }
       }
-      if (need.length) return pickWeighted(view, need) ?? null;
+      if (need.length) return pickWeighted(view, applyKindCap(view, need)) ?? null;
     }
   }
 
@@ -270,7 +372,7 @@ export function pickOne(view: DealerView): string | null {
       }
       if (fits) cands.push(x);
     }
-    if (cands.length) return pickWeighted(view, cands) ?? null;
+    if (cands.length) return pickWeighted(view, applyKindCap(view, cands)) ?? null;
   }
 
   // 2. A partner for something already on the board. When there is a pile,
@@ -297,15 +399,15 @@ export function pickOne(view: DealerView): string | null {
     // heavily toward them (3:1) rather than all-or-nothing — occasional
     // "wrong" partners still help by introducing variety.
     if (pileFirst.length && otherOnBoard.length && rand(view.rng) < 0.75) {
-      return pickWeighted(view, pileFirst) ?? null;
+      return pickWeighted(view, applyKindCap(view, pileFirst)) ?? null;
     }
-    if (pileFirst.length) return pickWeighted(view, pileFirst) ?? null;
-    if (otherOnBoard.length) return pickWeighted(view, otherOnBoard) ?? null;
+    if (pileFirst.length) return pickWeighted(view, applyKindCap(view, pileFirst)) ?? null;
+    if (otherOnBoard.length) return pickWeighted(view, applyKindCap(view, otherOnBoard)) ?? null;
   }
 
   // 3. A made thing from this age — starts a chain next time.
   if (roll < 0.88 && A.MID.length) {
-    return pickWeighted(view, A.MID) ?? null;
+    return pickWeighted(view, applyKindCap(view, A.MID.slice())) ?? null;
   }
 
   // 4. A raw thing for this age; occasionally allow tools too.
@@ -314,8 +416,8 @@ export function pickOne(view: DealerView): string | null {
   );
   const pool =
     rand(view.rng) < 0.25 ? A.BASE.filter((x) => okTool(x)) : base;
-  if (pool.length) return pickWeighted(view, pool) ?? null;
-  return pickWeighted(view, [...A.ING]) ?? null;
+  if (pool.length) return pickWeighted(view, applyKindCap(view, pool)) ?? null;
+  return pickWeighted(view, applyKindCap(view, [...A.ING])) ?? null;
 }
 
 /** Canonical fingerprint for a tray — sorted multiset of non-null tiles. */
