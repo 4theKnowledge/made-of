@@ -223,6 +223,7 @@ export function validateActionShape(a: unknown): a is Action {
     "move",
     "promote",
     "shore",
+    "unshore",
     "hold",
     "pluck-hold",
     "wipe-board",

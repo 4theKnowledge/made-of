@@ -66,7 +66,7 @@ export const TIER_VALUE: Record<string, number> = {
  * It is fine (and expected) to skip bumping for pure refactors that
  * leave the reducer's output-for-input identical.
  */
-export const ENGINE_VERSION = 6;
+export const ENGINE_VERSION = 7;
 
 /** Baseline hold-zone capacity at chapter 0. */
 const HOLD_CAPACITY_BASE = 2;
@@ -288,6 +288,7 @@ export type Action =
   | { type: "move"; from: number; to: number }
   | { type: "promote"; cell: number }
   | { type: "shore"; cell: number }
+  | { type: "unshore"; cell: number }
   | { type: "hold"; slot: number }
   | { type: "pluck-hold"; cell: number }
   | { type: "wipe-board" }
@@ -1390,6 +1391,17 @@ export function reduce(
       if (!state.debug) state.shore--;
       state.crumb[action.cell] = null;
       state.shored[action.cell] = true;
+      return { state, events };
+    }
+
+    case "unshore": {
+      // Release a previously shored tile. The shore charge was already
+      // spent — unshore does NOT refund it (that would make shore a
+      // reusable resource). The next afterMove tick arms a fresh crumble
+      // counter via the lazy init in the crumble pass; no explicit
+      // reset needed here.
+      if (!state.shored[action.cell]) return { state: prev, events: [] };
+      state.shored[action.cell] = false;
       return { state, events };
     }
 

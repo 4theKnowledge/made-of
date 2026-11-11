@@ -561,6 +561,71 @@ describe("helpers (swap, clear, move)", () => {
     expect(afterClear.shored[4]).toBe(false);
   });
 
+  it("unshore clears the shored flag without refunding the charge", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    s0.board[4] = "flour";
+    s0.crumb[4] = { id: "flour", n: 2 };
+    const beforeShore = s0.shore;
+    const afterShore = reduce(s0, bundle, { type: "shore", cell: 4 }).state;
+    expect(afterShore.shored[4]).toBe(true);
+    expect(afterShore.shore).toBe(beforeShore - 1);
+    const afterUnshore = reduce(afterShore, bundle, {
+      type: "unshore",
+      cell: 4,
+    }).state;
+    expect(afterUnshore.shored[4]).toBe(false);
+    // No refund: shore charge stays spent.
+    expect(afterUnshore.shore).toBe(beforeShore - 1);
+    // Still on the board — unshore doesn't remove the tile.
+    expect(afterUnshore.board[4]).toBe("flour");
+  });
+
+  it("unshore is a no-op when the cell isn't shored", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    s0.board[4] = "flour";
+    s0.crumb[4] = { id: "flour", n: 2 };
+    const { state } = reduce(s0, bundle, { type: "unshore", cell: 4 });
+    expect(state).toEqual(s0);
+  });
+
+  it("a tile crumbles on schedule again after being unshored", () => {
+    // Shore a stale tile, unshore, then run turns — the crumble pass
+    // should re-arm a fresh counter and the tile should eventually fall
+    // off (matching the "no refund, fresh countdown" semantics in T-0318).
+    const b = fakeBundle({
+      recipes: [R("dough", ["flour", "water"])],
+    });
+    const s0 = newGame("everything", b, { seed: 1, size: 3 }).state;
+    s0.board = Array(9).fill(null);
+    s0.board[4] = "stone";
+    s0.crumb[4] = { id: "stone", n: 1 };
+    const afterShore = reduce(s0, b, { type: "shore", cell: 4 }).state;
+    expect(afterShore.shored[4]).toBe(true);
+    const afterUnshore = reduce(afterShore, b, {
+      type: "unshore",
+      cell: 4,
+    }).state;
+    expect(afterUnshore.shored[4]).toBe(false);
+
+    // Run turns until the stone crumbles. CRUMBLE_TTL_MAX is 60 at empty
+    // board and this loop keeps occupancy low (place-then-null), so give
+    // it comfortable headroom.
+    let s = afterUnshore;
+    let crumbled = false;
+    for (let i = 0; i < 80; i++) {
+      s.tray = ["flour", null, null];
+      s = reduce(s, b, { type: "place", slot: 0, cell: 0 }).state;
+      s.board[0] = null;
+      if (s.board[4] == null) {
+        crumbled = true;
+        break;
+      }
+    }
+    expect(crumbled).toBe(true);
+  });
+
   it("moving a shored tile carries the shore flag to the new cell", () => {
     const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
     s0.board = Array(9).fill(null);

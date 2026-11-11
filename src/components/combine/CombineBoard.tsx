@@ -102,6 +102,7 @@ import { JourneySheet } from "@/components/combine/board-parts/overlays/JourneyS
 import { ChoicePicker } from "@/components/combine/board-parts/overlays/ChoicePicker";
 import { CollectionBook } from "@/components/combine/board-parts/overlays/CollectionBook";
 import { DetailCard } from "@/components/combine/board-parts/overlays/DetailCard";
+import { ShoredTileSheet } from "@/components/combine/board-parts/overlays/ShoredTileSheet";
 import { GameOverCard } from "@/components/combine/board-parts/overlays/GameOverCard";
 import { DebugPanel } from "@/components/combine/board-parts/overlays/DebugPanel";
 import { SoundMenu } from "@/components/combine/board-parts/overlays/SoundMenu";
@@ -644,6 +645,10 @@ export function CombineBoard({
   // tray / hold tile), carry the originating cell so we can expose a
   // "promote" affordance scoped to that cell. Null for non-board sources.
   const [infoCell, setInfoCell] = useState<number | null>(null);
+  // Cell under the shored-tile action sheet (long-press on a shored tile).
+  // Null when the sheet is closed. Separate from infoCell because the sheet
+  // offers "see info" as one of its choices rather than being the info view.
+  const [shoredSheetCell, setShoredSheetCell] = useState<number | null>(null);
   // Per-scope set of items the player unlocked recently and hasn't yet
   // acknowledged. Mirrors localStorage; survives reloads. Items leave
   // when the player opens their DetailCard or the Collection book.
@@ -2232,11 +2237,14 @@ export function CombineBoard({
         return;
       }
 
-      // Idle path: only arm long-press-for-info when nothing else is
-      // claiming the tap. Any helper mode or an active tray selection
-      // short-circuits above / via `onCellTap`.
-      if (clearMode || shoreMode || pluckMode) return;
-      if (selectedSlot != null) return;
+      // Idle path: arm long-press. Shored tiles are always long-pressable
+      // — even inside helper modes — because the action sheet is the only
+      // way to release the shore or inspect the tile. For non-shored tiles
+      // the usual rule applies: any helper mode or an active tray selection
+      // claims the tap, so skip the long-press timer.
+      const isShored = state.shored[cell];
+      if (!isShored && (clearMode || shoreMode || pluckMode)) return;
+      if (!isShored && selectedSlot != null) return;
       suppressClick.current = false;
       const x0 = e.clientX;
       const y0 = e.clientY;
@@ -2258,8 +2266,12 @@ export function CombineBoard({
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", cancel);
         window.removeEventListener("pointercancel", cancel);
-        setInfoTile(tile);
-        setInfoCell(cell);
+        if (isShored) {
+          setShoredSheetCell(cell);
+        } else {
+          setInfoTile(tile);
+          setInfoCell(cell);
+        }
         suppressClick.current = true;
       }, 450);
       window.addEventListener("pointermove", onMove);
@@ -2273,6 +2285,7 @@ export function CombineBoard({
       pluckMode,
       selectedSlot,
       state.board,
+      state.shored,
       state.over,
     ],
   );
@@ -2976,6 +2989,26 @@ export function CombineBoard({
             bundle={bundle}
             onInfo={(id) => setInfoTile(id)}
             onDismiss={() => setAgesOpen(false)}
+          />
+        )}
+        {shoredSheetCell != null && (
+          <ShoredTileSheet
+            tileName={state.board[shoredSheetCell] ?? null}
+            onRelease={() => {
+              const c = shoredSheetCell;
+              setShoredSheetCell(null);
+              act({ type: "unshore", cell: c });
+            }}
+            onInfo={() => {
+              const c = shoredSheetCell;
+              const t = state.board[c];
+              setShoredSheetCell(null);
+              if (t) {
+                setInfoTile(t);
+                setInfoCell(c);
+              }
+            }}
+            onDismiss={() => setShoredSheetCell(null)}
           />
         )}
         {infoTile && (
