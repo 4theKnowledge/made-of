@@ -15,6 +15,7 @@ import { endRun, getRunForOwner, saveRunCheckpoint } from "@/combine/run-store";
 import { getDb, schema } from "@/db/client";
 import { loadSeason } from "@/combine/season";
 import { writeDiscoveriesFromState } from "@/combine/discoveries-writer";
+import { finalizeFromStoredState } from "@/combine/progress-writer";
 import { ENGINE_VERSION, type Action, type GameState } from "@/combine/engine";
 
 export const dynamic = "force-dynamic";
@@ -120,11 +121,33 @@ export async function POST(
       alreadyEnded: true,
     });
   }
+  // Both 409 branches below are rescuable when the stored state is
+  // already `over`: the run naturally ended during a prior checkpoint
+  // and this /finish is just the race-losing POST. Writing the progress
+  // row from stored state puts the player on the leaderboard instead
+  // of leaving them with "rank unavailable" (T-0315).
+  const stored = run.stateJson as unknown as GameState;
+  const canRescueFromStored = stored?.over === true;
+  const rescueSession = canRescueFromStored ? await getSession() : null;
+
   // Reject replay against a stored run that predates the running reducer.
   // Replaying would silently produce a different score. Client treats
   // `engineVersionMismatch` the same as the ordinary 409 reconcile path —
   // drop local state and start a fresh run.
   if (!isEngineVersionCurrent(run.engineVersion)) {
+    if (canRescueFromStored) {
+      await finalizeFromStoredState(run, stored, rescueSession?.user?.id ?? null, {
+        engineVersion: run.engineVersion,
+        legacy: true,
+        clientDurationMs,
+      });
+      return NextResponse.json({
+        state: stored,
+        eventCount: run.eventCount,
+        ended: true,
+        rescued: "engine-version",
+      });
+    }
     return NextResponse.json(
       {
         error: "engine version mismatch",
@@ -136,6 +159,18 @@ export async function POST(
     );
   }
   if (baseCount !== run.eventCount) {
+    if (canRescueFromStored) {
+      await finalizeFromStoredState(run, stored, rescueSession?.user?.id ?? null, {
+        engineVersion: ENGINE_VERSION,
+        clientDurationMs,
+      });
+      return NextResponse.json({
+        state: stored,
+        eventCount: run.eventCount,
+        ended: true,
+        rescued: "event-count",
+      });
+    }
     return NextResponse.json(
       {
         error: "event count mismatch",

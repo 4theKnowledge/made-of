@@ -11,4 +11,8 @@ echo "predeploy: backfill-handles..."
 # backfill from finishing. The script is idempotent, so the next deploy
 # picks up anyone still NULL.
 node dist-scripts/backfill-handles.js || echo "predeploy: backfill-handles failed (non-fatal)"
+echo "predeploy: invalidate-stale-combine-runs..."
+# Non-fatal: lazy invalidation in run-store.ts still catches stragglers
+# per-request, so a failure here just means the cleanup is deferred.
+node dist-scripts/invalidate-stale-combine-runs.js || echo "predeploy: invalidate-stale-combine-runs failed (non-fatal)"
 echo "predeploy: done."
