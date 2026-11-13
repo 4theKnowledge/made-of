@@ -118,7 +118,15 @@ export function CombineTile(props: CombineTileProps) {
 }
 
 function TileLabel({ name }: { name: string }) {
-  const longest = Math.max(0, ...name.split("-").map((w) => w.length));
-  const len = longest >= 10 ? " l2" : longest >= 7 ? " l1" : "";
+  const longest = Math.max(0, ...name.split(/[\s-]/).map((w) => w.length));
+  const total = name.length;
+  const len =
+    longest >= 13 || total >= 22
+      ? " l3"
+      : longest >= 10
+        ? " l2"
+        : longest >= 7
+          ? " l1"
+          : "";
   return <span className={`cbn${len}`}>{cap(name)}</span>;
 }

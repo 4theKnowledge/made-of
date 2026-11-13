@@ -1040,7 +1040,8 @@ a.btn.primary{color:var(--bg)}
 .cbc .ic.el{font-size:15px}
 .cbc .cbn{font-size:clamp(9px, 15.5cqw, 12px);line-height:1.05;white-space:normal;text-align:center;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:break-word;max-width:96%;font-weight:700}
 .cbc .cbn.l1{font-size:clamp(8px, 12.5cqw, 11px)}
-.cbc .cbn.l2{font-size:clamp(7.5px, 10.5cqw, 10px)}
+.cbc .cbn.l2{font-size:clamp(7.5px, 10.5cqw, 10px);-webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 6px), transparent 100%);mask-image:linear-gradient(to bottom, #000 calc(100% - 6px), transparent 100%)}
+.cbc .cbn.l3{font-size:clamp(7px, 9cqw, 9px);-webkit-line-clamp:3;-webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 6px), transparent 100%);mask-image:linear-gradient(to bottom, #000 calc(100% - 6px), transparent 100%)}
 .cbc.can{border:2px solid var(--accent);background:color-mix(in srgb, var(--accent) 12%, var(--surface));box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)}
 .cbc.over{border:2.5px solid var(--accent)!important;background:color-mix(in srgb, var(--accent) 22%, var(--surface))!important}
 .cbc.full.over{outline:3px solid var(--accent);outline-offset:1px;transform:scale(1.06)}
@@ -1083,7 +1084,9 @@ a.btn.primary{color:var(--bg)}
 .cbp .ic{width:56%;height:auto;aspect-ratio:1;border:0;background:transparent}
 .cbp .ic svg{width:100%;height:100%}
 .cbp .cbn{font-size:clamp(10px, 13cqw, 12px);line-height:1.05;text-align:center;font-weight:700;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:break-word;max-width:92%}
-.cbp .cbn.l2{-webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 6px), transparent 100%);mask-image:linear-gradient(to bottom, #000 calc(100% - 6px), transparent 100%)}
+.cbp .cbn.l1{font-size:clamp(9px, 11.5cqw, 11px)}
+.cbp .cbn.l2{font-size:clamp(8.5px, 10cqw, 10px);-webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 6px), transparent 100%);mask-image:linear-gradient(to bottom, #000 calc(100% - 6px), transparent 100%)}
+.cbp .cbn.l3{font-size:clamp(7.5px, 8.5cqw, 9px);-webkit-line-clamp:3;-webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 6px), transparent 100%);mask-image:linear-gradient(to bottom, #000 calc(100% - 6px), transparent 100%)}
 .cbp.sel{outline:3px solid var(--accent);outline-offset:3px;transform:translateY(-4px)}
 .cbp.empty{border:1.5px dashed color-mix(in srgb, var(--ink) 25%, transparent);background:transparent;box-shadow:none;cursor:default}
 .cbp .tool{position:absolute;top:-8px;right:-8px;font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;background:var(--ink);color:var(--bg);padding:1px 5px;border-radius:2px}
