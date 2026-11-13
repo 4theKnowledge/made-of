@@ -1000,19 +1000,40 @@ export function newGame(
   const spots = shuffle(state.rng, candidateCells).slice(0, seedCount);
   const seedTiles: string[] = [];
   const events: Event[] = [];
-  // Starter pool: `bundle.base` by default; endless runs may supply extra
-  // discovered mid items so the first few tiles aren't always the same
-  // handful of fundamental atoms (T-0302). Extras are weighted by inverse
-  // band (1 / (band + 1)) so late-game items don't dominate the starting
-  // board for players with huge collections. Bases always carry weight 1.
-  // A floor of base picks guarantees the player can kick off from scratch.
+  // Starter pool: `bundle.base` plus a themed slice of early-era mids
+  // (T-0324). Historically only endless runs with a `starterPool` got extras
+  // (T-0302), which meant daily and fresh-endless starts always landed the
+  // same ~4 atoms for themes with a tiny base set ("everything" has 4). The
+  // mid widening gives each seed a visibly different starter board while
+  // staying deterministic — the day's RNG picks from the pool.
+  //
+  // Extras are weighted by inverse band (1 / (band + 1)) so late-game items
+  // don't dominate the starting board. Bases always carry weight 1. A floor
+  // of base picks guarantees the player can kick off from scratch.
+  //
+  // `STARTER_MID_MAX_BAND` scopes the themed widening to early-era outputs
+  // so starters feel like "stuff you'd recognise from age 1–2", not a random
+  // tile from deep in the tree.
+  const STARTER_MID_MAX_BAND = 2;
   const baseSet = new Set(bundle.base);
-  const extraStarters =
+  const discoveryExtras =
     mode === "endless" && opts.starterPool
       ? opts.starterPool.filter(
           (x) => !baseSet.has(x) && !bundle.tools.has(x),
         )
       : [];
+  // Tutorial keeps an empty board (seedCount is already 0); skip the pool
+  // build entirely to keep behaviour identical.
+  const themedExtras = mode === "tutorial" ? [] : bundle.mid.filter((x) => {
+    if (baseSet.has(x)) return false;
+    if (bundle.tools.has(x)) return false;
+    const band = bundle.outBand.get(x);
+    if (band == null || band > STARTER_MID_MAX_BAND) return false;
+    return true;
+  });
+  const extraStarters = discoveryExtras.length > 0 || themedExtras.length > 0
+    ? Array.from(new Set([...discoveryExtras, ...themedExtras]))
+    : [];
   const wideStarters = extraStarters.length > 0
     ? [...bundle.base, ...extraStarters]
     : bundle.base;

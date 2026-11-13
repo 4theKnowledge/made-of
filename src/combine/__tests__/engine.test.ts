@@ -129,6 +129,24 @@ describe("newGame", () => {
     expect(a.state.tray).toEqual(b.state.tray);
     expect(a.state.n).toBe(6);
   });
+
+  it("different daily seeds produce different starter boards (T-0324)", () => {
+    // Guards against the stale-starter regression where every daily picked
+    // the same ~4 base atoms. Widening the pool with early-era mids means
+    // most adjacent days should differ by at least one tile.
+    const days = [
+      "2026-11-14", "2026-11-15", "2026-11-16", "2026-11-17",
+      "2026-11-18", "2026-11-19", "2026-11-20", "2026-11-21",
+    ];
+    const multisets = days.map((d) => {
+      const { state } = newGame("everything", everything, { daily: d });
+      return state.board.filter(Boolean).slice().sort().join("|");
+    });
+    const unique = new Set(multisets);
+    // At least most days should differ; strict "all different" is too brittle
+    // against the weighted RNG happening to collide once in a blue moon.
+    expect(unique.size).toBeGreaterThanOrEqual(days.length - 1);
+  });
 });
 
 describe("place (unique output recipe)", () => {
