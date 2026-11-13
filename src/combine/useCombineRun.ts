@@ -37,6 +37,17 @@ export interface RunContext {
   startedAt: string | null;
 }
 
+/** Snapshot of the server's ack from a successful `flush()`. Returned
+ *  to callers that need to immediately write against the latest state
+ *  (e.g. `finish()` computing its `baseEventCount` without waiting for
+ *  React to re-render the context). Null means the flush was a no-op
+ *  (buffer empty, network failure, or 409 reconcile). */
+export interface FlushResult {
+  eventCount: number;
+  epoch: number;
+  state: GameState;
+}
+
 export interface StartArgs {
   mode: ServerMode;
   theme: string;
@@ -181,8 +192,11 @@ export interface UseCombineRunApi {
    *  already applied it to its local state; the buffer is purely for
    *  server validation. */
   push: (action: Action) => void;
-  /** Force an immediate flush (e.g. on blur / unmount). */
-  flush: () => Promise<void>;
+  /** Force an immediate flush (e.g. on blur / unmount). Returns the
+   *  server's ack on the last successful POST (eventCount, epoch, and
+   *  state), or null if nothing was flushed / the request failed /
+   *  a 409 reconciled. */
+  flush: () => Promise<FlushResult | null>;
   /** Close the run server-side. Flushes the buffer first, then calls
    *  /finish with any trailing actions. Optionally pass `extras` to
    *  thread extra fields into the finish body (e.g. `durationMs` for
@@ -219,18 +233,15 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
   const [context, setContext] = useState<RunContext | null>(null);
   const [finishing, setFinishing] = useState(false);
   const bufferRef = useRef<Action[]>([]);
-  const inFlightRef = useRef<Promise<void> | null>(null);
+  // `inFlightRef` holds the in-flight flush's eventual result so a
+  // concurrent `flush()` call (or `finish()` that lands mid-flight)
+  // can await the same promise and read its post-ack state — instead
+  // of either racing React's render queue to see the updated context
+  // or 409-ing with a stale base. See T-0319 / T-0320.
+  const inFlightRef = useRef<Promise<FlushResult | null> | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contextRef = useRef<RunContext | null>(null);
   contextRef.current = context;
-  // Authoritative eventCount for *the next write*. `contextRef.current`
-  // is only fresh after a React render — but `flush()` and `finish()`
-  // run in the same microtask, so a `setContext(..)` inside flush isn't
-  // visible to finish's next line. This ref is updated synchronously
-  // every time the server acks a new eventCount (checkpoint happy path
-  // or 409 drift reconcile), so `finish()` can read the true base
-  // without racing React. See T-0319.
-  const latestEcRef = useRef<number | null>(null);
   // Keep the latest onReconcile in a ref so the flush closure doesn't
   // need to be rebuilt every render when the caller passes a fresh
   // function. React-standard "stable callback" pattern.
@@ -266,7 +277,6 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
       setContext(ctx);
       setReady(true);
       bufferRef.current = [];
-      latestEcRef.current = ctx.eventCount;
       return { context: ctx, state: res.state, resumed: res.resumed };
     },
     [],
@@ -323,106 +333,102 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
     };
   }, []);
 
-  const flush = useCallback(async () => {
+  const flush = useCallback(async (): Promise<FlushResult | null> => {
     const ctx = contextRef.current;
-    if (!ctx) return;
-    if (bufferRef.current.length === 0) return;
-    // Serialise flushes — never two in flight at once. If one is
-    // already running, the trailing actions queue in the buffer and
-    // this call returns; the in-flight flush drains them on its next
-    // tick via the post-send re-check.
+    if (!ctx) return null;
+    if (bufferRef.current.length === 0) return null;
+    // Serialise flushes — never two in flight at once. A concurrent
+    // caller awaits the same drain promise and inherits its final ack,
+    // which is what `finish()` needs to compute a fresh baseEventCount.
     if (inFlightRef.current) {
-      await inFlightRef.current;
-      return;
+      return inFlightRef.current;
     }
-    const batch = bufferRef.current.slice();
-    const sent = batch.length;
-    bufferRef.current = [];
-    const promise = (async () => {
-      const res = await postJSON<
-        | {
-            eventCount: number;
-            epoch: number;
-            state: GameState;
-          }
-        | {
-            __error: true;
-            status: number;
-            error?: string;
-            serverEventCount?: number;
-            state?: GameState;
-            epoch?: number;
-            engineVersionMismatch?: boolean;
-            // `status` field on the 409 body (distinct from HTTP status)
-            // identifies ended/invalidated runs — the server sends
-            // `status: 'ended' | 'invalidated'` at runtime even though
-            // `postJSON` collides the top-level `status` with the HTTP
-            // code. See runStatus below for the runtime-level read.
-          }
-      >(`/api/combine/runs/${ctx.runId}/checkpoint`, {
-        // Use the ref, not ctx.eventCount — if a prior flush in this
-        // same tick advanced the server, `ctx.eventCount` is stale.
-        baseEventCount: latestEcRef.current ?? ctx.eventCount,
-        actions: batch,
-      });
-      if (!res) {
-        // Network error or feature-off. Stash the batch back for a
-        // later retry; preserve ordering.
-        bufferRef.current = [...batch, ...bufferRef.current];
-        return;
-      }
-      if ("__error" in res) {
-        // Server returned a non-2xx. Reconcile on 409 (drift / engine
-        // version / ended run); drop silently on anything else so a
-        // single bad batch doesn't tombstone the run. See
-        // `parseReconcile` for the wire-shape mapping.
-        if (res.status === 409) {
-          const event = parseReconcile(res);
-          event.runId = ctx.runId;
-          // For ended/invalidated runs, drop the context so the caller
-          // can `start()` a fresh one. Engine-version mismatches are
-          // unrecoverable on the existing run id — the server will 409
-          // every subsequent write — so treat them the same way: drop
-          // the context and let the caller mint a new run. The
-          // event-count-drift case keeps the run id and just rewinds
-          // our local count to the server's truth.
-          if (event.reason === "run-ended" || event.reason === "engine-version") {
-            setContext(null);
-            latestEcRef.current = null;
-          } else if (event.eventCount !== null) {
-            latestEcRef.current = event.eventCount;
-            setContext((cur) =>
-              cur
-                ? {
-                    ...cur,
-                    eventCount: event.eventCount!,
-                    epoch: event.epoch ?? cur.epoch,
-                  }
-                : cur,
-            );
-          }
-          onReconcileRef.current?.(event);
+    // Drain the buffer in a loop: each POST's ack becomes the next
+    // POST's base, so new actions that landed during the previous
+    // flight don't stall waiting for the next idle debounce and
+    // don't race `contextRef` being stale between renders. Returns
+    // the final ack (or null if any step reconciled / failed).
+    const drain = async (): Promise<FlushResult | null> => {
+      let lastOk: FlushResult | null = null;
+      let base = ctx.eventCount;
+      while (bufferRef.current.length > 0) {
+        const batch = bufferRef.current.slice();
+        bufferRef.current = [];
+        const res = await postJSON<
+          | {
+              eventCount: number;
+              epoch: number;
+              state: GameState;
+            }
+          | {
+              __error: true;
+              status: number;
+              error?: string;
+              serverEventCount?: number;
+              state?: GameState;
+              epoch?: number;
+              engineVersionMismatch?: boolean;
+              // `status` field on the 409 body (distinct from HTTP status)
+              // identifies ended/invalidated runs — the server sends
+              // `status: 'ended' | 'invalidated'` at runtime even though
+              // `postJSON` collides the top-level `status` with the HTTP
+              // code. See runStatus below for the runtime-level read.
+            }
+        >(`/api/combine/runs/${ctx.runId}/checkpoint`, {
+          baseEventCount: base,
+          actions: batch,
+        });
+        if (!res) {
+          // Network error or feature-off. Stash the batch back for a
+          // later retry; preserve ordering.
+          bufferRef.current = [...batch, ...bufferRef.current];
+          return lastOk;
         }
-        return;
+        if ("__error" in res) {
+          // Server returned a non-2xx. Reconcile on 409 (drift / engine
+          // version / ended run); drop silently on anything else so a
+          // single bad batch doesn't tombstone the run. See
+          // `parseReconcile` for the wire-shape mapping.
+          if (res.status === 409) {
+            const event = parseReconcile(res);
+            event.runId = ctx.runId;
+            // For ended/invalidated runs, drop the context so the caller
+            // can `start()` a fresh one. Engine-version mismatches are
+            // unrecoverable on the existing run id — the server will 409
+            // every subsequent write — so treat them the same way: drop
+            // the context and let the caller mint a new run. The
+            // event-count-drift case keeps the run id and just rewinds
+            // our local count to the server's truth.
+            if (event.reason === "run-ended" || event.reason === "engine-version") {
+              setContext(null);
+            } else if (event.eventCount !== null) {
+              setContext((cur) =>
+                cur
+                  ? {
+                      ...cur,
+                      eventCount: event.eventCount!,
+                      epoch: event.epoch ?? cur.epoch,
+                    }
+                  : cur,
+              );
+            }
+            onReconcileRef.current?.(event);
+          }
+          return lastOk;
+        }
+        base = res.eventCount;
+        lastOk = { eventCount: res.eventCount, epoch: res.epoch, state: res.state };
+        setContext((cur) =>
+          cur ? { ...cur, eventCount: res.eventCount, epoch: res.epoch } : cur,
+        );
       }
-      latestEcRef.current = res.eventCount;
-      setContext((cur) =>
-        cur ? { ...cur, eventCount: res.eventCount, epoch: res.epoch } : cur,
-      );
-    })();
+      return lastOk;
+    };
+    const promise = drain();
     inFlightRef.current = promise.finally(() => {
       inFlightRef.current = null;
     });
-    await inFlightRef.current;
-    // If more actions landed during the flight, kick a tail flush so
-    // the buffer doesn't stall waiting for the next idle debounce.
-    if (bufferRef.current.length > 0) {
-      // Fire-and-forget; the next scheduled flush or an explicit call
-      // will pick it up.
-      void flush();
-    }
-    // Suppress "sent" unused-var warning — kept for future logging.
-    void sent;
+    return inFlightRef.current;
   }, []);
 
   const scheduleFlush = useCallback(() => {
@@ -455,22 +461,23 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
       if (!ctx) return null;
       setFinishing(true);
       try {
-        // Drain any pending flush first so the server sees everything
-        // in order.
-        await flush();
-        const pending = [...bufferRef.current, ...trailing];
-        bufferRef.current = [];
-        // `latestEcRef` is updated synchronously by flush() when the
-        // server acks a new eventCount, so it stays accurate even when
-        // React hasn't re-rendered yet (and thus `contextRef.current`
-        // still points at the pre-flush state). Without this,
-        // every daily completion whose terminal action lands in the
-        // flush just before /finish would 409 on event-count mismatch
-        // with no rescue, because stored.over was still false. T-0319.
-        const base =
-          latestEcRef.current ??
-          contextRef.current?.eventCount ??
-          ctx.eventCount;
+        // Drain the buffer completely before posting /finish. The loop
+        // handles the case where a tail flush was scheduled while an
+        // earlier flush was in flight — we need to be sure no actions
+        // are still outstanding, and that the base we send matches the
+        // last server ack. `flush()` is serialized by `inFlightRef`, so
+        // each iteration either runs a new drain or awaits the one in
+        // flight. The final ack's `eventCount` is the authoritative
+        // base; without this, a daily completion whose terminal action
+        // landed in a flush just before /finish would 409 on event-
+        // count mismatch with no rescue (T-0319).
+        let flushed: FlushResult | null = null;
+        while (bufferRef.current.length > 0 || inFlightRef.current) {
+          const r = await flush();
+          if (r) flushed = r;
+        }
+        const pending = trailing;
+        const base = flushed?.eventCount ?? ctx.eventCount;
         const res = await postJSON<
           | { state: GameState; eventCount: number; ended: boolean }
           | {
@@ -498,14 +505,12 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
             const event = parseReconcile(res);
             event.runId = ctx.runId;
             setContext(null);
-            latestEcRef.current = null;
             onReconcileRef.current?.(event);
           }
           return null;
         }
         // Clear the context — a finished run isn't ours to checkpoint anymore.
         setContext(null);
-        latestEcRef.current = null;
         return res.state;
       } finally {
         setFinishing(false);

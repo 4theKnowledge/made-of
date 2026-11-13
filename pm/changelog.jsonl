@@ -184,3 +184,4 @@
 {"id": "C-0184", "ts": "2026-11-11T22:58:38Z", "kind": "feature", "summary": "Combine: long-press a shored tile for a release-or-info action sheet (unshore; no charge refund)", "refs": {"task": "T-0318"}}
 {"id": "C-0185", "ts": "2026-11-11T23:10:43Z", "kind": "feature", "summary": "Combine dealer: kind-diversity cap + recency penalty on endless modes (T-0317); ENGINE_VERSION 6→7", "refs": {"task": "T-0317", "commit": "0312788"}}
 {"id": "C-0186", "ts": "2026-11-13T06:23:09Z", "kind": "fix", "summary": "daily combine finish writes progress row + leaderboard rank; closes stale-ref 409 race (T-0319)", "refs": {"task": "T-0319"}}
+{"id": "C-0187", "ts": "2026-11-13T22:31:08Z", "kind": "refactor", "summary": "useCombineRun: flush() returns FlushResult, drop latestEcRef bolt-on (T-0320)", "refs": {"task": "T-0320"}}
