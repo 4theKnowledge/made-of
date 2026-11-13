@@ -171,14 +171,26 @@ export async function POST(
         rescued: "event-count",
       });
     }
-    return NextResponse.json(
-      {
-        error: "event count mismatch",
-        serverEventCount: run.eventCount,
-        state: run.stateJson,
-      },
-      { status: 409 },
-    );
+    // Defense-in-depth for the race where the client's `baseEventCount`
+    // is stale but it did ship its terminating action(s) in `actions`
+    // (classic symptom: /checkpoint for the winning move and /finish fire
+    // in the same tick; client reads a stale ref for base). Rather than
+    // 409 and lose the run on the leaderboard, try the replay against the
+    // *stored* state with the client's actions — if it terminates in
+    // `over`, we treat this as a valid finish. The happy-path replay
+    // block below is reused; we just need to not 409 here. If the replay
+    // doesn't reach `over`, the existing `!final.over` 422 fires. T-0319.
+    if (parsed.length === 0) {
+      return NextResponse.json(
+        {
+          error: "event count mismatch",
+          serverEventCount: run.eventCount,
+          state: run.stateJson,
+        },
+        { status: 409 },
+      );
+    }
+    // fall through to replay
   }
 
   let bundle;

@@ -223,6 +223,14 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contextRef = useRef<RunContext | null>(null);
   contextRef.current = context;
+  // Authoritative eventCount for *the next write*. `contextRef.current`
+  // is only fresh after a React render — but `flush()` and `finish()`
+  // run in the same microtask, so a `setContext(..)` inside flush isn't
+  // visible to finish's next line. This ref is updated synchronously
+  // every time the server acks a new eventCount (checkpoint happy path
+  // or 409 drift reconcile), so `finish()` can read the true base
+  // without racing React. See T-0319.
+  const latestEcRef = useRef<number | null>(null);
   // Keep the latest onReconcile in a ref so the flush closure doesn't
   // need to be rebuilt every render when the caller passes a fresh
   // function. React-standard "stable callback" pattern.
@@ -258,6 +266,7 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
       setContext(ctx);
       setReady(true);
       bufferRef.current = [];
+      latestEcRef.current = ctx.eventCount;
       return { context: ctx, state: res.state, resumed: res.resumed };
     },
     [],
@@ -351,7 +360,9 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
             // code. See runStatus below for the runtime-level read.
           }
       >(`/api/combine/runs/${ctx.runId}/checkpoint`, {
-        baseEventCount: ctx.eventCount,
+        // Use the ref, not ctx.eventCount — if a prior flush in this
+        // same tick advanced the server, `ctx.eventCount` is stale.
+        baseEventCount: latestEcRef.current ?? ctx.eventCount,
         actions: batch,
       });
       if (!res) {
@@ -377,7 +388,9 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
           // our local count to the server's truth.
           if (event.reason === "run-ended" || event.reason === "engine-version") {
             setContext(null);
+            latestEcRef.current = null;
           } else if (event.eventCount !== null) {
+            latestEcRef.current = event.eventCount;
             setContext((cur) =>
               cur
                 ? {
@@ -392,6 +405,7 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
         }
         return;
       }
+      latestEcRef.current = res.eventCount;
       setContext((cur) =>
         cur ? { ...cur, eventCount: res.eventCount, epoch: res.epoch } : cur,
       );
@@ -446,7 +460,17 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
         await flush();
         const pending = [...bufferRef.current, ...trailing];
         bufferRef.current = [];
-        const base = contextRef.current?.eventCount ?? ctx.eventCount;
+        // `latestEcRef` is updated synchronously by flush() when the
+        // server acks a new eventCount, so it stays accurate even when
+        // React hasn't re-rendered yet (and thus `contextRef.current`
+        // still points at the pre-flush state). Without this,
+        // every daily completion whose terminal action lands in the
+        // flush just before /finish would 409 on event-count mismatch
+        // with no rescue, because stored.over was still false. T-0319.
+        const base =
+          latestEcRef.current ??
+          contextRef.current?.eventCount ??
+          ctx.eventCount;
         const res = await postJSON<
           | { state: GameState; eventCount: number; ended: boolean }
           | {
@@ -474,12 +498,14 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
             const event = parseReconcile(res);
             event.runId = ctx.runId;
             setContext(null);
+            latestEcRef.current = null;
             onReconcileRef.current?.(event);
           }
           return null;
         }
         // Clear the context — a finished run isn't ours to checkpoint anymore.
         setContext(null);
+        latestEcRef.current = null;
         return res.state;
       } finally {
         setFinishing(false);
