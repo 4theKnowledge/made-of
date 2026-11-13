@@ -24,10 +24,13 @@ import {
   buildClusterManifest,
   buildManifestForDay,
   computeDifficulty,
+  filterManifestPool,
+  manifestTurnBudget,
   resolveManifestPool,
   UnreachablePin,
   UnreachableManifest,
 } from "./manifest-solver";
+import { DEFAULT_MANIFEST_SIZE } from "./daily-config";
 
 /** Pool size below which cluster sampling degenerates — not enough items
  *  to find `m` seeds at `MIN_SEED_DISTANCE` apart. Below this threshold
@@ -211,11 +214,27 @@ export async function scheduleActiveDaily(
     // run a budgeted sample + skip sim-unsolvable items instead of
     // discovering them day-by-day through failed sim retries.
     const difficulty = computeDifficulty(cappedBundle, themeCode);
+    // Hoist the sampler-eligible pool + turn budget: both depend only
+    // on (bundle, config, pool, difficulty), none of which change
+    // across the 30-day loop. Doing the filter once saves an
+    // `isReachable` sweep per day.
+    const filtered = filterManifestPool({
+      cappedBundle,
+      config: dailyConfig.manifest,
+      pool: resolvedPool,
+      difficulty,
+    });
+    const sharedTurnBudget = manifestTurnBudget({
+      size: dailyConfig.manifest.size ?? DEFAULT_MANIFEST_SIZE,
+      pool: filtered.reachablePool,
+      difficulty,
+    });
     const manifestHistory = buildManifestRotation(priorRows, startDay);
     const useClusterSampler = resolvedPool.length >= CLUSTER_SAMPLER_MIN_POOL;
     for (let i = 0; i < toUpsert.length; i++) {
       const row = toUpsert[i];
       try {
+        if (filtered.unreachablePin) throw new UnreachablePin(filtered.unreachablePin);
         const build = useClusterSampler
           ? buildClusterManifest({
               cappedBundle,
@@ -223,8 +242,10 @@ export async function scheduleActiveDaily(
               config: dailyConfig.manifest,
               day: row.day,
               pool: resolvedPool,
+              reachablePool: filtered.reachablePool,
               rotation: perDayRotation(manifestHistory, row.day),
               difficulty,
+              turnBudget: sharedTurnBudget,
             })
           : buildManifestForDay({
               cappedBundle,
@@ -232,8 +253,10 @@ export async function scheduleActiveDaily(
               config: dailyConfig.manifest,
               day: row.day,
               pool: resolvedPool,
+              reachablePool: filtered.reachablePool,
               rotation: perDayRotation(manifestHistory, row.day),
               difficulty,
+              turnBudget: sharedTurnBudget,
             });
         const { manifest } = build;
         row.payload = { ...row.payload, manifest };
@@ -254,6 +277,10 @@ export async function scheduleActiveDaily(
           throw err;
         }
       }
+      // Yield the event loop so concurrent API requests get served
+      // between days. Without this, the 30-day loop monopolises the
+      // Node worker for the duration of the regenerate.
+      await new Promise((r) => setImmediate(r));
     }
   }
 
@@ -280,6 +307,7 @@ export async function scheduleActiveDaily(
         set: { payload: row.payload },
       });
     written.push(row);
+    await new Promise((r) => setImmediate(r));
   }
 
   return {

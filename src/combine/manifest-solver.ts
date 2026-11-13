@@ -667,6 +667,62 @@ const MANIFEST_RESAMPLE_ATTEMPTS = 5;
  *  pools, bump to 2.0; too loose, drop to 1.2. */
 const DIFFICULTY_CEILING_MULTIPLIER = 1.5;
 
+/** Filter a raw manifest pool down to the sampler-eligible items for a
+ *  given bundle: reachable outputs, minus pins, minus sim-unsolvable
+ *  items when a difficulty map is present. Pulled out of the per-day
+ *  builders so a schedule build can run it once and share across all
+ *  days (the pool, pins, bundle, and difficulty don't change day to
+ *  day — only `rotation` and per-day `badOnDay` do). */
+export function filterManifestPool(args: {
+  cappedBundle: ThemeBundle;
+  config: NonNullable<DailyConfig["manifest"]>;
+  pool: string[];
+  difficulty?: DifficultyMap;
+}): { reachablePool: string[]; unreachablePin: string | null } {
+  const { cappedBundle, config, pool, difficulty } = args;
+  const pins = config.pins ?? [];
+  const cache = new Map<string, boolean>();
+  for (const p of pins) {
+    if (!isReachable(p, cappedBundle, cache)) {
+      return { reachablePool: [], unreachablePin: p };
+    }
+  }
+  const pinSet = new Set(pins);
+  const reachablePool = pool.filter((id) => {
+    if (pinSet.has(id)) return false;
+    if (!isReachable(id, cappedBundle, cache)) return false;
+    if (difficulty) {
+      const d = difficulty.get(id);
+      if (d === null || d === undefined) return false;
+    }
+    return true;
+  });
+  return { reachablePool, unreachablePin: null };
+}
+
+/** Derive the per-manifest `turnBudget` from a difficulty map + pool.
+ *  Exposed so the schedule builder can compute it once per bundle and
+ *  pass it in, rather than recomputing the same median per day. */
+export function manifestTurnBudget(args: {
+  size: number;
+  pool: string[];
+  difficulty?: DifficultyMap;
+}): number {
+  const { size, pool, difficulty } = args;
+  if (difficulty) {
+    const solvable: number[] = [];
+    for (const id of pool) {
+      const x = difficulty.get(id);
+      if (typeof x === "number") solvable.push(x);
+    }
+    if (solvable.length > 0) {
+      const m = median(solvable);
+      return Math.max(320, Math.round(size * m * 2));
+    }
+  }
+  return 2 * size * 20;
+}
+
 /** Build the frozen per-day manifest. Picks admin-pinned items first,
  *  fills the rest from the pool with rotation weighting + difficulty
  *  budgeting, verifies with the headless simulator. Resamples the
@@ -681,7 +737,12 @@ const DIFFICULTY_CEILING_MULTIPLIER = 1.5;
  *  dropped from the pool and the sampler enforces a total-difficulty
  *  budget. When omitted, the solver falls back to the pre-T-0250
  *  behaviour (raw sample, no budget) — kept for tests and for callers
- *  that can't afford the precompute. */
+ *  that can't afford the precompute.
+ *
+ *  `reachablePool` is optional. When passed, the builder skips its own
+ *  reachability + difficulty filter — the caller has already produced
+ *  the sampler-eligible pool (e.g. via `filterManifestPool`) and is
+ *  reusing it across many days of a schedule build. */
 export function buildManifestForDay(args: {
   cappedBundle: ThemeBundle;
   theme: ThemeKey;
@@ -691,6 +752,7 @@ export function buildManifestForDay(args: {
   rotation: Map<string, number>;
   turnBudget?: number;
   difficulty?: DifficultyMap;
+  reachablePool?: string[];
 }): { manifest: string[]; turnsToSolve: number } {
   const {
     cappedBundle,
@@ -703,46 +765,23 @@ export function buildManifestForDay(args: {
   } = args;
   const size = config.size ?? DEFAULT_MANIFEST_SIZE;
   const pins = config.pins ?? [];
-  // Turn budget: if we have difficulty data, scale from the actual
-  // median solo-solve turns (the sim needs at least that much per item
-  // in series, plus overhead for tray-sharing between items). Fall back
-  // to the T-0237 heuristic when no difficulty map is available.
-  const budgetFromDifficulty = args.difficulty
-    ? (() => {
-        const d = args.difficulty;
-        const solvable: number[] = [];
-        for (const id of rawPool) {
-          const x = d.get(id);
-          if (typeof x === "number") solvable.push(x);
-        }
-        if (solvable.length === 0) return null;
-        const m = median(solvable);
-        // 2× per-item median gives headroom for shared-tray contention;
-        // minimum 320 so small-manifest runs don't starve.
-        return Math.max(320, Math.round(size * m * 2));
-      })()
-    : null;
-  const turnBudget = args.turnBudget ?? budgetFromDifficulty ?? 2 * size * 20;
-  const cache = new Map<string, boolean>();
-  // 1. Validate pins are reachable.
-  for (const p of pins) {
-    if (!isReachable(p, cappedBundle, cache)) {
-      throw new UnreachablePin(p);
-    }
+  let reachablePool: string[];
+  if (args.reachablePool) {
+    // Caller already validated pins + filtered the pool. Trust it.
+    reachablePool = args.reachablePool;
+  } else {
+    const filtered = filterManifestPool({
+      cappedBundle,
+      config,
+      pool: rawPool,
+      difficulty,
+    });
+    if (filtered.unreachablePin) throw new UnreachablePin(filtered.unreachablePin);
+    reachablePool = filtered.reachablePool;
   }
-  // 2. Filter the pool: reachable outputs only, minus pins. If we have a
-  //    difficulty map, also drop sim-unsolvable items — they'd dominate
-  //    the sample and fail sim every time.
-  const pinSet = new Set(pins);
-  const reachablePool = rawPool.filter((id) => {
-    if (pinSet.has(id)) return false;
-    if (!isReachable(id, cappedBundle, cache)) return false;
-    if (difficulty) {
-      const d = difficulty.get(id);
-      if (d === null || d === undefined) return false;
-    }
-    return true;
-  });
+  const turnBudget =
+    args.turnBudget ??
+    manifestTurnBudget({ size, pool: reachablePool, difficulty });
   if (pins.length + reachablePool.length < size) {
     throw new UnreachableManifest(pins, day);
   }
@@ -986,6 +1025,10 @@ export function buildClusterManifest(args: {
   difficulty?: DifficultyMap;
   /** Optional cluster count override. Defaults to `max(1, floor(sqrt(size)))`. */
   m?: number;
+  /** Pre-filtered sampler-eligible pool. Same semantics as
+   *  `buildManifestForDay.reachablePool` — lets a schedule build reuse
+   *  one filter across all days. */
+  reachablePool?: string[];
 }): ClusterManifest {
   const {
     cappedBundle,
@@ -1000,38 +1043,28 @@ export function buildClusterManifest(args: {
   const pins = config.pins ?? [];
   const picksNeeded = size - pins.length;
   const m = Math.max(1, args.m ?? Math.floor(Math.sqrt(size)));
+
+  let reachablePool: string[];
+  if (args.reachablePool) {
+    reachablePool = args.reachablePool;
+  } else {
+    const filtered = filterManifestPool({
+      cappedBundle,
+      config,
+      pool: rawPool,
+      difficulty,
+    });
+    if (filtered.unreachablePin) throw new UnreachablePin(filtered.unreachablePin);
+    reachablePool = filtered.reachablePool;
+  }
   const turnBudget =
     args.turnBudget ??
-    (difficulty
-      ? (() => {
-          const solvable: number[] = [];
-          for (const id of rawPool) {
-            const x = difficulty.get(id);
-            if (typeof x === "number") solvable.push(x);
-          }
-          if (solvable.length === 0) return 320;
-          const med = median(solvable);
-          return Math.max(320, Math.round(size * med * 2));
-        })()
-      : 2 * size * 20);
+    manifestTurnBudget({ size, pool: reachablePool, difficulty });
 
-  const cache = new Map<string, boolean>();
-  for (const p of pins) {
-    if (!isReachable(p, cappedBundle, cache)) throw new UnreachablePin(p);
-  }
-  const pinSet = new Set(pins);
-  const reachablePool = rawPool.filter((id) => {
-    if (pinSet.has(id)) return false;
-    if (!isReachable(id, cappedBundle, cache)) return false;
-    if (difficulty) {
-      const d = difficulty.get(id);
-      if (d === null || d === undefined) return false;
-    }
-    return true;
-  });
   if (pins.length + reachablePool.length < size) {
     throw new UnreachableManifest(pins, day);
   }
+  const pinSet = new Set(pins);
 
   const badOnDay = new Set<string>();
   let lastPicks: string[] = [];

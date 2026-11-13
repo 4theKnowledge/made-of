@@ -194,3 +194,4 @@
 {"id": "C-0194", "ts": "2026-11-13T23:08:45Z", "kind": "fix", "summary": "Combine tile labels: word-aware tier selection + l3 size + fade mask for long multi-word names", "refs": {"task": "T-0328"}}
 {"id": "C-0195", "ts": "2026-11-13T23:14:56Z", "kind": "fix", "summary": "Combine Daily: soft-block the entry when today's manifest is empty (\"Check back tomorrow\")", "refs": {"task": "T-0329"}}
 {"id": "C-0196", "ts": "2026-11-13T23:21:01Z", "kind": "fix", "summary": "Admin: allow saving an empty explicit manifest for a daily (soft-block testing)", "refs": {"task": "T-0331"}}
+{"id": "C-0197", "ts": "2026-11-13T23:25:07Z", "kind": "fix", "summary": "Daily Combine regenerate no longer blocks concurrent API traffic (T-0330)", "refs": {"task": "T-0330"}}
