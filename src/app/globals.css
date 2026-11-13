@@ -1923,7 +1923,9 @@ a.btn.primary{color:var(--bg)}
 .cbdaily.done{gap:10px}
 .cbdaily.done .cbh{align-self:stretch;justify-content:center;margin-top:6px}
 
-.cbbook{max-height:min(640px, calc(100dvh - 28px));overflow:hidden}
+.cbbook{height:min(640px, calc(100dvh - 28px));max-height:min(640px, calc(100dvh - 28px));overflow:hidden}
+.cbbook .cbbooklist,.cbbook .cbbookages{flex:1 1 auto;min-height:0}
+@media (max-width: 600px){.cbbook{height:88dvh;max-height:88dvh}}
 .cbbook .big2{font-family:var(--mono);font-size:30px;line-height:1}
 .cbbook .big2 small{font-size:14px;color:var(--muted)}
 .cbbar{width:100%;height:8px;border:1.5px solid var(--ink);border-radius:5px;overflow:hidden;background:var(--surface);flex:none}
@@ -1976,6 +1978,16 @@ a.btn.primary{color:var(--bg)}
 .cbbooktabs{display:flex;gap:4px;width:100%;padding:3px;border:1.5px solid var(--ink);border-radius:4px;background:var(--surface);box-sizing:border-box}
 .cbbooktab{flex:1;padding:6px 8px;border:0;border-radius:3px;background:transparent;color:var(--ink);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
 .cbbooktab.on{background:var(--ink);color:var(--bg)}
+.cbbooksearch{position:relative;display:flex;align-items:center;gap:6px;width:100%;padding:0 10px;border:1.5px solid var(--ink);border-radius:4px;background:var(--surface);box-sizing:border-box;transition:border-color .12s ease, box-shadow .12s ease}
+.cbbooksearch:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)}
+.cbbooksearch-icon{flex:none;font-size:14px;color:var(--muted);line-height:1}
+.cbbooksearch input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font:inherit;font-size:16px;padding:9px 0;letter-spacing:0}
+.cbbooksearch input::placeholder{color:var(--muted)}
+.cbbooksearch input::-webkit-search-cancel-button,.cbbooksearch input::-webkit-search-decoration{-webkit-appearance:none;appearance:none}
+.cbbooksearch-count{flex:none;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.02em;padding:0 4px;border-radius:7px;background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.cbbooksearch-clear{flex:none;border:0;background:transparent;color:var(--muted);font:inherit;font-size:18px;line-height:1;padding:4px 2px;cursor:pointer;border-radius:3px}
+.cbbooksearch-clear:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.cbbooksearch-empty{padding:12px 4px;text-align:center}
 .cbbooksort{display:flex;align-items:center;gap:8px;align-self:flex-start;font-size:12px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em}
 .cbbooksort select{font:inherit;font-size:12px;padding:3px 6px;border:1.5px solid var(--ink);border-radius:3px;background:var(--surface);color:var(--ink);text-transform:none;letter-spacing:0}
 .cbbooklist{width:100%;overflow:auto;display:flex;flex-direction:column;gap:6px;text-align:left;padding:2px;box-sizing:border-box}

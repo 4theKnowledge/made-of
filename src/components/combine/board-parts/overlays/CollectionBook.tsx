@@ -202,6 +202,9 @@ export function CollectionBook({
   }, [masteryByItem]);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [sort, setSort] = useState<"recent" | "alpha" | "kind" | "chapter">("recent");
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const q = query.trim().toLowerCase();
   // Recipes for every discovered output, grouped by id. The quick-lookup
   // list renders these inline so players don't have to tap through each
   // item to see how it's made.
@@ -219,7 +222,12 @@ export function CollectionBook({
     return m;
   }, [bundle.recipes, findsForTheme]);
   const sortedFinds = useMemo(() => {
-    const ids = [...findsForTheme.keys()];
+    const ids = q
+      ? [...findsForTheme.keys()].filter((id) => {
+          const name = bundle.items.get(id)?.name;
+          return !!name && name.toLowerCase().includes(q);
+        })
+      : [...findsForTheme.keys()];
     switch (sort) {
       case "alpha":
         return ids.sort((a, b) => {
@@ -249,7 +257,31 @@ export function CollectionBook({
           (a, b) => (findsForTheme.get(b) ?? 0) - (findsForTheme.get(a) ?? 0),
         );
     }
-  }, [findsForTheme, sort, bundle.items, bundle.outBand, cat.no]);
+  }, [findsForTheme, sort, bundle.items, bundle.outBand, cat.no, q]);
+
+  // Grid view: precompute per-kind filtered items and total match counts so
+  // we can hide empty kind sections and show a single "X of Y" tally.
+  const filteredKinds = useMemo(() => {
+    if (!q) {
+      let total = 0;
+      for (const { items } of catKinds.kinds) total += items.length;
+      return { kinds: catKinds.kinds, matched: total, total };
+    }
+    let matched = 0;
+    let total = 0;
+    const kinds = catKinds.kinds
+      .map(({ kind, items }) => {
+        total += items.length;
+        const filtered = items.filter((id) => {
+          const name = bundle.items.get(id)?.name;
+          return !!name && name.toLowerCase().includes(q);
+        });
+        matched += filtered.length;
+        return { kind, items: filtered };
+      })
+      .filter((k) => k.items.length > 0);
+    return { kinds, matched, total };
+  }, [catKinds.kinds, bundle.items, q]);
   return (
     <ResponsiveSheet
       open
@@ -332,6 +364,46 @@ export function CollectionBook({
             Discoveries ({got})
           </button>
         </div>
+        {(got > 0 || view === "grid") && (
+          <div className="cbbooksearch" role="search">
+            <span className="cbbooksearch-icon" aria-hidden="true">⌕</span>
+            <input
+              ref={searchRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={
+                view === "grid" ? "Search items…" : "Search discoveries…"
+              }
+              aria-label="Search collection"
+              inputMode="search"
+              enterKeyHint="search"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+            {query && (
+              <>
+                <span className="cbbooksearch-count" aria-live="polite">
+                  {view === "grid"
+                    ? `${filteredKinds.matched}/${filteredKinds.total}`
+                    : `${sortedFinds.length}/${got}`}
+                </span>
+                <button
+                  type="button"
+                  className="cbbooksearch-clear"
+                  aria-label="Clear search"
+                  onClick={() => {
+                    setQuery("");
+                    searchRef.current?.focus();
+                  }}
+                >
+                  ×
+                </button>
+              </>
+            )}
+          </div>
+        )}
         {view === "list" && got > 0 && (
           <div className="cbbooksort">
             <label htmlFor="cbbooksortsel">Sort</label>
@@ -354,6 +426,10 @@ export function CollectionBook({
             {got === 0 ? (
               <p className="sub">
                 No discoveries yet. Find combos in a run to fill this list.
+              </p>
+            ) : sortedFinds.length === 0 ? (
+              <p className="sub cbbooksearch-empty">
+                No discoveries match “{query.trim()}”.
               </p>
             ) : (
               sortedFinds.map((id) => {
@@ -489,7 +565,12 @@ export function CollectionBook({
           </div>
         ) : (
         <div className="cbbookages">
-          {catKinds.kinds.map(({ kind, items }) => {
+          {filteredKinds.kinds.length === 0 && (
+            <p className="sub cbbooksearch-empty">
+              No items match “{query.trim()}”.
+            </p>
+          )}
+          {filteredKinds.kinds.map(({ kind, items }) => {
             const kindGot = items.filter((x) => findsForTheme.has(x)).length;
             return (
               <div key={kind} className="cbbage">
