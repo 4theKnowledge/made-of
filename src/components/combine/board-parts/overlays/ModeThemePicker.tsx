@@ -75,6 +75,11 @@ interface Props {
   currentDaily: string | null;
   currentTheme: string;
   dailyEnabled: boolean;
+  /** T-0329: today's daily payload exists but its manifest is empty (admin
+   *  pruning / solver gave up). Picker renders the Daily tile as disabled
+   *  with a "Check back tomorrow" subtitle so the player can't launch an
+   *  unwinnable run. */
+  dailyManifestEmpty?: boolean;
   themes: PickerTheme[];
   /** T-0217 slice 3: theme codes the signed-in user has completed at the
    *  current `collectionVersion`. Renders a ✓ chip on matching tiles.
@@ -107,6 +112,7 @@ export function ModeThemePicker({
   currentDaily,
   currentTheme,
   dailyEnabled,
+  dailyManifestEmpty = false,
   themes,
   completedThemes,
   onDismiss,
@@ -148,12 +154,17 @@ export function ModeThemePicker({
   const dirty = mode !== currentPickerMode || theme !== currentTheme;
   const confirmLabel =
     mode === "daily"
-      ? "Play today's daily"
+      ? dailyManifestEmpty
+        ? "No daily today · check back tomorrow"
+        : "Play today's daily"
       : `Play ${mode === "fast" ? "Fast" : "Endless"} · ${
           themes.find((t) => t.code === theme)?.label ?? theme
         }`;
 
-  const canConfirm = mode === "daily" || themes.some((t) => t.code === theme);
+  const canConfirm =
+    mode === "daily"
+      ? !dailyManifestEmpty
+      : themes.some((t) => t.code === theme);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   return (
@@ -302,19 +313,22 @@ export function ModeThemePicker({
         {visibleModes.map((m) => {
           const on = mode === m.k;
           const isCurrent = currentPickerMode === m.k;
+          const dailyUnavailable = m.k === "daily" && dailyManifestEmpty;
+          const tag = dailyUnavailable ? "Check back tomorrow" : m.tag;
           return (
             <button
               key={m.k}
               type="button"
               role="radio"
               aria-checked={on}
-              aria-label={`Mode: ${m.name}${isCurrent ? ", currently playing" : ""}`}
+              aria-label={`Mode: ${m.name}${isCurrent ? ", currently playing" : ""}${dailyUnavailable ? ", unavailable today" : ""}`}
               className={`cbmtpTile cbmtpTileFit${isCurrent ? " current" : on ? " on" : ""}`}
               onClick={() => setMode(m.k)}
+              disabled={dailyUnavailable}
             >
               <Pictogram name={`mode:${m.k}`} tier={m.tier} kind="object" pictogram={m.picto} />
               <b>{m.name}</b>
-              <span className="t">{m.tag}</span>
+              <span className="t">{tag}</span>
             </button>
           );
         })}

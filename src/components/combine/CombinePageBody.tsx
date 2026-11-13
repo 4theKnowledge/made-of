@@ -107,11 +107,17 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
   let dailyPayloadSeed: number | null = null;
   let dailyManifest: string[] | null = null;
   let dailyManifestPartnerBias: number | null = null;
+  // Rare edge case (T-0329): a payload exists for today but its manifest
+  // resolved to zero items — admin pruning, misconfigured pool, solver
+  // gave up. UI greys out Daily with a "check back tomorrow" message
+  // rather than launching an unwinnable run.
+  let dailyManifestEmpty = false;
   const todaysPayload = await getDailyPayload(dailyHostTheme, today);
   if (todaysPayload) {
     dailyPayloadSeed = todaysPayload.seed;
     dailyManifest = todaysPayload.manifest.length > 0 ? todaysPayload.manifest : null;
     dailyManifestPartnerBias = todaysPayload.config.manifest?.partnerBias ?? null;
+    dailyManifestEmpty = todaysPayload.manifest.length === 0;
   }
   if (activeDaily && todaysPayload && todaysPayload.guestOutputIds.length > 0) {
     const fullThemeBundle = buildThemeBundle(
@@ -205,6 +211,7 @@ export async function CombinePageBody({ theme: themeParam, mode: modeParam }: Pr
         dailyPayloadSeed={dailyEnabled ? dailyPayloadSeed : null}
         dailyManifest={dailyEnabled ? dailyManifest : null}
         dailyManifestPartnerBias={dailyEnabled ? dailyManifestPartnerBias : null}
+        dailyManifestEmpty={dailyEnabled ? dailyManifestEmpty : false}
         dailyEnabled={dailyEnabled}
         admin={admin}
         signedIn={signedIn}

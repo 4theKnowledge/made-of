@@ -151,6 +151,10 @@ interface Props {
    *  partners). Frozen on the payload's `config.manifest.partnerBias`.
    *  Null falls through to the engine's default coercion. */
   dailyManifestPartnerBias?: number | null;
+  /** True iff a daily payload exists for today but its manifest is empty
+   *  (T-0329). When true the Daily entry is soft-blocked: picker tile reads
+   *  "Check back tomorrow" and `startDaily()` is a no-op. */
+  dailyManifestEmpty?: boolean;
   /** Feature flag — when false, hide every daily entry point (deep-link
    *  resolution, auto-open on first visit, theme-menu Daily option).
    *  Server-side gate runs `env flag OR isAdmin()` before passing. */
@@ -229,6 +233,7 @@ export function CombineBoard({
   dailyPayloadSeed = null,
   dailyManifest = null,
   dailyManifestPartnerBias = null,
+  dailyManifestEmpty = false,
   dailyEnabled = true,
   admin = false,
   signedIn = false,
@@ -420,7 +425,10 @@ export function CombineBoard({
     const sp =
       typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
     const deepLinkDay = sp?.get("d");
-    if (dailyEnabled && deepLinkDay && deepLinkDay === todayKey()) {
+    // Empty-manifest daily (T-0329): skip the deep-link daily branch and
+    // fall through to the endless resume path so the player isn't dropped
+    // into an unwinnable run from a shared ?d= URL.
+    if (dailyEnabled && !dailyManifestEmpty && deepLinkDay && deepLinkDay === todayKey()) {
       const day = deepLinkDay;
       const dailyBundle = dailyBundles[dailyHostTheme];
       const saved = loadGame(dailyBundle, { daily: day, expectedSeed: dailyPayloadSeed });
@@ -532,7 +540,7 @@ export function CombineBoard({
       setState(hydrateGame(endlessSave));
       return;
     }
-    if (dailyEnabled && (admin || !loadDailyDone(today))) {
+    if (dailyEnabled && !dailyManifestEmpty && (admin || !loadDailyDone(today))) {
       const dailyBundle = dailyBundles[dailyHostTheme];
       const saved = loadGame(dailyBundle, { daily: today, expectedSeed: dailyPayloadSeed });
       setState(
@@ -547,7 +555,7 @@ export function CombineBoard({
             }).state,
       );
     }
-  }, [activeTheme, initialMode, themeFromUrl, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyPayloadSeed, dailyManifest, dailyManifestPartnerBias, dailyEnabled, run.ready, admin]);
+  }, [activeTheme, initialMode, themeFromUrl, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyPayloadSeed, dailyManifest, dailyManifestPartnerBias, dailyManifestEmpty, dailyEnabled, run.ready, admin]);
 
   // Server run alignment. Each time the local state settles on a fresh
   // (mode, theme, dailyKey) slot, register a matching server run. The
@@ -1560,6 +1568,10 @@ export function CombineBoard({
     // UI should never surface the entry point, but any stray callback
     // (stale onClick ref, keyboard shortcut) short-circuits here too.
     if (!dailyEnabled) return;
+    // T-0329: empty-manifest daily — picker greys out the tile; this is
+    // the belt check in case the confirm fires anyway (stale state,
+    // keyboard).
+    if (dailyManifestEmpty) return;
     const day = todayKey();
     // Admins bypass the dailyDone lock so they can replay today's daily
     // as many times as they want for playtesting. Regular players still
@@ -1602,7 +1614,7 @@ export function CombineBoard({
       setDailyStartPending(true);
     }
     resetTransient();
-  }, [bundles, dailyBundles, dailyHostTheme, state, resetTransient, dailyPayloadSeed, dailyManifest, dailyManifestPartnerBias, dailyEnabled, admin]);
+  }, [bundles, dailyBundles, dailyHostTheme, state, resetTransient, dailyPayloadSeed, dailyManifest, dailyManifestPartnerBias, dailyManifestEmpty, dailyEnabled, admin]);
 
   // Player tapped "Start" on the Start-daily sheet. Stamps the clock
   // locally + server-side (T-0247: `run.markStartedDaily()` so a
@@ -2908,6 +2920,7 @@ export function CombineBoard({
             currentDaily={state.daily}
             currentTheme={state.theme}
             dailyEnabled={dailyEnabled}
+            dailyManifestEmpty={dailyManifestEmpty}
             themes={publishedThemes}
             completedThemes={completedThemeCodes}
             dailyDone={!!dailyDone}

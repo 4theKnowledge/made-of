@@ -92,6 +92,15 @@ export async function POST(req: Request) {
   // doesn't fire on a zero-length list. `partnerBias` (T-0245) comes
   // from the same payload's config.
   const manifestInfo = await dailyManifestForRun(theme, dailyKey);
+  // T-0329: refuse daily runs whose payload has no manifest items. UI
+  // greys out the entry; this is the defensive gate for stale clients /
+  // direct POSTs. Endless/fast skip this (manifestInfo is null anyway).
+  if (mode === "daily" && manifestInfo && manifestInfo.manifest.length === 0) {
+    return NextResponse.json(
+      { error: "daily unavailable", reason: "empty_manifest" },
+      { status: 409 },
+    );
+  }
   const state = newServerGame({
     mode,
     theme,
