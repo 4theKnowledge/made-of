@@ -19,6 +19,7 @@ import {
   buildClusterManifest,
   buildManifestForDay,
   computeDifficulty,
+  isReachable,
   resolveManifestPool,
   UnreachableManifest,
   UnreachablePin,
@@ -33,19 +34,26 @@ const CLUSTER_SAMPLER_MIN_POOL = 20;
  *  future day's guest ingredients and/or add extra manifest pins without
  *  regenerating the whole 30-day window.
  *
- *  Body: `{ guestOutputIds?: string[], extraPins?: string[] }`.
+ *  Body: `{ guestOutputIds?, extraPins?, explicitManifest?, rerollSalt? }`.
  *   - `guestOutputIds` (optional): replaces the day's guest list. Each
  *     id must be in the current guest pool for the active config's
  *     capped bundle — ids not in the pool are rejected.
  *   - `extraPins` (optional): added to the config's existing pins for
  *     this day only. Merged pins become the pin set the solver uses
- *     when rebuilding the manifest. Original config stays unchanged.
+ *     when rebuilding the manifest. Ignored when `explicitManifest` is
+ *     also provided.
+ *   - `explicitManifest` (optional): a hand-curated manifest that
+ *     bypasses the solver. Each id must be reachable in the capped
+ *     bundle; unreachable ids reject with 400. Length must be ≥ 1 and
+ *     ≤ `config.manifest.size` (if a manifest config exists).
+ *   - `rerollSalt` (optional): integer appended to the solver's day
+ *     input to force a different RNG stream. Lets the admin keep
+ *     clicking Reroll until they see a manifest they like. Ignored
+ *     when `explicitManifest` is also provided. The row's `payload.seed`
+ *     (which drives the player's board at runtime) stays stable.
  *
  *  Rules:
- *   - 400 if `day` isn't `yyyy-mm-dd` or `day <= today` (today's row is
- *     reserved for `resetTodaySchedule`; past days are immutable).
- *   - 400 if no active daily or active config has no manifest (we need
- *     a solver pool to rebuild the manifest).
+ *   - 400 if `day` isn't `yyyy-mm-dd` or `day < today`.
  *   - Seed stays stable: existing row's seed is preserved; if no row
  *     exists yet, we use `dailySeed(day)`.
  *   - Rebuilds manifest using rotation history from all prior rows
@@ -90,6 +98,13 @@ export async function PUT(
   const inputExtraPins = Array.isArray(body.extraPins)
     ? (body.extraPins as unknown[]).filter((x): x is string => typeof x === "string")
     : [];
+  const inputExplicitManifest = Array.isArray(body.explicitManifest)
+    ? (body.explicitManifest as unknown[]).filter((x): x is string => typeof x === "string")
+    : null;
+  const inputRerollSalt =
+    typeof body.rerollSalt === "number" && Number.isFinite(body.rerollSalt)
+      ? Math.trunc(body.rerollSalt)
+      : null;
 
   const active = await getActiveDaily();
   if (!active) {
@@ -160,16 +175,59 @@ export async function PUT(
   const unresolvedSet = new Set(unresolved);
   const resolvedGuests = nextGuests.filter((id) => !unresolvedSet.has(id));
 
-  // Rebuild the manifest. We require active.config.manifest here because
-  // the solver needs a pool and size; without it the row's manifest would
-  // be empty and the engine refuses to win. If the admin is running a
-  // manifest-less daily (legacy), we skip the rebuild and reuse existing
-  // manifest (likely empty).
+  // Rebuild the manifest. Three paths:
+  //   1. `explicitManifest` provided → use as-is after reachability check.
+  //   2. Active config has a manifest → rerun the solver (optionally with
+  //      a reroll salt to get a different RNG stream).
+  //   3. Neither → keep the existing row's manifest (legacy no-manifest
+  //      daily; the engine won't let players win on an empty manifest
+  //      anyway, so we just preserve it).
   const extraPinSet = new Set(inputExtraPins);
   let manifest: string[] = existing?.manifest ?? [];
   let turnsToSolve: number | null = null;
 
-  if (dailyConfig.manifest) {
+  if (inputExplicitManifest !== null) {
+    if (inputExplicitManifest.length === 0) {
+      return NextResponse.json(
+        { error: "explicit_manifest_empty", message: "Explicit manifest must have at least one item." },
+        { status: 400 },
+      );
+    }
+    const sizeCap = dailyConfig.manifest?.size;
+    if (sizeCap && inputExplicitManifest.length > sizeCap) {
+      return NextResponse.json(
+        {
+          error: "explicit_manifest_too_large",
+          message: `Explicit manifest has ${inputExplicitManifest.length} items but config.manifest.size is ${sizeCap}.`,
+        },
+        { status: 400 },
+      );
+    }
+    const cache = new Map<string, boolean>();
+    const unreachable = inputExplicitManifest.filter(
+      (id) => !isReachable(id, cappedBundle, cache),
+    );
+    if (unreachable.length > 0) {
+      return NextResponse.json(
+        {
+          error: "explicit_manifest_unreachable",
+          message: "One or more explicit-manifest items are unreachable in the capped bundle.",
+          unreachable,
+        },
+        { status: 400 },
+      );
+    }
+    // Deduplicate while preserving order.
+    const seen = new Set<string>();
+    manifest = [];
+    for (const id of inputExplicitManifest) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        manifest.push(id);
+      }
+    }
+    turnsToSolve = null;
+  } else if (dailyConfig.manifest) {
     const mergedPins = [
       ...(dailyConfig.manifest.pins ?? []),
       ...[...extraPinSet].filter((p) => !(dailyConfig.manifest!.pins ?? []).includes(p)),
@@ -207,6 +265,12 @@ export async function PUT(
       if (delta >= 0) rotation.set(id, delta);
     }
 
+    // Salt the solver's day input so Reroll yields a different stream.
+    // The row's `payload.seed` (what the player's board uses at runtime)
+    // is independent and preserved below.
+    const solverDay =
+      inputRerollSalt !== null ? `${day}#${inputRerollSalt}` : day;
+
     try {
       const useCluster = resolvedPool.length >= CLUSTER_SAMPLER_MIN_POOL;
       const build = useCluster
@@ -214,7 +278,7 @@ export async function PUT(
             cappedBundle,
             theme: themeCode,
             config: effectiveManifestConfig,
-            day,
+            day: solverDay,
             pool: resolvedPool,
             rotation,
             difficulty,
@@ -223,7 +287,7 @@ export async function PUT(
             cappedBundle,
             theme: themeCode,
             config: effectiveManifestConfig,
-            day,
+            day: solverDay,
             pool: resolvedPool,
             rotation,
             difficulty,

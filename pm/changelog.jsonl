@@ -190,3 +190,4 @@
 {"id": "C-0190", "ts": "2026-11-13T22:52:06Z", "kind": "feature", "summary": "admin: edit a single scheduled daily (guests + extra pins) directly from the Schedule view", "refs": {"task": "T-0322"}}
 {"id": "C-0191", "ts": "2026-11-13T22:54:26Z", "kind": "fix", "summary": "Combine initial board no longer lands the same ~4 base atoms every daily; starter pool widened with early-era mids (T-0324, 052f96f)", "refs": {"task": "T-0324", "commit": "052f96f"}}
 {"id": "C-0192", "ts": "2026-11-13T22:55:34Z", "kind": "refactor", "summary": "admin daily: fold Reset today's daily into the today-row edit modal, drop standalone Danger zone", "refs": {"task": "T-0326"}}
+{"id": "C-0193", "ts": "2026-11-13T22:59:22Z", "kind": "feature", "summary": "admin daily edit: pick an explicit per-day manifest or reroll the solver output", "refs": {"task": "T-0327"}}

@@ -19,7 +19,10 @@ interface SaveResponse {
   invalid?: string[];
   pin?: string;
   manifest?: string[];
+  unreachable?: string[];
 }
+
+type ManifestMode = "solver" | "explicit";
 
 /** Edit a single scheduled day's guests + extra pins. Future days only.
  *  The modal saves via `PUT /api/admin/combine/daily/[day]`, which
@@ -71,9 +74,24 @@ export function EditDayModal({
 
   const [guestQuery, setGuestQuery] = useState("");
   const [pinQuery, setPinQuery] = useState("");
-  const [busy, setBusy] = useState<"save" | "reset" | null>(null);
+  const [busy, setBusy] = useState<"save" | "reset" | "reroll" | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [wipeResults, setWipeResults] = useState(false);
+
+  // Live preview of the current manifest. Starts as the row's saved
+  // manifest; Reroll replaces it via PUT, explicit-mode edits replace it
+  // locally until Save.
+  const [displayManifest, setDisplayManifest] = useState<string[]>(
+    currentPayload.manifest,
+  );
+  const [manifestMode, setManifestMode] = useState<ManifestMode>("solver");
+  // Explicit manifest the admin curates by hand. Seeded with the current
+  // display manifest so switching modes picks up where the solver left
+  // off.
+  const [explicitManifest, setExplicitManifest] = useState<string[]>(
+    currentPayload.manifest,
+  );
+  const [explicitQuery, setExplicitQuery] = useState("");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -101,6 +119,15 @@ export function EditDayModal({
     return matches.filter((m) => m.name.toLowerCase().includes(q)).slice(0, 8);
   }, [manifestPoolMembers, configPins, extraPins, pinQuery]);
 
+  const explicitSuggestions = useMemo<PoolMember[]>(() => {
+    if (!manifestPoolMembers) return [];
+    const already = new Set(explicitManifest);
+    const q = explicitQuery.trim().toLowerCase();
+    const matches = manifestPoolMembers.filter((m) => !already.has(m.id));
+    if (!q) return matches.slice(0, 8);
+    return matches.filter((m) => m.name.toLowerCase().includes(q)).slice(0, 8);
+  }, [manifestPoolMembers, explicitManifest, explicitQuery]);
+
   const addGuest = useCallback((id: string) => {
     setGuests((cur) => (cur.includes(id) ? cur : [...cur, id]));
     setGuestQuery("");
@@ -115,38 +142,78 @@ export function EditDayModal({
   const removeExtraPin = useCallback((id: string) => {
     setExtraPins((cur) => cur.filter((p) => p !== id));
   }, []);
+  const addExplicit = useCallback((id: string) => {
+    setExplicitManifest((cur) => (cur.includes(id) ? cur : [...cur, id]));
+    setExplicitQuery("");
+  }, []);
+  const removeExplicit = useCallback((id: string) => {
+    setExplicitManifest((cur) => cur.filter((p) => p !== id));
+  }, []);
+
+  const callPut = async (extra: Record<string, unknown>): Promise<SaveResponse> => {
+    const res = await fetch(
+      `/api/admin/combine/daily/${encodeURIComponent(day)}`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          guestOutputIds: guests,
+          extraPins,
+          ...extra,
+        }),
+      },
+    );
+    const j = (await res.json()) as SaveResponse;
+    if (!res.ok || !j.ok) {
+      const parts: string[] = [];
+      parts.push(j.message ?? j.error ?? `request_failed_${res.status}`);
+      if (j.invalid?.length) {
+        parts.push(
+          `Invalid: ${j.invalid.map((i) => itemNamesById[i] ?? i).join(", ")}`,
+        );
+      }
+      if (j.unreachable?.length) {
+        parts.push(
+          `Unreachable: ${j.unreachable.map((i) => itemNamesById[i] ?? i).join(", ")}`,
+        );
+      }
+      if (j.pin) {
+        parts.push(`Pin: ${itemNamesById[j.pin] ?? j.pin}`);
+      }
+      throw new Error(parts.join(" · "));
+    }
+    return j;
+  };
 
   const save = async () => {
     setBusy("save");
     setErr(null);
     try {
-      const res = await fetch(
-        `/api/admin/combine/daily/${encodeURIComponent(day)}`,
-        {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            guestOutputIds: guests,
-            extraPins,
-          }),
-        },
+      await callPut(
+        manifestMode === "explicit" ? { explicitManifest } : {},
       );
-      const j = (await res.json()) as SaveResponse;
-      if (!res.ok || !j.ok) {
-        const parts: string[] = [];
-        parts.push(j.message ?? j.error ?? `request_failed_${res.status}`);
-        if (j.invalid?.length) {
-          parts.push(
-            `Invalid: ${j.invalid.map((i) => itemNamesById[i] ?? i).join(", ")}`,
-          );
-        }
-        if (j.pin) {
-          parts.push(`Pin: ${itemNamesById[j.pin] ?? j.pin}`);
-        }
-        throw new Error(parts.join(" · "));
-      }
       await onSaved();
       onClose();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const reroll = async () => {
+    setBusy("reroll");
+    setErr(null);
+    try {
+      // Fresh salt per click. Not deterministic — we don't need it to be;
+      // the admin just wants a different draw.
+      const salt = Math.floor(Math.random() * 1_000_000);
+      const j = await callPut({ rerollSalt: salt });
+      if (j.payload) {
+        setDisplayManifest(j.payload.manifest);
+        setExplicitManifest(j.payload.manifest);
+      }
+      await onSaved();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -289,28 +356,119 @@ export function EditDayModal({
             />
           </Section>
 
-          {currentPayload.manifest.length > 0 && (
+          <div
+            style={{
+              borderTop: "1px dashed var(--line)",
+              paddingTop: 12,
+              display: "grid",
+              gap: 8,
+            }}
+          >
             <div
               style={{
-                fontSize: 11,
-                color: "var(--muted)",
-                borderTop: "1px dashed var(--line)",
-                paddingTop: 10,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
               }}
             >
-              <div style={{ marginBottom: 4 }}>
-                Current manifest ({currentPayload.manifest.length}) — will be
-                recomputed on save:
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                {currentPayload.manifest.map((id) => (
-                  <span key={id} style={pillStyle}>
-                    {itemNamesById[id] ?? id}
-                  </span>
-                ))}
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Manifest</div>
+              <div
+                role="radiogroup"
+                aria-label="Manifest mode"
+                style={{ display: "flex", gap: 4, fontSize: 11 }}
+              >
+                <ModeButton
+                  active={manifestMode === "solver"}
+                  onClick={() => setManifestMode("solver")}
+                  label="Solver"
+                />
+                <ModeButton
+                  active={manifestMode === "explicit"}
+                  onClick={() => setManifestMode("explicit")}
+                  label="Explicit"
+                />
               </div>
             </div>
-          )}
+
+            {manifestMode === "solver" ? (
+              <>
+                <div
+                  style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.45 }}
+                >
+                  Solver rebuilds the manifest from the pool + pins on Save.
+                  Reroll draws a different random manifest now and persists
+                  it — keep clicking until you see one you like, then close.
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "var(--muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Current ({displayManifest.length})
+                  </div>
+                  {displayManifest.length === 0 ? (
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                      No manifest yet — Save or Reroll to build one.
+                    </div>
+                  ) : (
+                    <div
+                      style={{ display: "flex", flexWrap: "wrap", gap: 4 }}
+                    >
+                      {displayManifest.map((id) => (
+                        <span key={id} style={pillStyle}>
+                          {itemNamesById[id] ?? id}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={reroll}
+                    disabled={busy !== null}
+                  >
+                    {busy === "reroll" ? "…" : "Reroll manifest"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div
+                  style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.45 }}
+                >
+                  Hand-pick the exact items for this day&apos;s manifest. Extra
+                  pins above are ignored. Each item must be reachable in the
+                  capped bundle — unreachable picks reject on Save.
+                </div>
+                <ChipList
+                  ids={explicitManifest}
+                  itemNamesById={itemNamesById}
+                  onRemove={removeExplicit}
+                  emptyText="No items yet."
+                />
+                <Typeahead
+                  query={explicitQuery}
+                  onQuery={setExplicitQuery}
+                  suggestions={explicitSuggestions}
+                  onPick={addExplicit}
+                  placeholder={
+                    manifestPoolMembers == null
+                      ? "Loading manifest pool…"
+                      : `Search ${manifestPoolMembers.length} items…`
+                  }
+                  disabled={manifestPoolMembers == null}
+                />
+              </>
+            )}
+          </div>
 
           {err && (
             <div
@@ -572,6 +730,37 @@ function Typeahead({
         </div>
       )}
     </div>
+  );
+}
+
+function ModeButton({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onClick}
+      style={{
+        padding: "4px 10px",
+        fontSize: 11,
+        border: `1px solid ${active ? "var(--ink)" : "var(--line)"}`,
+        background: active ? "var(--ink)" : "var(--surface)",
+        color: active ? "var(--bg)" : "var(--ink)",
+        borderRadius: 3,
+        cursor: "pointer",
+        fontWeight: active ? 600 : 400,
+      }}
+    >
+      {label}
+    </button>
   );
 }
 
