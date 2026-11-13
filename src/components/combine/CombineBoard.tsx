@@ -2546,6 +2546,44 @@ export function CombineBoard({
             (state.mode === "fast" ? fastBest : best)[state.theme] ?? 0
           }
           onTheme={() => setThemeOpen(true)}
+          moreOpen={moreOpen}
+          soundOn={sound.music !== "off" || sound.sfxPack !== "off"}
+          signedIn={signedIn}
+          isAdmin={admin}
+          canEndRun={state.score > 0}
+          onToggleMore={() => setMoreOpen((o) => !o)}
+          onBook={() => {
+            setMoreOpen(false);
+            setBookOpen(true);
+          }}
+          onSound={() => {
+            setMoreOpen(false);
+            setSoundOpen(true);
+          }}
+          onDebug={() => {
+            setMoreOpen(false);
+            setExperimentsOpen(true);
+          }}
+          onHelp={() => {
+            setMoreOpen(false);
+            setHelpOpen(true);
+          }}
+          onIntro={() => {
+            setMoreOpen(false);
+            startTutorial();
+          }}
+          onFeedback={() => {
+            setMoreOpen(false);
+            setFeedback({ type: "suggest_item", payload: {} });
+          }}
+          onEndRun={
+            (state.mode === "endless" || state.mode === "fast") && !state.over
+              ? () => {
+                  setMoreOpen(false);
+                  setEndRunConfirm(true);
+                }
+              : undefined
+          }
         />
         <TipLine
           state={state}
@@ -2663,44 +2701,6 @@ export function CombineBoard({
             act({ type: "hold", slot: selectedSlot.slot });
             setSelectedSlot(null);
           }}
-          moreOpen={moreOpen}
-          soundOn={sound.music !== "off" || sound.sfxPack !== "off"}
-          signedIn={signedIn}
-          isAdmin={admin}
-          canEndRun={state.score > 0}
-          onToggleMore={() => setMoreOpen((o) => !o)}
-          onBook={() => {
-            setMoreOpen(false);
-            setBookOpen(true);
-          }}
-          onSound={() => {
-            setMoreOpen(false);
-            setSoundOpen(true);
-          }}
-          onDebug={() => {
-            setMoreOpen(false);
-            setExperimentsOpen(true);
-          }}
-          onHelp={() => {
-            setMoreOpen(false);
-            setHelpOpen(true);
-          }}
-          onIntro={() => {
-            setMoreOpen(false);
-            startTutorial();
-          }}
-          onFeedback={() => {
-            setMoreOpen(false);
-            setFeedback({ type: "suggest_item", payload: {} });
-          }}
-          onEndRun={
-            (state.mode === "endless" || state.mode === "fast") && !state.over
-              ? () => {
-                  setMoreOpen(false);
-                  setEndRunConfirm(true);
-                }
-              : undefined
-          }
         />
         <Tray
           state={state}

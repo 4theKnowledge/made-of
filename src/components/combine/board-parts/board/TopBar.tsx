@@ -2,6 +2,7 @@ import React from "react";
 import type { GameState } from "@/combine/engine";
 import type { Fx } from "@/components/combine/board-parts/types";
 import { formatDailyLabel } from "@/components/combine/board-parts/util";
+import { MoreButton } from "@/components/combine/board-parts/board/MoreButton";
 
 export type { HelperKey } from "@/components/combine/board-parts/board/HelpersButton";
 
@@ -10,11 +11,37 @@ export function TopBar({
   fx,
   best,
   onTheme,
+  moreOpen,
+  soundOn,
+  signedIn,
+  isAdmin,
+  canEndRun,
+  onToggleMore,
+  onBook,
+  onSound,
+  onDebug,
+  onHelp,
+  onIntro,
+  onFeedback,
+  onEndRun,
 }: {
   state: GameState;
   fx: Fx;
   best: number;
   onTheme: () => void;
+  moreOpen: boolean;
+  soundOn: boolean;
+  signedIn: boolean;
+  isAdmin: boolean;
+  canEndRun?: boolean;
+  onToggleMore: () => void;
+  onBook: () => void;
+  onSound: () => void;
+  onDebug?: () => void;
+  onHelp: () => void;
+  onIntro: () => void;
+  onFeedback: () => void;
+  onEndRun?: () => void;
 }) {
   const themeName = state.daily
     ? "Daily"
@@ -97,6 +124,21 @@ export function TopBar({
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
+      <MoreButton
+        moreOpen={moreOpen}
+        soundOn={soundOn}
+        signedIn={signedIn}
+        isAdmin={isAdmin}
+        canEndRun={canEndRun}
+        onToggleMore={onToggleMore}
+        onBook={onBook}
+        onSound={onSound}
+        onDebug={onDebug}
+        onHelp={onHelp}
+        onIntro={onIntro}
+        onFeedback={onFeedback}
+        onEndRun={onEndRun}
+      />
     </div>
   );
 }
