@@ -187,12 +187,9 @@ export async function PUT(
   let turnsToSolve: number | null = null;
 
   if (inputExplicitManifest !== null) {
-    if (inputExplicitManifest.length === 0) {
-      return NextResponse.json(
-        { error: "explicit_manifest_empty", message: "Explicit manifest must have at least one item." },
-        { status: 400 },
-      );
-    }
+    // Empty is now an intentional state (T-0331): the player-facing
+    // picker soft-blocks Daily with "Check back tomorrow" (T-0329).
+    // Reachability + size-cap checks below still apply when non-empty.
     const sizeCap = dailyConfig.manifest?.size;
     if (sizeCap && inputExplicitManifest.length > sizeCap) {
       return NextResponse.json(
