@@ -9,6 +9,7 @@ import {
 import type { DailyPayload } from "@/combine/daily-schedule";
 import { todayKey } from "@/combine/rng";
 import { useConfirm } from "@/components/common/useConfirm";
+import { EditDayModal } from "./EditDayModal";
 
 
 export interface ThemeOption {
@@ -118,9 +119,10 @@ export function DailyAdmin({
   const [previewBusy, setPreviewBusy] = useState<boolean>(false);
   const [schedule, setSchedule] = useState<ScheduleRow[]>(initialSchedule);
   const [busy, setBusy] = useState<"save" | "regen" | "clear" | "reset" | null>(null);
-  const [wipeResults, setWipeResults] = useState(false);
   const [msg, setMsg] = useState<{ text: string; kind: "ok" | "err" } | null>(null);
   const [unresolved, setUnresolved] = useState<string[]>([]);
+  const [editingDay, setEditingDay] = useState<ScheduleRow | null>(null);
+  const [guestPoolMembers, setGuestPoolMembers] = useState<PoolMember[] | null>(null);
 
   const payloadConfig = useCallback((): DailyConfig => {
     const cfg: DailyConfig = {};
@@ -254,6 +256,34 @@ export function DailyAdmin({
     setSchedule(j.schedule);
   }, []);
 
+  // Fetch the active daily's resolved guest pool when the admin first
+  // opens an Edit modal. Cached for the life of the page — the pool
+  // only changes when the global config changes, and the admin can
+  // reload the page after saving a new config.
+  const ensureGuestPool = useCallback(async () => {
+    if (guestPoolMembers !== null) return;
+    try {
+      const res = await fetch("/api/admin/combine/daily/guest-pool");
+      if (!res.ok) throw new Error(`guest_pool_fetch_${res.status}`);
+      const j = (await res.json()) as { items: PoolMember[] };
+      setGuestPoolMembers(j.items);
+    } catch (e) {
+      setGuestPoolMembers([]);
+      setMsg({
+        text: e instanceof Error ? e.message : String(e),
+        kind: "err",
+      });
+    }
+  }, [guestPoolMembers]);
+
+  const openEdit = useCallback(
+    (row: ScheduleRow) => {
+      void ensureGuestPool();
+      setEditingDay(row);
+    },
+    [ensureGuestPool],
+  );
+
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const save = async () => {
@@ -313,56 +343,60 @@ export function DailyAdmin({
     }
   };
 
-  const resetToday = async () => {
-    if (
-      !(await confirm({
-        title: "Reset today's daily?",
-        body:
-          "This invalidates every in-progress run save. Players currently in a run will lose their progress and need to start over.",
-        confirmLabel: "Reset today",
-        destructive: true,
-      }))
-    )
-      return;
-    if (wipeResults) {
+  const resetToday = useCallback(
+    async ({ wipeResults }: { wipeResults: boolean }) => {
       if (
         !(await confirm({
-          title: "Also delete today's finished run records?",
-          body: "This cannot be undone.",
-          confirmLabel: "Delete results",
+          title: "Reset today's daily?",
+          body:
+            "This invalidates every in-progress run save. Players currently in a run will lose their progress and need to start over.",
+          confirmLabel: "Reset today",
           destructive: true,
         }))
       )
         return;
-    }
-    const dayKey = todayKey();
-
-    setBusy("reset");
-    setMsg(null);
-    try {
-      const res = await fetch("/api/admin/combine/daily/reset-today", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ confirmDay: dayKey, wipeResults }),
-      });
-      const j = (await res.json()) as {
-        ok?: boolean;
-        deletedResults?: number;
-        error?: string;
-        message?: string;
-      };
-      if (!res.ok || !j.ok) {
-        throw new Error(j.message ?? j.error ?? `request_failed_${res.status}`);
+      if (wipeResults) {
+        if (
+          !(await confirm({
+            title: "Also delete today's finished run records?",
+            body: "This cannot be undone.",
+            confirmLabel: "Delete results",
+            destructive: true,
+          }))
+        )
+          return;
       }
-      const suffix = wipeResults ? ` Deleted ${j.deletedResults ?? 0} result(s).` : "";
-      setMsg({ text: `Today's daily reset.${suffix}`, kind: "ok" });
-      await refreshSchedule();
-    } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : String(e), kind: "err" });
-    } finally {
-      setBusy(null);
-    }
-  };
+      const dayKey = todayKey();
+
+      setBusy("reset");
+      setMsg(null);
+      try {
+        const res = await fetch("/api/admin/combine/daily/reset-today", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ confirmDay: dayKey, wipeResults }),
+        });
+        const j = (await res.json()) as {
+          ok?: boolean;
+          deletedResults?: number;
+          error?: string;
+          message?: string;
+        };
+        if (!res.ok || !j.ok) {
+          throw new Error(j.message ?? j.error ?? `request_failed_${res.status}`);
+        }
+        const suffix = wipeResults ? ` Deleted ${j.deletedResults ?? 0} result(s).` : "";
+        setMsg({ text: `Today's daily reset.${suffix}`, kind: "ok" });
+        await refreshSchedule();
+      } catch (e) {
+        setMsg({ text: e instanceof Error ? e.message : String(e), kind: "err" });
+        throw e; // rethrow so modal can surface it
+      } finally {
+        setBusy(null);
+      }
+    },
+    [confirm, refreshSchedule],
+  );
 
   const clearConfig = async () => {
     if (
@@ -918,7 +952,19 @@ export function DailyAdmin({
                           </span>
                         )}
                       </span>
-                      <span className="cb-seed">seed {r.payload.seed || "—"}</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        <span className="cb-seed">seed {r.payload.seed || "—"}</span>
+                        {!r.isPast && (
+                          <button
+                            type="button"
+                            className="btn"
+                            style={{ padding: "2px 8px", fontSize: 11 }}
+                            onClick={() => openEdit(r)}
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </span>
                     </div>
                     {r.payload.manifest && r.payload.manifest.length > 0 && (
                       <div style={{ marginTop: 4 }}>
@@ -965,6 +1011,7 @@ export function DailyAdmin({
                   <th style={th}>Manifest</th>
                   <th style={th}>Guests</th>
                   <th style={th}>Seed</th>
+                  <th style={th}></th>
                 </tr>
               </thead>
               <tbody>
@@ -976,7 +1023,7 @@ export function DailyAdmin({
                       {showTodayDivider && (
                         <tr>
                           <td
-                            colSpan={4}
+                            colSpan={5}
                             style={{
                               padding: "4px 10px",
                               fontSize: 10,
@@ -1035,6 +1082,18 @@ export function DailyAdmin({
                         <td style={{ ...td, fontFamily: "var(--mono, monospace)", opacity: 0.7 }}>
                           {r.payload.seed || "—"}
                         </td>
+                        <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
+                          {!r.isPast && (
+                            <button
+                              type="button"
+                              className="btn"
+                              style={{ padding: "2px 8px", fontSize: 11 }}
+                              onClick={() => openEdit(r)}
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     </Fragment>
                   );
@@ -1046,54 +1105,24 @@ export function DailyAdmin({
         )}
       </section>
 
-      <section className="feat feat-danger">
-        <h3 style={{ marginTop: 0, fontSize: 16, color: "var(--warn, #a66400)" }}>
-          Danger zone
-        </h3>
-        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 0 }}>
-          Reset today&apos;s daily puzzle for every player. Use when a bad
-          config shipped or you need to swap the active theme mid-day.
-          The regenerate button above deliberately protects today&apos;s row;
-          this is the escape hatch.
-          <br />
-          <br />
-          <strong>What breaks:</strong> every in-progress run save for today
-          is invalidated — players lose their current board on refresh and
-          start over on the new puzzle. Collection discoveries are kept
-          (they&apos;re lifetime). Finished run records are kept unless you
-          tick the box below.
-        </p>
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: 13,
-            color: "var(--ink)",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={wipeResults}
-            onChange={(e) => setWipeResults(e.target.checked)}
-          />
-          Also delete today&apos;s finished player results
-          <span style={{ fontSize: 11, color: "var(--muted)" }}>
-            (clears today&apos;s leaderboard)
-          </span>
-        </label>
-        <div className="cb-daily-actions">
-          <button
-            type="button"
-            className="btn danger"
-            disabled={busy !== null}
-            onClick={resetToday}
-          >
-            {busy === "reset" ? "…" : "Reset today's daily"}
-          </button>
-        </div>
-      </section>
       {confirmDialog}
+      {editingDay && (
+        <EditDayModal
+          day={editingDay.day}
+          isToday={editingDay.day === todayKey()}
+          currentPayload={editingDay.payload}
+          itemNamesById={itemNamesById}
+          guestPoolMembers={guestPoolMembers}
+          manifestPoolMembers={poolMembers}
+          configPins={initialActive?.config.manifest?.pins ?? []}
+          onClose={() => setEditingDay(null)}
+          onSaved={async () => {
+            await refreshSchedule();
+            setMsg({ text: `Updated ${editingDay.day}.`, kind: "ok" });
+          }}
+          onResetToday={resetToday}
+        />
+      )}
     </div>
   );
 }

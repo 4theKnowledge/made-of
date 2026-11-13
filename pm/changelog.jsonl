@@ -185,3 +185,8 @@
 {"id": "C-0185", "ts": "2026-11-11T23:10:43Z", "kind": "feature", "summary": "Combine dealer: kind-diversity cap + recency penalty on endless modes (T-0317); ENGINE_VERSION 6→7", "refs": {"task": "T-0317", "commit": "0312788"}}
 {"id": "C-0186", "ts": "2026-11-13T06:23:09Z", "kind": "fix", "summary": "daily combine finish writes progress row + leaderboard rank; closes stale-ref 409 race (T-0319)", "refs": {"task": "T-0319"}}
 {"id": "C-0187", "ts": "2026-11-13T22:31:08Z", "kind": "refactor", "summary": "useCombineRun: flush() returns FlushResult, drop latestEcRef bolt-on (T-0320)", "refs": {"task": "T-0320"}}
+{"id": "C-0188", "ts": "2026-11-13T22:44:03Z", "kind": "feature", "summary": "Combine Collection dialog has a mobile-aware search field; modal height stays fixed while filtering.", "refs": {"task": "T-0321", "commit": "a54e356"}}
+{"id": "C-0189", "ts": "2026-11-13T22:46:44Z", "kind": "refactor", "summary": "Combine 'More' menu moved back to the top bar, immediately right of the theme button.", "refs": {"task": "T-0323", "commit": "c672d25"}}
+{"id": "C-0190", "ts": "2026-11-13T22:52:06Z", "kind": "feature", "summary": "admin: edit a single scheduled daily (guests + extra pins) directly from the Schedule view", "refs": {"task": "T-0322"}}
+{"id": "C-0191", "ts": "2026-11-13T22:54:26Z", "kind": "fix", "summary": "Combine initial board no longer lands the same ~4 base atoms every daily; starter pool widened with early-era mids (T-0324, 052f96f)", "refs": {"task": "T-0324", "commit": "052f96f"}}
+{"id": "C-0192", "ts": "2026-11-13T22:55:34Z", "kind": "refactor", "summary": "admin daily: fold Reset today's daily into the today-row edit modal, drop standalone Danger zone", "refs": {"task": "T-0326"}}
