@@ -74,9 +74,11 @@ export function ThemeToggle({ className }: { className?: string }) {
 export function ThemeToggleRow({
   onActivate,
   className,
+  showSubtitle = true,
 }: {
   onActivate?: () => void;
   className?: string;
+  showSubtitle?: boolean;
 }) {
   const { theme, cycle } = useThemeToggle();
   return (
@@ -92,7 +94,7 @@ export function ThemeToggleRow({
       <ThemeIcon theme={theme} />
       <span className="nm">
         <b className="t">Appearance</b>
-        <em>{themeLabel(theme)}</em>
+        {showSubtitle && <em>{themeLabel(theme)}</em>}
       </span>
     </button>
   );

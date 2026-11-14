@@ -68,7 +68,6 @@ export function MoreButton({
           </svg>
           <span className="nm">
             <b className="t">Home</b>
-            <em>Back to the Made Of home</em>
           </span>
         </Link>
         <button
@@ -82,7 +81,6 @@ export function MoreButton({
           </svg>
           <span className="nm">
             <b className="t">Collection</b>
-            <em>Everything you&apos;ve ever found</em>
           </span>
         </button>
         <button
@@ -101,10 +99,9 @@ export function MoreButton({
           </svg>
           <span className="nm">
             <b className="t">Music &amp; sound</b>
-            <em>{soundOn ? "On" : "Off"}</em>
           </span>
         </button>
-        <ThemeToggleRow />
+        <ThemeToggleRow showSubtitle={false} />
         {onDebug && isAdmin && (
           <button
             type="button"
@@ -118,7 +115,6 @@ export function MoreButton({
             </svg>
             <span className="nm">
               <b className="t">Debug</b>
-              <em>Admin-only</em>
             </span>
           </button>
         )}
@@ -135,7 +131,6 @@ export function MoreButton({
           </svg>
           <span className="nm">
             <b className="t">How to play</b>
-            <em>Rules and tips</em>
           </span>
         </button>
         <button
@@ -149,7 +144,6 @@ export function MoreButton({
           </svg>
           <span className="nm">
             <b className="t">Replay tutorial</b>
-            <em>Walk through the basics again</em>
           </span>
         </button>
         {onEndRun && (
@@ -165,11 +159,6 @@ export function MoreButton({
             </svg>
             <span className="nm">
               <b className="t">End run</b>
-              <em>
-                {canEndRun
-                  ? "Bank your score and start fresh"
-                  : "Score something first"}
-              </em>
             </span>
           </button>
         )}
@@ -184,7 +173,6 @@ export function MoreButton({
           </svg>
           <span className="nm">
             <b className="t">Send feedback</b>
-            <em>Suggest items, recipes, or flag issues</em>
           </span>
         </button>
         {isAdmin && (
@@ -199,7 +187,6 @@ export function MoreButton({
             </svg>
             <span className="nm">
               <b className="t">Admin</b>
-              <em>Content, themes, debug</em>
             </span>
           </Link>
         )}
@@ -215,11 +202,6 @@ export function MoreButton({
           </svg>
           <span className="nm">
             <b className="t">{signedIn ? "Account" : "Sign in"}</b>
-            <em>
-              {signedIn
-                ? "Settings, stats, sign out"
-                : "Sync your scores + collection"}
-            </em>
           </span>
         </Link>
       </ResponsiveSheet>
