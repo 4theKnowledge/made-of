@@ -56,7 +56,13 @@ export function useThemeToggle() {
   return { theme, cycle };
 }
 
-export function ThemeToggle({ className }: { className?: string }) {
+export function ThemeToggle({
+  className,
+  showLabel = false,
+}: {
+  className?: string;
+  showLabel?: boolean;
+}) {
   const { theme, cycle } = useThemeToggle();
   return (
     <button
@@ -66,7 +72,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       aria-label={`Appearance: ${themeLabel(theme)}. Click to change.`}
       title={`Appearance: ${themeLabel(theme)}`}
     >
-      <ThemeIcon theme={theme} />
+      {showLabel ? `Theme: ${themeLabel(theme)}` : <ThemeIcon theme={theme} />}
     </button>
   );
 }

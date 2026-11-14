@@ -121,7 +121,7 @@ export function Header({
             </Link>
           ))}
           <AuthNavLink />
-          <ThemeToggle />
+          <ThemeToggle className="navDrawerTheme" showLabel />
         </nav>
       </div>
       {open && (

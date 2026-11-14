@@ -202,3 +202,4 @@
 {"id": "C-0202", "ts": "2026-11-14T01:02:03Z", "kind": "fix", "summary": "Combine recipe picker now centers in viewport on mobile and scrolls internally when options exceed viewport height (T-0336)", "refs": {"task": "T-0336"}}
 {"id": "C-0203", "ts": "2026-11-14T01:06:21Z", "kind": "feature", "summary": "Light/dark theme toggle in Header + Combine more-menu (cycles system → light → dark, persisted per-browser).", "refs": {"task": "T-0337"}}
 {"id": "C-0204", "ts": "2026-11-14T01:07:55Z", "kind": "refactor", "summary": "Combine more-menu: removed per-row subtitles for a cleaner scannable list.", "refs": {"task": "T-0338"}}
+{"id": "C-0205", "ts": "2026-11-14T01:43:34Z", "kind": "fix", "summary": "Compact mobile leaderboard (single-row results, horizontal day chips), labeled theme in nav drawer, stable 10-row daily leaderboard preview", "refs": {"task": "T-0339"}}

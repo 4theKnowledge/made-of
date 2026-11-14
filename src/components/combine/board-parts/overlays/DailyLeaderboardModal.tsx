@@ -107,7 +107,7 @@ export function DailyLeaderboardModal({
 
       {rows === null && !error && (
         <ul className="cblb-rows" aria-busy="true">
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: TOP_N }).map((_, i) => (
             <li key={i} className="cblb-row cblb-skeleton" aria-hidden="true">
               <span className="cblb-rank">&nbsp;</span>
               <span className="cblb-player">&nbsp;</span>
@@ -123,13 +123,7 @@ export function DailyLeaderboardModal({
         </p>
       )}
 
-      {rows && rows.length === 0 && (
-        <p className="sub" style={{ marginTop: 6 }}>
-          No finishes yet for this day.
-        </p>
-      )}
-
-      {rows && rows.length > 0 && (
+      {rows && (
         <ul className="cblb-rows">
           {topSlice.map((r, i) => (
             <Row
@@ -144,6 +138,11 @@ export function DailyLeaderboardModal({
               manifestSize={manifestSize ?? null}
             />
           ))}
+          {Array.from({ length: Math.max(0, TOP_N - topSlice.length) }).map(
+            (_, i) => (
+              <EmptyRow key={`empty-${i}`} rank={topSlice.length + i + 1} />
+            ),
+          )}
           {showDivider && (
             <li className="cblb-divider" aria-hidden="true">
               ···
@@ -167,6 +166,11 @@ export function DailyLeaderboardModal({
           })}
         </ul>
       )}
+      {rows && rows.length === 0 && (
+        <p className="sub cblb-empty-note" aria-live="polite">
+          No finishes yet — be the first.
+        </p>
+      )}
 
       <Link
         href="/leaderboard"
@@ -176,6 +180,17 @@ export function DailyLeaderboardModal({
         View full leaderboard →
       </Link>
     </ResponsiveSheet>
+  );
+}
+
+function EmptyRow({ rank }: { rank: number }) {
+  return (
+    <li className="cblb-row cblb-row-empty" aria-hidden="true">
+      <span className="cblb-rank">#{rank}</span>
+      <span className="cblb-player cblb-muted">—</span>
+      <span className="cblb-num cblb-muted">—</span>
+      <span className="cblb-num cblb-score cblb-muted">—</span>
+    </li>
   );
 }
 

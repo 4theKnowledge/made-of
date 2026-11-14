@@ -145,9 +145,13 @@ export function DailyLeaderboard({
                   <tr key={`${i}-${r.handle ?? "anon"}`} className={isMe ? "me" : undefined}>
                     <td className="lb-rank">{i + 1}</td>
                     <td className="lb-player">
-                      {r.handle ?? <span className="lb-muted">—</span>}
-                      {isMe && <span className="lb-youbadge" aria-label="This is you">You</span>}
-                      <span className="lb-score-mobile">{r.score.toLocaleString("en")} pts</span>
+                      <span className="lb-player-inner">
+                        <span className="lb-player-name">
+                          {r.handle ?? <span className="lb-muted">—</span>}
+                        </span>
+                        {isMe && <span className="lb-youbadge" aria-label="This is you">You</span>}
+                        <span className="lb-score-mobile">{r.score.toLocaleString("en")} pts</span>
+                      </span>
                     </td>
                     <td className="lb-num">
                       {r.manifestFound}
