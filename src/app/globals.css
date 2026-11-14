@@ -722,7 +722,7 @@ a.btn.primary{color:var(--bg)}
 .lb-youbadge{flex:0 0 auto;display:inline-block;padding:2px 7px;border-radius:3px;background:var(--ink);color:var(--surface);font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:1}
 .lb-score-mobile{flex:0 0 auto;display:none;font-family:var(--mono);font-weight:500;color:var(--muted);font-size:11px}
 @media (max-width: 600px){
-  .lb-table .lb-score-h,.lb-table .lb-score,.lb-table .lb-time-h,.lb-table .lb-time{display:none}
+  .lb-table .lb-score-h,.lb-table .lb-score{display:none}
   .lb-score-mobile{display:inline-block}
   .lb-table th,.lb-table td{padding:6px 6px}
   .lb-table .lb-rank{width:2em}

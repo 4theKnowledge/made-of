@@ -206,3 +206,5 @@
 {"id": "C-0206", "ts": "2026-11-14T01:54:37Z", "kind": "fix", "summary": "server-engine tests: add missing `mid: []` to synthetic bundles so `newGame` doesn't crash (T-0341)", "refs": {"task": "T-0341", "commit": "7922c38"}}
 {"id": "C-0207", "ts": "2026-11-14T01:54:55Z", "kind": "fix", "summary": "Daily GameOverCard time cell: thread server durationMs through /finish response + leaderboard fallback so time survives reload", "refs": {"task": "T-0340"}}
 {"id": "C-0208", "ts": "2026-11-14T01:57:34Z", "kind": "feature", "summary": "Leaderboard: show per-row Time column on /leaderboard (hidden on mobile, same as Score)", "refs": {"task": "T-0342"}}
+{"id": "C-0209", "ts": "2026-11-14T02:03:49Z", "kind": "decision", "summary": "Keep Time off the daily leaderboard preview sheet — glance surface, would regress T-0339 single-row compaction. Full /leaderboard has it via T-0342.", "refs": {"task": "T-0343"}}
+{"id": "C-0210", "ts": "2026-11-14T02:25:47Z", "kind": "fix", "summary": "Leaderboard mobile: show Time column, drop Score column (kept inline under handle) — Time matches rank sort key", "refs": {"task": "T-0344"}}
