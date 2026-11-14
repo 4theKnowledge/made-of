@@ -66,7 +66,7 @@ export const TIER_VALUE: Record<string, number> = {
  * It is fine (and expected) to skip bumping for pure refactors that
  * leave the reducer's output-for-input identical.
  */
-export const ENGINE_VERSION = 7;
+export const ENGINE_VERSION = 8;
 
 /** Baseline hold-zone capacity at chapter 0. */
 const HOLD_CAPACITY_BASE = 2;
@@ -1477,21 +1477,22 @@ export function reduce(
 
     case "finish": {
       // Player-chosen end-of-run. Two legal paths:
-      //  1. Endless / fast: any time after the player has actually scored,
-      //     so they can bank a high-watermark run instead of grinding until
-      //     the board fills.
-      //  2. Daily or either mode's "last chance" state: no organic finishing
-      //     move left but helpers still available. Lets the player bail
-      //     without burning helpers. Daily is restricted to this path so a
-      //     player can't unlock a tile and immediately bank it.
+      //  1. Score bank (endless / fast / daily): any time after the player
+      //     has scored, so they can lock in a high-watermark run instead of
+      //     grinding until the board fills. For daily this is the only
+      //     self-service way to bank a partial-manifest run (T-0332); the
+      //     leaderboard orders partials below completions via
+      //     `manifestFound DESC, turns ASC, duration_ms ASC`.
+      //  2. "Last chance" state (any mode): no organic finishing move left
+      //     but helpers still available. Lets the player bail without
+      //     burning helpers — also the only `finish` path when score is 0.
       //
       // Guarded here so the UI can dispatch freely without re-checking.
       if (state.over) return { state: prev, events: [] };
       const lastChance =
         !hasOrganicFinishingMove(state, bundle) && hasHelperMove(state, bundle);
-      const endlessBank =
-        (state.mode === "endless" || state.mode === "fast") && state.score > 0;
-      if (!lastChance && !endlessBank) return { state: prev, events: [] };
+      const scoreBank = state.score > 0;
+      if (!lastChance && !scoreBank) return { state: prev, events: [] };
       state.over = true;
       events.push({ type: "over" });
       return { state, events };

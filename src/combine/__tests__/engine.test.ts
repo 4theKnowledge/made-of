@@ -1326,9 +1326,17 @@ describe("finish (player-chosen end-of-run)", () => {
     expect(events).toEqual([]);
   });
 
-  it("daily + score > 0 but no last-chance state → no-op", () => {
+  it("daily + score > 0 → ends the run (banks partial-manifest score, T-0332)", () => {
     const s0 = newGame("everything", bundle, { seed: 1, size: 3, mode: "daily", daily: "2026-01-01" }).state;
     s0.score = 50;
+    const { state, events } = reduce(s0, bundle, { type: "finish" });
+    expect(state.over).toBe(true);
+    expect(events).toContainEqual({ type: "over" });
+  });
+
+  it("daily + score 0 → no-op (misclick guard; must score at least once)", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3, mode: "daily", daily: "2026-01-01" }).state;
+    s0.score = 0;
     const { state, events } = reduce(s0, bundle, { type: "finish" });
     expect(state).toBe(s0);
     expect(events).toEqual([]);

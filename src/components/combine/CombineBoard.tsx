@@ -2589,7 +2589,10 @@ export function CombineBoard({
             setFeedback({ type: "suggest_item", payload: {} });
           }}
           onEndRun={
-            (state.mode === "endless" || state.mode === "fast") && !state.over
+            (state.mode === "endless" ||
+              state.mode === "fast" ||
+              state.mode === "daily") &&
+            !state.over
               ? () => {
                   setMoreOpen(false);
                   setEndRunConfirm(true);
@@ -3282,7 +3285,11 @@ export function CombineBoard({
         <ConfirmDialog
           open={endRunConfirm}
           title="End this run?"
-          body="Banks your current score and saves any new discoveries. You'll start a fresh run on the next tap."
+          body={
+            state.mode === "daily"
+              ? "Submits your current score to today's leaderboard and saves any new discoveries. Today's puzzle is one-and-done — you won't get another go."
+              : "Banks your current score and saves any new discoveries. You'll start a fresh run on the next tap."
+          }
           confirmLabel="End run"
           cancelLabel="Keep playing"
           destructive
