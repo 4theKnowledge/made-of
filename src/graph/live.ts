@@ -12,7 +12,7 @@ import { loadRowsFromDb, loadKindPictograms } from "./load";
 import { buildSnapshot, type Snapshot } from "./snapshot";
 import { buildCodeMap, type CodeMap } from "./codes";
 import { buildClosedSet } from "./link";
-import { applyPictogramOverrides } from "@/pictograms/Pictogram";
+import { applyPictogramOverrides } from "@/pictograms/overrides";
 import { auditGraph, formatAudit, isCleanAudit } from "@/data/invariants";
 
 export interface LiveSnapshot {

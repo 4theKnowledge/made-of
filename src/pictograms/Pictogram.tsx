@@ -26,13 +26,7 @@
 
 import { useEffect, useState } from "react";
 import type { ItemKind, Tier } from "@/db/schema";
-
-// Module-level override maps, populated by the live snapshot server-side
-// and by client-side fetches when a name/kind is seen on the client for
-// the first time. `null` entries aren't stored — absence means "fall back
-// to the next layer".
-const itemOverrides = new Map<string, string>();
-const kindOverrides = new Map<string, string>();
+import { itemOverrides, kindOverrides } from "./overrides";
 
 // Dedupe in-flight fetches so N concurrent renders of the same name
 // trigger exactly one network request.
@@ -66,16 +60,6 @@ function notify(bucket: Map<string, Set<Subscriber>>, key: string) {
   const set = bucket.get(key);
   if (!set) return;
   for (const cb of set) cb();
-}
-
-export function applyPictogramOverrides(
-  items: Map<string, string>,
-  kinds: Map<string, string>,
-) {
-  itemOverrides.clear();
-  for (const [name, svg] of items) itemOverrides.set(name, svg);
-  kindOverrides.clear();
-  for (const [code, svg] of kinds) kindOverrides.set(code, svg);
 }
 
 async function fetchItemPictogram(name: string): Promise<string | null> {
