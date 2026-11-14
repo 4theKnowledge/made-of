@@ -8,6 +8,7 @@ import { fillVar } from "@/components/combine/board-parts/util";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 import { ButtonGroup } from "@/components/common/ButtonGroup";
 import { ManifestGrid } from "@/components/combine/board-parts/ManifestGrid";
+import { formatDuration } from "@/lib/duration";
 import { NextDailyCountdown } from "@/components/combine/board-parts/NextDailyCountdown";
 import { DailyLeaderboardModal } from "@/components/combine/board-parts/overlays/DailyLeaderboardModal";
 
@@ -432,23 +433,6 @@ export function GameOverCard({
         )}
     </ResponsiveSheet>
   );
-}
-
-/** Render a run duration as `mm:ss` (or `h:mm:ss` beyond one hour).
- *  Rounds down to the nearest second — the daily clock is tracked at
- *  millisecond precision so leaderboard tie-breaks stay decisive, but
- *  the display rounds so "1:23.456" doesn't flicker. */
-function formatDuration(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const hours = Math.floor(total / 3600);
-  const mins = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-  if (hours > 0) {
-    return `${hours}:${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  }
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 type RankState =

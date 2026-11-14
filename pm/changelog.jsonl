@@ -209,3 +209,5 @@
 {"id": "C-0209", "ts": "2026-11-14T02:03:49Z", "kind": "decision", "summary": "Keep Time off the daily leaderboard preview sheet — glance surface, would regress T-0339 single-row compaction. Full /leaderboard has it via T-0342.", "refs": {"task": "T-0343"}}
 {"id": "C-0210", "ts": "2026-11-14T02:25:47Z", "kind": "fix", "summary": "Leaderboard mobile: show Time column, drop Score column (kept inline under handle) — Time matches rank sort key", "refs": {"task": "T-0344"}}
 {"id": "C-0211", "ts": "2026-11-14T02:28:59Z", "kind": "feature", "summary": "Mobile leaderboard: two-line card layout (rank/handle/score on top, found·turns·time on bottom) — desktop table unchanged", "refs": {"task": "T-0345"}}
+{"id": "C-0212", "ts": "2026-11-14T02:34:56Z", "kind": "fix", "summary": "Mobile nav drawer Theme row now uses the body font (Chivo) at 16px to match the other nav links (T-0347)", "refs": {"task": "T-0347"}}
+{"id": "C-0213", "ts": "2026-11-14T02:37:08Z", "kind": "refactor", "summary": "Shared DailyLeaderboard across /leaderboard and the in-game sheet preview; unit-based compact time format (1m 23s, 1h 02m 30s)", "refs": {"task": "T-0346"}}

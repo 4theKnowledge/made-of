@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { formatDuration } from "@/lib/duration";
 
 type Row = {
   handle: string | null;
@@ -22,6 +23,11 @@ export function DailyLeaderboard({
   days,
   targetByDay,
   currentUserHandle,
+  maxRows,
+  showDayChips = true,
+  showGameChip = true,
+  showMeta = true,
+  variant = "page",
 }: {
   theme: string;
   today: string;
@@ -30,6 +36,21 @@ export function DailyLeaderboard({
   /** `targetDiscoveries` per day; null for pre-feature days. */
   targetByDay: Record<string, number | null>;
   currentUserHandle: string | null;
+  /** Cap the rendered row count. When set, trims the leaderboard to the
+   *  top N — used by the in-game sheet preview to show a 10-row teaser. */
+  maxRows?: number;
+  /** Render the 7-day navigation chips. Off for the sheet preview, which
+   *  is pinned to a single day. */
+  showDayChips?: boolean;
+  /** Render the "Combine Daily" pill at the top. Off for the sheet. */
+  showGameChip?: boolean;
+  /** Render the `<day> · find N` subtitle. The sheet already shows the
+   *  day in its own header. */
+  showMeta?: boolean;
+  /** `page` adds the outer `.feat` section wrapper used on /leaderboard.
+   *  `embed` skips it so the component can live inside another surface
+   *  (e.g. the sheet) without double-framing. */
+  variant?: "page" | "embed";
 }) {
   const [selectedDay, setSelectedDay] = useState<string>(today);
   const [rows, setRows] = useState<Row[]>([]);
@@ -75,53 +96,61 @@ export function DailyLeaderboard({
   // Manifest size per day; T-0244 will swap the "Found" column label
   // for "Manifest" once player UI copy stabilises.
   const manifestSize = targetByDay[selectedDay] ?? null;
+  const shown = maxRows != null ? rows.slice(0, maxRows) : rows;
+  const Wrapper = variant === "page" ? "section" : "div";
 
   return (
-    <section className="feat lb-wrap">
-      <div className="lb-gamechips" role="tablist" aria-label="Pick a game">
-        <button
-          type="button"
-          role="tab"
-          aria-selected
-          className="lb-gamechip active"
-        >
-          Combine Daily
-        </button>
-        {/* Future games slot in here. Disabled ghost chip hints at it: */}
-        {/* <button className="lb-gamechip" disabled>Link (soon)</button> */}
-      </div>
+    <Wrapper className={variant === "page" ? "feat lb-wrap" : "lb-wrap lb-embed"}>
+      {showGameChip && (
+        <div className="lb-gamechips" role="tablist" aria-label="Pick a game">
+          <button
+            type="button"
+            role="tab"
+            aria-selected
+            className="lb-gamechip active"
+          >
+            Combine Daily
+          </button>
+          {/* Future games slot in here. Disabled ghost chip hints at it: */}
+          {/* <button className="lb-gamechip" disabled>Link (soon)</button> */}
+        </div>
+      )}
 
-      <header className="lb-header">
-        <span className="lb-sub">
-          {selectedDay}
-          {manifestSize != null && <span className="lb-target"> · find {manifestSize}</span>}
-        </span>
-      </header>
+      {showMeta && (
+        <header className="lb-header">
+          <span className="lb-sub">
+            {selectedDay}
+            {manifestSize != null && <span className="lb-target"> · find {manifestSize}</span>}
+          </span>
+        </header>
+      )}
 
-      <div className="lb-daychips" role="tablist" aria-label="Pick a day">
-        {days.map((d) => {
-          const isActive = d === selectedDay;
-          const isToday = d === today;
-          return (
-            <button
-              key={d}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              className={`lb-daychip${isActive ? " active" : ""}${isToday ? " today" : ""}`}
-              onClick={() => setSelectedDay(d)}
-            >
-              {formatChipLabel(d, isToday)}
-            </button>
-          );
-        })}
-      </div>
+      {showDayChips && (
+        <div className="lb-daychips" role="tablist" aria-label="Pick a day">
+          {days.map((d) => {
+            const isActive = d === selectedDay;
+            const isToday = d === today;
+            return (
+              <button
+                key={d}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                className={`lb-daychip${isActive ? " active" : ""}${isToday ? " today" : ""}`}
+                onClick={() => setSelectedDay(d)}
+              >
+                {formatChipLabel(d, isToday)}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {loading ? (
         <p className="lb-muted">Loading…</p>
       ) : error ? (
         <p className="lb-muted">Couldn&apos;t load leaderboard.</p>
-      ) : rows.length === 0 ? (
+      ) : shown.length === 0 ? (
         <p className="lb-muted">No finishes yet for this day.</p>
       ) : (
         <>
@@ -138,7 +167,7 @@ export function DailyLeaderboard({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => {
+                {shown.map((r, i) => {
                   const isMe =
                     currentUserHandle != null &&
                     r.handle != null &&
@@ -176,7 +205,7 @@ export function DailyLeaderboard({
             </table>
           </div>
           <ol className="lb-cards" aria-label="Leaderboard">
-            {rows.map((r, i) => {
+            {shown.map((r, i) => {
               const isMe =
                 currentUserHandle != null &&
                 r.handle != null &&
@@ -231,24 +260,8 @@ export function DailyLeaderboard({
           </ol>
         </>
       )}
-    </section>
+    </Wrapper>
   );
-}
-
-/** Row duration as `m:ss` (or `h:mm:ss`), rounded to the nearest second.
- *  Mirrors the GameOverCard helper — intentionally duplicated rather than
- *  shared to keep a formatter local to the only two surfaces that need it. */
-function formatDuration(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const hours = Math.floor(total / 3600);
-  const mins = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-  if (hours > 0) {
-    return `${hours}:${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  }
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 /** Short chip label. "Today" for today; otherwise "Mon 3". */
