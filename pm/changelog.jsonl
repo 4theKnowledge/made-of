@@ -221,3 +221,4 @@
 {"id": "C-0221", "ts": "2026-11-14T11:10:51Z", "kind": "fix", "summary": "Hotfix: SSR crash on /combine — split pictogram overrides into server-safe module", "refs": {"task": "T-0357"}}
 {"id": "C-0222", "ts": "2026-11-14T11:35:56Z", "kind": "fix", "summary": "seed-if-empty: skip when items table has rows (previously reseeded every deploy, wiping admin pictograms/tags)", "refs": {"task": "T-0358"}}
 {"id": "C-0223", "ts": "2026-11-14T11:40:44Z", "kind": "fix", "summary": "Admin pictogram audit: pre-resolve effective pictogram server-side; zero client fetches on load", "refs": {"task": "T-0359"}}
+{"id": "C-0224", "ts": "2026-11-14T12:16:20Z", "kind": "refactor", "summary": "Delete migrate-hardcoded-pictograms + _hardcoded-pictograms; DB is now sole pictogram source (phase 3/3 complete)", "refs": {"task": "T-0356"}}
