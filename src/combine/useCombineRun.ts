@@ -48,6 +48,16 @@ export interface FlushResult {
   state: GameState;
 }
 
+/** Return from a successful `finish()`. `durationMs` is the server-
+ *  authoritative run duration (ms) for daily runs; null for endless/fast
+ *  or legacy runs without a `startedAt`. Callers display this directly
+ *  on the end-of-run card so the number matches what the leaderboard
+ *  ranks by — see T-0340. */
+export interface FinishResult {
+  state: GameState;
+  durationMs: number | null;
+}
+
 export interface StartArgs {
   mode: ServerMode;
   theme: string;
@@ -204,7 +214,7 @@ export interface UseCombineRunApi {
   finish: (
     trailingActions?: Action[],
     extras?: Record<string, unknown>,
-  ) => Promise<GameState | null>;
+  ) => Promise<FinishResult | null>;
   /** Register (or replace) the reconcile callback at any point in
    *  render. Useful when the hook has to be called early (e.g. for
    *  `ready`), but the reconcile closure depends on state declared
@@ -456,7 +466,7 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
     async (
       trailing: Action[] = [],
       extras: Record<string, unknown> = {},
-    ): Promise<GameState | null> => {
+    ): Promise<FinishResult | null> => {
       const ctx = contextRef.current;
       if (!ctx) return null;
       setFinishing(true);
@@ -479,7 +489,12 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
         const pending = trailing;
         const base = flushed?.eventCount ?? ctx.eventCount;
         const res = await postJSON<
-          | { state: GameState; eventCount: number; ended: boolean }
+          | {
+              state: GameState;
+              eventCount: number;
+              ended: boolean;
+              durationMs: number | null;
+            }
           | {
               __error: true;
               status: number;
@@ -511,7 +526,7 @@ export function useCombineRun(opts: UseCombineRunOpts = {}): UseCombineRunApi {
         }
         // Clear the context — a finished run isn't ours to checkpoint anymore.
         setContext(null);
-        return res.state;
+        return { state: res.state, durationMs: res.durationMs ?? null };
       } finally {
         setFinishing(false);
       }

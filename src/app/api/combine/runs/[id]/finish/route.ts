@@ -236,6 +236,17 @@ export async function POST(
   await saveRunCheckpoint(run.id, final, run.eventCount + result.appliedCount);
   await endRun(run.id);
 
+  // Server-authoritative durationMs (T-0247). Hoisted so we can also
+  // return it on the response — the client echoes this on the GameOverCard
+  // so the "time" cell shows the same number the leaderboard will rank by.
+  let durationMs: number | null = clientDurationMs;
+  if (run.mode === "daily" && run.startedAt) {
+    const elapsed = Date.now() - run.startedAt.getTime();
+    if (Number.isFinite(elapsed) && elapsed >= 0) {
+      durationMs = Math.min(elapsed, 24 * 60 * 60 * 1000);
+    }
+  }
+
   // Write to `progress` (only for signed-in users — anon runs just
   // end). All numbers are server-computed.
   const session = await getSession();
@@ -257,18 +268,6 @@ export async function POST(
     };
     const manifestSize = final.manifest?.length ?? 0;
     const manifestFound = final.manifestFound.length;
-    // Server-authoritative durationMs (T-0247). Computed from the row's
-    // `startedAt` (stamped when the player tapped Start on the daily
-    // sheet) and now. Clamped at 24h for absurd tabs. Falls back to the
-    // client hint only when the row has no `startedAt` (shouldn't happen
-    // for a valid daily run; belt-and-suspenders).
-    let durationMs: number | null = clientDurationMs;
-    if (run.mode === "daily" && run.startedAt) {
-      const elapsed = Date.now() - run.startedAt.getTime();
-      if (Number.isFinite(elapsed) && elapsed >= 0) {
-        durationMs = Math.min(elapsed, 24 * 60 * 60 * 1000);
-      }
-    }
     const resultValue =
       run.mode === "daily"
         ? {
@@ -312,5 +311,6 @@ export async function POST(
     eventCount: run.eventCount + result.appliedCount,
     events: result.events,
     ended: true,
+    durationMs: run.mode === "daily" ? durationMs : null,
   });
 }

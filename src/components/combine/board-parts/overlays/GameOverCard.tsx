@@ -83,7 +83,7 @@ export function GameOverCard({
   const manifestSize = manifest.length;
   const won =
     isDailyTargetRun && manifestSize > 0 && manifestFoundCount >= manifestSize;
-  const rank = useDailyRank({
+  const { rank, myDurationMs } = useDailyRank({
     // Gate on `!finishing` so we don't fetch before `/finish` commits
     // the `progress` row. Pre-fix, the fetch fired on mount and almost
     // always lost the race — leaderboard returned the pre-insert list
@@ -96,6 +96,10 @@ export function GameOverCard({
     day: state.daily,
     handle: currentUserHandle ?? null,
   });
+  // Fallback to the server-stored row duration when the in-session timer
+  // is gone (reload / navigate back / admin replay with cleared ref).
+  // T-0340.
+  const displayDurationMs = durationMs ?? myDurationMs;
   const [lbOpen, setLbOpen] = useState(false);
   const rankClickable =
     isDailyTargetRun && !!state.daily && !!currentUserHandle && !finishing;
@@ -296,7 +300,7 @@ export function GameOverCard({
                 <span>{manifestSize > 0 ? "found" : "discoveries"}</span>
               </div>
               <div>
-                <b>{durationMs != null ? formatDuration(durationMs) : "—"}</b>
+                <b>{displayDurationMs != null ? formatDuration(displayDurationMs) : "—"}</b>
                 <span>time</span>
               </div>
             </>
@@ -457,7 +461,11 @@ type RankState =
 /** Fetch today's daily leaderboard and resolve this player's position.
  *  The `/finish` submission is server-side so by the time the GameOver
  *  card renders, the row should already be committed; still, ranking is
- *  best-effort — failure quietly falls back to turn count only. */
+ *  best-effort — failure quietly falls back to turn count only.
+ *
+ *  Also surfaces `myDurationMs` — the server-stored duration for this
+ *  player's row. Used by the card to display "time" even after a reload
+ *  when the in-memory `dailyStartRef` is gone (T-0340). */
 function useDailyRank({
   enabled,
   theme,
@@ -468,11 +476,13 @@ function useDailyRank({
   theme: string;
   day: string | null;
   handle: string | null;
-}): RankState {
+}): { rank: RankState; myDurationMs: number | null } {
   const [state, setState] = useState<RankState>({ kind: "idle" });
+  const [myDurationMs, setMyDurationMs] = useState<number | null>(null);
   useEffect(() => {
     if (!enabled || !day || !handle) {
       setState({ kind: "idle" });
+      setMyDurationMs(null);
       return;
     }
     let cancelled = false;
@@ -485,13 +495,18 @@ function useDailyRank({
         );
         if (!res.ok) throw new Error(`request_failed_${res.status}`);
         const j = (await res.json()) as {
-          rows: Array<{ handle: string | null }>;
+          rows: Array<{ handle: string | null; durationMs: number | null }>;
         };
         if (cancelled) return;
         const total = j.rows.length;
         const idx = j.rows.findIndex((r) => r.handle === handle);
-        if (idx < 0) setState({ kind: "unranked", total });
-        else setState({ kind: "ranked", position: idx + 1, total });
+        if (idx < 0) {
+          setState({ kind: "unranked", total });
+          setMyDurationMs(null);
+        } else {
+          setState({ kind: "ranked", position: idx + 1, total });
+          setMyDurationMs(j.rows[idx].durationMs ?? null);
+        }
       } catch {
         if (!cancelled) setState({ kind: "error" });
       }
@@ -500,7 +515,7 @@ function useDailyRank({
       cancelled = true;
     };
   }, [enabled, theme, day, handle]);
-  return state;
+  return { rank: state, myDurationMs };
 }
 
 function formatRank(

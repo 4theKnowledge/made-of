@@ -203,3 +203,5 @@
 {"id": "C-0203", "ts": "2026-11-14T01:06:21Z", "kind": "feature", "summary": "Light/dark theme toggle in Header + Combine more-menu (cycles system → light → dark, persisted per-browser).", "refs": {"task": "T-0337"}}
 {"id": "C-0204", "ts": "2026-11-14T01:07:55Z", "kind": "refactor", "summary": "Combine more-menu: removed per-row subtitles for a cleaner scannable list.", "refs": {"task": "T-0338"}}
 {"id": "C-0205", "ts": "2026-11-14T01:43:34Z", "kind": "fix", "summary": "Compact mobile leaderboard (single-row results, horizontal day chips), labeled theme in nav drawer, stable 10-row daily leaderboard preview", "refs": {"task": "T-0339"}}
+{"id": "C-0206", "ts": "2026-11-14T01:54:37Z", "kind": "fix", "summary": "server-engine tests: add missing `mid: []` to synthetic bundles so `newGame` doesn't crash (T-0341)", "refs": {"task": "T-0341", "commit": "7922c38"}}
+{"id": "C-0207", "ts": "2026-11-14T01:54:55Z", "kind": "fix", "summary": "Daily GameOverCard time cell: thread server durationMs through /finish response + leaderboard fallback so time survives reload", "refs": {"task": "T-0340"}}

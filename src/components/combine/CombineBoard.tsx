@@ -1425,10 +1425,18 @@ export function CombineBoard({
         // context) just end locally — a signed-out player's best is
         // still kept in localStorage via the saveBest() call above.
         if (run.serverBacked) {
-          void run.finish(
-            [],
-            sealedDurationMs != null ? { durationMs: sealedDurationMs } : {},
-          );
+          void (async () => {
+            const result = await run.finish(
+              [],
+              sealedDurationMs != null ? { durationMs: sealedDurationMs } : {},
+            );
+            // Prefer the server-authoritative durationMs — matches what
+            // the leaderboard ranks by, and survives a reload because the
+            // leaderboard fetch later re-reads it (T-0340).
+            if (result?.durationMs != null) {
+              setDailyDurationMs(result.durationMs);
+            }
+          })();
         }
         if (r.state.daily) {
           const bestShelfId =
