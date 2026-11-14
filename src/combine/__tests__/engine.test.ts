@@ -40,6 +40,7 @@ function fakeBundle(opts: {
     symbol: string | null;
     fact: string;
     kind: "object";
+    pictogram: string | null;
   }>();
   const touched = new Set<string>([...outputs, ...ingredients]);
   for (const id of touched) {
@@ -52,6 +53,7 @@ function fakeBundle(opts: {
       symbol: null,
       fact: "",
       kind: "object",
+      pictogram: null,
     });
   }
   const sameIngredients = new Map<string, CombineRecipe[]>();

@@ -71,6 +71,7 @@ export function CombineTile(props: CombineTileProps) {
       tier={item.tier}
       kind={item.kind}
       symbol={item.symbol}
+      pictogram={item.pictogram}
     />
   );
   const labelNode = label ? <TileLabel name={item.name} /> : null;

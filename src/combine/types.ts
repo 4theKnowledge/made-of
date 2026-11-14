@@ -99,6 +99,10 @@ export interface CombineItem {
   symbol: string | null;
   fact: string;
   kind: ItemKind;
+  /** DB-sourced SVG inner-markup. Passed through to the tile Pictogram so
+   *  client-only renders (new tiles crumbling in mid-game) render
+   *  synchronously without hitting /api/pictograms/item/<name>. */
+  pictogram: string | null;
   /** The item's first `f` recipe parts (ids), straight from the knowledge
    *  base. Shown by the detail card when the gameplay bundle has filtered
    *  the recipe out. */

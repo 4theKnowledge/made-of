@@ -24,7 +24,7 @@
  * continue to work unchanged.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import type { ItemKind, Tier } from "@/db/schema";
 import { itemOverrides, kindOverrides } from "./overrides";
 
@@ -144,45 +144,30 @@ export function Pictogram({
     ...(size ? { width: size, height: size } : {}),
   } as React.CSSProperties;
 
-  // useState seeds from the sync lookup; useEffect triggers the async
-  // fetch if the seed came up empty. Rendered once with whatever is
-  // available, then re-rendered when the fetch resolves.
-  const [itemSvg, setItemSvg] = useState<string | undefined>(() =>
-    itemOverrides.get(name),
+  // Read from the override maps on every render so a reused component
+  // instance (e.g. a Combine tile that swaps from "wood" to "carbon
+  // dioxide") always renders the correct item. useSyncExternalStore
+  // re-renders when the map changes for THIS name/kind.
+  const itemSvg = useSyncExternalStore(
+    (cb) => subscribe(itemSubs, name, cb),
+    () => itemOverrides.get(name),
+    () => itemOverrides.get(name),
   );
-  const [kindSvg, setKindSvg] = useState<string | undefined>(() =>
-    kindOverrides.get(kind),
+  const kindSvg = useSyncExternalStore(
+    (cb) => subscribe(kindSubs, kind, cb),
+    () => kindOverrides.get(kind),
+    () => kindOverrides.get(kind),
   );
 
   useEffect(() => {
     // Short-circuit if the symbol path will be taken or a prop is passed.
     if (symbol || pictogram) return;
-
-    let cancelled = false;
-
-    // Subscribe first so a concurrent fetch landing while we're setting
-    // up still reaches us.
-    const unsubItem = subscribe(itemSubs, name, () => {
-      if (cancelled) return;
-      setItemSvg(itemOverrides.get(name));
-    });
-    const unsubKind = subscribe(kindSubs, kind, () => {
-      if (cancelled) return;
-      setKindSvg(kindOverrides.get(kind));
-    });
-
     if (!itemOverrides.has(name)) {
       void fetchItemPictogram(name);
     }
     if (!kindOverrides.has(kind)) {
       void fetchKindPictogram(kind);
     }
-
-    return () => {
-      cancelled = true;
-      unsubItem();
-      unsubKind();
-    };
   }, [name, kind, symbol, pictogram]);
 
   if (symbol) {

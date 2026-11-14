@@ -370,6 +370,7 @@ function makeItemView(node: GraphNode): CombineItem {
     symbol: node.symbol,
     fact: node.fact,
     kind: node.kind,
+    pictogram: node.pictogram ?? null,
     ...(lore ? { lore } : {}),
   };
 }

@@ -611,6 +611,7 @@ function toCombineItem(t: TreeItem): CombineItem {
     symbol: t.symbol,
     kind: t.kind,
     fact: "",
+    pictogram: null,
   };
 }
 
