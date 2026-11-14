@@ -52,6 +52,11 @@ export default async function PictogramAuditPage() {
     pictogram: k.pictogram,
   }));
 
+  const missingCount = items.reduce(
+    (n, it) => (it.pictogram == null ? n + 1 : n),
+    0,
+  );
+
   return (
     <main className="wrap">
       <Header />
@@ -64,10 +69,28 @@ export default async function PictogramAuditPage() {
           Click any tile to edit it; click <em>Edit fallback</em> next to a
           kind header to edit that kind&apos;s default.
         </p>
-        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10 }}>
           <Link href="/admin/pictograms/upload" className="btn">
             Bulk upload pictograms
           </Link>
+          {missingCount > 0 && (
+            <a
+              href="/api/admin/pictograms/missing"
+              className="btn"
+              download
+              title="Export items with no pictogram as JSON. Pair with the pictogram style guide to generate SVGs with an AI."
+            >
+              Download {missingCount} missing
+            </a>
+          )}
+          <a
+            href="/api/admin/bulk/pictogram-style"
+            className="btn"
+            download
+            title="Markdown style guide for authoring 32×32 pictogram SVGs."
+          >
+            Download style guide
+          </a>
         </div>
       </section>
 
