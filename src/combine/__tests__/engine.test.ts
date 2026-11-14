@@ -1731,3 +1731,72 @@ describe("daily manifest win (T-0241)", () => {
     expect(s2.state.over).toBe(false);
   });
 });
+
+describe("make history tracking (T-0361)", () => {
+  const bundle = fakeBundle({
+    recipes: [R("dough", ["flour", "water"])],
+  });
+
+  function makeDough(s: GameState): GameState {
+    s.board = Array(9).fill(null);
+    s.board[0] = "water";
+    s.tray = ["flour", null, null];
+    return reduce(s, bundle, { type: "place", slot: 0, cell: 1 }).state;
+  }
+
+  it("increments madeCounts and madeCountsEma on a successful combine", () => {
+    const s0 = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    const s1 = makeDough(s0);
+    expect(s1.madeCounts["dough"]).toBe(1);
+    // EMA is incremented by 1 then decayed by 0.95 in the same afterMove,
+    // so the first-make value lands at 0.95 — still well above baseline.
+    expect(s1.madeCountsEma["dough"]).toBeGreaterThan(0.9);
+    expect(s1.madeCountsEma["dough"]).toBeLessThanOrEqual(1);
+  });
+
+  it("recentMakes is a ring buffer capped at 8, newest first", () => {
+    // Chain 10 dough-makes by rearming the board each turn.
+    let state = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    for (let i = 0; i < 10; i++) {
+      state = makeDough(state);
+    }
+    expect(state.recentMakes.length).toBe(8);
+    expect(state.recentMakes[0]).toBe("dough");
+    expect(state.madeCounts["dough"]).toBe(10);
+  });
+
+  it("madeCountsEma decays each afterMove tick", () => {
+    // Make dough once, then trigger several "no-op" afterMove ticks by
+    // placing flour on empty cells (no match → no new make, but afterMove
+    // still runs).
+    let state = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    state = makeDough(state);
+    const emaAfterMake = state.madeCountsEma["dough"];
+    expect(emaAfterMake).toBeGreaterThan(0);
+    // Place flour on empty cells; each triggers afterMove → decay.
+    for (let i = 0; i < 5; i++) {
+      // Reset the board to empty so the placement never combines.
+      state.board = Array(9).fill(null);
+      state.tray = ["flour", null, null];
+      state = reduce(state, bundle, { type: "place", slot: 0, cell: 4 }).state;
+    }
+    const emaAfterIdle = state.madeCountsEma["dough"];
+    // Five decay passes at 0.95: 0.95^5 ≈ 0.774 of the starting value.
+    expect(emaAfterIdle).toBeLessThan(emaAfterMake * 0.85);
+    expect(emaAfterIdle).toBeGreaterThan(0); // not deleted yet
+  });
+
+  it("madeCountsEma entries below epsilon are deleted", () => {
+    // Prime the EMA directly, then run many idle ticks until decay drops
+    // below 0.01 and the key is pruned.
+    let state = newGame("everything", bundle, { seed: 1, size: 3 }).state;
+    state.madeCountsEma["dough"] = 0.02;
+    // 0.02 * 0.95^k < 0.01 when k >= 14.
+    for (let i = 0; i < 20; i++) {
+      state.board = Array(9).fill(null);
+      state.tray = ["flour", null, null];
+      state = reduce(state, bundle, { type: "place", slot: 0, cell: 4 }).state;
+    }
+    expect(state.madeCountsEma["dough"]).toBeUndefined();
+  });
+});

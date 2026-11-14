@@ -66,7 +66,7 @@ export const TIER_VALUE: Record<string, number> = {
  * It is fine (and expected) to skip bumping for pure refactors that
  * leave the reducer's output-for-input identical.
  */
-export const ENGINE_VERSION = 8;
+export const ENGINE_VERSION = 9;
 
 /** Baseline hold-zone capacity at chapter 0. */
 const HOLD_CAPACITY_BASE = 2;
@@ -85,6 +85,18 @@ export function holdCapacity(chapter: number): number {
     HOLD_CAPACITY_BASE + HOLD_CAPACITY_STEP * Math.max(0, chapter),
   );
 }
+
+/** Make-count EMA decay (T-0361). Applied once per `afterMove` to every
+ *  entry of `state.madeCountsEma`. At 0.95 per move, an item made 15×
+ *  decays to ~5.4 after 20 idle moves (penalty weight 0.31 → 0.55), so
+ *  an over-made ingredient gradually rejoins the pool. Tuned so fresh
+ *  makes still dominate the signal while stale ones don't permanently
+ *  block the ingredient. */
+const MAKE_COUNT_DECAY = 0.95;
+/** Entries below this are deleted during the decay pass to keep the map
+ *  small and avoid unbounded growth across long runs. 0.01 ≈ 90 moves
+ *  of decay from a single make; functionally zero weight impact. */
+const MAKE_COUNT_EMA_EPS = 0.01;
 
 /** A crumble counter for cell `i`: counts moves of inactivity since the
  *  tile was last touched. Reset implicitly when the cell's tile changes. */
@@ -151,6 +163,20 @@ export interface GameState {
    *  on-board history tray, which shows every make with a ×N count rather
    *  than only terminal items shipped to the shelf. */
   madeCounts: Record<string, number>;
+  /** Decayed make-counts used by the dealer penalty (T-0361). Same keys
+   *  as `madeCounts` but values are floats: incremented by 1 on each make
+   *  and multiplicatively decayed by `MAKE_COUNT_DECAY` on every
+   *  `afterMove` tick. Separated from `madeCounts` so the UI's integer
+   *  "×N" display is preserved while the dealer sees a freshness-aware
+   *  signal — an item over-made 20 moves ago rejoins the pool as newer
+   *  recipes make it needed again. Entries below 0.01 are deleted to
+   *  keep the map small. */
+  madeCountsEma: Record<string, number>;
+  /** Ring buffer of recent make outputs, newest first (T-0361). Capped at
+   *  8 entries by `finishResolve`. Read by the dealer to block recently-
+   *  used ingredients from the next tray, breaking "made X → dealt X's
+   *  ingredients → made X again" loops. */
+  recentMakes: string[];
   /** The ingredient list the player actually used the first time they
    *  made each output this run. Lets the info card show "How you made it"
    *  with the right recipe when an item has multiple valid recipes
@@ -337,6 +363,8 @@ function cloneState(s: GameState): GameState {
     tray: cloneTray(s.tray),
     found: [...s.found],
     madeCounts: { ...s.madeCounts },
+    madeCountsEma: { ...s.madeCountsEma },
+    recentMakes: [...s.recentMakes],
     howMade: { ...s.howMade },
     discoveredAtChapter: { ...s.discoveredAtChapter },
     shelf: [...s.shelf],
@@ -615,6 +643,15 @@ function finishResolve(
   // info card, not the lifetime collection.
   state.howMade[recipe.out] = recipe.all.slice();
   state.madeCounts[recipe.out] = (state.madeCounts[recipe.out] ?? 0) + 1;
+  // T-0361: decayed dealer-side count. +1 on each make; decayed every
+  // afterMove by MAKE_COUNT_DECAY so old over-makes forgive themselves
+  // when newer recipes need the ingredient again.
+  state.madeCountsEma[recipe.out] = (state.madeCountsEma[recipe.out] ?? 0) + 1;
+  // T-0361: ring buffer of the last 8 makes, newest first. The dealer
+  // reads the first few entries to block their ingredients from the next
+  // tray, breaking tight make-X / deal-X's-partners / make-X loops.
+  state.recentMakes.unshift(recipe.out);
+  if (state.recentMakes.length > 8) state.recentMakes.length = 8;
   // Age progression: count unique first-time makes at the current age's band.
   // `ageNeed` is documented as "unique discoveries at the current age's band
   // needed to leave each age" — duplicates at the same band don't count, so
@@ -674,6 +711,13 @@ function dealerViewFromState(state: GameState, bundle: ThemeBundle) {
     manifest: state.manifest,
     manifestFound: state.manifestFound,
     manifestPartnerBias: state.manifestPartnerBias,
+    // T-0361: thread run-local make history into the dealer so it can
+    // soft-bias against over-made items and block ingredients of recent
+    // makes. Pass the decayed EMA (not the raw integer counts) so old
+    // over-makes forgive themselves over time. Both are no-ops for daily
+    // (diversify=false).
+    madeCounts: state.madeCountsEma,
+    recentMakes: state.recentMakes,
     // T-0317: kind-diversity cap + recency penalty apply to endless/fast/
     // tutorial play. Daily runs skip them so the manifest solver's
     // reachability budget isn't squeezed by the extra biases.
@@ -686,6 +730,15 @@ function afterMove(
   bundle: ThemeBundle,
   events: Event[],
 ): void {
+  // T-0361: decay the dealer-side make-count EMA every tick. Old
+  // over-makes forgive themselves so an ingredient needed by a
+  // later-unlocked recipe isn't permanently under-served.
+  for (const k of Object.keys(state.madeCountsEma)) {
+    const next = state.madeCountsEma[k] * MAKE_COUNT_DECAY;
+    if (next < MAKE_COUNT_EMA_EPS) delete state.madeCountsEma[k];
+    else state.madeCountsEma[k] = next;
+  }
+
   // 0. Daily manifest win: every item on the frozen per-day find list
   //    has been discovered. `manifestFound` is kept in manifest order
   //    denormalised from `found` in `finishResolve`, so the length check
@@ -947,6 +1000,8 @@ export function newGame(
     longest: 0,
     found: [],
     madeCounts: {},
+    madeCountsEma: {},
+    recentMakes: [],
     howMade: {},
     discoveredAtChapter: {},
     swaps: 0,

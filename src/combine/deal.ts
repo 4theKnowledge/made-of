@@ -42,6 +42,23 @@ const KIND_DIVERSITY_CAP = 2;
 const RECENCY_PENALTY_LAST = 0.4;
 const RECENCY_PENALTY_PREV = 0.7;
 
+/** Per-item make-count penalty (T-0361). Applied in `pickWeighted` to
+ *  non-base, non-tool items: weight multiplier is `1 / (1 + k * n)` where
+ *  n is a decayed count of how many times that item has been made this
+ *  run (see `MAKE_COUNT_DECAY` in `engine.ts`). Flattens the
+ *  make-histogram without hard cutoffs — fresh n=5 gets ~57% weight,
+ *  n=10 ~40%, n=20 ~25%. Base ingredients (water, wood) and tools are
+ *  exempt: they *must* recur as ingredients. */
+const MADE_COUNT_PENALTY_K = 0.15;
+
+/** How many recent makes block their ingredients from the next tray
+ *  (T-0361). With `recentMakes=['steel']` and steel's recipe = [iron,
+ *  wood], iron+wood are filtered from the layer pool for this tray. The
+ *  filter falls back to the unfiltered list if it empties the pool, same
+ *  rule as the kind cap. Prevents "made steel → dealt iron+wood → made
+ *  steel again" loops. */
+const RECENT_MAKES_WINDOW = 3;
+
 /** The dealer only knows about the state it needs — not the whole game. */
 export interface DealerView {
   bundle: ThemeBundle;
@@ -90,6 +107,21 @@ export interface DealerView {
    *  `recentTrays` (T-0317). Keys are kinds seen in the two most recent
    *  trays; missing keys mean "no penalty, 1.0". */
   _recentKindPenalty?: Map<ItemKind, number>;
+  /** Per-item make-count map (T-0361). Keyed by item id; value is how
+   *  many times that item has been made *this run*. Mirrors
+   *  `GameState.madeCounts` — the engine passes it through
+   *  `dealerViewFromState`. Missing key = 0. Drives the make-count
+   *  penalty in `pickWeighted`. */
+  madeCounts?: Record<string, number>;
+  /** Recent makes, newest first (T-0361). Mirrors `GameState.recentMakes`,
+   *  a ring buffer of the last ~8 outputs the player successfully made.
+   *  The dealer uses the first `RECENT_MAKES_WINDOW` entries to block
+   *  their ingredients from this tray's layer pools. */
+  recentMakes?: string[];
+  /** Internal: lazily-populated union of ingredients used by the recent
+   *  makes within the window (T-0361). Base ingredients and tools are
+   *  excluded from the set so they're never blocked. */
+  _recentIngredientBlock?: Set<string>;
   /** Enable kind-diversity cap + recency penalty (T-0317). On for endless
    *  play, off for daily — the daily manifest solver has strict budget
    *  constraints and these biases can push specific day seeds past the
@@ -204,6 +236,45 @@ function buildRecentKindPenalty(view: DealerView): Map<ItemKind, number> {
   return out;
 }
 
+/** Build the set of ingredients used by recent makes within the window
+ *  (T-0361). Only non-base, non-tool ingredients are included — base
+ *  ingredients and tools are never blocked (would starve the dealer). */
+function buildRecentIngredientBlock(view: DealerView): Set<string> {
+  const out = new Set<string>();
+  const recent = view.recentMakes;
+  if (!recent || recent.length === 0) return out;
+  const window = Math.min(recent.length, RECENT_MAKES_WINDOW);
+  const recentSet = new Set(recent.slice(0, window));
+  for (const r of view.bundle.recipes) {
+    if (!recentSet.has(r.out)) continue;
+    for (const ing of r.all) {
+      if (!view.bundle.outputs.has(ing)) continue; // base ingredient: exempt
+      if (view.bundle.tools.has(ing)) continue; // tool: exempt
+      out.add(ing);
+    }
+  }
+  return out;
+}
+
+/** Apply the recent-makes ingredient block to a candidate list (T-0361).
+ *  Drops candidates whose id is in `_recentIngredientBlock`. Falls back to
+ *  the original list if filtering empties it, same rule as the kind cap. */
+function applyRecentMakesFilter(view: DealerView, arr: string[]): string[] {
+  if (arr.length === 0) return arr;
+  if (view.diversify === false) return arr;
+  if (!view._recentIngredientBlock) {
+    view._recentIngredientBlock = buildRecentIngredientBlock(view);
+  }
+  const block = view._recentIngredientBlock;
+  if (block.size === 0) return arr;
+  const filtered: string[] = [];
+  for (const x of arr) {
+    if (block.has(x)) continue;
+    filtered.push(x);
+  }
+  return filtered.length > 0 ? filtered : arr;
+}
+
 /** Apply the kind-diversity cap to a candidate list (T-0317). Filters
  *  out tiles whose kind is already at `KIND_DIVERSITY_CAP` on the board.
  *  If the filter would empty the list, returns the original list
@@ -252,6 +323,7 @@ function pickWeighted(view: DealerView, arr: readonly string[]): string | undefi
       : buildRecentKindPenalty(view);
   }
   const recentKinds = view._recentKindPenalty;
+  const madeCounts = view.madeCounts;
   const weightFor = (x: string): number => {
     let w = found.has(x) ? DISCOVERED_WEIGHT : 1;
     if (partners && partners.has(x)) w *= 1 + bias;
@@ -261,6 +333,13 @@ function pickWeighted(view: DealerView, arr: readonly string[]): string | undefi
         const p = recentKinds.get(k);
         if (p != null) w *= p;
       }
+    }
+    // Make-count penalty (T-0361): only on recipe outputs (base ingredients
+    // must recur); tools are always exempt. `madeCounts` missing or zero
+    // means no penalty applies.
+    if (madeCounts && view.bundle.outputs.has(x) && !view.bundle.tools.has(x)) {
+      const n = madeCounts[x];
+      if (n && n > 0) w *= 1 / (1 + MADE_COUNT_PENALTY_K * n);
     }
     if (override) w *= override(view, x);
     return w;
@@ -351,7 +430,7 @@ export function pickOne(view: DealerView): string | null {
           need.push(x);
         }
       }
-      if (need.length) return pickWeighted(view, applyKindCap(view, need)) ?? null;
+      if (need.length) return pickWeighted(view, applyKindCap(view, applyRecentMakesFilter(view, need))) ?? null;
     }
   }
 
@@ -372,7 +451,7 @@ export function pickOne(view: DealerView): string | null {
       }
       if (fits) cands.push(x);
     }
-    if (cands.length) return pickWeighted(view, applyKindCap(view, cands)) ?? null;
+    if (cands.length) return pickWeighted(view, applyKindCap(view, applyRecentMakesFilter(view, cands))) ?? null;
   }
 
   // 2. A partner for something already on the board. When there is a pile,
@@ -399,15 +478,15 @@ export function pickOne(view: DealerView): string | null {
     // heavily toward them (3:1) rather than all-or-nothing — occasional
     // "wrong" partners still help by introducing variety.
     if (pileFirst.length && otherOnBoard.length && rand(view.rng) < 0.75) {
-      return pickWeighted(view, applyKindCap(view, pileFirst)) ?? null;
+      return pickWeighted(view, applyKindCap(view, applyRecentMakesFilter(view, pileFirst))) ?? null;
     }
-    if (pileFirst.length) return pickWeighted(view, applyKindCap(view, pileFirst)) ?? null;
-    if (otherOnBoard.length) return pickWeighted(view, applyKindCap(view, otherOnBoard)) ?? null;
+    if (pileFirst.length) return pickWeighted(view, applyKindCap(view, applyRecentMakesFilter(view, pileFirst))) ?? null;
+    if (otherOnBoard.length) return pickWeighted(view, applyKindCap(view, applyRecentMakesFilter(view, otherOnBoard))) ?? null;
   }
 
   // 3. A made thing from this age — starts a chain next time.
   if (roll < 0.88 && A.MID.length) {
-    return pickWeighted(view, applyKindCap(view, A.MID.slice())) ?? null;
+    return pickWeighted(view, applyKindCap(view, applyRecentMakesFilter(view, A.MID.slice()))) ?? null;
   }
 
   // 4. A raw thing for this age; occasionally allow tools too.
@@ -416,8 +495,8 @@ export function pickOne(view: DealerView): string | null {
   );
   const pool =
     rand(view.rng) < 0.25 ? A.BASE.filter((x) => okTool(x)) : base;
-  if (pool.length) return pickWeighted(view, applyKindCap(view, pool)) ?? null;
-  return pickWeighted(view, applyKindCap(view, [...A.ING])) ?? null;
+  if (pool.length) return pickWeighted(view, applyKindCap(view, applyRecentMakesFilter(view, pool))) ?? null;
+  return pickWeighted(view, applyKindCap(view, applyRecentMakesFilter(view, [...A.ING]))) ?? null;
 }
 
 /** Canonical fingerprint for a tray — sorted multiset of non-null tiles. */

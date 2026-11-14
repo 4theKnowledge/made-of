@@ -96,6 +96,14 @@ export interface StoredGame {
   longest: number;
   found: string[];
   madeCounts?: Record<string, number>;
+  /** Decayed dealer-side make counts (T-0361). Optional for forward-compat
+   *  with saves predating this field — hydrate falls back to the integer
+   *  `madeCounts` as a seed. */
+  madeCountsEma?: Record<string, number>;
+  /** Recent makes ring buffer, newest first (T-0361). Dealer uses the
+   *  first few entries to block their ingredients from the next tray.
+   *  Optional for forward-compat with saves predating this field. */
+  recentMakes?: string[];
   howMade?: Record<string, string[]>;
   discoveredAtChapter?: Record<string, number>;
   swaps: number;
@@ -169,6 +177,8 @@ function toStored(state: GameState): StoredGame {
     longest: state.longest,
     found: state.found.slice(),
     madeCounts: { ...state.madeCounts },
+    madeCountsEma: { ...state.madeCountsEma },
+    recentMakes: [...state.recentMakes],
     howMade: { ...state.howMade },
     discoveredAtChapter: { ...state.discoveredAtChapter },
     swaps: state.swaps,
@@ -387,6 +397,15 @@ export function hydrateGame(s: StoredGame): GameState {
     madeCounts: s.madeCounts
       ? { ...s.madeCounts }
       : Object.fromEntries(s.found.map((id) => [id, 1])),
+    // Older saves predate madeCountsEma — seed from integer madeCounts so
+    // resumed runs don't lose the dealer penalty entirely. Decay will
+    // normalise it within a few moves.
+    madeCountsEma: s.madeCountsEma
+      ? { ...s.madeCountsEma }
+      : s.madeCounts
+        ? { ...s.madeCounts }
+        : {},
+    recentMakes: s.recentMakes ? [...s.recentMakes] : [],
     howMade: s.howMade ? { ...s.howMade } : {},
     discoveredAtChapter: s.discoveredAtChapter ? { ...s.discoveredAtChapter } : {},
     swaps: s.swaps,

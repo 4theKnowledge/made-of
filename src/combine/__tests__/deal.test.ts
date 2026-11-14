@@ -436,3 +436,155 @@ describe("terminal tiles are never dealt", () => {
     }
   });
 });
+
+describe("make-count penalty (T-0361)", () => {
+  // Pick a 2-input base-only recipe so we can prime `found` cheaply and
+  // know exactly which ingredients the dealer should consider.
+  const twoBase = everything.recipes.find(
+    (r) => r.all.length === 2 && r.all.every((x) => everything.base.includes(x)),
+  );
+  if (!twoBase) throw new Error("no 2-input base-only recipe found");
+  const outputItem = twoBase.out;
+  const baseIng = twoBase.all[0];
+
+  it("down-weights an over-made output in pickOne", () => {
+    // Prime found with the output so it's in the soft pool as a mid-tile.
+    // Then compare pickOne frequency for the output with 0 vs 20 makes.
+    const freq = (madeN: number): number => {
+      let hits = 0;
+      const trials = 400;
+      for (let i = 0; i < trials; i++) {
+        const v: DealerView = {
+          bundle: everything,
+          board: emptyBoard(5),
+          tray: [null, null, null],
+          size: 5,
+          rng: makeRng(20000 + i),
+          found: [outputItem],
+          madeCounts: madeN > 0 ? { [outputItem]: madeN } : undefined,
+        };
+        for (let k = 0; k < 20; k++) {
+          const picked = pickOne(v);
+          if (picked === outputItem) {
+            hits++;
+            break;
+          }
+        }
+      }
+      return hits / trials;
+    };
+    const baseline = freq(0);
+    const penalized = freq(20);
+    // Penalty at n=20 is 1/(1+0.15*20) = 0.25 — a large drop. Even with
+    // the recent-makes filter and layered picker in play, penalized
+    // frequency should be visibly below baseline.
+    expect(penalized).toBeLessThan(baseline * 0.9);
+  });
+
+  it("does NOT penalize base ingredients regardless of madeCount", () => {
+    // Base ingredients have no incoming recipe, so `bundle.outputs.has(x)`
+    // is false and the penalty branch skips them. A base ingredient with
+    // a nonsense-high count should pick at roughly the baseline rate.
+    expect(everything.outputs.has(baseIng)).toBe(false);
+    const freq = (madeN: number): number => {
+      let hits = 0;
+      const trials = 400;
+      for (let i = 0; i < trials; i++) {
+        const v: DealerView = {
+          bundle: everything,
+          board: emptyBoard(5),
+          tray: [null, null, null],
+          size: 5,
+          rng: makeRng(30000 + i),
+          found: [],
+          madeCounts: madeN > 0 ? { [baseIng]: madeN } : undefined,
+        };
+        for (let k = 0; k < 20; k++) {
+          const picked = pickOne(v);
+          if (picked === baseIng) {
+            hits++;
+            break;
+          }
+        }
+      }
+      return hits / trials;
+    };
+    const baseline = freq(0);
+    const withPenaltyAttempt = freq(100);
+    // Within 20% of baseline — exemption means the penalty is skipped;
+    // any drift is pure RNG noise across 400 trials.
+    expect(withPenaltyAttempt).toBeGreaterThan(baseline * 0.8);
+    expect(withPenaltyAttempt).toBeLessThan(baseline * 1.2);
+  });
+});
+
+describe("recent-makes ingredient filter (T-0361)", () => {
+  // When an output appears in `recentMakes`, the dealer should block its
+  // non-base ingredients from this tray's pools. Find a recipe whose
+  // ingredients include at least one non-base output.
+  const withOutputIng = everything.recipes.find(
+    (r) =>
+      r.all.length === 2 &&
+      r.all.some((x) => everything.outputs.has(x) && !everything.tools.has(x)),
+  );
+  if (!withOutputIng) throw new Error("no 2-input recipe with an output ingredient");
+  const blockedIng = withOutputIng.all.find(
+    (x) => everything.outputs.has(x) && !everything.tools.has(x),
+  )!;
+
+  it("drops recent-make ingredients from pickOne results when alternatives exist", () => {
+    let blockedHits = 0;
+    let freeHits = 0;
+    const trials = 300;
+    for (let i = 0; i < trials; i++) {
+      // Prime found so blockedIng is reachable.
+      const found = [...withOutputIng.all, withOutputIng.out];
+      const blockedView: DealerView = {
+        bundle: everything,
+        board: emptyBoard(5),
+        tray: [null, null, null],
+        size: 5,
+        rng: makeRng(40000 + i),
+        found,
+        recentMakes: [withOutputIng.out],
+      };
+      const freeView: DealerView = {
+        bundle: everything,
+        board: emptyBoard(5),
+        tray: [null, null, null],
+        size: 5,
+        rng: makeRng(40000 + i),
+        found,
+        // no recentMakes → filter is a no-op
+      };
+      for (let k = 0; k < 10; k++) {
+        if (pickOne(blockedView) === blockedIng) {
+          blockedHits++;
+          break;
+        }
+      }
+      for (let k = 0; k < 10; k++) {
+        if (pickOne(freeView) === blockedIng) {
+          freeHits++;
+          break;
+        }
+      }
+    }
+    // The block isn't absolute (filter falls back if it empties the pool),
+    // but blocked frequency should be clearly lower than free frequency.
+    expect(blockedHits).toBeLessThan(freeHits);
+  });
+
+  it("is deterministic given same seed + same recentMakes", () => {
+    const makeView = (): DealerView => ({
+      bundle: everything,
+      board: emptyBoard(5),
+      tray: [null, null, null],
+      size: 5,
+      rng: makeRng(777),
+      found: [...withOutputIng.all, withOutputIng.out],
+      recentMakes: [withOutputIng.out],
+    });
+    expect(dealTray(makeView())).toEqual(dealTray(makeView()));
+  });
+});

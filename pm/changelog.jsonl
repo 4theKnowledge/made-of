@@ -223,3 +223,4 @@
 {"id": "C-0223", "ts": "2026-11-14T11:40:44Z", "kind": "fix", "summary": "Admin pictogram audit: pre-resolve effective pictogram server-side; zero client fetches on load", "refs": {"task": "T-0359"}}
 {"id": "C-0224", "ts": "2026-11-14T12:16:20Z", "kind": "refactor", "summary": "Delete migrate-hardcoded-pictograms + _hardcoded-pictograms; DB is now sole pictogram source (phase 3/3 complete)", "refs": {"task": "T-0356"}}
 {"id": "C-0225", "ts": "2026-11-14T12:39:15Z", "kind": "fix", "summary": "Combine pictograms: fix stale useState causing wrong icons during tile swaps; thread pictogram through theme bundle", "refs": {"task": "T-0360"}}
+{"id": "C-0226", "ts": "2026-11-14T23:27:00Z", "kind": "feature", "summary": "Combine dealer now biases against over-made items and blocks recent-make ingredients; EMA decay forgives stale over-makes", "refs": {"task": "T-0361"}}
