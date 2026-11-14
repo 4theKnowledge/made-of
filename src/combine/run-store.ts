@@ -7,7 +7,7 @@
  * one-way) have a single enforcer.
  */
 
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import type { CombineRun, CombineRunOwnerKind } from "@/db/schema";
 import { ENGINE_VERSION, type GameState } from "./engine";
@@ -126,6 +126,39 @@ export async function listActiveRuns(owner: RunOwnerKey): Promise<CombineRun[]> 
     await Promise.all(stale.map((r) => invalidateRun(r.id)));
   }
   return rows.filter((r) => r.engineVersion === ENGINE_VERSION);
+}
+
+/** Most-recent active daily run whose `dailyKey` is strictly before
+ *  `today`. Used by the "recover yesterday's abandoned daily" prompt
+ *  (T-0333) — the client fetches this on mount, and if present, offers
+ *  the player Save (write progress row from stored state) or Discard.
+ *
+ *  Unlike `listActiveRuns`, this intentionally does NOT filter on
+ *  `engineVersion`: a stale-engine row is still a legit abandoned run
+ *  and we should let the player bank it (via the stored state, which
+ *  the finalize path trusts without replay). Stale-engine rows get
+ *  stamped with their original `engineVersion` on the progress row —
+ *  mirrors `finalize-legacy` semantics. */
+export async function getLatestStaleDailyRun(
+  owner: RunOwnerKey,
+  today: string,
+): Promise<CombineRun | null> {
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(schema.combineRuns)
+    .where(
+      and(
+        eq(schema.combineRuns.ownerKind, owner.kind),
+        eq(schema.combineRuns.ownerId, owner.id),
+        eq(schema.combineRuns.status, "active"),
+        eq(schema.combineRuns.mode, "daily"),
+        lt(schema.combineRuns.dailyKey, today),
+      ),
+    )
+    .orderBy(desc(schema.combineRuns.updatedAt))
+    .limit(1);
+  return row ?? null;
 }
 
 /** Overwrite a run's state + event count. Used after a successful
