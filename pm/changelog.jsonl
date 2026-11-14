@@ -214,3 +214,4 @@
 {"id": "C-0214", "ts": "2026-11-14T07:01:36Z", "kind": "fix", "summary": "Clarify theme-delete confirm copy: removes memberships, not catalog items", "refs": {"task": "T-0348"}}
 {"id": "C-0215", "ts": "2026-11-14T07:09:58Z", "kind": "refactor", "summary": "Remove /admin/import; add ?mode=compact to bulk snapshot (drops evidence/sources/pictograms for smaller agent prompts)", "refs": {"task": "T-0349"}}
 {"id": "C-0216", "ts": "2026-11-14T07:20:31Z", "kind": "feature", "summary": "Bulk-upload: preset download buttons + custom form; compact snapshot can embed vocab/schema via includeSchema=1", "refs": {"task": "T-0350"}}
+{"id": "C-0217", "ts": "2026-11-14T07:39:47Z", "kind": "fix", "summary": "Combine tile labels: drop bottom fade mask; use text-overflow ellipsis for honest truncation", "refs": {"task": "T-0351"}}
