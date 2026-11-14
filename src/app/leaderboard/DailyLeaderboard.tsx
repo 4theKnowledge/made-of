@@ -132,6 +132,7 @@ export function DailyLeaderboard({
                 <th>Player</th>
                 <th className="lb-num-h">Found</th>
                 <th className="lb-num-h">Turns</th>
+                <th className="lb-num-h lb-time-h">Time</th>
                 <th className="lb-num-h lb-score-h">Score</th>
               </tr>
             </thead>
@@ -160,6 +161,13 @@ export function DailyLeaderboard({
                       )}
                     </td>
                     <td className="lb-num">{r.turns}</td>
+                    <td className="lb-num lb-time">
+                      {r.durationMs != null ? (
+                        formatDuration(r.durationMs)
+                      ) : (
+                        <span className="lb-muted">—</span>
+                      )}
+                    </td>
                     <td className="lb-num lb-score">
                       {r.score.toLocaleString("en")}
                     </td>
@@ -172,6 +180,22 @@ export function DailyLeaderboard({
       )}
     </section>
   );
+}
+
+/** Row duration as `m:ss` (or `h:mm:ss`), rounded to the nearest second.
+ *  Mirrors the GameOverCard helper — intentionally duplicated rather than
+ *  shared to keep a formatter local to the only two surfaces that need it. */
+function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (hours > 0) {
+    return `${hours}:${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  }
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 /** Short chip label. "Today" for today; otherwise "Mon 3". */
