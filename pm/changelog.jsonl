@@ -216,3 +216,4 @@
 {"id": "C-0216", "ts": "2026-11-14T07:20:31Z", "kind": "feature", "summary": "Bulk-upload: preset download buttons + custom form; compact snapshot can embed vocab/schema via includeSchema=1", "refs": {"task": "T-0350"}}
 {"id": "C-0217", "ts": "2026-11-14T07:39:47Z", "kind": "fix", "summary": "Combine tile labels: drop bottom fade mask; use text-overflow ellipsis for honest truncation", "refs": {"task": "T-0351"}}
 {"id": "C-0218", "ts": "2026-11-14T07:54:50Z", "kind": "feature", "summary": "Pictogram audit: download items missing pictograms as JSON for AI SVG generation", "refs": {"task": "T-0352"}}
+{"id": "C-0219", "ts": "2026-11-14T08:15:13Z", "kind": "refactor", "summary": "Migration script copies hardcoded PICTO/KIND_PICTO into DB on every deploy (phase 1 of 3)", "refs": {"task": "T-0353"}}
