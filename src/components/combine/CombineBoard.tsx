@@ -103,6 +103,7 @@ import { ChoicePicker } from "@/components/combine/board-parts/overlays/ChoicePi
 import { CollectionBook } from "@/components/combine/board-parts/overlays/CollectionBook";
 import { DetailCard } from "@/components/combine/board-parts/overlays/DetailCard";
 import { ShoredTileSheet } from "@/components/combine/board-parts/overlays/ShoredTileSheet";
+import { StaleDailyPromptSheet } from "@/components/combine/board-parts/overlays/StaleDailyPromptSheet";
 import { GameOverCard } from "@/components/combine/board-parts/overlays/GameOverCard";
 import { DebugPanel } from "@/components/combine/board-parts/overlays/DebugPanel";
 import { SoundMenu } from "@/components/combine/board-parts/overlays/SoundMenu";
@@ -556,6 +557,106 @@ export function CombineBoard({
       );
     }
   }, [activeTheme, initialMode, themeFromUrl, dailyHostTheme, bundles, dailyBundles, fastBundles, dailyPayloadSeed, dailyManifest, dailyManifestPartnerBias, dailyManifestEmpty, dailyEnabled, run.ready, admin]);
+
+  // T-0333: prior-day daily run recovery. A one-shot probe asks the
+  // server for an owner's most-recent abandoned daily (dailyKey < today).
+  // If found, we render a Save-score / Discard sheet. Gated on signedIn —
+  // anon runs don't write to `progress`, so there's nothing to bank.
+  // Dismissals (scrim / Esc) only clear local state; the server row
+  // stays `active` and the prompt re-fires on next reload until the
+  // player picks Save or Discard. That's deliberate — we want the
+  // overhang to resolve, not silently dismiss.
+  const [staleDaily, setStaleDaily] = useState<{
+    runId: string;
+    dailyKey: string;
+    score: number;
+    moves: number;
+    manifestFound: number;
+    manifestSize: number;
+  } | null>(null);
+  const [staleDailyBusy, setStaleDailyBusy] = useState(false);
+  const staleDailyChecked = useRef(false);
+  useEffect(() => {
+    if (staleDailyChecked.current) return;
+    if (!signedIn) return;
+    staleDailyChecked.current = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/combine/runs/stale-daily", {
+          method: "GET",
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const body = (await res.json()) as {
+          run: {
+            runId: string;
+            dailyKey: string;
+            score: number;
+            moves: number;
+            manifestFound: number;
+            manifestSize: number;
+          } | null;
+        };
+        if (!body.run) return;
+        // Zero-interaction runs are noise — close them silently so the
+        // player isn't nagged for a tap on /combine they immediately
+        // backed out of. Mirrors the planning note's threshold.
+        if (body.run.moves === 0 && body.run.score === 0) {
+          void fetch(`/api/combine/runs/${body.run.runId}/finalize-stale`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "discard" }),
+          }).catch(() => {
+            // best-effort — if the cleanup POST fails, the next mount
+            // re-fires the same no-op path
+          });
+          return;
+        }
+        setStaleDaily(body.run);
+      } catch {
+        // network blip — try again on the next mount
+      }
+    })();
+  }, [signedIn]);
+
+  const onStaleDailySave = useCallback(() => {
+    if (!staleDaily) return;
+    setStaleDailyBusy(true);
+    (async () => {
+      try {
+        await fetch(`/api/combine/runs/${staleDaily.runId}/finalize-stale`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "save" }),
+        });
+      } catch {
+        // POST failed — leave staleDaily set so the user can retry.
+        setStaleDailyBusy(false);
+        return;
+      }
+      setStaleDailyBusy(false);
+      setStaleDaily(null);
+    })();
+  }, [staleDaily]);
+
+  const onStaleDailyDiscard = useCallback(() => {
+    if (!staleDaily) return;
+    setStaleDailyBusy(true);
+    (async () => {
+      try {
+        await fetch(`/api/combine/runs/${staleDaily.runId}/finalize-stale`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "discard" }),
+        });
+      } catch {
+        setStaleDailyBusy(false);
+        return;
+      }
+      setStaleDailyBusy(false);
+      setStaleDaily(null);
+    })();
+  }, [staleDaily]);
 
   // Server run alignment. Each time the local state settles on a fresh
   // (mode, theme, dailyKey) slot, register a matching server run. The
@@ -3299,6 +3400,18 @@ export function CombineBoard({
           }}
           onDismiss={() => setEndRunConfirm(false)}
         />
+        {staleDaily && (
+          <StaleDailyPromptSheet
+            dailyKey={staleDaily.dailyKey}
+            score={staleDaily.score}
+            manifestFound={staleDaily.manifestFound}
+            manifestSize={staleDaily.manifestSize}
+            busy={staleDailyBusy}
+            onSave={onStaleDailySave}
+            onDiscard={onStaleDailyDiscard}
+            onDismiss={() => setStaleDaily(null)}
+          />
+        )}
       </div>
       {drag &&
         drag.slot != null &&
