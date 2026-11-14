@@ -9,6 +9,7 @@ import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 import { ButtonGroup } from "@/components/common/ButtonGroup";
 import { ManifestGrid } from "@/components/combine/board-parts/ManifestGrid";
 import { NextDailyCountdown } from "@/components/combine/board-parts/NextDailyCountdown";
+import { DailyLeaderboardModal } from "@/components/combine/board-parts/overlays/DailyLeaderboardModal";
 
 /** T-0217 Slice 1b: the newest completion row for the active theme, or
  *  null if the player has never completed it (or isn't signed in). */
@@ -95,6 +96,9 @@ export function GameOverCard({
     day: state.daily,
     handle: currentUserHandle ?? null,
   });
+  const [lbOpen, setLbOpen] = useState(false);
+  const rankClickable =
+    isDailyTargetRun && !!state.daily && !!currentUserHandle && !finishing;
   // Top-3 most-made outputs this run. Metric is `state.madeCounts`
   // (outputs produced, incremented in finishResolve). Ties broken by
   // tier then id so the row is deterministic across clients.
@@ -249,7 +253,34 @@ export function GameOverCard({
                 ? `${(best - state.score).toLocaleString("en")} from best (${best.toLocaleString("en")}).`
                 : `You reached ${progressionLabel}.`}
         </span>
-        <div className={isDailyTargetRun ? "cb4" : "cb3"}>
+        {isDailyTargetRun && (
+          rankClickable ? (
+            <button
+              type="button"
+              className="cbrankrow"
+              onClick={() => setLbOpen(true)}
+              aria-label="Open today's leaderboard"
+            >
+              <b className="cbrankrow-pos">
+                {formatRank(rank, won, !!currentUserHandle, finishing)}
+              </b>
+              <span className="cbrankrow-label">
+                {rankLabel(rank, won, !!currentUserHandle, finishing)}
+              </span>
+              <span className="cbrankrow-chev" aria-hidden="true">›</span>
+            </button>
+          ) : (
+            <div className="cbrankrow cbrankrow-static">
+              <b className="cbrankrow-pos">
+                {formatRank(rank, won, !!currentUserHandle, finishing)}
+              </b>
+              <span className="cbrankrow-label">
+                {rankLabel(rank, won, !!currentUserHandle, finishing)}
+              </span>
+            </div>
+          )
+        )}
+        <div className="cb3">
           {isDailyTargetRun ? (
             <>
               <div>
@@ -267,14 +298,6 @@ export function GameOverCard({
               <div>
                 <b>{durationMs != null ? formatDuration(durationMs) : "—"}</b>
                 <span>time</span>
-              </div>
-              <div>
-                <b>
-                  {formatRank(rank, won, !!currentUserHandle, finishing)}
-                </b>
-                <span>
-                  {rankLabel(rank, won, !!currentUserHandle, finishing)}
-                </span>
               </div>
             </>
           ) : (
@@ -393,6 +416,16 @@ export function GameOverCard({
             </button>
           )}
         </ButtonGroup>
+        {isDailyTargetRun && state.daily && (
+          <DailyLeaderboardModal
+            open={lbOpen}
+            onDismiss={() => setLbOpen(false)}
+            day={state.daily}
+            theme={state.theme}
+            currentUserHandle={currentUserHandle ?? null}
+            manifestSize={manifestSize > 0 ? manifestSize : null}
+          />
+        )}
     </ResponsiveSheet>
   );
 }

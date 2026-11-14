@@ -197,3 +197,5 @@
 {"id": "C-0197", "ts": "2026-11-13T23:25:07Z", "kind": "fix", "summary": "Daily Combine regenerate no longer blocks concurrent API traffic (T-0330)", "refs": {"task": "T-0330"}}
 {"id": "C-0198", "ts": "2026-11-14T00:23:04Z", "kind": "feature", "summary": "Daily Combine now has an End-run button — banks partial-manifest score to today's leaderboard", "refs": {"task": "T-0332"}}
 {"id": "C-0199", "ts": "2026-11-14T00:36:27Z", "kind": "feature", "summary": "Daily Combine prompts to save or discard yesterday's abandoned run on return", "refs": {"task": "T-0333"}}
+{"id": "C-0200", "ts": "2026-11-14T00:55:18Z", "kind": "feature", "summary": "Combine daily now shares the endless layout height — the \"Find\" manifest sits in a split row next to the shelf, instead of stacking above it.", "refs": {"task": "T-0334", "commit": "2b4c0ba"}}
+{"id": "C-0201", "ts": "2026-11-14T00:59:21Z", "kind": "feature", "summary": "Daily end-screen rank is now a tappable row that opens the day's leaderboard in a sheet (top 10 + your neighbours).", "refs": {"task": "T-0335"}}
