@@ -1,80 +1,41 @@
 /**
- * Seed-if-stale: runs the seed script on three triggers.
+ * Seed-if-empty: runs `src/db/seed.ts` only when the `items` table is
+ * empty. On a database that already has content (which is every deploy
+ * past the initial boot), this is a no-op.
  *
- *   1. The items table is empty (first boot).
- *   2. No row carries any tag (the deploy predates the tag migration).
- *   3. Any of the five non-physical items are still present (the deploy
- *      predates the data module which filters them out at parse time).
+ * Why so minimal: prod has data. Any re-seeding on a populated DB
+ * overwrites admin edits (pictograms, tags) because the seed upserts
+ * from `items.data.ts` where those columns are unset. An empty-table
+ * check is the only one that still means "we need to materialise the
+ * KB from source" — the previous tag/non-physical checks were about
+ * historical data migrations that have long since finished.
  *
- * Any of those conditions means the DB has drifted from the source of
- * truth at src/data/items.data.ts and the game won't behave right.
- *
- * The seed itself is idempotent on its own transaction (delete + bulk
- * insert), so running it again is safe.
+ * If you ever need to force a reseed, run `npm run db:seed` manually
+ * (or via a Railway one-off container).
  */
 
 import { getDb, closeDb, schema } from "@/db/client";
-import { inArray, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
-/** The five items that must never appear in the DB (dropped at parse time
- *  in src/data/load.ts). If they're there, the DB predates the data
- *  module. */
-const NONPHYSICAL = [
-  "sunlight",
-  "lightning",
-  "electricity",
-  "internet",
-  "fire",
-];
-
-async function needsReseed(): Promise<string | null> {
+async function main() {
   const db = getDb();
-
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(schema.items);
-  if (count === 0) return "items table is empty";
-
-  // Separate query is simpler than FILTER (WHERE …) which the sql tag
-  // may rewrite in unexpected ways. "array_length(tags, 1)" is null for
-  // empty arrays, so compare > 0 after coalescing.
-  const [{ tagged }] = await db
-    .select({
-      tagged: sql<number>`count(*)::int`,
-    })
-    .from(schema.items)
-    .where(sql`coalesce(array_length(tags, 1), 0) > 0`);
-  if (tagged === 0) {
-    return "no items carry any tag — predates the tag migration";
-  }
-
-  const nonPhysicalRows = await db
-    .select({ name: schema.items.name })
-    .from(schema.items)
-    .where(inArray(schema.items.name, NONPHYSICAL));
-  if (nonPhysicalRows.length > 0) {
-    return `found non-physical items (${nonPhysicalRows
-      .map((r) => r.name)
-      .join(", ")}) — predates the data module`;
-  }
-
-  return null;
-}
-
-async function main() {
-  const reason = await needsReseed();
   await closeDb();
-  if (!reason) {
-    console.log("seed-if-stale: DB is current, skipping seed.");
+
+  if (count > 0) {
+    console.log(`seed-if-empty: items table has ${count} rows, skipping seed.`);
     return;
   }
-  console.log(`seed-if-stale: ${reason}; running seed...`);
+
+  console.log("seed-if-empty: items table is empty; running seed...");
   // Dynamic import so the seed script runs in its own module scope.
   await import("../src/db/seed");
 }
 
 main().catch(async (err) => {
-  console.error("seed-if-stale failed:", err);
+  console.error("seed-if-empty failed:", err);
   await closeDb();
   process.exit(1);
 });

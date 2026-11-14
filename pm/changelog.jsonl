@@ -219,3 +219,4 @@
 {"id": "C-0219", "ts": "2026-11-14T08:15:13Z", "kind": "refactor", "summary": "Migration script copies hardcoded PICTO/KIND_PICTO into DB on every deploy (phase 1 of 3)", "refs": {"task": "T-0353"}}
 {"id": "C-0220", "ts": "2026-11-14T09:09:14Z", "kind": "refactor", "summary": "Pictograms: DB is now source of truth; client fetches via per-item cached endpoints; delete hardcoded maps (phase 2 of 3)", "refs": {"task": "T-0354"}}
 {"id": "C-0221", "ts": "2026-11-14T11:10:51Z", "kind": "fix", "summary": "Hotfix: SSR crash on /combine — split pictogram overrides into server-safe module", "refs": {"task": "T-0357"}}
+{"id": "C-0222", "ts": "2026-11-14T11:35:56Z", "kind": "fix", "summary": "seed-if-empty: skip when items table has rows (previously reseeded every deploy, wiping admin pictograms/tags)", "refs": {"task": "T-0358"}}
