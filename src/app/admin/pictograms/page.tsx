@@ -34,6 +34,12 @@ export default async function PictogramAuditPage() {
       .orderBy(asc(schema.kinds.position), asc(schema.kinds.code)),
   ]);
 
+  // Map kind code -> kind pictogram so we can pre-resolve the effective
+  // pictogram server-side and avoid 400 client fetches.
+  const kindPictograms = new Map<string, string | null>(
+    kinds.map((k) => [k.code, k.pictogram]),
+  );
+
   const itemsByKind: Record<string, AuditItem[]> = {};
   for (const it of items) {
     (itemsByKind[it.kind] ??= []).push({
@@ -43,6 +49,10 @@ export default async function PictogramAuditPage() {
       kind: it.kind as ItemKind,
       symbol: it.symbol,
       pictogram: it.pictogram,
+      // Pre-resolved SVG to render. Passing this as `pictogram` on the
+      // client Pictogram component skips its useEffect fetch — HTML ships
+      // with the SVG inlined.
+      effectivePictogram: it.pictogram ?? kindPictograms.get(it.kind) ?? null,
     });
   }
 

@@ -19,6 +19,10 @@ export interface AuditItem {
   kind: ItemKind;
   symbol: string | null;
   pictogram: string | null;
+  /** Pre-resolved SVG (item's own if set, else the kind fallback). Passing
+   *  this to <Pictogram pictogram={...}> keeps the tile sync-rendered and
+   *  avoids the client-side useEffect fetch. */
+  effectivePictogram: string | null;
 }
 
 export interface AuditKind {
@@ -48,8 +52,12 @@ export function PictogramAuditClient({ itemsByKind, kinds }: Props) {
     setItems((prev) => {
       const next: typeof prev = {};
       for (const [kind, list] of Object.entries(prev)) {
+        const kindFallback =
+          kindRows.find((k) => k.code === kind)?.pictogram ?? null;
         next[kind] = list.map((it) =>
-          it.id === itemId ? { ...it, pictogram } : it,
+          it.id === itemId
+            ? { ...it, pictogram, effectivePictogram: pictogram ?? kindFallback }
+            : it,
         );
       }
       return next;
@@ -58,6 +66,18 @@ export function PictogramAuditClient({ itemsByKind, kinds }: Props) {
 
   function updateKind(code: string, pictogram: string | null) {
     setKindRows((prev) => prev.map((k) => (k.code === code ? { ...k, pictogram } : k)));
+    // Items in this kind that don't carry their own pictogram take the
+    // new fallback; items with their own pictogram are unaffected.
+    setItems((prev) => {
+      const list = prev[code];
+      if (!list) return prev;
+      return {
+        ...prev,
+        [code]: list.map((it) =>
+          it.pictogram ? it : { ...it, effectivePictogram: pictogram },
+        ),
+      };
+    });
   }
 
   return (
@@ -135,7 +155,7 @@ export function PictogramAuditClient({ itemsByKind, kinds }: Props) {
                         tier={item.tier}
                         kind={item.kind}
                         symbol={item.symbol}
-                        pictogram={item.pictogram}
+                        pictogram={item.effectivePictogram}
                       />
                     </div>
                     <div
