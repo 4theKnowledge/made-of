@@ -1158,11 +1158,15 @@ a.btn.primary{color:var(--bg)}
 .cbghost .ic{width:60%;height:auto;aspect-ratio:1;border:0;background:transparent}
 .cbghost .cbn{font-size:9px}
 
-/* Cap the picker to the viewport so a high alt-output count
+/* Center the picker in the viewport so a high alt-output count
  * (common-bases like water+* or carbon+* can balloon to 10+ options)
- * doesn't push the dialog off the screen on mobile. The dialog itself
- * stays bounded; the .opts list scrolls inside it. */
-.cbchoose{position:absolute;left:6px;right:6px;top:42%;z-index:40;max-height:calc(100dvh - 48px);padding:10px;border:2.5px solid var(--ink);border-radius:4px;background:var(--bg);box-shadow:4px 4px 0 var(--ink);display:flex;flex-direction:column;gap:8px;animation:mdin .2s ease-out;box-sizing:border-box;overflow:hidden}
+ * doesn't push the dialog off the screen on mobile. position:fixed
+ * + top:0/bottom:0/margin:auto centers vertically without a transform —
+ * the mdin keyframe ends on transform:none, which would wipe out any
+ * translate-based centering. height:fit-content keeps a small 2-3
+ * option dialog hugging its content rather than stretching full-height;
+ * the .opts list scrolls internally when options exceed max-height. */
+.cbchoose{position:fixed;left:6px;right:6px;top:0;bottom:0;margin:auto;z-index:40;height:fit-content;max-height:calc(100dvh - 32px);padding:10px;border:2.5px solid var(--ink);border-radius:4px;background:var(--bg);box-shadow:4px 4px 0 var(--ink);display:flex;flex-direction:column;gap:8px;animation:mdin .2s ease-out;box-sizing:border-box;overflow:hidden}
 .cbchoose .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;text-align:center;flex:none}
 .cbchoose .opts{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;min-height:0;padding:2px}
 /* Footer button (Cancel) stays pinned under the scrolling list. */
