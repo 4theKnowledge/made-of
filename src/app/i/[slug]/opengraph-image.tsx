@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { getItemPage } from "@/graph/queries";
+import { getLiveSnapshot } from "@/graph/live";
 import { TIER, KIND } from "@/lib/taxonomy";
-import { KIND_PICTO, PICTO } from "@/pictograms/data";
 
 export const runtime = "nodejs";
 export const alt = "Made Of · an item page";
@@ -69,7 +69,13 @@ export default async function OgImage({
       : item.fact
     : "";
 
-  const svgInner = pictogramSvg(item.name, item.kind, item.symbol);
+  const live = await getLiveSnapshot();
+  const svgInner = item.symbol
+    ? ""
+    : (item.pictogram ??
+        live.kindPictograms.get(item.kind) ??
+        live.kindPictograms.get("object") ??
+        "");
 
   return new ImageResponse(
     (
@@ -215,13 +221,3 @@ export default async function OgImage({
   );
 }
 
-function pictogramSvg(
-  name: string,
-  kind: string,
-  symbol: string | null,
-): string {
-  if (symbol) return "";
-  const map = PICTO as Record<string, string>;
-  const kinds = KIND_PICTO as Record<string, string>;
-  return map[name] ?? kinds[kind] ?? kinds.object ?? "";
-}

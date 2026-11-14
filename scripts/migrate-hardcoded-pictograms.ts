@@ -25,7 +25,7 @@
 
 import { and, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "../src/db/client";
-import { KIND_PICTO, PICTO } from "../src/pictograms/data";
+import { KIND_PICTO, PICTO } from "./_hardcoded-pictograms";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 

@@ -1,14 +1,14 @@
 /**
- * Pictograms.
+ * Snapshot of the pre-DB hardcoded PICTO / KIND_PICTO maps from the former
+ * `src/pictograms/data.ts`. Kept here only so the one-shot migration can
+ * backfill `items.pictogram` and `kinds.pictogram` in prod without
+ * dragging the data back into the client bundle.
  *
- * One style: a white body (class b), ink lines (l), solid ink (k), white lines (w),
- * on a 32-unit grid. Specific pictures for items with an obvious image; every other
- * item uses its kind's fallback. Elements keep their letter symbols.
- *
- * These strings are inserted directly into an <svg> at render time via
- * dangerouslySetInnerHTML. All content is static and admin-authored —
- * never from end-user input — so XSS is not a concern.
+ * Do not add new entries. Edit pictograms via /admin/pictograms instead.
+ * After the migration has successfully run in prod, this file and the
+ * migration script can be deleted.
  */
+
 
 const KIND_PICTO={
   cosmic:`<ellipse class="l" cx="16" cy="17" rx="14" ry="4.5" transform="rotate(-18 16 17)"/><circle class="b" cx="16" cy="16" r="7.5"/><path class="l" d="M3.5 21.5c3 1.5 9 0 15-2.5M27.5 12c.8-1.6.5-2.6-1-3"/>`,

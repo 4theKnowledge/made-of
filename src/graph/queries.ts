@@ -37,6 +37,7 @@ export interface PageItem {
   tier: Tier;
   kind: ItemKind;
   symbol: string | null;
+  pictogram: string | null;
   firstAppeared: string | null;
   firstAppearedYa: number | null;
   fact: string;
@@ -90,6 +91,7 @@ export async function getItemPage(
     tier: node.tier,
     kind: node.kind,
     symbol: node.symbol,
+    pictogram: node.pictogram ?? null,
     firstAppeared: node.firstAppeared,
     firstAppearedYa: node.firstAppearedYa,
     fact: node.fact,
