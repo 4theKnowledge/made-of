@@ -124,59 +124,112 @@ export function DailyLeaderboard({
       ) : rows.length === 0 ? (
         <p className="lb-muted">No finishes yet for this day.</p>
       ) : (
-        <div className="lb-table-wrap">
-          <table className="lb-table">
-            <thead>
-              <tr>
-                <th className="lb-rank-h">#</th>
-                <th>Player</th>
-                <th className="lb-num-h">Found</th>
-                <th className="lb-num-h">Turns</th>
-                <th className="lb-num-h lb-time-h">Time</th>
-                <th className="lb-num-h lb-score-h">Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => {
-                const isMe =
-                  currentUserHandle != null &&
-                  r.handle != null &&
-                  r.handle === currentUserHandle;
-                return (
-                  <tr key={`${i}-${r.handle ?? "anon"}`} className={isMe ? "me" : undefined}>
-                    <td className="lb-rank">{i + 1}</td>
-                    <td className="lb-player">
-                      <span className="lb-player-inner">
+        <>
+          <div className="lb-table-wrap">
+            <table className="lb-table">
+              <thead>
+                <tr>
+                  <th className="lb-rank-h">#</th>
+                  <th>Player</th>
+                  <th className="lb-num-h">Found</th>
+                  <th className="lb-num-h">Turns</th>
+                  <th className="lb-num-h">Time</th>
+                  <th className="lb-num-h">Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const isMe =
+                    currentUserHandle != null &&
+                    r.handle != null &&
+                    r.handle === currentUserHandle;
+                  return (
+                    <tr key={`${i}-${r.handle ?? "anon"}`} className={isMe ? "me" : undefined}>
+                      <td className="lb-rank">{i + 1}</td>
+                      <td className="lb-player">
                         <span className="lb-player-name">
                           {r.handle ?? <span className="lb-muted">—</span>}
                         </span>
                         {isMe && <span className="lb-youbadge" aria-label="This is you">You</span>}
-                        <span className="lb-score-mobile">{r.score.toLocaleString("en")} pts</span>
+                      </td>
+                      <td className="lb-num">
+                        {r.manifestFound}
+                        {manifestSize != null && (
+                          <span className="lb-muted"> / {manifestSize}</span>
+                        )}
+                      </td>
+                      <td className="lb-num">{r.turns}</td>
+                      <td className="lb-num">
+                        {r.durationMs != null ? (
+                          formatDuration(r.durationMs)
+                        ) : (
+                          <span className="lb-muted">—</span>
+                        )}
+                      </td>
+                      <td className="lb-num">
+                        {r.score.toLocaleString("en")}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <ol className="lb-cards" aria-label="Leaderboard">
+            {rows.map((r, i) => {
+              const isMe =
+                currentUserHandle != null &&
+                r.handle != null &&
+                r.handle === currentUserHandle;
+              return (
+                <li
+                  key={`card-${i}-${r.handle ?? "anon"}`}
+                  className={`lb-card${isMe ? " me" : ""}`}
+                >
+                  <div className="lb-card-top">
+                    <span className="lb-card-rank">#{i + 1}</span>
+                    <span className="lb-card-handle">
+                      {r.handle ?? <span className="lb-muted">—</span>}
+                    </span>
+                    {isMe && (
+                      <span className="lb-youbadge" aria-label="This is you">
+                        You
                       </span>
-                    </td>
-                    <td className="lb-num">
-                      {r.manifestFound}
+                    )}
+                    <span className="lb-card-score">
+                      {r.score.toLocaleString("en")} pts
+                    </span>
+                  </div>
+                  <div className="lb-card-stats">
+                    <span>
+                      <b>{r.manifestFound}</b>
                       {manifestSize != null && (
-                        <span className="lb-muted"> / {manifestSize}</span>
-                      )}
-                    </td>
-                    <td className="lb-num">{r.turns}</td>
-                    <td className="lb-num lb-time">
+                        <span className="lb-muted">/{manifestSize}</span>
+                      )}{" "}
+                      found
+                    </span>
+                    <span className="lb-card-sep" aria-hidden="true">
+                      ·
+                    </span>
+                    <span>
+                      <b>{r.turns}</b> turn{r.turns === 1 ? "" : "s"}
+                    </span>
+                    <span className="lb-card-sep" aria-hidden="true">
+                      ·
+                    </span>
+                    <span>
                       {r.durationMs != null ? (
-                        formatDuration(r.durationMs)
+                        <b>{formatDuration(r.durationMs)}</b>
                       ) : (
                         <span className="lb-muted">—</span>
                       )}
-                    </td>
-                    <td className="lb-num lb-score">
-                      {r.score.toLocaleString("en")}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </>
       )}
     </section>
   );

@@ -208,3 +208,4 @@
 {"id": "C-0208", "ts": "2026-11-14T01:57:34Z", "kind": "feature", "summary": "Leaderboard: show per-row Time column on /leaderboard (hidden on mobile, same as Score)", "refs": {"task": "T-0342"}}
 {"id": "C-0209", "ts": "2026-11-14T02:03:49Z", "kind": "decision", "summary": "Keep Time off the daily leaderboard preview sheet — glance surface, would regress T-0339 single-row compaction. Full /leaderboard has it via T-0342.", "refs": {"task": "T-0343"}}
 {"id": "C-0210", "ts": "2026-11-14T02:25:47Z", "kind": "fix", "summary": "Leaderboard mobile: show Time column, drop Score column (kept inline under handle) — Time matches rank sort key", "refs": {"task": "T-0344"}}
+{"id": "C-0211", "ts": "2026-11-14T02:28:59Z", "kind": "feature", "summary": "Mobile leaderboard: two-line card layout (rank/handle/score on top, found·turns·time on bottom) — desktop table unchanged", "refs": {"task": "T-0345"}}
