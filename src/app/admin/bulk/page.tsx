@@ -2,6 +2,7 @@ import { Header } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { Breadcrumb } from "../Breadcrumb";
 import { BulkForm } from "./BulkForm";
+import { DownloadPanel } from "./DownloadPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -15,20 +16,10 @@ export default function AdminBulkPage() {
         <p>
           Add new items, recipes, links and evidence to the knowledge base in
           one shot. Additive — existing content is left alone unless you
-          explicitly merge. Hand the template and the KB snapshot to an AI
-          agent as context, then paste its output below.
+          explicitly merge. Hand the snapshot (with schema) to an AI agent as
+          context, then paste its output below.
         </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
-          <a href="/api/admin/bulk/template" className="btn" download>
-            Download template
-          </a>
-          <a href="/api/admin/bulk/snapshot" className="btn" download>
-            Download KB snapshot
-          </a>
-          <a href="/api/admin/bulk/pictogram-style" className="btn" download>
-            Download pictogram style guide
-          </a>
-        </div>
+        <DownloadPanel />
       </section>
       <section className="feat">
         <BulkForm />

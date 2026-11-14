@@ -127,7 +127,7 @@ Shared components live in `src/components/{common,bowtie,craft,explore,combine,l
 | `/admin/combine/themes` + `/[code]` — manage Combine themes with reachability validator | **Shipped** |
 | `/admin/items/[id]` — dedicated per-item editor (full form; retained alongside the tree modal) | **Shipped** |
 | `/admin/pictograms` — pictogram audit | **Shipped** |
-| `/admin/import`, admin export | **Shipped** |
+| `/admin/bulk`, admin export | **Shipped** |
 | `/admin/codes` — invite codes | **Shipped** |
 
 ### Still to build

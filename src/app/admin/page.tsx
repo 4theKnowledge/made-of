@@ -20,7 +20,6 @@ const GROUPS: ToolGroup[] = [
     tools: [
       { href: "/admin/tree", label: "Knowledge base" },
       { href: "/admin/kinds", label: "Kinds" },
-      { href: "/admin/import", label: "Import JSON" },
       { href: "/admin/bulk", label: "Bulk upload" },
     ],
   },

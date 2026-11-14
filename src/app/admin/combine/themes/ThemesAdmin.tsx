@@ -168,14 +168,17 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
         const members = Number(e.body?.memberCount ?? 0);
         const completions = Number(e.body?.completionRows ?? 0);
         const parts: string[] = [];
-        if (members > 0) parts.push(`${members} item${members === 1 ? "" : "s"} in the theme`);
+        if (members > 0)
+          parts.push(
+            `${members} item${members === 1 ? "" : "s"} from this theme`,
+          );
         if (completions > 0)
           parts.push(
             `${completions} player completion stamp${completions === 1 ? "" : "s"}`,
           );
         const ok = await confirm({
           title: `Force delete "${code}"?`,
-          body: `This will also remove ${parts.join(" and ")}. This cannot be undone.`,
+          body: `This will remove ${parts.join(" and ")}. The items themselves stay in the catalog. This cannot be undone.`,
           confirmLabel: "Force delete",
           destructive: true,
         });
@@ -305,7 +308,7 @@ export function ThemesAdmin({ initial }: { initial: ThemeRow[] }) {
                         style={{ ...smallBtn, color: "#f85149" }}
                         title={
                           row.itemCount > 0
-                            ? `Delete this theme (will prompt to cascade ${row.itemCount} item${row.itemCount === 1 ? "" : "s"})`
+                            ? `Delete this theme (will prompt to remove ${row.itemCount} item${row.itemCount === 1 ? "" : "s"} from the theme; items stay in catalog)`
                             : "Delete this theme"
                         }
                         onClick={async () => {
