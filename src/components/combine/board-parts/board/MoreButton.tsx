@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
+import { ThemeToggleRow } from "@/components/common/ThemeToggle";
 
 export function MoreButton({
   moreOpen,
@@ -103,6 +104,7 @@ export function MoreButton({
             <em>{soundOn ? "On" : "Off"}</em>
           </span>
         </button>
+        <ThemeToggleRow />
         {onDebug && isAdmin && (
           <button
             type="button"

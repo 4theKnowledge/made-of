@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { AuthNavLink } from "./AuthNavLink";
+import { ThemeToggle } from "./ThemeToggle";
 
 type Current =
   | "home"
@@ -85,6 +86,7 @@ export function Header({
           </Link>
         ))}
         <AuthNavLink />
+        <ThemeToggle />
       </nav>
       <button
         type="button"
@@ -119,6 +121,7 @@ export function Header({
             </Link>
           ))}
           <AuthNavLink />
+          <ThemeToggle />
         </nav>
       </div>
       {open && (
