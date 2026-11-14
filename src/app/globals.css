@@ -945,6 +945,22 @@ a.btn.primary{color:var(--bg)}
 .cbshelf-empty svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.7}
 .cbshelf-empty em{font-style:normal}
 .cbslot.cbslot-ph{background:transparent;border:1.5px dashed color-mix(in srgb, var(--ink) 25%, transparent);box-shadow:none;cursor:default;pointer-events:none}
+/* Daily history row: left column = manifest-to-find (scrollable), right
+ * column = shelf (scrollable). Endless mode skips this row and renders
+ * the shelf directly at full width. T-0334. */
+.cbhistrow{display:flex;gap:6px;align-items:stretch}
+.cbhistrow > *{flex:1 1 0;min-width:0}
+.cbhistrow-finds{position:relative;display:flex;align-items:center;gap:5px;min-height:34px;padding:4px 6px;border:1.5px solid color-mix(in srgb, var(--ink) 20%, transparent);border-radius:4px;background:var(--surface);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;cursor:pointer;-webkit-tap-highlight-color:transparent;font:inherit;color:inherit;text-align:left;-webkit-mask-image:linear-gradient(to right, #000, #000 18px, #000 calc(100% - 18px), #000);mask-image:linear-gradient(to right, #000, #000 18px, #000 calc(100% - 18px), #000)}
+.cbhistrow-finds:hover{background:color-mix(in srgb, var(--ink) 6%, var(--surface))}
+.cbhistrow-finds:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cbhistrow-finds-slots{display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap;min-width:0;flex:1 1 auto}
+.cbhistrow-finds-tally{position:sticky;right:0;flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;padding:0 4px 0 18px;margin-left:auto;background:linear-gradient(to right, transparent, var(--surface) 14px);pointer-events:none;font-size:12px;color:var(--muted);font-family:var(--mono);letter-spacing:.04em;text-transform:uppercase}
+.cbhistrow-finds-tally em{font-style:normal}
+@media (max-width: 640px){
+  .cbhistrow{gap:4px}
+  .cbhistrow-finds{min-height:28px;padding:3px 5px 3px 5px;scrollbar-width:none}
+  .cbhistrow-finds::-webkit-scrollbar{display:none}
+}
 /* Lifetime-collection unlock badge — a persistent ★ in the top-left of
  * a shelf tile until the player opens its DetailCard. Opposite side
  * from the count badge (bottom-right) so they never collide. Accent

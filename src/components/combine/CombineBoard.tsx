@@ -109,13 +109,12 @@ import { DebugPanel } from "@/components/combine/board-parts/overlays/DebugPanel
 import { SoundMenu } from "@/components/combine/board-parts/overlays/SoundMenu";
 import { ModeThemePicker } from "@/components/combine/board-parts/overlays/ModeThemePicker";
 import { ChapterBar } from "@/components/combine/board-parts/board/ChapterBar";
-import { DailyFindsStrip } from "@/components/combine/board-parts/DailyFindsStrip";
+import { HistoryRow } from "@/components/combine/board-parts/board/HistoryRow";
 import { Board } from "@/components/combine/board-parts/board/Board";
 import { BoardErrorBoundary } from "@/components/combine/board-parts/board/BoardErrorBoundary";
 import { BoardPlaceholder } from "@/components/combine/board-parts/board/BoardPlaceholder";
 import { DragGhost } from "@/components/combine/board-parts/board/DragGhost";
 import { Hold } from "@/components/combine/board-parts/board/Hold";
-import { Shelf } from "@/components/combine/board-parts/board/Shelf";
 import { TipLine } from "@/components/combine/board-parts/board/TipLine";
 import { TopBar } from "@/components/combine/board-parts/board/TopBar";
 import { Tray } from "@/components/combine/board-parts/board/Tray";
@@ -2715,20 +2714,13 @@ export function CombineBoard({
           bundle={bundle}
           onAges={() => setAgesOpen(true)}
         />
-        {state.mode === "daily" && state.manifest && state.manifest.length > 0 && (
-          <DailyFindsStrip
-            manifest={state.manifest}
-            manifestFound={state.manifestFound}
-            bundle={bundle}
-            onOpen={() => setAgesOpen(true)}
-          />
-        )}
-        <Shelf
+        <HistoryRow
           state={state}
           bundle={bundle}
           fx={fx}
           newUnlocks={newUnlocks}
           onInfo={(id) => setInfoTile(id)}
+          onOpenManifest={() => setAgesOpen(true)}
         />
         {(!loaded || dailyStartPending) && (
           <BoardPlaceholder size={6} traySlots={3} holdSlots={3} />
