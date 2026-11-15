@@ -370,7 +370,7 @@ export function GameOverCard({
                 New discoveries
               </p>
               <div className="cbchip cbfound row">
-                {state.found.slice(0, 10).map((id) => {
+                {state.found.map((id) => {
                   const it = bundle.items.get(id);
                   if (!it) return null;
                   return (
@@ -385,12 +385,13 @@ export function GameOverCard({
                     </span>
                   );
                 })}
+                <span className="cbshelf-empty cbshelf-tally" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 2l2.6 6.3 6.8.5-5.2 4.5 1.6 6.7L12 16.8 6.2 20l1.6-6.7L2.6 8.8l6.8-.5z" />
+                  </svg>
+                  <em>{state.found.length} found</em>
+                </span>
               </div>
-              {state.found.length > 10 && (
-                <p className="cbfound-more">
-                  +{state.found.length - 10} more in your collection
-                </p>
-              )}
             </>
           )
         )}
