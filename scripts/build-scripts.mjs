@@ -48,6 +48,11 @@ await Promise.all([
   }),
   build({
     ...common,
+    entryPoints: ["scripts/reconcile-uuidv5-item-ids.ts"],
+    outfile: "dist-scripts/reconcile-uuidv5-item-ids.js",
+  }),
+  build({
+    ...common,
     entryPoints: ["scripts/seed-if-empty.ts"],
     outfile: "dist-scripts/seed-if-empty.js",
     // seed-if-empty does a dynamic import("../src/db/seed") — rewrite that
