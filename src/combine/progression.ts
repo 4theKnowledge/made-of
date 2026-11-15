@@ -89,6 +89,58 @@ export function softPool(bundle: ThemeBundle, found: string[]): SoftPool {
 }
 
 /**
+ * Recipes the player can fire *right now* given current on-board inventory.
+ *
+ * Strictly stricter than `softPool().reachableRecipes`, which only requires
+ * that each ingredient is known. This additionally requires that the
+ * ingredients actually sit on the board / tray / hold in sufficient count —
+ * i.e., no further placement or discovery needed; the player could, in
+ * principle, trigger the combine by moving pieces around.
+ *
+ * Multiset-aware: a recipe needing `wood+wood` requires two wood tiles
+ * in the inventory.
+ *
+ * Returned in the recipe set's natural order (`bundle.recipes` ordering),
+ * which is stable across renders so the UI's chip list doesn't flicker.
+ *
+ * Pure function. The engine does not read this — it exists purely to
+ * surface ambient "you can do this" information to the player.
+ */
+export function reachableNow(
+  bundle: ThemeBundle,
+  board: ReadonlyArray<string | null>,
+  tray: ReadonlyArray<string | null>,
+  hold: ReadonlyArray<string | null>,
+  found: ReadonlyArray<string>,
+): CombineRecipe[] {
+  const sp = softPool(bundle, [...found]);
+
+  const inv = new Map<string, number>();
+  const bump = (id: string | null) => {
+    if (!id) return;
+    inv.set(id, (inv.get(id) ?? 0) + 1);
+  };
+  for (const v of board) bump(v);
+  for (const v of tray) bump(v);
+  for (const v of hold) bump(v);
+
+  const out: CombineRecipe[] = [];
+  for (const r of sp.reachableRecipes) {
+    const need = new Map<string, number>();
+    for (const ing of r.all) need.set(ing, (need.get(ing) ?? 0) + 1);
+    let ok = true;
+    for (const [ing, n] of need) {
+      if ((inv.get(ing) ?? 0) < n) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) out.push(r);
+  }
+  return out;
+}
+
+/**
  * KB-size-invariant chapter thresholds.
  *
  * Replaces the earlier fraction-of-KB scheme (`softAgeThresholds`) which

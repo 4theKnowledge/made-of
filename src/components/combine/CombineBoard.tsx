@@ -111,6 +111,8 @@ import { ModeThemePicker } from "@/components/combine/board-parts/overlays/ModeT
 import { ChapterBar } from "@/components/combine/board-parts/board/ChapterBar";
 import { HistoryRow } from "@/components/combine/board-parts/board/HistoryRow";
 import { Board } from "@/components/combine/board-parts/board/Board";
+import { ReachableColumn } from "@/components/combine/board-parts/board/ReachableColumn";
+import { reachableNow } from "@/combine/progression";
 import { BoardErrorBoundary } from "@/components/combine/board-parts/board/BoardErrorBoundary";
 import { BoardPlaceholder } from "@/components/combine/board-parts/board/BoardPlaceholder";
 import { DragGhost } from "@/components/combine/board-parts/board/DragGhost";
@@ -2656,6 +2658,43 @@ export function CombineBoard({
     });
   };
 
+  // Recipes whose ingredients are all currently on board/tray/hold — the
+  // ambient "what can I do right now" signal surfaced by ReachableColumn.
+  // Pure read of state; nothing here feeds back into the engine.
+  const reachable = useMemo(
+    () => reachableNow(bundle, state.board, state.tray, state.hold, state.found),
+    [bundle, state.board, state.tray, state.hold, state.found],
+  );
+  const [reachableActiveId, setReachableActiveId] = useState<string | null>(null);
+  // Any time the reachable set changes, the previously active recipe may no
+  // longer be reachable — clear the highlight so it doesn't lie about the
+  // board.
+  useEffect(() => {
+    if (reachableActiveId && !reachable.some((r) => r.id === reachableActiveId)) {
+      setReachableActiveId(null);
+    }
+  }, [reachable, reachableActiveId]);
+  const reachableHighlightCells = useMemo(() => {
+    if (!reachableActiveId) return null;
+    const r = reachable.find((x) => x.id === reachableActiveId);
+    if (!r) return null;
+    const need = new Map<string, number>();
+    for (const ing of r.all) need.set(ing, (need.get(ing) ?? 0) + 1);
+    // Walk board cells in order, consuming the multiset need. Only board
+    // tiles are highlighted — tray/hold affordances already live elsewhere.
+    const cells = new Set<number>();
+    for (let i = 0; i < state.board.length; i++) {
+      const v = state.board[i];
+      if (!v) continue;
+      const n = need.get(v) ?? 0;
+      if (n > 0) {
+        cells.add(i);
+        need.set(v, n - 1);
+      }
+    }
+    return cells;
+  }, [reachable, reachableActiveId, state.board]);
+
   return (
     <div className="cbwrap">
       <div id="cb" className={state.over ? "cbdone" : undefined}>
@@ -2735,6 +2774,7 @@ export function CombineBoard({
         )}
         {loaded && !dailyStartPending && (
         <>
+        <div className="cbboardrow">
         <BoardErrorBoundary>
           <Board
             state={state}
@@ -2757,10 +2797,21 @@ export function CombineBoard({
             shoreMode={shoreMode}
             pluckMode={pluckMode}
             lastChance={lastChance}
+            highlightCells={reachableHighlightCells}
             onCellTap={onCellTap}
             onCellPointerDown={onCellPointerDown}
           />
         </BoardErrorBoundary>
+        <ReachableColumn
+          bundle={bundle}
+          recipes={reachable}
+          found={new Set(state.found)}
+          activeRecipeId={reachableActiveId}
+          onChipTap={(r) =>
+            setReachableActiveId((cur) => (cur === r.id ? null : r.id))
+          }
+        />
+        </div>
         {lastChance && !state.over && (
           <button
             type="button"

@@ -18,6 +18,7 @@ export function Board({
   shoreMode,
   pluckMode,
   lastChance,
+  highlightCells,
   onCellTap,
   onCellPointerDown,
 }: {
@@ -31,13 +32,22 @@ export function Board({
   shoreMode: boolean;
   pluckMode: boolean;
   lastChance: boolean;
+  /** Cells to highlight as the ingredients of a user-tapped reachable
+   *  recipe (right-side column). Non-highlighted cells get a dim class so
+   *  the eye snaps to the relevant tiles. Null = no highlight active. */
+  highlightCells: ReadonlySet<number> | null;
   onCellTap: (cell: number) => void;
   onCellPointerDown: (cell: number, e: React.PointerEvent<HTMLButtonElement>) => void;
 }) {
   const size = state.n;
+  const hasHighlight = highlightCells != null && highlightCells.size > 0;
   return (
     <div
-      className={"cbboard" + (lastChance ? " cbboard-lastchance" : "")}
+      className={
+        "cbboard" +
+        (lastChance ? " cbboard-lastchance" : "") +
+        (hasHighlight ? " cbboard-hl" : "")
+      }
       style={{ "--cbn": size } as React.CSSProperties}
       role="grid"
       aria-label="Board"
@@ -67,6 +77,7 @@ export function Board({
         // "clearable" affordance since both modes want "any full tile is
         // tappable". The onCellTap handler enforces capacity.
         const isPluckable = pluckMode && v != null;
+        const isHighlighted = hasHighlight && highlightCells!.has(i);
         return (
           <Cell
             key={i}
@@ -82,6 +93,7 @@ export function Board({
             moving={isMoving}
             shoreable={isShoreable}
             shored={isShored}
+            highlighted={isHighlighted}
             onTap={() => onCellTap(i)}
             onPointerDown={(e) => onCellPointerDown(i, e)}
           />
@@ -106,6 +118,7 @@ function Cell({
   moving,
   shoreable,
   shored,
+  highlighted,
   onTap,
   onPointerDown,
 }: {
@@ -121,6 +134,7 @@ function Cell({
   moving: boolean;
   shoreable: boolean;
   shored: boolean;
+  highlighted: boolean;
   onTap: () => void;
   onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => void;
 }) {
@@ -187,6 +201,7 @@ function Cell({
   if (moving) classes.push("moving");
   if (shoreable) classes.push("shoreable");
   if (shored) classes.push("shored");
+  if (highlighted) classes.push("hl");
 
   const words = displayId ? displayId.split("-") : [];
   const longest = Math.max(0, ...words.map((w) => w.length));
