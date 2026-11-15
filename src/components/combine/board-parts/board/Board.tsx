@@ -135,9 +135,13 @@ function Cell({
   const popGhostId = isPop ? fx.popGhost : undefined;
   const isShipped = fx.shipped?.at === cell;
   const shipGhostId = isShipped ? fx.shipped?.out : undefined;
-  const displayId = fuseGhostId || popGhostId || id || shipGhostId || null;
+  const rawDisplayId = fuseGhostId || popGhostId || id || shipGhostId || null;
+  // A stored id with no bundle match (stale save after content reseed —
+  // see T-0362) would otherwise render a .full cell with no pictogram or
+  // name. Treat as empty so the board doesn't lie about what's placed.
+  const item = rawDisplayId ? bundle.items.get(rawDisplayId) ?? null : null;
+  const displayId = item ? rawDisplayId : null;
   const empty = !displayId;
-  const item = displayId ? bundle.items.get(displayId) : null;
   const ghostItem = preview?.out ? bundle.items.get(preview.out) : null;
 
   const inFuse = fx.fuse?.has(cell) ?? false;
