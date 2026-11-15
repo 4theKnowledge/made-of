@@ -18,7 +18,14 @@ export default function NewItemPage() {
           ]}
         />
         <h2>Create item</h2>
-        <p>Lands as a draft. Add recipes/links from the item page or via import.</p>
+        <p>
+          Lands as a draft. Add recipes/links from the item page or via import.
+        </p>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
+          Items must be <strong>physical things</strong> — something you could
+          hold, grow, mine, build, or catch. Don&apos;t add abstract phenomena
+          like electricity, fire, sunlight, heat, or sound.
+        </p>
       </section>
       <section className="feat">
         <NewItemForm />

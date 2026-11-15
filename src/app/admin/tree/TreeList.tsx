@@ -2358,6 +2358,7 @@ function AddItemForm({
         required
         autoFocus
         style={formInput}
+        title="Physical things only — no abstract phenomena like electricity, fire, sunlight, heat, sound."
       />
       <select value={tier} onChange={(e) => setTier(e.target.value as Tier)} style={formInput}>
         {TIER_ORDER.map((t) => (
