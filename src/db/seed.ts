@@ -5,7 +5,7 @@
  * already contains edited content.
  */
 
-import { notInArray, sql } from "drizzle-orm";
+import { inArray, notInArray, sql } from "drizzle-orm";
 import { loadKnowledgeBase } from "../data/load";
 import { toRows } from "../data/rows";
 import { buildCanaryLinks } from "../data/canaries";
@@ -86,6 +86,29 @@ async function main() {
     // are legitimate removals — discoveries for them cascade too, which is
     // the right call (the item no longer exists).
     const keepIds = rows.items.map((it) => it.id!);
+    // Blast-radius guard: on 2026-11-14 this prune deleted every item in
+    // prod (because pre-UUIDv5 random ids didn't match the current
+    // keepIds) and cascaded combine_discoveries.itemId ON DELETE CASCADE
+    // → every user's lifetime collection wiped in one shot. Count what
+    // would die and refuse unless the caller opts in. See T-0365/367.
+    const toDelete = await tx
+      .select({ id: schema.items.id })
+      .from(schema.items)
+      .where(keepIds.length === 0 ? sql`true` : notInArray(schema.items.id, keepIds));
+    if (toDelete.length > 0 && !process.env.ALLOW_DISCOVERY_WIPE) {
+      const doomedIds = toDelete.map((r) => r.id);
+      const [{ n: cascadeCount }] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(schema.combineDiscoveries)
+        .where(inArray(schema.combineDiscoveries.itemId, doomedIds));
+      if (cascadeCount > 0) {
+        throw new Error(
+          `seed: pruning ${toDelete.length} items would cascade-delete ` +
+            `${cascadeCount} combine_discoveries rows. ` +
+            `Set ALLOW_DISCOVERY_WIPE=1 to proceed.`,
+        );
+      }
+    }
     const removed = await tx
       .delete(schema.items)
       .where(keepIds.length === 0 ? sql`true` : notInArray(schema.items.id, keepIds))
