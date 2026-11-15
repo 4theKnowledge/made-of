@@ -3110,7 +3110,10 @@ export function CombineBoard({
         )}
         {shoredSheetCell != null && (
           <ShoredTileSheet
-            tileName={state.board[shoredSheetCell] ?? null}
+            item={(() => {
+              const id = state.board[shoredSheetCell];
+              return id ? bundle.items.get(id) ?? null : null;
+            })()}
             onRelease={() => {
               const c = shoredSheetCell;
               setShoredSheetCell(null);

@@ -1,6 +1,9 @@
 import React from "react";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
+import { Pictogram } from "@/pictograms/Pictogram";
 import { cap } from "@/lib/taxonomy";
+import { fillVar } from "@/components/combine/board-parts/util";
+import type { CombineItem } from "@/combine/types";
 
 /**
  * Action sheet shown when the player long-presses a shored tile. Two
@@ -12,19 +15,33 @@ import { cap } from "@/lib/taxonomy";
  * expect a refund.
  */
 export function ShoredTileSheet({
-  tileName,
+  item,
   onRelease,
   onInfo,
   onDismiss,
 }: {
-  tileName: string | null;
+  item: CombineItem | null;
   onRelease: () => void;
   onInfo: () => void;
   onDismiss: () => void;
 }) {
-  const label = tileName ? cap(tileName) : "Steadied tile";
+  const label = item ? cap(item.name) : "Steadied tile";
   return (
     <ResponsiveSheet open onDismiss={onDismiss} ariaLabel={`Actions for ${label}`}>
+      {item && (
+        <span
+          className="cbopt-chip"
+          style={fillVar(item)}
+          aria-hidden="true"
+        >
+          <Pictogram
+            name={item.name}
+            tier={item.tier}
+            kind={item.kind}
+            symbol={item.symbol}
+          />
+        </span>
+      )}
       <span className="k">{label}</span>
       <p className="sub">
         This tile is steadied. Releasing it lets it start crumbling again.
