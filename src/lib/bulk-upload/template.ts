@@ -85,6 +85,7 @@ const COMMON_RULES: string[] = [
   "Item-level links use `linksN` (needs) and `linksS` (comes from). `s` is item-level only — NEVER put it in a recipe.",
   "Legal `tier` values: F, N, M, C, P, S. Legal `kind` values are listed under _readme.vocab.kinds (fetch /api/admin/kinds for live list).",
   "Set `isCombineExcluded: true` to keep an item out of every Combine theme. Omit for false.",
+  "Items must be PHYSICAL things — something that could in principle be held, grown, mined, built, or caught. Do NOT add abstract phenomena or energies: `sunlight`, `lightning`, `electricity`, `fire`, `internet`, heat, sound, and the like. Those are consequences of other things and are explicitly blocked by the parser; model them indirectly (e.g. 'the sun emits light so plants grow' is captured by sun → plant recipes, not by a 'sunlight' item).",
 ];
 
 const TEMPLATE_RULES: string[] = [
